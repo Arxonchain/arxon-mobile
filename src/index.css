@@ -1,0 +1,359 @@
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-LightItalic.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-BoldItalic.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-ExtraBold.otf') format('opentype');
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-ExtraBoldItalic.otf') format('opentype');
+  font-weight: 800;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-BlackItalic.otf') format('opentype');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-ThinItalic.otf') format('opentype');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-MediumItalic.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-RegularItalic.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creato Display';
+  src: url('/fonts/CreatoDisplay-Thin.otf') format('opentype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Arxon Brand: Pure black background with steel blue/silver metallic accent */
+    --background: 0 0% 0%;
+    --foreground: 220 20% 95%;
+
+    --card: 220 15% 6%;
+    --card-foreground: 220 20% 95%;
+
+    --popover: 220 15% 8%;
+    --popover-foreground: 220 20% 95%;
+
+    /* Primary: Steel blue from logo */
+    --primary: 220 40% 60%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 20% 12%;
+    --secondary-foreground: 220 20% 90%;
+
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 15% 55%;
+
+    /* Accent: Brighter steel blue for highlights */
+    --accent: 215 50% 70%;
+    --accent-foreground: 0 0% 0%;
+
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 18%;
+    --input: 220 15% 12%;
+    --ring: 215 50% 70%;
+
+    --radius: 0.75rem;
+
+    /* Custom Arxon brand palette */
+    --arxon-black: 0 0% 0%;
+    --arxon-steel: 220 40% 60%;
+    --arxon-steel-light: 215 50% 80%;
+    --arxon-silver: 220 20% 85%;
+    --arxon-card: 220 15% 6%;
+    --arxon-glow: 215 50% 70%;
+
+    --sidebar-background: 220 15% 4%;
+    --sidebar-foreground: 220 20% 95%;
+    --sidebar-primary: 220 40% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 20% 12%;
+    --sidebar-accent-foreground: 220 20% 95%;
+    --sidebar-border: 220 15% 18%;
+    --sidebar-ring: 215 50% 70%;
+  }
+
+  .dark {
+    --background: 0 0% 0%;
+    --foreground: 220 20% 95%;
+    --card: 220 15% 6%;
+    --card-foreground: 220 20% 95%;
+    --popover: 220 15% 8%;
+    --popover-foreground: 220 20% 95%;
+    --primary: 220 40% 60%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 20% 12%;
+    --secondary-foreground: 220 20% 90%;
+    --muted: 220 15% 15%;
+    --muted-foreground: 220 15% 55%;
+    --accent: 215 50% 70%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 15% 18%;
+    --input: 220 15% 12%;
+    --ring: 215 50% 70%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    font-family: 'Creato Display', system-ui, sans-serif;
+  }
+
+  html {
+    font-family: 'Creato Display', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Creato Display', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Creato Display', system-ui, sans-serif;
+    @apply font-bold;
+  }
+
+  button, input, textarea, select {
+    font-family: 'Creato Display', system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl;
+  }
+
+  .glass-card-light {
+    @apply bg-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl;
+  }
+
+  .glow-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    pointer-events: none;
+  }
+
+  .glow-orb-blue {
+    background: radial-gradient(circle, hsl(215 50% 70% / 0.4) 0%, transparent 70%);
+  }
+
+  .glow-orb-white {
+    background: radial-gradient(circle, hsl(220 20% 85% / 0.2) 0%, transparent 70%);
+  }
+
+  .glow-orb-steel {
+    background: radial-gradient(circle, hsl(220 40% 60% / 0.5) 0%, transparent 70%);
+  }
+
+  .mining-circle {
+    @apply relative rounded-full bg-card border border-border/50 flex flex-col items-center justify-center;
+    box-shadow: 0 0 60px hsl(215 50% 70% / 0.15);
+  }
+
+  .status-connected {
+    @apply bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2;
+  }
+
+  .status-not-active {
+    @apply bg-destructive/20 text-destructive px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors;
+  }
+
+  .nav-item-active {
+    @apply bg-accent/20 text-foreground border-l-4 border-accent;
+  }
+
+  .stat-card {
+    @apply glass-card p-6;
+  }
+
+  .btn-wallet {
+    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-2.5 rounded-none font-medium flex items-center gap-2 transition-all duration-200;
+  }
+
+  .btn-share {
+    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-2.5 rounded-full font-medium transition-all duration-200;
+  }
+
+  .btn-mining {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-all duration-200;
+  }
+
+  .btn-claim {
+    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-2 rounded-lg font-medium transition-all duration-200;
+  }
+
+  .btn-claimed {
+    @apply bg-muted text-muted-foreground px-6 py-2 rounded-lg font-medium cursor-default;
+  }
+
+  /* Button glow effect on click */
+  .btn-glow {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .btn-glow::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: radial-gradient(circle, hsl(var(--accent) / 0.6) 0%, transparent 70%);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .btn-glow:active::before {
+    width: 300%;
+    height: 300%;
+    opacity: 1;
+  }
+
+  .btn-glow:active {
+    transform: scale(0.97);
+    box-shadow: 0 0 20px hsl(var(--accent) / 0.5), 0 0 40px hsl(var(--accent) / 0.3);
+  }
+
+  .btn-mining.btn-glow:active {
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.5), 0 0 40px hsl(var(--primary) / 0.3);
+  }
+
+  .btn-mining.btn-glow::before {
+    background: radial-gradient(circle, hsl(var(--primary) / 0.6) 0%, transparent 70%);
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary;
+  }
+  
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 3s infinite;
+}
