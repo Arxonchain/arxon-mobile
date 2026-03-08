@@ -33,6 +33,23 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
+      - name: Install ImageMagick
+        run: sudo apt-get install -y imagemagick
+
+      - name: Set App Icon
+        run: |
+          cp android/app/src/main/res/icon.png /tmp/icon_source.png
+          convert /tmp/icon_source.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher.png
+          convert /tmp/icon_source.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher.png
+          convert /tmp/icon_source.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher.png
+          convert /tmp/icon_source.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png
+          convert /tmp/icon_source.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png
+          convert /tmp/icon_source.png -resize 48x48 android/app/src/main/res/mipmap-mdpi/ic_launcher_round.png
+          convert /tmp/icon_source.png -resize 72x72 android/app/src/main/res/mipmap-hdpi/ic_launcher_round.png
+          convert /tmp/icon_source.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
+          convert /tmp/icon_source.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
+          convert /tmp/icon_source.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+
       - name: Build APK
         run: |
           cd android
