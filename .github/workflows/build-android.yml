@@ -28,7 +28,7 @@ jobs:
         run: npm run build
 
       - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android
+        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/push-notifications
 
       - name: Sync Capacitor
         run: npx cap sync android
@@ -49,6 +49,9 @@ jobs:
           convert /tmp/icon_source.png -resize 96x96 android/app/src/main/res/mipmap-xhdpi/ic_launcher_round.png
           convert /tmp/icon_source.png -resize 144x144 android/app/src/main/res/mipmap-xxhdpi/ic_launcher_round.png
           convert /tmp/icon_source.png -resize 192x192 android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_round.png
+
+      - name: Add Firebase google-services.json
+        run: echo '${{ secrets.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
       - name: Build APK
         run: |

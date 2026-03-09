@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "164339669335",
+    "project_id": "arxon-d0efb",
+    "storage_bucket": "arxon-d0efb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:164339669335:android:b0484cad143ee357308612",
+        "android_client_info": {
+          "package_name": "xyz.arxonchain.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCy_rHfVYKMRNd11XNW52-OIs1WtcpMlSc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
