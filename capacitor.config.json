@@ -1,0 +1,13 @@
+{
+  "appId": "xyz.arxonchain.app",
+  "appName": "Arxon Mining",
+  "webDir": "dist",
+  "plugins": {
+    "PushNotifications": {
+      "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "CapacitorUpdater": {
+      "autoUpdate": true
+    }
+  }
+}
