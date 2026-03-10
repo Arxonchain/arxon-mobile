@@ -30,18 +30,40 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
+      - name: List ios directory
+        run: find ios -type f | head -40
+
+      - name: Generate Podfile if missing
+        run: |
+          if [ ! -f "ios/App/Podfile" ]; then
+            echo "Generating Podfile..."
+            cat > ios/App/Podfile << 'EOF'
+platform :ios, '13.0'
+use_frameworks!
+
+target 'App' do
+  capacitor_pods
+end
+EOF
+          fi
+
       - name: Install CocoaPods
         run: |
-          PODFILE=$(find . -name "Podfile" -not -path "*/node_modules/*" | head -1)
-          echo "Podfile found at: $PODFILE"
-          cd $(dirname $PODFILE)
+          cd ios/App
           pod install --repo-update
 
       - name: Build iOS unsigned
         run: |
-          WORKSPACE=$(find . -name "*.xcworkspace" -not -path "*/node_modules/*" | head -1)
-          echo "Workspace: $WORKSPACE"
-          xcodebuild -workspace "$WORKSPACE" -scheme App -configuration Release -sdk iphoneos -archivePath $RUNNER_TEMP/App.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO archive
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath $RUNNER_TEMP/App.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
 
       - name: Package IPA
         run: |
