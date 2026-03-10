@@ -30,19 +30,10 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: Show Podfile contents
-        run: cat ios/App/Podfile || echo "NO PODFILE EXISTS"
-
-      - name: Install CocoaPods
-        run: |
-          gem install cocoapods
-          cd ios/App
-          pod install --repo-update
-
       - name: Build iOS unsigned
         run: |
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -sdk iphoneos \
