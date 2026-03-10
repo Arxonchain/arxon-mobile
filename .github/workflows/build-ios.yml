@@ -36,7 +36,7 @@ jobs:
       - name: Generate Podfile if missing
         run: |
           if [ ! -f "ios/App/Podfile" ]; then
-            printf "platform :ios, '13.0'\nuse_frameworks!\n\ntarget 'App' do\n  capacitor_pods\nend\n" > ios/App/Podfile
+            printf "require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'\n\nplatform :ios, '13.0'\nuse_frameworks!\n\ntarget 'App' do\n  capacitor_pods\nend\n" > ios/App/Podfile
           fi
 
       - name: Install CocoaPods
