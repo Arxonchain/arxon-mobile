@@ -30,17 +30,12 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: List ios directory
-        run: find ios -type f | head -40
-
-      - name: Generate Podfile if missing
-        run: |
-          if [ ! -f "ios/App/Podfile" ]; then
-            printf "require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'\n\nplatform :ios, '13.0'\nuse_frameworks!\n\ntarget 'App' do\n  capacitor_pods\nend\n" > ios/App/Podfile
-          fi
+      - name: Show Podfile contents
+        run: cat ios/App/Podfile || echo "NO PODFILE EXISTS"
 
       - name: Install CocoaPods
         run: |
+          gem install cocoapods
           cd ios/App
           pod install --repo-update
 
