@@ -36,15 +36,7 @@ jobs:
       - name: Generate Podfile if missing
         run: |
           if [ ! -f "ios/App/Podfile" ]; then
-            echo "Generating Podfile..."
-            cat > ios/App/Podfile << 'EOF'
-platform :ios, '13.0'
-use_frameworks!
-
-target 'App' do
-  capacitor_pods
-end
-EOF
+            printf "platform :ios, '13.0'\nuse_frameworks!\n\ntarget 'App' do\n  capacitor_pods\nend\n" > ios/App/Podfile
           fi
 
       - name: Install CocoaPods
