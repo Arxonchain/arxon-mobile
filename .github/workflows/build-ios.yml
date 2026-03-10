@@ -24,33 +24,54 @@ jobs:
       - name: Install Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/ios @capacitor/push-notifications @capgo/capacitor-updater
 
-      - name: Add iOS platform
-        run: npx cap add ios
+      - name: Add iOS platform if not exists
+        run: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
 
       - name: Sync Capacitor
         run: npx cap sync ios
 
-      - name: Debug ios folder
-        run: find ios -name "Podfile" || echo "No Podfile found anywhere"
-
       - name: Install CocoaPods
         run: |
           cd ios/App
-          pod install --repo-update
+          pod install
 
-      - name: Build iOS unsigned
+      - name: Build iOS (unsigned)
         run: |
-          xcodebuild -workspace ios/App/App.xcworkspace -scheme App -configuration Release -sdk iphoneos -archivePath $RUNNER_TEMP/App.xcarchive CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO archive
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath ios/App/App.xcarchive \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            archive
 
-      - name: Package IPA
+      - name: Export IPA
         run: |
-          mkdir -p $RUNNER_TEMP/Payload
-          cp -r "$RUNNER_TEMP/App.xcarchive/Products/Applications/App.app" "$RUNNER_TEMP/Payload/"
-          cd $RUNNER_TEMP
+          mkdir -p ios/App/output
+          xcodebuild \
+            -exportArchive \
+            -archivePath ios/App/App.xcarchive \
+            -exportPath ios/App/output \
+            -exportOptionsPlist ios/App/ExportOptions.plist \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO || true
+          
+          # Fallback: manually package the app
+          cd ios/App/App.xcarchive/Products/Applications
+          mkdir -p Payload
+          cp -r App.app Payload/
           zip -r Arxon-Mining-App.ipa Payload
+          mv Arxon-Mining-App.ipa $GITHUB_WORKSPACE/
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: Arxon-iOS-App
-          path: ${{ runner.temp }}/Arxon-Mining-App.ipa
+          path: Arxon-Mining-App.ipa
