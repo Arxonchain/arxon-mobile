@@ -1,12 +1,11 @@
-import { useState, useCallback } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
-import SplashScreen from "@/components/SplashScreen";
-import BottomNav from "@/components/layout/BottomNav";
+import { Capacitor } from "@capacitor/core";
+import { useState, useCallback } from "react";
 
 // Pages
 import Landing from "@/pages/Landing";
@@ -23,7 +22,8 @@ import Referrals from "@/pages/Referrals";
 import Nexus from "@/pages/Nexus";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
-import Wallet from "@/pages/Wallet";
+import Notifications from "@/pages/Notifications";
+import Litepaper from "@/pages/Litepaper";
 
 // Admin pages
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -39,73 +39,48 @@ import AdminExportFilter from "@/pages/admin/AdminExportFilter";
 import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
-import Litepaper from "@/pages/Litepaper";
-import Notifications from "@/pages/Notifications";
+
+// Mobile UI components
+import MobileDashboard from "@/components/mobile/MobileDashboard";
+import MobileMining from "@/components/mobile/MobileMining";
+import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileSplash from "@/components/mobile/MobileSplash";
 
 const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      staleTime: 5000,
-      refetchOnWindowFocus: false,
-    },
-  },
+  defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
 });
+
+const isNative = Capacitor.isNativePlatform();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const location = useLocation();
+  
+  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
     <>
       <Routes>
-        <Route path="/" element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
-        <Route path="/mining" element={<Mining />} />
-        <Route path="/tasks" element={<Tasks />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/arena" element={<Arena />} />
-        <Route path="/referrals" element={<Referrals />} />
-        <Route path="/nexus" element={<Nexus />} />
-        <Route path="/wallet" element={<ProtectedRoute><Wallet /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
-        <Route path="/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
-        <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+        {/* Auth routes - same on web and mobile */}
         <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
         <Route path="/auth/confirm" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/litepaper" element={<Litepaper />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
@@ -120,29 +95,54 @@ function AppRoutes() {
           <Route path="global-map" element={<AdminGlobalMap />} />
           <Route path="pitch-deck" element={<AdminPitchDeck />} />
         </Route>
-        <Route path="/litepaper" element={<Litepaper />} />
+
+        {/* Native mobile routes */}
+        {isNative ? (
+          <>
+            <Route path="/" element={user ? <MobileDashboard /> : <Landing />} />
+            <Route path="/mining" element={<MobileMining />} />
+            <Route path="/leaderboard" element={<MobileLeaderboard />} />
+            <Route path="/arena" element={<Arena />} />
+            <Route path="/nexus" element={<Nexus />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/referrals" element={<Referrals />} />
+            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+          </>
+        ) : (
+          /* Web routes - unchanged */
+          <>
+            <Route path="/" element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
+            <Route path="/mining" element={<Mining />} />
+            <Route path="/tasks" element={<Tasks />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/arena" element={<Arena />} />
+            <Route path="/referrals" element={<Referrals />} />
+            <Route path="/nexus" element={<Nexus />} />
+            <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+          </>
+        )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* Floating pill bottom nav — shown on all app pages on mobile */}
-      <BottomNav />
+      {/* Mobile bottom nav only on native */}
+      {isNative && <MobileBottomNav />}
     </>
   );
 }
 
 function AppWithSplash() {
-  const [splashDone, setSplashDone] = useState(false);
   const { loading } = useAuth();
-
-  const handleFinish = useCallback(() => setSplashDone(true), []);
+  const [splashDone, setSplashDone] = useState(false);
+  const handleSplashFinish = useCallback(() => setSplashDone(true), []);
 
   return (
     <>
-      {!splashDone && (
-        <SplashScreen
-          onFinish={handleFinish}
-          isAppReady={!loading}
-        />
+      {isNative && !splashDone && (
+        <MobileSplash isAppReady={!loading} onFinish={handleSplashFinish} />
       )}
       <AppRoutes />
     </>
