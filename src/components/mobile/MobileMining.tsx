@@ -1,4 +1,3 @@
-// v2.0 - Mobile UI Redesign: periwinkle nav, immersive space cards, crystal gem
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useMining } from '@/hooks/useMining';
