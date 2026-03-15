@@ -1,4 +1,3 @@
-// v2.0 - Mobile UI Redesign: periwinkle nav, immersive space cards, crystal gem
 import { motion } from 'framer-motion';
 import { usePoints } from '@/hooks/usePoints';
 import { useState, useEffect } from 'react';

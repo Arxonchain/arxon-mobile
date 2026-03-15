@@ -1,26 +1,32 @@
 // v2.0 - Mobile UI Redesign: periwinkle nav, immersive space cards, crystal gem
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { LayoutDashboard, Trophy, Pickaxe, Swords, Send } from 'lucide-react';
 
 const navItems = [
-  { icon: LayoutDashboard, label: 'Home', path: '/', id: 'home' },
-  { icon: Trophy, label: 'Ranks', path: '/leaderboard', id: 'leaderboard' },
-  { icon: Pickaxe, label: 'Mine', path: '/mining', id: 'mining', center: true },
-  { icon: Swords, label: 'Arena', path: '/arena', id: 'arena' },
-  { icon: Send, label: 'Nexus', path: '/nexus', id: 'nexus' },
+  { icon: LayoutDashboard, label: 'Home',        path: '/',            id: 'home' },
+  { icon: Trophy,          label: 'Ranks',       path: '/leaderboard', id: 'leaderboard' },
+  { icon: Pickaxe,         label: 'Mine',        path: '/mining',      id: 'mining',  center: true },
+  { icon: Swords,          label: 'Arena',       path: '/arena',       id: 'arena' },
+  { icon: Send,            label: 'Nexus',       path: '/nexus',       id: 'nexus' },
 ];
 
-// Periwinkle brand color
 const PERIWINKLE = '#9EB3E0';
-const NAVY = '#1E3A5F';
+const NAVY       = '#1E3A5F';
+const NAVY_MID   = '#2A4A6C';
 
 export default function MobileBottomNav() {
-  const location = useLocation();
-  const navigate = useNavigate();
+  const location  = useLocation();
+  const navigate  = useNavigate();
+  const { user }  = useAuth();
 
-  const hiddenPaths = ['/auth', '/admin', '/landing', '/litepaper'];
-  if (hiddenPaths.some(p => location.pathname.startsWith(p))) return null;
+  // Only show when logged in
+  if (!user) return null;
+
+  // Hide on auth / admin / landing / litepaper
+  const hidden = ['/auth', '/admin', '/landing', '/litepaper'];
+  if (hidden.some(p => location.pathname.startsWith(p))) return null;
 
   return (
     <div style={{
@@ -30,13 +36,13 @@ export default function MobileBottomNav() {
     }}>
       <div style={{
         background: PERIWINKLE,
-        borderRadius: '32px',
+        borderRadius: 32,
         border: '1px solid rgba(255,255,255,0.25)',
         padding: '10px 8px',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
-        boxShadow: '0 4px 24px rgba(158,179,224,0.25)',
+        boxShadow: '0 4px 24px rgba(158,179,224,0.3)',
       }}>
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;

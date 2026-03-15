@@ -33,15 +33,15 @@ export default function MobileSplash({ isAppReady, onFinish }: MobileSplashProps
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}
         >
-          {/* Radial glow */}
+          {/* Subtle radial glow only */}
           <div style={{
             position: 'absolute',
-            width: 280, height: 280, borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(158,179,224,0.1) 0%, transparent 70%)',
+            width: 300, height: 300, borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(158,179,224,0.08) 0%, transparent 70%)',
             pointerEvents: 'none',
           }} />
 
-          {/* Logo */}
+          {/* Arxon logo — no text, no fallback shown */}
           <motion.div
             initial={{ scale: 0.75, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
@@ -50,8 +50,7 @@ export default function MobileSplash({ isAppReady, onFinish }: MobileSplashProps
             <img
               src="/arxon-logo.png"
               alt="Arxon"
-              style={{ width: 88, height: 88, objectFit: 'contain' }}
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              style={{ width: 100, height: 100, objectFit: 'contain' }}
             />
           </motion.div>
         </motion.div>
