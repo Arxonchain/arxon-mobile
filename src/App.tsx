@@ -40,12 +40,14 @@ import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 
-// Mobile UI
-import MobileDashboard from "@/components/mobile/MobileDashboard";
-import MobileMining from "@/components/mobile/MobileMining";
-import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import MobileSplash from "@/components/mobile/MobileSplash";
+// Mobile UI — fully redesigned
+import MobileDashboard    from "@/components/mobile/MobileDashboard";
+import MobileMining       from "@/components/mobile/MobileMining";
+import MobileLeaderboard  from "@/components/mobile/MobileLeaderboard";
+import MobileBottomNav    from "@/components/mobile/MobileBottomNav";
+import MobileSplash       from "@/components/mobile/MobileSplash";
+import MobileArena        from "@/components/mobile/MobileArena";
+import MobileNexus        from "@/components/mobile/MobileNexus";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -67,7 +69,6 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-// Mobile page wrapper — adds bottom padding so content doesn't hide behind nav
 function MobilePage({ children }: { children: React.ReactNode }) {
   return (
     <div style={{ minHeight: '100vh', background: '#000', paddingBottom: 90 }}>
@@ -78,55 +79,51 @@ function MobilePage({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-
   if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
 
   return (
     <>
       <Routes>
-        {/* Shared auth + admin routes */}
-        <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
-        <Route path="/auth/confirm" element={<AuthCallback />} />
+        {/* ── Shared routes (auth + admin) ── */}
+        <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
+        <Route path="/auth/confirm"   element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/litepaper" element={<Litepaper />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/litepaper"      element={<Litepaper />} />
+        <Route path="/admin/login"    element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="signups" element={<AdminSignups />} />
-          <Route path="controls" element={<AdminControls />} />
-          <Route path="arena" element={<AdminArena />} />
+          <Route index               element={<AdminDashboard />} />
+          <Route path="users"        element={<AdminUsers />} />
+          <Route path="signups"      element={<AdminSignups />} />
+          <Route path="controls"     element={<AdminControls />} />
+          <Route path="arena"        element={<AdminArena />} />
           <Route path="battle-history" element={<AdminBattleHistory />} />
           <Route path="reconciliation" element={<AdminReconciliation />} />
-          <Route path="export-filter" element={<AdminExportFilter />} />
-          <Route path="import-users" element={<AdminImportUsers />} />
-          <Route path="global-map" element={<AdminGlobalMap />} />
-          <Route path="pitch-deck" element={<AdminPitchDeck />} />
+          <Route path="export-filter"  element={<AdminExportFilter />} />
+          <Route path="import-users"   element={<AdminImportUsers />} />
+          <Route path="global-map"     element={<AdminGlobalMap />} />
+          <Route path="pitch-deck"     element={<AdminPitchDeck />} />
         </Route>
 
         {isNative ? (
-          /* ── NATIVE MOBILE ROUTES ── */
+          /* ── NATIVE MOBILE ROUTES — all using redesigned UI ── */
           <>
-            {/* Landing / Dashboard */}
-            <Route path="/" element={user ? <MobileDashboard /> : <Landing />} />
-
-            {/* Core redesigned screens */}
+            <Route path="/"            element={user ? <MobileDashboard /> : <Landing />} />
             <Route path="/mining"      element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/leaderboard" element={<MobileLeaderboard />} />
+            <Route path="/arena"       element={<MobileArena />} />
+            <Route path="/nexus"       element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
 
-            {/* These use existing pages but wrapped with mobile bottom padding */}
-            <Route path="/arena"       element={<MobilePage><Arena /></MobilePage>} />
-            <Route path="/nexus"       element={<ProtectedRoute><MobilePage><Nexus /></MobilePage></ProtectedRoute>} />
-            <Route path="/tasks"       element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
-            <Route path="/referrals"   element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
-            <Route path="/profile"     element={<ProtectedRoute><MobilePage><Profile /></MobilePage></ProtectedRoute>} />
-            <Route path="/settings"    element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
+            {/* Profile / Settings / Notifications — wrapped with mobile padding */}
+            <Route path="/tasks"         element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
+            <Route path="/referrals"     element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
+            <Route path="/profile"       element={<ProtectedRoute><MobilePage><Profile /></MobilePage></ProtectedRoute>} />
+            <Route path="/settings"      element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><MobilePage><Notifications /></MobilePage></ProtectedRoute>} />
           </>
         ) : (
           /* ── WEB ROUTES — completely unchanged ── */
           <>
-            <Route path="/" element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
+            <Route path="/"            element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
             <Route path="/mining"      element={<Mining />} />
             <Route path="/tasks"       element={<Tasks />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
@@ -142,7 +139,6 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {/* Nav: native only, hidden until user logs in (handled inside MobileBottomNav) */}
       {isNative && <MobileBottomNav />}
     </>
   );
@@ -152,7 +148,6 @@ function AppWithSplash() {
   const { loading } = useAuth();
   const [splashDone, setSplashDone] = useState(false);
   const handleSplashFinish = useCallback(() => setSplashDone(true), []);
-
   return (
     <>
       {isNative && !splashDone && (
