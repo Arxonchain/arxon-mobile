@@ -7,7 +7,7 @@ import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
 import { useState, useCallback } from "react";
 
-// Pages
+// Web pages
 import Landing from "@/pages/Landing";
 import AuthPage from "@/pages/AuthPage";
 import AuthCallback from "@/pages/AuthCallback";
@@ -40,7 +40,7 @@ import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 
-// Mobile — fully redesigned
+// Mobile — legendary redesign
 import MobileDashboard   from "@/components/mobile/MobileDashboard";
 import MobileMining      from "@/components/mobile/MobileMining";
 import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
@@ -59,41 +59,47 @@ const isNative = Capacitor.isNativePlatform();
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/><style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style></div>;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/><style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style></div>;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
+// Thin wrapper for web pages on mobile — adds padding so content doesn't hide behind nav
 function MobilePage({ children }: { children: React.ReactNode }) {
-  return <div style={{ minHeight:'100vh', background:'#000', paddingBottom:90 }}>{children}</div>;
+  return (
+    <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
+      fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
+      {children}
+    </div>
+  );
 }
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <div className="min-h-screen bg-background flex items-center justify-center"><div className="h-12 w-12 border-4 border-accent border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/><style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style></div>;
 
   return (
     <>
       <Routes>
-        {/* Shared */}
+        {/* Shared routes */}
         <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
         <Route path="/auth/confirm"   element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/litepaper"      element={<Litepaper />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index               element={<AdminDashboard />} />
-          <Route path="users"        element={<AdminUsers />} />
-          <Route path="signups"      element={<AdminSignups />} />
-          <Route path="controls"     element={<AdminControls />} />
-          <Route path="arena"        element={<AdminArena />} />
+          <Route index                 element={<AdminDashboard />} />
+          <Route path="users"          element={<AdminUsers />} />
+          <Route path="signups"        element={<AdminSignups />} />
+          <Route path="controls"       element={<AdminControls />} />
+          <Route path="arena"          element={<AdminArena />} />
           <Route path="battle-history" element={<AdminBattleHistory />} />
           <Route path="reconciliation" element={<AdminReconciliation />} />
           <Route path="export-filter"  element={<AdminExportFilter />} />
@@ -104,18 +110,18 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            {/* Dashboard */}
+            {/* Home */}
             <Route path="/" element={user ? <MobileDashboard /> : <Landing />} />
 
-            {/* Core mobile screens */}
+            {/* Core mobile screens — fully redesigned */}
             <Route path="/mining"      element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
-            <Route path="/leaderboard" element={<MobileLeaderboard />} />
             <Route path="/arena"       element={<MobileArena />} />
+            <Route path="/leaderboard" element={<MobileLeaderboard />} />
             <Route path="/nexus"       element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
             <Route path="/profile"     element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
             <Route path="/wallet"      element={<MobileWallet />} />
 
-            {/* Web pages wrapped for mobile */}
+            {/* Web pages wrapped with mobile styling */}
             <Route path="/tasks"         element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
             <Route path="/referrals"     element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
             <Route path="/settings"      element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
@@ -150,9 +156,7 @@ function AppWithSplash() {
   const handleFinish = useCallback(() => setSplashDone(true), []);
   return (
     <>
-      {isNative && !splashDone && (
-        <MobileSplash isAppReady={!loading} onFinish={handleFinish} />
-      )}
+      {isNative && !splashDone && <MobileSplash isAppReady={!loading} onFinish={handleFinish} />}
       <AppRoutes />
     </>
   );
