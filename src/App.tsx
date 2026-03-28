@@ -50,6 +50,7 @@ import MobileArena       from "@/components/mobile/MobileArena";
 import MobileNexus       from "@/components/mobile/MobileNexus";
 import MobileProfile     from "@/components/mobile/MobileProfile";
 import MobileWallet      from "@/components/mobile/MobileWallet";
+import MobileChat        from "@/components/mobile/MobileChat";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -57,21 +58,27 @@ const queryClient = new QueryClient({
 
 const isNative = Capacitor.isNativePlatform();
 
+const Spinner = () => (
+  <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+    <div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/>
+    <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+  </div>
+);
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/><style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style></div>;
+  if (loading) return <Spinner/>;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/><style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style></div>;
+  if (loading) return <Spinner/>;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
 
-// Thin wrapper for web pages on mobile — adds padding so content doesn't hide behind nav
 function MobilePage({ children }: { children: React.ReactNode }) {
   return (
     <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
@@ -83,12 +90,12 @@ function MobilePage({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}><div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/><style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style></div>;
+  if (loading) return <Spinner/>;
 
   return (
     <>
       <Routes>
-        {/* Shared routes */}
+        {/* Shared */}
         <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
         <Route path="/auth/confirm"   element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -110,18 +117,19 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            {/* Home */}
+            {/* Home / Dashboard */}
             <Route path="/" element={user ? <MobileDashboard /> : <Landing />} />
 
-            {/* Core mobile screens — fully redesigned */}
+            {/* Core mobile screens */}
             <Route path="/mining"      element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena"       element={<MobileArena />} />
             <Route path="/leaderboard" element={<MobileLeaderboard />} />
             <Route path="/nexus"       element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
             <Route path="/profile"     element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
             <Route path="/wallet"      element={<MobileWallet />} />
+            <Route path="/chat"        element={<MobileChat />} />
 
-            {/* Web pages wrapped with mobile styling */}
+            {/* Web pages with mobile wrapper */}
             <Route path="/tasks"         element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
             <Route path="/referrals"     element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
             <Route path="/settings"      element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
@@ -156,7 +164,7 @@ function AppWithSplash() {
   const handleFinish = useCallback(() => setSplashDone(true), []);
   return (
     <>
-      {isNative && !splashDone && <MobileSplash isAppReady={!loading} onFinish={handleFinish} />}
+      {isNative && !splashDone && <MobileSplash isAppReady={!loading} onFinish={handleFinish}/>}
       <AppRoutes />
     </>
   );

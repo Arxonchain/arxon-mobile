@@ -10,12 +10,6 @@ const HomeIcon = (a: boolean) => (
     <rect x="14" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.35)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
   </svg>
 );
-const MineIcon = (a: boolean) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.8" strokeLinecap="round">
-    <path d="M15 5l4 4-8 8-5 1 1-5 8-8z" fill={a?'hsl(215 35% 62%/0.2)':'none'}/>
-    <path d="M12 8l4 4"/>
-  </svg>
-);
 const ArenaIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.8">
     <path d="M14.5 17.5L3 6V3h3l11.5 11.5" fill={a?'hsl(255 50% 60%/0.15)':'none'}/>
@@ -23,7 +17,15 @@ const ArenaIcon = (a: boolean) => (
     <circle cx="5" cy="5" r="2" fill={a?'hsl(255 50% 65%)':'none'}/>
   </svg>
 );
-const RanksIcon = (a: boolean) => (
+const ChatIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
+      fill={a?'hsl(155 45% 43%/0.2)':'none'} stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
+    <line x1="8" y1="10" x2="16" y2="10" stroke={a?'hsl(155 45% 55%)':'hsl(215 14% 30%)'} strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="8" y1="14" x2="13" y2="14" stroke={a?'hsl(155 45% 55%)':'hsl(215 14% 30%)'} strokeWidth="1.4" strokeLinecap="round"/>
+  </svg>
+);
+const LeaderboardIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"
       fill={a?'hsl(38 55% 52%/0.22)':'none'} stroke={a?'hsl(38 55% 52%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
@@ -38,9 +40,9 @@ const ProfileIcon = (a: boolean) => (
 
 const TABS = [
   { to:'/',to2:null,id:'home',label:'Home',icon:HomeIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
-  { to:'/mining',to2:null,id:'mining',label:'Mine',icon:MineIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
   { to:'/arena',to2:null,id:'arena',label:'Arena',icon:ArenaIcon,col:'hsl(255 50% 65%)',dot:'hsl(255 55% 70%)' },
-  { to:'/leaderboard',to2:null,id:'ranks',label:'Ranks',icon:RanksIcon,col:'hsl(38 55% 52%)',dot:'hsl(38 60% 58%)' },
+  { to:'/chat',to2:null,id:'chat',label:'Chat',icon:ChatIcon,col:'hsl(155 45% 50%)',dot:'hsl(155 50% 55%)' },
+  { to:'/leaderboard',to2:null,id:'leaderboard',label:'Leaderboard',icon:LeaderboardIcon,col:'hsl(38 55% 52%)',dot:'hsl(38 60% 58%)' },
   { to:'/profile',to2:null,id:'profile',label:'Profile',icon:ProfileIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
 ];
 
@@ -86,7 +88,7 @@ export default function MobileBottomNav() {
               <div style={{position:'relative',zIndex:1,filter:isActive?`drop-shadow(0 0 6px ${dot}88)`:'none',transition:'filter 0.25s'}}>
                 {icon(isActive)}
               </div>
-              <span style={{fontSize:9,fontWeight:isActive?700:500,letterSpacing:'0.06em',
+              <span style={{fontSize:9,fontWeight:isActive?700:500,letterSpacing:'0.04em',
                 textTransform:'uppercase',position:'relative',zIndex:1,
                 color:isActive?col:'hsl(215 14% 38%)',transition:'color 0.2s',
                 fontFamily:"'Creato Display',-apple-system,sans-serif"}}>
