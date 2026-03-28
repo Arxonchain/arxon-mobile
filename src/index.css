@@ -1,114 +1,9 @@
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-Light.otf') format('opentype');
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-LightItalic.otf') format('opentype');
-  font-weight: 300;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-Bold.otf') format('opentype');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-BoldItalic.otf') format('opentype');
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-ExtraBold.otf') format('opentype');
-  font-weight: 800;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-ExtraBoldItalic.otf') format('opentype');
-  font-weight: 800;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-BlackItalic.otf') format('opentype');
-  font-weight: 900;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-ThinItalic.otf') format('opentype');
-  font-weight: 100;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-MediumItalic.otf') format('opentype');
-  font-weight: 500;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-RegularItalic.otf') format('opentype');
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-Regular.otf') format('opentype');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-Medium.otf') format('opentype');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-Black.otf') format('opentype');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Creato Display';
-  src: url('/fonts/CreatoDisplay-Thin.otf') format('opentype');
-  font-weight: 100;
-  font-style: normal;
-  font-display: swap;
-}
+/* ── Creato Display (local, already in /public/fonts) ── */
+@font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Light.otf') format('opentype'); font-weight:300; font-display:swap; }
+@font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Regular.otf') format('opentype'); font-weight:400; font-display:swap; }
+@font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Medium.otf') format('opentype'); font-weight:500; font-display:swap; }
+@font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Bold.otf') format('opentype'); font-weight:700; font-display:swap; }
+@font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-ExtraBold.otf') format('opentype'); font-weight:800; font-display:swap; }
 
 @tailwind base;
 @tailwind components;
@@ -116,244 +11,125 @@
 
 @layer base {
   :root {
-    /* Arxon Brand: Pure black background with steel blue/silver metallic accent */
-    --background: 0 0% 0%;
-    --foreground: 220 20% 95%;
-
-    --card: 220 15% 6%;
-    --card-foreground: 220 20% 95%;
-
-    --popover: 220 15% 8%;
-    --popover-foreground: 220 20% 95%;
-
-    /* Primary: Steel blue from logo */
-    --primary: 220 40% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 220 20% 12%;
-    --secondary-foreground: 220 20% 90%;
-
-    --muted: 220 15% 15%;
-    --muted-foreground: 220 15% 55%;
-
-    /* Accent: Brighter steel blue for highlights */
-    --accent: 215 50% 70%;
-    --accent-foreground: 0 0% 0%;
-
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 220 15% 18%;
-    --input: 220 15% 12%;
-    --ring: 215 50% 70%;
-
-    --radius: 0.75rem;
-
-    /* Custom Arxon brand palette */
-    --arxon-black: 0 0% 0%;
-    --arxon-steel: 220 40% 60%;
-    --arxon-steel-light: 215 50% 80%;
-    --arxon-silver: 220 20% 85%;
-    --arxon-card: 220 15% 6%;
-    --arxon-glow: 215 50% 70%;
-
-    --sidebar-background: 220 15% 4%;
-    --sidebar-foreground: 220 20% 95%;
-    --sidebar-primary: 220 40% 60%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 12%;
-    --sidebar-accent-foreground: 220 20% 95%;
-    --sidebar-border: 220 15% 18%;
-    --sidebar-ring: 215 50% 70%;
-  }
-
-  .dark {
-    --background: 0 0% 0%;
-    --foreground: 220 20% 95%;
-    --card: 220 15% 6%;
-    --card-foreground: 220 20% 95%;
-    --popover: 220 15% 8%;
-    --popover-foreground: 220 20% 95%;
-    --primary: 220 40% 60%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 12%;
-    --secondary-foreground: 220 20% 90%;
-    --muted: 220 15% 15%;
-    --muted-foreground: 220 15% 55%;
-    --accent: 215 50% 70%;
-    --accent-foreground: 0 0% 0%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 220 15% 18%;
-    --input: 220 15% 12%;
-    --ring: 215 50% 70%;
+    /* Shadcn tokens */
+    --background:225 30% 3%;
+    --foreground:215 20% 93%;
+    --card:225 25% 7%;
+    --card-foreground:215 20% 93%;
+    --popover:225 25% 7%;
+    --popover-foreground:215 20% 93%;
+    --primary:215 35% 62%;
+    --primary-foreground:225 30% 3%;
+    --secondary:225 22% 11%;
+    --secondary-foreground:215 18% 58%;
+    --muted:225 20% 9%;
+    --muted-foreground:215 14% 38%;
+    --accent:215 40% 68%;
+    --accent-foreground:225 30% 3%;
+    --destructive:0 60% 56%;
+    --destructive-foreground:0 0% 100%;
+    --border:225 20% 13%;
+    --input:225 20% 13%;
+    --ring:215 35% 62%;
+    --radius:1rem;
+    /* Arxon brand */
+    --steel:215 25% 62%;
+    --steel2:215 32% 72%;
+    --steel3:215 38% 85%;
+    --glow:215 55% 62%;
+    --deep:225 35% 3%;
+    --surface:225 28% 7%;
+    --raised:225 24% 11%;
+    --success:155 45% 43%;
+    --gold:38 55% 52%;
+    --danger:0 60% 56%;
+    --purple:255 50% 60%;
   }
 }
 
 @layer base {
-  * {
-    @apply border-border;
-    font-family: 'Creato Display', system-ui, sans-serif;
-  }
-
-  html {
-    font-family: 'Creato Display', system-ui, sans-serif;
-  }
-
+  * { @apply border-border; box-sizing:border-box; }
   body {
-    @apply bg-background text-foreground;
-    font-family: 'Creato Display', system-ui, sans-serif;
+    @apply bg-background text-foreground antialiased;
+    font-family:'Creato Display',-apple-system,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
   }
-
-  h1, h2, h3, h4, h5, h6 {
-    font-family: 'Creato Display', system-ui, sans-serif;
-    @apply font-bold;
-  }
-
-  button, input, textarea, select {
-    font-family: 'Creato Display', system-ui, sans-serif;
-  }
-}
-
-@layer components {
-  .glass-card {
-    @apply bg-card/80 backdrop-blur-xl border border-border/50 rounded-xl;
-  }
-
-  .glass-card-light {
-    @apply bg-secondary/90 backdrop-blur-xl border border-border/50 rounded-xl;
-  }
-
-  .glow-orb {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(80px);
-    pointer-events: none;
-  }
-
-  .glow-orb-blue {
-    background: radial-gradient(circle, hsl(215 50% 70% / 0.4) 0%, transparent 70%);
-  }
-
-  .glow-orb-white {
-    background: radial-gradient(circle, hsl(220 20% 85% / 0.2) 0%, transparent 70%);
-  }
-
-  .glow-orb-steel {
-    background: radial-gradient(circle, hsl(220 40% 60% / 0.5) 0%, transparent 70%);
-  }
-
-  .mining-circle {
-    @apply relative rounded-full bg-card border border-border/50 flex flex-col items-center justify-center;
-    box-shadow: 0 0 60px hsl(215 50% 70% / 0.15);
-  }
-
-  .status-connected {
-    @apply bg-primary text-primary-foreground px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2;
-  }
-
-  .status-not-active {
-    @apply bg-destructive/20 text-destructive px-4 py-1.5 rounded-full text-sm font-medium flex items-center gap-2;
-  }
-
-  .nav-item {
-    @apply flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors;
-  }
-
-  .nav-item-active {
-    @apply bg-accent/20 text-foreground border-l-4 border-accent;
-  }
-
-  .stat-card {
-    @apply glass-card p-6;
-  }
-
-  .btn-wallet {
-    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-2.5 rounded-none font-medium flex items-center gap-2 transition-all duration-200;
-  }
-
-  .btn-share {
-    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-2.5 rounded-full font-medium transition-all duration-200;
-  }
-
-  .btn-mining {
-    @apply bg-primary hover:bg-primary/90 text-primary-foreground px-6 py-2.5 rounded-lg font-medium flex items-center gap-2 transition-all duration-200;
-  }
-
-  .btn-claim {
-    @apply bg-accent hover:bg-accent/90 text-accent-foreground px-6 py-2 rounded-lg font-medium transition-all duration-200;
-  }
-
-  .btn-claimed {
-    @apply bg-muted text-muted-foreground px-6 py-2 rounded-lg font-medium cursor-default;
-  }
-
-  /* Button glow effect on click */
-  .btn-glow {
-    position: relative;
-    overflow: hidden;
-    transition: all 0.3s ease;
-  }
-
-  .btn-glow::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    background: radial-gradient(circle, hsl(var(--accent) / 0.6) 0%, transparent 70%);
-    border-radius: 50%;
-    transform: translate(-50%, -50%);
-    transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .btn-glow:active::before {
-    width: 300%;
-    height: 300%;
-    opacity: 1;
-  }
-
-  .btn-glow:active {
-    transform: scale(0.97);
-    box-shadow: 0 0 20px hsl(var(--accent) / 0.5), 0 0 40px hsl(var(--accent) / 0.3);
-  }
-
-  .btn-mining.btn-glow:active {
-    box-shadow: 0 0 20px hsl(var(--primary) / 0.5), 0 0 40px hsl(var(--primary) / 0.3);
-  }
-
-  .btn-mining.btn-glow::before {
-    background: radial-gradient(circle, hsl(var(--primary) / 0.6) 0%, transparent 70%);
-  }
+  ::-webkit-scrollbar { display:none; width:0; }
+  .scrollbar-none { scrollbar-width:none; -ms-overflow-style:none; }
+  .scrollbar-none::-webkit-scrollbar { display:none; }
 }
 
 @layer utilities {
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-accent to-primary;
+  /* Glass system */
+  .glass {
+    background:linear-gradient(135deg,hsl(225 25% 8%/0.6),hsl(225 28% 5%/0.4));
+    backdrop-filter:blur(20px) saturate(1.3);
+    -webkit-backdrop-filter:blur(20px) saturate(1.3);
+    border:1px solid hsl(225 20% 18%/0.35);
   }
-  
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+  .glass-card {
+    background:linear-gradient(160deg,hsl(225 25% 10%/0.78),hsl(225 30% 6%/0.56));
+    backdrop-filter:blur(24px);
+    -webkit-backdrop-filter:blur(24px);
+    border:1px solid hsl(225 20% 16%/0.28);
+    box-shadow:0 4px 20px -4px hsl(225 35% 3%/0.55),inset 0 1px 0 hsl(215 35% 62%/0.04);
   }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
+  .glass-elevated {
+    background:linear-gradient(160deg,hsl(225 24% 13%/0.88),hsl(225 28% 8%/0.68));
+    backdrop-filter:blur(28px);
+    -webkit-backdrop-filter:blur(28px);
+    border:1px solid hsl(215 30% 22%/0.28);
+    box-shadow:0 8px 32px -8px hsl(225 35% 3%/0.65),inset 0 1px 0 hsl(215 40% 80%/0.04);
   }
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%);
+  .glass-premium {
+    background:linear-gradient(165deg,hsl(225 24% 14%/0.94),hsl(215 28% 9%/0.74),hsl(225 32% 6%/0.88));
+    backdrop-filter:blur(36px) saturate(1.5);
+    -webkit-backdrop-filter:blur(36px) saturate(1.5);
+    border:1px solid hsl(215 38% 26%/0.24);
+    box-shadow:0 16px 48px -16px hsl(215 55% 62%/0.09),0 4px 16px -4px hsl(225 35% 3%/0.55),inset 0 1px 0 hsl(215 40% 82%/0.05);
   }
-  100% {
-    transform: translateX(100%);
+  .glass-hero {
+    background:linear-gradient(150deg,hsl(225 26% 14%/0.92),hsl(215 30% 9%/0.82));
+    backdrop-filter:blur(44px) saturate(1.6);
+    -webkit-backdrop-filter:blur(44px) saturate(1.6);
+    border:1px solid hsl(215 42% 30%/0.2);
+    box-shadow:0 24px 64px -24px hsl(215 55% 62%/0.11),0 8px 24px -8px hsl(225 35% 3%/0.45),inset 0 1px 0 hsl(215 40% 82%/0.07);
   }
-}
-
-.animate-shimmer {
-  animation: shimmer 3s infinite;
+  /* Gradients */
+  .gradient-steel { background:linear-gradient(135deg,hsl(var(--steel)),hsl(var(--steel2))); }
+  .gradient-success { background:linear-gradient(135deg,hsl(var(--success)),hsl(155 50% 52%)); }
+  .gradient-gold { background:linear-gradient(135deg,hsl(var(--gold)),hsl(38 65% 62%)); }
+  .text-gradient { background:linear-gradient(135deg,hsl(var(--steel2)),hsl(var(--glow)));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+  .text-gradient-hero { background:linear-gradient(135deg,hsl(215 20% 94%),hsl(var(--steel2)));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text; }
+  /* Glows */
+  .glow-steel { box-shadow:0 0 22px hsl(var(--glow)/0.22),0 0 60px hsl(var(--glow)/0.07); }
+  .glow-success { box-shadow:0 0 18px hsl(var(--success)/0.2),0 0 50px hsl(var(--success)/0.06); }
+  /* Shine */
+  .shine { position:relative; overflow:hidden; }
+  .shine::after { content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%; background:linear-gradient(45deg,transparent 42%,hsl(var(--glow)/0.04) 46%,hsl(var(--glow)/0.07) 50%,hsl(var(--glow)/0.04) 54%,transparent 58%); animation:shineSwipe 7s ease-in-out infinite; pointer-events:none; }
+  @keyframes shineSwipe { 0%,100%{transform:translateX(-100%)} 50%{transform:translateX(100%)} }
+  /* Animations */
+  .pulse-glow { animation:pulseGlow 4s ease-in-out infinite; }
+  @keyframes pulseGlow { 0%,100%{box-shadow:0 0 12px hsl(var(--glow)/0.12)} 50%{box-shadow:0 0 28px hsl(var(--glow)/0.28),0 0 55px hsl(var(--glow)/0.09)} }
+  .mining-pulse { animation:miningPulse 2.5s ease-in-out infinite; }
+  @keyframes miningPulse { 0%,100%{transform:scale(1);opacity:1} 50%{transform:scale(1.05);opacity:0.82} }
+  .float { animation:floatY 7s ease-in-out infinite; }
+  @keyframes floatY { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-7px)} }
+  .orbit { animation:orbitA 10s linear infinite; }
+  .orbit-b { animation:orbitB 14s linear infinite; }
+  .orbit-c { animation:orbitC 20s linear infinite; }
+  @keyframes orbitA { 0%{transform:rotate(0deg) translateX(52px) rotate(0deg)} 100%{transform:rotate(360deg) translateX(52px) rotate(-360deg)} }
+  @keyframes orbitB { 0%{transform:rotate(0deg) translateX(72px) rotate(0deg)} 100%{transform:rotate(-360deg) translateX(72px) rotate(360deg)} }
+  @keyframes orbitC { 0%{transform:rotate(0deg) translateX(94px) rotate(0deg)} 100%{transform:rotate(360deg) translateX(94px) rotate(-360deg)} }
+  .ripple-ring { animation:rippleRing 2.8s ease-out infinite; }
+  @keyframes rippleRing { 0%{transform:scale(1);opacity:0.18} 100%{transform:scale(2.6);opacity:0} }
+  .spin-slow { animation:spinSlow 14s linear infinite; }
+  @keyframes spinSlow { to{transform:rotate(360deg)} }
+  /* Interactive */
+  .safe-bottom { padding-bottom:env(safe-area-inset-bottom,0px); }
+  .press { transition:transform 0.12s ease,box-shadow 0.12s ease; }
+  .press:active { transform:scale(0.96); }
+  .card-lift { transition:transform 0.28s cubic-bezier(0.25,0.46,0.45,0.94),box-shadow 0.28s ease; }
+  .card-lift:hover { transform:translateY(-2px); }
 }

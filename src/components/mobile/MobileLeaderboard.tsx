@@ -1,253 +1,230 @@
 import { motion } from 'framer-motion';
 import { usePoints } from '@/hooks/usePoints';
+import { useAuth } from '@/contexts/AuthContext';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { Crown, Medal, ChevronUp } from 'lucide-react';
 
-interface LeaderEntry { user_id: string; username: string | null; total_points: number; }
+const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.05,delayChildren:0.1}} };
+const fadeUp  = { hidden:{opacity:0,y:20}, show:{opacity:1,y:0,transition:{duration:0.45,ease:[0.25,0.46,0.45,0.94]}} };
+const scaleIn = { hidden:{opacity:0,scale:0.92}, show:{opacity:1,scale:1,transition:{duration:0.45,ease:[0.25,0.46,0.45,0.94]}} };
 
-const CSS = `
-@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@keyframes shimmer{0%{left:-100%}100%{left:200%}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-@keyframes spin{to{transform:rotate(360deg)}}
-`;
+interface Entry { user_id:string; username:string|null; total_points:number; }
 
-const TIER = [
-  { col:'#FFD700', bg:'rgba(255,215,0,.12)', bd:'rgba(255,215,0,.28)', glow:'rgba(255,215,0,.3)', label:'Gold' },
-  { col:'#C0C0C0', bg:'rgba(192,192,192,.1)',  bd:'rgba(192,192,192,.22)', glow:'rgba(192,192,192,.2)', label:'Silver' },
-  { col:'#CD7F32', bg:'rgba(205,127,50,.1)',   bd:'rgba(205,127,50,.22)', glow:'rgba(205,127,50,.2)', label:'Bronze' },
+const TIERS = [
+  {col:'hsl(38 55% 52%)', bg:'hsl(38 55% 52% / 0.14)', bd:'hsl(38 55% 52% / 0.32)', glow:'hsl(38 55% 52% / 0.35)', label:'Gold'},
+  {col:'hsl(215 18% 68%)',bg:'hsl(215 18% 68% / 0.12)',bd:'hsl(215 18% 68% / 0.26)',glow:'hsl(215 18% 68% / 0.22)',label:'Silver'},
+  {col:'hsl(22 50% 48%)', bg:'hsl(22 50% 48% / 0.12)', bd:'hsl(22 50% 48% / 0.26)', glow:'hsl(22 50% 48% / 0.22)', label:'Bronze'},
 ];
+const FILTERS = ['Global','Weekly','Friends'] as const;
 
 export default function MobileLeaderboard() {
   const { user }         = useAuth();
   const { points, rank } = usePoints();
-  const [leaders,  setLeaders]  = useState<LeaderEntry[]>([]);
+  const [leaders,  setLeaders]  = useState<Entry[]>([]);
   const [loading,  setLoading]  = useState(true);
-  const [filter,   setFilter]   = useState<'global'|'weekly'|'friends'>('global');
+  const [filter,   setFilter]   = useState<typeof FILTERS[number]>('Global');
 
   useEffect(() => {
-    // Query user_points joined with profiles — this is the correct table for points data
-    supabase
-      .from('user_points')
-      .select('user_id, total_points')
-      .order('total_points', { ascending: false })
-      .limit(100)
-      .then(async ({ data: pts, error }) => {
-        if (error) { console.error('leaderboard error:', error); setLoading(false); return; }
-        if (!pts?.length) { setLoading(false); return; }
-
-        // Fetch usernames for all user_ids
-        const ids = pts.map(p => p.user_id);
-        const { data: profiles } = await supabase
-          .from('profiles')
-          .select('user_id, username')
-          .in('user_id', ids);
-
-        const nameMap = new Map((profiles || []).map(p => [p.user_id, p.username]));
-        const merged: LeaderEntry[] = pts.map(p => ({
-          user_id: p.user_id,
-          username: nameMap.get(p.user_id) || null,
-          total_points: Math.round(Number(p.total_points) || 0),
-        }));
-        setLeaders(merged);
+    setLoading(true);
+    supabase.from('user_points').select('user_id,total_points').order('total_points',{ascending:false}).limit(100)
+      .then(async ({data:pts})=>{
+        if (!pts?.length){ setLoading(false); return; }
+        const {data:profiles} = await supabase.from('profiles').select('user_id,username').in('user_id',pts.map(p=>p.user_id));
+        const nameMap = new Map((profiles||[]).map(p=>[p.user_id,p.username]));
+        setLeaders(pts.map(p=>({user_id:p.user_id,username:nameMap.get(p.user_id)||null,total_points:Math.round(Number(p.total_points)||0)})));
         setLoading(false);
       });
-  }, [filter]);
+  },[filter]);
 
-  const totalPoints = Math.round(points?.total_points ?? 0);
-  const userRank    = rank ?? null;
-  const topPct      = leaders.length > 0 && userRank
-    ? ((userRank / leaders.length) * 100).toFixed(1) : null;
-  const top3 = leaders.slice(0, 3);
+  const totalPts = Math.round(points?.total_points??0);
+  const userRank = rank??null;
+  const topPct   = leaders.length>0&&userRank ? ((userRank/leaders.length)*100).toFixed(1) : null;
+  const top3     = leaders.slice(0,3);
+  const rest     = leaders.slice(3);
 
   return (
-    <div style={{ minHeight:'100vh', background:'#000', fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif", paddingBottom:100 }}>
-      <style>{CSS}</style>
+    <motion.div variants={stagger} initial="hidden" animate="show"
+      style={{fontFamily:"'Space Grotesk','Inter',system-ui,sans-serif",paddingBottom:100,minHeight:'100vh',background:'hsl(225 30% 3%)'}}>
 
       {/* Header */}
-      <div style={{ padding:'52px 24px 0' }}>
-        <motion.div initial={{ opacity:0, y:12 }} animate={{ opacity:1, y:0 }}>
-          <div style={{ fontSize:28, fontWeight:900, color:'#EEF2F7', letterSpacing:'-.6px' }}>Leaderboard</div>
-          <div style={{ fontSize:13, color:'rgba(139,174,214,.4)', marginTop:4, fontWeight:500 }}>Top ARX-P miners globally</div>
-        </motion.div>
-      </div>
+      <motion.div variants={fadeUp} style={{padding:'52px 20px 0'}}>
+        <h1 style={{fontSize:26,fontWeight:700,color:'hsl(215 20% 93%)',letterSpacing:'-0.5px'}}>Leaderboard</h1>
+        <p style={{fontSize:12,color:'hsl(215 14% 38%)',marginTop:4,fontWeight:400}}>Top ARX-P miners globally</p>
+      </motion.div>
 
       {/* Filter pills */}
-      <div style={{ display:'flex', gap:8, padding:'20px 24px 0' }}>
-        {(['global','weekly','friends'] as const).map((f,i) => (
-          <motion.button key={f} initial={{ opacity:0, y:8 }} animate={{ opacity:1, y:0 }} transition={{ delay:i*0.05 }}
-            onClick={() => setFilter(f)}
-            style={{ padding:'8px 20px', borderRadius:24, fontSize:12, fontWeight:700, border:'none', cursor:'pointer',
-              textTransform:'capitalize', outline:'none', transition:'all .2s',
-              background: filter===f ? 'rgba(139,174,214,.18)' : 'rgba(139,174,214,.06)',
-              color: filter===f ? '#8BAED6' : 'rgba(139,174,214,.4)',
-              boxShadow: filter===f ? 'inset 0 1px 0 rgba(139,174,214,.15), 0 0 12px rgba(139,174,214,.1)' : 'none',
-              borderWidth:1, borderStyle:'solid',
-              borderColor: filter===f ? 'rgba(139,174,214,.3)' : 'rgba(139,174,214,.08)' }}>
-            {f.charAt(0).toUpperCase()+f.slice(1)}
-          </motion.button>
+      <motion.div variants={fadeUp} style={{display:'flex',gap:8,padding:'18px 20px 0'}}>
+        {FILTERS.map(f=>(
+          <button key={f} onClick={()=>setFilter(f)} style={{
+            padding:'7px 20px',borderRadius:24,fontSize:12,fontWeight:700,border:'none',cursor:'pointer',
+            transition:'all 0.22s',
+            background:filter===f?'hsl(215 35% 62% / 0.18)':'hsl(215 14% 10%)',
+            color:filter===f?'hsl(215 35% 62%)':'hsl(215 14% 38%)',
+            boxShadow:filter===f?'inset 0 1px 0 hsl(215 35% 62% / 0.12), 0 0 12px hsl(215 55% 62% / 0.08)':'none',
+            borderWidth:1,borderStyle:'solid',
+            borderColor:filter===f?'hsl(215 35% 62% / 0.28)':'hsl(215 20% 14%)',
+          }}>
+            {f}
+          </button>
         ))}
-      </div>
+      </motion.div>
 
       {/* Your rank card */}
-      <div style={{ margin:'20px 24px 0', position:'relative', borderRadius:20, overflow:'hidden',
-        background:'linear-gradient(135deg,#0c2340,#0a1828,#061220)' }}>
-        {/* Shimmer */}
-        <div style={{ position:'absolute', top:0, left:'-100%', width:'60%', height:'100%',
-          background:'linear-gradient(90deg,transparent,rgba(139,174,214,.06),transparent)',
-          animation:'shimmer 4s ease-in-out infinite', pointerEvents:'none' }}/>
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:1,
-          background:'linear-gradient(90deg,transparent,rgba(200,228,255,.15),transparent)', pointerEvents:'none' }}/>
-        <div style={{ position:'absolute', inset:0, borderRadius:20, border:'1px solid rgba(139,174,214,.15)', pointerEvents:'none' }}/>
-        <div style={{ position:'relative', zIndex:2, padding:'20px', display:'grid', gridTemplateColumns:'1fr 1px 1fr 1px 1fr', alignItems:'center' }}>
-          {/* Rank */}
-          <div style={{ textAlign:'center' }}>
-            <div style={{ width:44, height:44, borderRadius:14, background:'rgba(200,150,60,.1)', border:'1px solid rgba(200,150,60,.25)',
-              display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 8px' }}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C8963C" strokeWidth="1.8">
-                <path d="M12 2l2.5 7h7l-5.5 4 2 7L12 16l-6 4 2-7L2 9h7z"/>
-              </svg>
+      <motion.div variants={scaleIn} style={{margin:'18px 20px 0'}} className="shine">
+        <div className="glass-hero" style={{borderRadius:22,position:'relative',overflow:'hidden'}}>
+          <div style={{position:'absolute',top:0,right:0,width:180,height:180,pointerEvents:'none',
+            background:'radial-gradient(circle,hsl(215 55% 62% / 0.06) 0%,transparent 70%)'}}/>
+          <div style={{position:'absolute',top:0,left:0,right:0,height:1,background:'linear-gradient(90deg,transparent,hsl(215 40% 82% / 0.12),transparent)',pointerEvents:'none'}}/>
+          <div style={{padding:'20px',display:'grid',gridTemplateColumns:'1fr 1px 1fr 1px 1fr',alignItems:'center'}}>
+            {/* Rank */}
+            <div style={{textAlign:'center'}}>
+              <div style={{width:42,height:42,borderRadius:14,background:'hsl(38 55% 52% / 0.1)',
+                border:'1px solid hsl(38 55% 52% / 0.22)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 10px'}}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="hsl(38 55% 52%)" strokeWidth="1.8">
+                  <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"/>
+                </svg>
+              </div>
+              <p style={{fontSize:8,textTransform:'uppercase',letterSpacing:'0.14em',color:'hsl(215 14% 35%)',fontWeight:600,marginBottom:4}}>Your Rank</p>
+              <p style={{fontSize:28,fontWeight:700,color:'hsl(215 20% 93%)',lineHeight:1}}>#{userRank||'—'}</p>
             </div>
-            <div style={{ fontSize:8, textTransform:'uppercase', letterSpacing:'1px', color:'rgba(168,196,232,.4)', fontWeight:600, marginBottom:3 }}>Your Rank</div>
-            <div style={{ fontSize:26, fontWeight:900, color:'#fff', lineHeight:1 }}>#{userRank||'—'}</div>
-          </div>
-          {/* Divider */}
-          <div style={{ background:'rgba(139,174,214,.1)', height:40 }}/>
-          {/* Points */}
-          <div style={{ textAlign:'center' }}>
-            <div style={{ fontSize:8, textTransform:'uppercase', letterSpacing:'1px', color:'rgba(168,196,232,.4)', fontWeight:600, marginBottom:6 }}>Points</div>
-            <div style={{ fontSize:20, fontWeight:800, color:'#8BAED6' }}>{totalPoints.toLocaleString()}</div>
-          </div>
-          {/* Divider */}
-          <div style={{ background:'rgba(139,174,214,.1)', height:40 }}/>
-          {/* Top % */}
-          <div style={{ textAlign:'center' }}>
-            <div style={{ fontSize:8, textTransform:'uppercase', letterSpacing:'1px', color:'rgba(168,196,232,.4)', fontWeight:600, marginBottom:6 }}>Top</div>
-            <div style={{ fontSize:20, fontWeight:800, color:'#5DB08A' }}>{topPct ? `${topPct}%` : '—'}</div>
+            <div style={{background:'hsl(215 25% 18%)',height:40}}/>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:8,textTransform:'uppercase',letterSpacing:'0.14em',color:'hsl(215 14% 35%)',fontWeight:600,marginBottom:8}}>Points</p>
+              <p style={{fontSize:19,fontWeight:700,color:'hsl(215 35% 62%)'}}>{totalPts.toLocaleString()}</p>
+            </div>
+            <div style={{background:'hsl(215 25% 18%)',height:40}}/>
+            <div style={{textAlign:'center'}}>
+              <p style={{fontSize:8,textTransform:'uppercase',letterSpacing:'0.14em',color:'hsl(215 14% 35%)',fontWeight:600,marginBottom:8}}>Top</p>
+              <p style={{fontSize:19,fontWeight:700,color:'hsl(155 45% 43%)'}}>{topPct?`${topPct}%`:'—'}</p>
+            </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
-      {/* Top 3 Podium */}
+      {/* Podium */}
       {!loading && top3.length >= 3 && (
-        <motion.div initial={{ opacity:0, y:16 }} animate={{ opacity:1, y:0 }} transition={{ delay:0.1 }}
-          style={{ padding:'28px 24px 0' }}>
-          <div style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'1.2px', color:'rgba(139,174,214,.3)', fontWeight:700, marginBottom:16 }}>Top 3</div>
-          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'center', gap:10 }}>
+        <motion.div variants={scaleIn} style={{padding:'26px 20px 0'}}>
+          <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.15em',color:'hsl(215 14% 30%)',fontWeight:700,marginBottom:18}}>Top 3</p>
+          <div style={{display:'flex',alignItems:'flex-end',justifyContent:'center',gap:10}}>
             {[top3[1], top3[0], top3[2]].map((entry, idx) => {
               const actualRank = idx===0?2:idx===1?1:3;
-              const heights = [82,106,66];
-              const t = TIER[actualRank-1];
+              const heights    = [88,110,68];
+              const t          = TIERS[actualRank-1];
+              const isFirst    = actualRank===1;
               return (
-                <div key={entry.user_id} style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', gap:6 }}>
+                <motion.div key={entry.user_id}
+                  initial={{y:44,opacity:0}} animate={{y:0,opacity:1}}
+                  transition={{delay:0.3+idx*0.1,type:'spring',stiffness:180,damping:20}}
+                  style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',gap:6}}>
                   {/* Avatar */}
-                  <div style={{ width:actualRank===1?54:46, height:actualRank===1?54:46, borderRadius:'50%',
-                    background:t.bg, border:`2px solid ${t.bd}`,
-                    display:'flex', alignItems:'center', justifyContent:'center',
-                    fontSize:actualRank===1?22:17, fontWeight:900, color:t.col,
-                    boxShadow:actualRank===1?`0 0 24px ${t.glow}`:'none',
-                    animation:actualRank===1?'float 3s ease-in-out infinite':'none' }}>
+                  <div className={isFirst?'float':''} style={{
+                    width:isFirst?58:46,height:isFirst?58:46,borderRadius:'50%',
+                    background:t.bg,border:`2px solid ${t.bd}`,
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    fontSize:isFirst?22:16,fontWeight:700,color:t.col,
+                    boxShadow:isFirst?`0 0 28px ${t.glow}`:'none',
+                    position:'relative',
+                  }}>
+                    {isFirst && (
+                      <motion.div animate={{rotate:[0,5,-5,0]}} transition={{duration:4,repeat:Infinity}}
+                        style={{position:'absolute',top:-20,left:'50%',transform:'translateX(-50%)'}}>
+                        <Crown size={16} color="hsl(38 55% 52%)" style={{filter:'drop-shadow(0 0 8px hsl(38 55% 52% / 0.6))'}}/>
+                      </motion.div>
+                    )}
+                    {!isFirst && <div style={{position:'absolute',top:-18,left:'50%',transform:'translateX(-50%)'}}><Medal size={13} color="hsl(215 14% 38%)"/></div>}
                     {entry.username?.[0]?.toUpperCase()||'?'}
                   </div>
-                  <div style={{ fontSize:11, fontWeight:700, color:'rgba(238,242,247,.7)', textAlign:'center',
-                    maxWidth:72, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                  <p style={{fontSize:11,fontWeight:700,color:'hsl(215 18% 72%)',textAlign:'center',maxWidth:72,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {entry.username||'Miner'}
-                  </div>
-                  <div style={{ fontSize:10, fontWeight:700, color:t.col }}>
-                    {entry.total_points.toLocaleString()}
-                  </div>
+                  </p>
+                  <p style={{fontSize:10,fontWeight:700,color:t.col}}>{entry.total_points.toLocaleString()}</p>
                   {/* Platform */}
-                  <div style={{ width:'100%', height:heights[idx], borderRadius:'14px 14px 0 0',
-                    background:t.bg, border:`1px solid ${t.bd}`, borderBottom:'none',
-                    display:'flex', alignItems:'flex-start', justifyContent:'center', paddingTop:12 }}>
-                    <span style={{ fontSize:actualRank===1?24:18, fontWeight:900, color:`${t.col}cc` }}>#{actualRank}</span>
+                  <div style={{width:'100%',height:heights[idx],borderRadius:'14px 14px 0 0',
+                    background:t.bg,border:`1px solid ${t.bd}`,borderBottom:'none',
+                    display:'flex',alignItems:'flex-start',justifyContent:'center',paddingTop:12,
+                    position:'relative',overflow:'hidden'}}>
+                    {isFirst && <div style={{position:'absolute',inset:0,background:'linear-gradient(to top,transparent,hsl(38 55% 52% / 0.04))'}}/>}
+                    <span style={{fontSize:isFirst?26:20,fontWeight:700,color:`${t.col}`,opacity:0.22,position:'relative',zIndex:1}}>#{actualRank}</span>
                   </div>
-                </div>
+                </motion.div>
               );
             })}
           </div>
         </motion.div>
       )}
 
-      {/* List */}
-      <div style={{ padding:'28px 24px 0' }}>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
-          <div style={{ fontSize:11, textTransform:'uppercase', letterSpacing:'1.2px', color:'rgba(139,174,214,.3)', fontWeight:700 }}>All Miners</div>
-          <div style={{ fontSize:11, color:'rgba(139,174,214,.3)', fontWeight:600 }}>
-            {loading ? 'Loading...' : `Top ${leaders.length}`}
-          </div>
+      {/* Full list */}
+      <div style={{padding:'24px 20px 0'}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+          <p style={{fontSize:11,textTransform:'uppercase',letterSpacing:'0.14em',color:'hsl(215 14% 30%)',fontWeight:700}}>All Miners</p>
+          <p style={{fontSize:11,color:'hsl(215 14% 30%)',fontWeight:500}}>
+            {loading?'Loading…':`Top ${leaders.length}`}
+          </p>
         </div>
 
         {loading ? (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {Array.from({length:8}).map((_,i) => (
-              <div key={i} style={{ height:60, borderRadius:16, background:'rgba(139,174,214,.04)',
-                border:'1px solid rgba(139,174,214,.06)', animation:'pulse 1.5s ease-in-out infinite',
-                animationDelay:`${i*0.1}s` }}/>
-            ))}
+          Array.from({length:8}).map((_,i)=>(
+            <div key={i} style={{height:58,borderRadius:16,marginBottom:8,
+              background:'hsl(225 24% 8%)',border:'1px solid hsl(215 20% 12%)',opacity:0.5+i*0.05}}/>
+          ))
+        ) : leaders.length===0 ? (
+          <div style={{textAlign:'center',padding:'48px 0'}}>
+            <p style={{fontSize:38,marginBottom:12}}>🏆</p>
+            <p style={{fontSize:15,fontWeight:700,color:'hsl(215 14% 38%)'}}>No miners yet</p>
           </div>
-        ) : leaders.length === 0 ? (
-          <div style={{ textAlign:'center', padding:'40px 0' }}>
-            <div style={{ fontSize:40, marginBottom:12 }}>🏆</div>
-            <div style={{ fontSize:15, fontWeight:700, color:'rgba(139,174,214,.5)' }}>No miners yet</div>
-            <div style={{ fontSize:12, color:'rgba(139,174,214,.3)', marginTop:6 }}>Be the first to mine!</div>
-          </div>
-        ) : leaders.map((entry, idx) => {
-          const isTop3 = idx < 3;
-          const t = isTop3 ? TIER[idx] : null;
-          const isMe = entry.user_id === user?.id;
+        ) : leaders.map((entry,idx)=>{
+          const isTop3 = idx<3;
+          const isMe   = entry.user_id===user?.id;
+          const t      = isTop3 ? TIERS[idx] : null;
           return (
             <motion.div key={entry.user_id}
-              initial={{ opacity:0, x:-10 }}
-              animate={{ opacity:1, x:0 }}
-              transition={{ delay: Math.min(idx * 0.012, 0.6) }}
-              style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:16, marginBottom:8,
-                background: isMe ? 'linear-gradient(135deg,rgba(139,174,214,.12),rgba(139,174,214,.06))' : isTop3 ? t!.bg : '#0d1117',
-                border: `1px solid ${isMe ? 'rgba(139,174,214,.3)' : isTop3 ? t!.bd : 'rgba(139,174,214,.07)'}`,
-                boxShadow: isMe ? '0 0 0 1px rgba(139,174,214,.1)' : 'none',
+              initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}}
+              transition={{delay:Math.min(idx*0.013,0.7)}}
+              whileTap={{scale:0.98}}
+              className="press"
+              style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderRadius:16,marginBottom:8,
+                background:isMe?'hsl(215 30% 12%)':isTop3?t!.bg:'hsl(225 22% 7%)',
+                border:`1px solid ${isMe?'hsl(215 35% 62% / 0.28)':isTop3?t!.bd:'hsl(215 20% 12%)'}`,
+                boxShadow:isMe?'0 0 0 1px hsl(215 35% 62% / 0.1), 0 4px 16px hsl(215 55% 62% / 0.07)':'none',
               }}>
-              {/* Rank */}
-              <div style={{ width:30, height:30, borderRadius:10,
-                background: isTop3 ? t!.bg : 'rgba(139,174,214,.06)',
-                border:`1px solid ${isTop3 ? t!.bd : 'rgba(139,174,214,.1)'}`,
-                display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                <span style={{ fontSize:11, fontWeight:800, color: isTop3 ? t!.col : 'rgba(139,174,214,.5)' }}>
-                  {isTop3 ? ['🥇','🥈','🥉'][idx] : idx+1}
+              {/* Rank badge */}
+              <div style={{width:30,height:30,borderRadius:10,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
+                background:isTop3?t!.bg:'hsl(215 20% 11%)',border:`1px solid ${isTop3?t!.bd:'hsl(215 20% 16%)'}`,}}>
+                <span style={{fontSize:11,fontWeight:800,color:isTop3?t!.col:'hsl(215 14% 38%)'}}>
+                  {isTop3?['🥇','🥈','🥉'][idx]:idx+1}
                 </span>
               </div>
               {/* Avatar */}
-              <div style={{ width:36, height:36, borderRadius:12,
-                background: isTop3 ? t!.bg : 'rgba(139,174,214,.08)',
-                border:`1px solid ${isTop3 ? t!.bd : 'rgba(139,174,214,.15)'}`,
-                display:'flex', alignItems:'center', justifyContent:'center',
-                fontSize:14, fontWeight:700,
-                color: isTop3 ? t!.col : isMe ? '#8BAED6' : 'rgba(139,174,214,.6)',
-                flexShrink:0 }}>
+              <div style={{width:36,height:36,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
+                fontSize:13,fontWeight:700,
+                background:isTop3?t!.bg:'hsl(215 25% 12%)',
+                border:`1px solid ${isTop3?t!.bd:'hsl(215 20% 18%)'}`,
+                color:isTop3?t!.col:isMe?'hsl(215 35% 62%)':'hsl(215 18% 52%)'}}>
                 {entry.username?.[0]?.toUpperCase()||'?'}
               </div>
               {/* Name */}
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ fontSize:13, fontWeight:700,
-                  color: isMe ? '#EEF2F7' : 'rgba(238,242,247,.85)',
-                  overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              <div style={{flex:1,minWidth:0}}>
+                <p style={{fontSize:13,fontWeight:600,color:'hsl(215 18% 88%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                   {entry.username||'Miner'}
-                  {isMe && <span style={{ marginLeft:6, fontSize:9, background:'rgba(139,174,214,.15)', border:'1px solid rgba(139,174,214,.25)', borderRadius:8, padding:'1px 6px', color:'#8BAED6', fontWeight:700 }}>YOU</span>}
-                </div>
+                </p>
+                {isMe && (
+                  <span style={{fontSize:9,background:'hsl(215 35% 62% / 0.12)',border:'1px solid hsl(215 35% 62% / 0.22)',
+                    borderRadius:8,padding:'1px 6px',color:'hsl(215 35% 62%)',fontWeight:700,marginTop:2,display:'inline-block'}}>YOU</span>
+                )}
               </div>
               {/* Points */}
-              <div style={{ textAlign:'right', flexShrink:0 }}>
-                <div style={{ fontSize:13, fontWeight:800, color: isTop3 ? t!.col : isMe ? '#8BAED6' : 'rgba(238,242,247,.7)' }}>
+              <div style={{textAlign:'right',flexShrink:0}}>
+                <p style={{fontSize:13,fontWeight:700,color:isTop3?t!.col:isMe?'hsl(215 35% 62%)':'hsl(215 18% 72%)'}}>
                   {entry.total_points.toLocaleString()}
-                </div>
-                <div style={{ fontSize:9, color:'rgba(139,174,214,.3)', marginTop:1 }}>ARX-P</div>
+                </p>
+                <p style={{fontSize:9,color:'hsl(215 14% 30%)',marginTop:1}}>ARX-P</p>
               </div>
             </motion.div>
           );
         })}
       </div>
-      <div style={{ height:20 }}/>
-    </div>
+      <div style={{height:20}}/>
+    </motion.div>
   );
 }
