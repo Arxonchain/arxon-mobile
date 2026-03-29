@@ -336,6 +336,78 @@ export const usePushNotifications = () => {
     return () => { if (miningSessionCheckRef.current) clearInterval(miningSessionCheckRef.current); };
   }, [user, preferences.miningAlerts, preferences.claimNotifications, sendServerPush]);
 
+
+  // ── CHAT NOTIFICATIONS ─────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!user) return;
+    const channel = supabase
+      .channel('chat-message-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'chat_messages',
+      }, async (payload) => {
+        const msg = payload.new as any;
+        // Don't notify of own messages
+        if (msg?.user_id === user.id) return;
+        const chanLabels: Record<string, string> = {
+          general: 'General',
+          alpha: 'Alpha Team',
+          omega: 'Omega Team',
+          nexus_exchange: 'Nexus Exchange',
+        };
+        await sendServerPush(
+          `💬 ${msg.username || 'Someone'} in ${chanLabels[msg.channel] || 'Chat'}`,
+          msg.message?.slice(0, 80) || 'New message',
+          { url: '/chat', tag: `chat-${msg.channel}` }
+        );
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, sendServerPush]);
+
+  // ── ARENA WIN/LOSS PERSONAL NOTIFICATIONS ─────────────────────────────────
+  useEffect(() => {
+    if (!user || !preferences.arenaResults) return;
+    const channel = supabase
+      .channel('arena-personal-result-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'user_notifications',
+        filter: `user_id=eq.${user.id}`,
+      }, async (payload) => {
+        const notif = payload.new as any;
+        if (notif?.notification_type === 'arena_win') {
+          await sendServerPush(
+            '🏆 You Won the Arena Battle!',
+            `You won ${notif.amount?.toLocaleString() || ''} ARX-P has been credited to your balance!`,
+            { url: '/arena', tag: 'arena-win' }
+          );
+        } else if (notif?.notification_type === 'arena_loss') {
+          await sendServerPush(
+            '💧 Arena Battle Result',
+            `Your team lost. ${Math.abs(notif.amount || 0).toLocaleString()} ARX-P has been removed from your balance.`,
+            { url: '/arena', tag: 'arena-loss' }
+          );
+        } else if (notif?.notification_type === 'arena_new_battle') {
+          await sendServerPush(
+            '⚔️ New Arena Battle Added!',
+            notif.message || 'A new battle has been added to the Arena. Stake your ARX-P!',
+            { url: '/arena', tag: 'arena-new-battle' }
+          );
+        } else if (notif?.notification_type === 'announcement') {
+          await sendServerPush(
+            '📢 ' + (notif.title || 'Arxon Announcement'),
+            notif.message || 'New announcement from the Arxon team.',
+            { url: '/notifications', tag: 'announcement' }
+          );
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, preferences.arenaResults, sendServerPush]);
+
   const updatePreferences = useCallback((newPrefs: NotificationPreferences) => {
     setPreferences(newPrefs);
     localStorage.setItem(NOTIFICATION_PREFS_KEY, JSON.stringify(newPrefs));
