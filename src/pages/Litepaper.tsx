@@ -187,40 +187,7 @@ const Litepaper = () => {
           </div>
           <p className="text-[12px] text-[#888] mb-6">Production depends on hardware, transaction type, and privacy mix — benchmarks on public testnet Q3 2026.</p>
 
-          {/* Tokenomics */}
-          <h2 className="text-[22px] font-bold text-[#0a0a0a] mt-10 mb-3">4. Tokenomics &amp; $ARX Utility</h2>
-          <p className="text-[14px] leading-[1.8] text-[#333] mb-4">
-            Total supply: 1,000,000,000 (fixed cap). Circulating at TGE: ~250,000,000.
-          </p>
-
-          <div className="my-6">
-            <table className="w-full text-[13px]">
-              <thead>
-                <tr className="border-b-2 border-[#0a0a0a]">
-                  <th className="text-left py-2 font-semibold text-[#0a0a0a]">Allocation</th>
-                  <th className="text-right py-2 font-semibold text-[#0a0a0a]">%</th>
-                  <th className="text-right py-2 font-semibold text-[#0a0a0a]">Tokens</th>
-                  <th className="text-left py-2 pl-4 font-semibold text-[#0a0a0a]">Notes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { name: "Community & Miners", pct: "25%", tokens: "250M", note: "Earned via mining" },
-                  { name: "Post-TGE Staking", pct: "10%", tokens: "100M", note: "APY incentives for long-term holders" },
-                  { name: "Team & Contributors", pct: "15%", tokens: "150M", note: "4-year vest, 1-year cliff" },
-                  { name: "Investors", pct: "20%", tokens: "200M", note: "SAFE + warrant, 1-year lock + 24–36mo vest" },
-                  { name: "Treasury/Ecosystem", pct: "30%", tokens: "300M", note: "Grants, liquidity, partnerships" },
-                ].map((r, i) => (
-                  <tr key={i} className="border-b border-[#eee]">
-                    <td className="py-2.5 text-[#333]">{r.name}</td>
-                    <td className="py-2.5 text-right font-semibold text-[#0a0a0a]">{r.pct}</td>
-                    <td className="py-2.5 text-right text-[#555]">{r.tokens}</td>
-                    <td className="py-2.5 pl-4 text-[#888] text-[12px]">{r.note}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {
 
           <h3 className="text-[17px] font-semibold text-[#0a0a0a] mt-6 mb-2">Utility</h3>
           <p className="text-[14px] leading-[1.8] text-[#333] mb-4">
@@ -429,38 +396,7 @@ const Litepaper = () => {
           </div>
         </div>
 
-        {/* Page 7: Tokenomics */}
-        <div data-lp-page="6" style={{ width: 816, height: 1056, background: "#fff", padding: 64, fontFamily: "'Creato Display', system-ui, sans-serif", position: "relative", overflow: "hidden" }}>
-          <div style={{ fontSize: 22, fontWeight: 700, color: "#0a0a0a", marginBottom: 12 }}>4. Tokenomics &amp; $ARX Utility</div>
-          <div style={{ width: 48, height: 3, background: "#0a0a0a", marginBottom: 20 }} />
-          <div style={{ fontSize: 13, color: "#333", lineHeight: 1.8, marginBottom: 20 }}>
-            Total supply: 1,000,000,000 (fixed cap). Circulating at TGE: ~250,000,000.
-          </div>
-          <table style={{ width: "100%", fontSize: 12, borderCollapse: "collapse", marginBottom: 24 }}>
-            <thead>
-              <tr style={{ borderBottom: "2px solid #0a0a0a" }}>
-                <th style={{ textAlign: "left", padding: "8px 4px", fontWeight: 600, color: "#0a0a0a" }}>Allocation</th>
-                <th style={{ textAlign: "right", padding: "8px 4px", fontWeight: 600, color: "#0a0a0a" }}>%</th>
-                <th style={{ textAlign: "right", padding: "8px 4px", fontWeight: 600, color: "#0a0a0a" }}>Tokens</th>
-                <th style={{ textAlign: "left", padding: "8px 4px 8px 16px", fontWeight: 600, color: "#0a0a0a" }}>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                { n: "Community & Miners", p: "25%", t: "250M", note: "Earned via mining" },
-                { n: "Post-TGE Staking", p: "10%", t: "100M", note: "APY incentives for long-term holders" },
-                { n: "Team & Contributors", p: "15%", t: "150M", note: "4-year vest, 1-year cliff" },
-                { n: "Investors", p: "20%", t: "200M", note: "SAFE + warrant, 1-year lock + 24–36mo vest" },
-                { n: "Treasury/Ecosystem", p: "30%", t: "300M", note: "Grants, liquidity, partnerships" },
-              ].map((r, i) => (
-                <tr key={i} style={{ borderBottom: "1px solid #eee" }}>
-                  <td style={{ padding: "8px 4px", color: "#333" }}>{r.n}</td>
-                  <td style={{ padding: "8px 4px", textAlign: "right", fontWeight: 600, color: "#0a0a0a" }}>{r.p}</td>
-                  <td style={{ padding: "8px 4px", textAlign: "right", color: "#555" }}>{r.t}</td>
-                  <td style={{ padding: "8px 4px 8px 16px", color: "#888", fontSize: 11 }}>{r.note}</td>
-                </tr>
-              ))}
-            </tbody>
+        
           </table>
           <div style={{ fontSize: 15, fontWeight: 600, color: "#0a0a0a", marginBottom: 8 }}>Utility</div>
           <div style={{ fontSize: 12, color: "#333", lineHeight: 1.8, marginBottom: 16 }}>
