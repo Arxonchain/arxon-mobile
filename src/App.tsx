@@ -50,6 +50,7 @@ import MobileArena       from "@/components/mobile/MobileArena";
 import MobileNexus       from "@/components/mobile/MobileNexus";
 import MobileProfile     from "@/components/mobile/MobileProfile";
 import MobileWallet      from "@/components/mobile/MobileWallet";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
 import MobileChat        from "@/components/mobile/MobileChat";
 
 const queryClient = new QueryClient({
@@ -162,6 +163,8 @@ function AppWithSplash() {
   const { loading } = useAuth();
   const [splashDone, setSplashDone] = useState(false);
   const handleFinish = useCallback(() => setSplashDone(true), []);
+  // Initialize push notifications globally so they run even when pages aren't mounted
+  usePushNotifications();
   return (
     <>
       {isNative && !splashDone && <MobileSplash isAppReady={!loading} onFinish={handleFinish}/>}
