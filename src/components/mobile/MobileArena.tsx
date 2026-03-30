@@ -1,3 +1,4 @@
+import { resolveBattleImage, extractSubjectsFromTitle } from '@/lib/battleImages';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -100,6 +101,20 @@ function BannerCard({ battle, isActive, userVoted, userWon, onClick }: {
     ? (total / battle.side_b_power).toFixed(2) : '2.00';
 
   const cat = (battle as any).category || 'other';
+
+  // Auto-resolve images from side names + title subjects
+  const titleSubjects = extractSubjectsFromTitle(battle.title || '');
+  const imgA = resolveBattleImage(
+    battle.side_a_name,
+    battle.side_a_image,
+    cat
+  ) || (titleSubjects ? resolveBattleImage(titleSubjects[0], null, cat) : null);
+  const imgB = resolveBattleImage(
+    battle.side_b_name,
+    battle.side_b_image,
+    cat
+  ) || (titleSubjects ? resolveBattleImage(titleSubjects[1], null, cat) : null);
+
   const catColor: Record<string, string> = {
     sports: '#2dd4a0', politics: '#f5a623', crypto: '#8BAED6',
     entertainment: '#c084fc', tech: '#60a5fa', other: '#94a3b8',
@@ -189,7 +204,7 @@ function BannerCard({ battle, isActive, userVoted, userWon, onClick }: {
         }}>
           {/* Image */}
           <div style={{ position: 'relative' }}>
-            <SideImg src={battle.side_a_image} name={battle.side_a_name} size={62} shape="circle"/>
+            <SideImg src={imgA} name={battle.side_a_name} size={62} shape="circle"/>
             {aWon && (
               <div style={{ position: 'absolute', top: -6, right: -6,
                 width: 20, height: 20, borderRadius: '50%', background: '#f5a623',
@@ -249,7 +264,7 @@ function BannerCard({ battle, isActive, userVoted, userWon, onClick }: {
           opacity: concluded && aWon ? 0.55 : 1,
         }}>
           <div style={{ position: 'relative' }}>
-            <SideImg src={battle.side_b_image} name={battle.side_b_name} size={62} shape="circle"/>
+            <SideImg src={imgB} name={battle.side_b_name} size={62} shape="circle"/>
             {bWon && (
               <div style={{ position: 'absolute', top: -6, right: -6,
                 width: 20, height: 20, borderRadius: '50%', background: '#f5a623',
@@ -313,6 +328,14 @@ function BattleDetail({ battle, isActive, userVote, participants, voting, castVo
   const pctB  = 100 - pctA;
   const oddsA = total > 0 && battle.side_a_power > 0 ? (total / battle.side_a_power).toFixed(2) : '2.00';
   const oddsB = total > 0 && battle.side_b_power > 0 ? (total / battle.side_b_power).toFixed(2) : '2.00';
+
+  // Auto-resolve images in detail view too
+  const detailCat = (battle as any).category || 'other';
+  const detailSubjects = extractSubjectsFromTitle(battle.title || '');
+  const imgA = resolveBattleImage(battle.side_a_name, battle.side_a_image, detailCat)
+    || (detailSubjects ? resolveBattleImage(detailSubjects[0], null, detailCat) : null);
+  const imgB = resolveBattleImage(battle.side_b_name, battle.side_b_image, detailCat)
+    || (detailSubjects ? resolveBattleImage(detailSubjects[1], null, detailCat) : null);
   const existingVote = userVote?.side ?? null;
   const [side, setSide] = useState<'a' | 'b' | null>(null);
   const [amt, setAmt] = useState('');
@@ -408,7 +431,7 @@ function BattleDetail({ battle, isActive, userVote, participants, voting, castVo
                 opacity: battle.winner_side && bWon ? 0.5 : 1,
               }}>
               <div style={{ position: 'relative' }}>
-                <SideImg src={battle.side_a_image} name={battle.side_a_name} size={80} shape="circle"/>
+                <SideImg src={imgA} name={battle.side_a_name} size={80} shape="circle"/>
                 {aWon && (
                   <div style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24,
                     borderRadius: '50%', background: '#f5a623', display: 'flex', alignItems: 'center',
@@ -464,7 +487,7 @@ function BattleDetail({ battle, isActive, userVote, participants, voting, castVo
                 opacity: battle.winner_side && aWon ? 0.5 : 1,
               }}>
               <div style={{ position: 'relative' }}>
-                <SideImg src={battle.side_b_image} name={battle.side_b_name} size={80} shape="circle"/>
+                <SideImg src={imgB} name={battle.side_b_name} size={80} shape="circle"/>
                 {bWon && (
                   <div style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24,
                     borderRadius: '50%', background: '#f5a623', display: 'flex', alignItems: 'center',
