@@ -102,6 +102,47 @@ export const usePushNotifications = () => {
     };
   }, [isNative, user]);
 
+  // ── AUTO-REQUEST permission on first load (native) ──────────────────────
+  useEffect(() => {
+    if (!isNative) return;
+    PushNotifications.checkPermissions().then(({ receive }) => {
+      if (receive === 'prompt' || receive === 'prompt-with-rationale') {
+        PushNotifications.requestPermissions().then(({ receive: r }) => {
+          if (r === 'granted') {
+            PushNotifications.register();
+            setPermission('granted');
+          }
+        });
+      } else if (receive === 'granted') {
+        PushNotifications.register();
+      }
+    });
+  }, [isNative]);
+
+  // ── AUTO-REQUEST permission on first load (web) ─────────────────────────
+  useEffect(() => {
+    if (isNative) return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      // Slight delay so user has interacted with page
+      const t = setTimeout(async () => {
+        const result = await Notification.requestPermission();
+        setPermission(result as 'default' | 'granted' | 'denied');
+        if (result === 'granted' && serviceWorkerRef.current) {
+          try {
+            await (serviceWorkerRef.current as any).pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            });
+          } catch (e) { console.error('Web push subscribe error:', e); }
+        }
+      }, 2000);
+      return () => clearTimeout(t);
+    } else if (Notification.permission === 'granted') {
+      setPermission('granted');
+    }
+  }, [isNative]);
+
   // ── WEB (Service Worker + VAPID) ───────────────────────────────────────────
   useEffect(() => {
     if (isNative) return;
