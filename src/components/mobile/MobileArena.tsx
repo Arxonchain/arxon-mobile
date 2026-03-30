@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useArena, type ArenaBattle, type BattleHistoryEntry, type LeaderboardEntry } from '@/hooks/useArena';
 import { useArenaMembership } from '@/hooks/useArenaMembership';
 import { usePoints } from '@/hooks/usePoints';
-import { ChevronLeft, ChevronRight, Users, Trophy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Trophy } from 'lucide-react';
 import AuthDialog from '@/components/auth/AuthDialog';
 import ArenaOnboarding from '@/components/arena/ArenaOnboarding';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,13 +12,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
 @keyframes spin{to{transform:rotate(360deg)}}
-@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(200%)}}
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shimmer{0%{left:-120%}100%{left:160%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+@keyframes oddsFlash{0%{opacity:1}50%{opacity:.6}100%{opacity:1}}
 `;
 
 type Tab = 'battles' | 'leaderboard' | 'my-stakes';
 
-/* ── Countdown ─────────────────────────────────────────────────────────────── */
 function useTimer(endsAt: string | null, active: boolean) {
   const [s, setS] = useState('');
   useEffect(() => {
@@ -27,204 +27,292 @@ function useTimer(endsAt: string | null, active: boolean) {
       const d = Math.max(0, new Date(endsAt).getTime() - Date.now());
       const h = Math.floor(d / 3600000);
       const m = String(Math.floor((d % 3600000) / 60000)).padStart(2, '0');
-      const sec = String(Math.floor((d % 60000) / 1000)).padStart(2, '0');
-      setS(h > 0 ? `${h}:${m}:${sec}` : `${m}:${sec}`);
+      const sc = String(Math.floor((d % 60000) / 1000)).padStart(2, '0');
+      setS(h > 0 ? `${h}:${m}:${sc}` : `${m}:${sc}`);
     };
     tick(); const id = setInterval(tick, 1000); return () => clearInterval(id);
   }, [endsAt, active]);
   return s;
 }
 
-/* ── Side image (logo / flag / photo) ─────────────────────────────────────── */
-function SideImg({ src, name, size = 60, circle = false }: {
-  src: string | null; name: string; size?: number; circle?: boolean;
+/* ── SideImg: shows real photo/logo/flag or branded initials fallback ── */
+function SideImg({ src, name, size = 60, shape = 'circle' }: {
+  src: string | null; name: string; size?: number; shape?: 'circle' | 'square';
 }) {
   const [err, setErr] = useState(false);
   const hue = name.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % 360;
-  const r = circle ? '50%' : `${size * 0.22}px`;
+  const radius = shape === 'circle' ? '50%' : `${size * 0.2}px`;
+  const init = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
   if (src && !err) {
     return (
-      <div style={{ width: size, height: size, borderRadius: r, overflow: 'hidden',
-        flexShrink: 0, border: '2px solid rgba(255,255,255,0.12)' }}>
+      <div style={{
+        width: size, height: size, borderRadius: radius, overflow: 'hidden', flexShrink: 0,
+        border: '2px solid rgba(255,255,255,0.15)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+      }}>
         <img src={src} alt={name} onError={() => setErr(true)}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
     );
   }
-  const init = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+
+  // Beautiful branded fallback — NOT just plain letters
   return (
-    <div style={{ width: size, height: size, borderRadius: r, flexShrink: 0,
-      background: `linear-gradient(135deg,hsl(${hue} 55% 32%),hsl(${(hue + 50) % 360} 48% 20%))`,
+    <div style={{
+      width: size, height: size, borderRadius: radius, flexShrink: 0,
+      background: `linear-gradient(145deg,hsl(${hue} 55% 28%),hsl(${(hue+60)%360} 48% 18%))`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: size * 0.28, fontWeight: 800, color: 'white',
-      border: '2px solid rgba(255,255,255,0.12)' }}>
-      {init}
+      border: '2px solid rgba(255,255,255,0.15)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Shine */}
+      <div style={{
+        position: 'absolute', top: '-40%', left: '-40%', width: '80%', height: '80%',
+        background: 'radial-gradient(ellipse,rgba(255,255,255,0.25),transparent 70%)',
+        borderRadius: '50%',
+      }}/>
+      <span style={{
+        fontSize: size * 0.3, fontWeight: 900, color: 'white',
+        letterSpacing: '-0.02em', position: 'relative', zIndex: 1,
+        textShadow: '0 2px 8px rgba(0,0,0,0.5)',
+      }}>{init}</span>
     </div>
   );
 }
 
-/* ── Banner Battle Card (like the image reference) ────────────────────────── */
+/* ── BETTING BANNER CARD ── Like Betway/1xBet but Arxon style ── */
 function BannerCard({ battle, isActive, userVoted, userWon, onClick }: {
   battle: ArenaBattle | BattleHistoryEntry;
-  isActive?: boolean;
-  userVoted?: boolean;
-  userWon?: boolean;
-  onClick: () => void;
+  isActive?: boolean; userVoted?: boolean; userWon?: boolean; onClick: () => void;
 }) {
   const timer = useTimer(battle.ends_at, !!isActive);
   const total = (battle.side_a_power || 0) + (battle.side_b_power || 0);
-  const pctA = total > 0 ? Math.round((battle.side_a_power / total) * 100) : 50;
-  const pctB = 100 - pctA;
+  const pctA  = total > 0 ? Math.round((battle.side_a_power / total) * 100) : 50;
+  const pctB  = 100 - pctA;
   const concluded = !isActive && battle.winner_side;
 
-  return (
-    <motion.div whileTap={{ scale: 0.97 }} onClick={onClick}
-      style={{ borderRadius: 22, overflow: 'hidden', marginBottom: 12, cursor: 'pointer',
-        position: 'relative',
-        background: concluded && userWon
-          ? 'linear-gradient(135deg,hsl(155 40% 12%),hsl(225 28% 9%))'
-          : 'linear-gradient(135deg,hsl(225 28% 10%),hsl(215 30% 13%),hsl(225 26% 8%))',
-        border: `1px solid ${isActive ? 'hsl(215 28% 24%/0.6)' : concluded && userWon ? 'hsl(155 45% 43%/0.3)' : 'hsl(215 22% 16%)'}`,
-        boxShadow: isActive ? '0 4px 24px hsl(215 55% 62%/0.06)' : 'none',
-      }}>
+  // Implied odds multiplier (betting style)
+  const oddsA = total > 0 && battle.side_a_power > 0
+    ? (total / battle.side_a_power).toFixed(2) : '2.00';
+  const oddsB = total > 0 && battle.side_b_power > 0
+    ? (total / battle.side_b_power).toFixed(2) : '2.00';
 
-      {/* Top shimmer for active */}
+  const cat = (battle as any).category || 'other';
+  const catColor: Record<string, string> = {
+    sports: '#2dd4a0', politics: '#f5a623', crypto: '#8BAED6',
+    entertainment: '#c084fc', tech: '#60a5fa', other: '#94a3b8',
+  };
+  const accent = catColor[cat] || '#8BAED6';
+
+  const aWon = battle.winner_side === 'a';
+  const bWon = battle.winner_side === 'b';
+
+  return (
+    <motion.div whileTap={{ scale: 0.975 }} onClick={onClick} style={{
+      borderRadius: 20, overflow: 'hidden', marginBottom: 12, cursor: 'pointer',
+      background: concluded && userWon
+        ? 'linear-gradient(145deg,#0d2218,#091520)'
+        : 'linear-gradient(145deg,#0e1828,#0b1420,#070e18)',
+      border: `1px solid ${isActive ? 'rgba(139,174,214,0.28)' : concluded && userWon ? 'rgba(45,212,160,0.28)' : 'rgba(139,174,214,0.1)'}`,
+      boxShadow: isActive ? '0 4px 32px rgba(139,174,214,0.08)' : 'none',
+    }}>
+      {/* Shimmer line for live */}
       {isActive && (
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', inset: 0,
-            background: 'linear-gradient(90deg,transparent,hsl(215 35% 62%/0.6),transparent)',
-            animation: 'shimmer 2.5s linear infinite' }} />
+        <div style={{ height: 2, background: `linear-gradient(90deg,transparent,${accent},transparent)`,
+          opacity: 0.7, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent)',
+            animation: 'shimmer 2s linear infinite', width: '50%' }}/>
         </div>
       )}
 
-      {/* Battle title + badge row */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '13px 14px 0' }}>
-        <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: 'hsl(215 18% 86%)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            letterSpacing: '-0.2px' }}>
+      {/* ── TOP: title + badges ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+        padding: '12px 14px 0', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <span style={{ fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 6,
+              background: `${accent}18`, color: accent, textTransform: 'uppercase', letterSpacing: '.06em' }}>
+              {cat}
+            </span>
+            {isActive && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4,
+                background: 'rgba(220,50,50,0.12)', border: '1px solid rgba(220,50,50,0.28)',
+                borderRadius: 8, padding: '2px 7px' }}>
+                <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#e05555',
+                  animation: 'pulse 1.2s ease-in-out infinite' }}/>
+                <span style={{ fontSize: 8, fontWeight: 800, color: '#e07070', letterSpacing: '.06em' }}>
+                  LIVE · {timer}
+                </span>
+              </div>
+            )}
+            {concluded && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 8,
+                color: userWon ? '#2dd4a0' : 'rgba(139,174,214,0.45)',
+                background: userWon ? 'rgba(45,212,160,0.1)' : 'rgba(139,174,214,0.06)',
+                border: `1px solid ${userWon ? 'rgba(45,212,160,0.25)' : 'rgba(139,174,214,0.14)'}` }}>
+                {userVoted ? (userWon ? '🏆 WON' : '💧 LOST') : 'ENDED'}
+              </div>
+            )}
+            {!isActive && !concluded && (
+              <div style={{ fontSize: 8, fontWeight: 700, padding: '2px 7px', borderRadius: 8,
+                color: '#f5a623', background: 'rgba(245,166,35,0.1)', border: '1px solid rgba(245,166,35,0.22)' }}>
+                UPCOMING
+              </div>
+            )}
+          </div>
+          <p style={{ fontSize: 13, fontWeight: 800, color: 'rgba(240,244,255,0.92)',
+            lineHeight: 1.3, letterSpacing: '-0.2px' }}>
             {battle.title || 'Arena Battle'}
           </p>
           {battle.description && (
-            <p style={{ fontSize: 10, color: 'hsl(215 14% 40%)', marginTop: 2,
+            <p style={{ fontSize: 10, color: 'rgba(139,174,214,0.5)', marginTop: 2,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {battle.description}
             </p>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
-          {isActive && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4,
-              background: 'hsl(0 60% 56%/0.12)', border: '1px solid hsl(0 60% 56%/0.28)',
-              borderRadius: 20, padding: '4px 9px' }}>
-              <div className="pulse" style={{ width: 5, height: 5, borderRadius: '50%',
-                background: 'hsl(0 60% 56%)' }} />
-              <span style={{ fontSize: 9, fontWeight: 700, color: 'hsl(0 60% 65%)' }}>LIVE · {timer}</span>
-            </div>
-          )}
-          {concluded && (
-            <div style={{ fontSize: 9, fontWeight: 700, padding: '4px 9px', borderRadius: 20,
-              color: userWon ? 'hsl(155 45% 55%)' : 'hsl(215 18% 45%)',
-              background: userWon ? 'hsl(155 45% 43%/0.12)' : 'hsl(215 22% 12%)',
-              border: `1px solid ${userWon ? 'hsl(155 45% 43%/0.25)' : 'hsl(215 22% 20%)'}` }}>
-              {userVoted ? (userWon ? '🏆 Won' : '💧 Lost') : 'Ended'}
-            </div>
-          )}
-          {!isActive && !concluded && (
-            <div style={{ fontSize: 9, fontWeight: 700, padding: '4px 9px', borderRadius: 20,
-              color: 'hsl(38 55% 52%)', background: 'hsl(38 55% 52%/0.1)',
-              border: '1px solid hsl(38 55% 52%/0.22)' }}>Upcoming</div>
-          )}
-          <ChevronRight size={14} color="hsl(215 18% 32%)" />
-        </div>
+        <ChevronRight size={14} color="rgba(139,174,214,0.3)" style={{ flexShrink: 0, marginTop: 2 }}/>
       </div>
 
-      {/* ── Main VS banner ── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 42px 1fr', gap: 0,
-        padding: '14px 0 0', alignItems: 'stretch' }}>
+      {/* ── MAIN VS SECTION ── Betting banner style ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 48px 1fr',
+        padding: '14px 12px 10px', gap: 0, alignItems: 'center' }}>
 
-        {/* Side A */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: 8, padding: '0 10px 14px',
-          background: battle.winner_side === 'a' ? 'hsl(38 55% 52%/0.06)' : 'transparent',
-          borderRight: '1px solid hsl(215 22% 16%)' }}>
-          <SideImg src={battle.side_a_image} name={battle.side_a_name} size={64} circle />
-          <p style={{ fontSize: 12, fontWeight: 800, color: 'hsl(215 18% 88%)', textAlign: 'center',
-            textTransform: 'uppercase', letterSpacing: '0.05em', maxWidth: 90,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        {/* SIDE A */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+          padding: '0 8px 12px',
+          borderRight: '1px solid rgba(139,174,214,0.08)',
+          opacity: concluded && bWon ? 0.55 : 1,
+        }}>
+          {/* Image */}
+          <div style={{ position: 'relative' }}>
+            <SideImg src={battle.side_a_image} name={battle.side_a_name} size={62} shape="circle"/>
+            {aWon && (
+              <div style={{ position: 'absolute', top: -6, right: -6,
+                width: 20, height: 20, borderRadius: '50%', background: '#f5a623',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, boxShadow: '0 0 10px rgba(245,166,35,0.6)' }}>👑</div>
+            )}
+          </div>
+          {/* Name */}
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'rgba(240,244,255,0.9)',
+            textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em',
+            maxWidth: 82, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {battle.side_a_name}
           </p>
-          <div style={{ fontSize: 18, fontWeight: 800,
-            color: battle.winner_side === 'a' ? 'hsl(38 55% 58%)' : 'hsl(215 30% 72%)' }}>
-            {pctA}%
+          {/* Betting odds pill */}
+          <div style={{
+            padding: '5px 12px', borderRadius: 10,
+            background: aWon ? 'rgba(245,166,35,0.15)' : 'rgba(139,174,214,0.1)',
+            border: `1px solid ${aWon ? 'rgba(245,166,35,0.35)' : 'rgba(139,174,214,0.2)'}`,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 900, textAlign: 'center',
+              color: aWon ? '#f5a623' : '#accafe', letterSpacing: '-0.02em' }}>
+              {oddsA}×
+            </div>
+            <div style={{ fontSize: 8, color: 'rgba(139,174,214,0.45)', textAlign: 'center',
+              marginTop: 1, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              {pctA}% backed
+            </div>
           </div>
-          {battle.winner_side === 'a' && <span style={{ fontSize: 16 }}>👑</span>}
         </div>
 
-        {/* VS center */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ width: 34, height: 34, borderRadius: 10,
-            background: 'hsl(215 26% 12%)', border: '1px solid hsl(215 22% 20%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <span style={{ fontSize: 10, fontWeight: 900, color: 'hsl(215 22% 40%)',
-              letterSpacing: '0.05em' }}>VS</span>
-          </div>
-        </div>
-
-        {/* Side B */}
+        {/* VS CENTER */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
-          gap: 8, padding: '0 10px 14px',
-          background: battle.winner_side === 'b' ? 'hsl(38 55% 52%/0.06)' : 'transparent',
-          borderLeft: '1px solid hsl(215 22% 16%)' }}>
-          <SideImg src={battle.side_b_image} name={battle.side_b_name} size={64} circle />
-          <p style={{ fontSize: 12, fontWeight: 800, color: 'hsl(215 18% 88%)', textAlign: 'center',
-            textTransform: 'uppercase', letterSpacing: '0.05em', maxWidth: 90,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          justifyContent: 'center', gap: 4 }}>
+          <div style={{
+            width: 36, height: 36, borderRadius: 10,
+            background: 'linear-gradient(145deg,rgba(139,174,214,0.12),rgba(139,174,214,0.05))',
+            border: '1px solid rgba(139,174,214,0.18)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontSize: 10, fontWeight: 900, color: 'rgba(139,174,214,0.7)',
+              letterSpacing: '0.04em' }}>VS</span>
+          </div>
+          {isActive && (
+            <div style={{ fontSize: 8, color: 'rgba(139,174,214,0.3)', textAlign: 'center',
+              lineHeight: 1.3, maxWidth: 36, wordBreak: 'break-all' }}>
+              {(battle.side_a_power + battle.side_b_power).toLocaleString()}<br/>
+              <span style={{ fontSize: 7 }}>ARX-P</span>
+            </div>
+          )}
+        </div>
+
+        {/* SIDE B */}
+        <div style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
+          padding: '0 8px 12px',
+          borderLeft: '1px solid rgba(139,174,214,0.08)',
+          opacity: concluded && aWon ? 0.55 : 1,
+        }}>
+          <div style={{ position: 'relative' }}>
+            <SideImg src={battle.side_b_image} name={battle.side_b_name} size={62} shape="circle"/>
+            {bWon && (
+              <div style={{ position: 'absolute', top: -6, right: -6,
+                width: 20, height: 20, borderRadius: '50%', background: '#f5a623',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 10, boxShadow: '0 0 10px rgba(245,166,35,0.6)' }}>👑</div>
+            )}
+          </div>
+          <p style={{ fontSize: 11, fontWeight: 800, color: 'rgba(240,244,255,0.9)',
+            textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em',
+            maxWidth: 82, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {battle.side_b_name}
           </p>
-          <div style={{ fontSize: 18, fontWeight: 800,
-            color: battle.winner_side === 'b' ? 'hsl(38 55% 58%)' : 'hsl(215 30% 72%)' }}>
-            {pctB}%
+          <div style={{
+            padding: '5px 12px', borderRadius: 10,
+            background: bWon ? 'rgba(245,166,35,0.15)' : 'rgba(139,174,214,0.1)',
+            border: `1px solid ${bWon ? 'rgba(245,166,35,0.35)' : 'rgba(139,174,214,0.2)'}`,
+          }}>
+            <div style={{ fontSize: 15, fontWeight: 900, textAlign: 'center',
+              color: bWon ? '#f5a623' : '#accafe', letterSpacing: '-0.02em' }}>
+              {oddsB}×
+            </div>
+            <div style={{ fontSize: 8, color: 'rgba(139,174,214,0.45)', textAlign: 'center',
+              marginTop: 1, textTransform: 'uppercase', letterSpacing: '.04em' }}>
+              {pctB}% backed
+            </div>
           </div>
-          {battle.winner_side === 'b' && <span style={{ fontSize: 16 }}>👑</span>}
         </div>
       </div>
 
-      {/* Bottom bar */}
-      <div style={{ padding: '0 14px 13px' }}>
-        {/* Progress */}
-        <div style={{ height: 4, borderRadius: 2, background: 'hsl(215 26% 12%)',
-          overflow: 'hidden', marginBottom: 8 }}>
-          <div style={{ height: '100%', borderRadius: 2, width: `${pctA}%`,
-            background: 'linear-gradient(90deg,hsl(215 35% 50%),hsl(215 45% 65%))',
-            transition: 'width 0.5s ease' }} />
+      {/* ── PROGRESS BAR ── */}
+      <div style={{ padding: '0 14px 12px' }}>
+        <div style={{ height: 6, borderRadius: 3, background: 'rgba(139,174,214,0.06)',
+          overflow: 'hidden', marginBottom: 6, position: 'relative' }}>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+            <div style={{ width: `${pctA}%`, background: `linear-gradient(90deg,rgba(139,174,214,0.6),rgba(172,202,254,0.9))`,
+              borderRadius: '3px 0 0 3px', transition: 'width 0.6s ease' }}/>
+            <div style={{ flex: 1, background: `linear-gradient(90deg,rgba(245,166,35,0.9),rgba(245,166,35,0.5))`,
+              borderRadius: '0 3px 3px 0' }}/>
+          </div>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9,
-          color: 'hsl(215 14% 35%)' }}>
+          color: 'rgba(139,174,214,0.4)' }}>
           <span>⚡ {total.toLocaleString()} ARX-P staked</span>
-          <span>{new Date(isActive ? battle.ends_at : battle.starts_at).toLocaleDateString()}</span>
+          <span>{new Date(battle.ends_at).toLocaleDateString()}</span>
         </div>
       </div>
     </motion.div>
   );
 }
 
-/* ── Battle Detail full-page overlay ─────────────────────────────────────── */
+/* ── BATTLE DETAIL OVERLAY ── */
 function BattleDetail({ battle, isActive, userVote, participants, voting, castVote, available, onClose }: {
-  battle: ArenaBattle | BattleHistoryEntry;
-  isActive?: boolean;
-  userVote: any;
-  participants: any[];
-  voting: boolean;
+  battle: ArenaBattle | BattleHistoryEntry; isActive?: boolean; userVote: any;
+  participants: any[]; voting: boolean;
   castVote: (id: string, side: 'a' | 'b', amt: number) => Promise<boolean>;
-  available: number;
-  onClose: () => void;
+  available: number; onClose: () => void;
 }) {
   const timer = useTimer(battle.ends_at, !!isActive);
   const total = (battle.side_a_power || 0) + (battle.side_b_power || 0);
-  const pctA = total > 0 ? Math.round((battle.side_a_power / total) * 100) : 50;
-  const pctB = 100 - pctA;
+  const pctA  = total > 0 ? Math.round((battle.side_a_power / total) * 100) : 50;
+  const pctB  = 100 - pctA;
+  const oddsA = total > 0 && battle.side_a_power > 0 ? (total / battle.side_a_power).toFixed(2) : '2.00';
+  const oddsB = total > 0 && battle.side_b_power > 0 ? (total / battle.side_b_power).toFixed(2) : '2.00';
   const existingVote = userVote?.side ?? null;
   const [side, setSide] = useState<'a' | 'b' | null>(null);
   const [amt, setAmt] = useState('');
@@ -239,209 +327,291 @@ function BattleDetail({ battle, isActive, userVote, participants, voting, castVo
     if (ok) { setAmt(''); setSide(null); }
   };
 
+  const aWon = battle.winner_side === 'a';
+  const bWon = battle.winner_side === 'b';
+
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
       style={{ position: 'fixed', inset: 0, background: 'hsl(225 30% 3%)', zIndex: 400,
-        overflowY: 'auto', paddingBottom: 80,
+        overflowY: 'auto', paddingBottom: 100,
         fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif" }}>
       <style>{CSS}</style>
 
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '52px 20px 0', position: 'sticky', top: 0, zIndex: 10,
-        background: 'hsl(225 30% 3%/0.95)', backdropFilter: 'blur(12px)' }}>
-        <button onClick={onClose} className="press"
-          style={{ width: 40, height: 40, borderRadius: 14, background: 'hsl(215 25% 11%)',
-            border: '1px solid hsl(215 22% 18%)', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', cursor: 'pointer' }}>
-          <ChevronLeft size={20} color="hsl(215 25% 55%)" />
+      {/* Sticky header */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'hsl(225 30% 3%/0.95)',
+        backdropFilter: 'blur(16px)', borderBottom: '1px solid rgba(139,174,214,0.08)',
+        display: 'flex', alignItems: 'center', padding: '52px 20px 14px', gap: 14 }}>
+        <button onClick={onClose} style={{ width: 40, height: 40, borderRadius: 14,
+          background: 'rgba(139,174,214,0.08)', border: '1px solid rgba(139,174,214,0.15)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+          <ChevronLeft size={20} color="rgba(139,174,214,0.7)" />
         </button>
-        <div style={{ textAlign: 'center', flex: 1, padding: '0 12px' }}>
-          <h1 style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 20% 93%)',
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {battle.title || 'Battle Detail'}
-          </h1>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <p style={{ fontSize: 15, fontWeight: 800, color: 'rgba(240,244,255,0.95)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', letterSpacing: '-0.2px' }}>
+            {battle.title}
+          </p>
           {isActive && timer && (
-            <p style={{ fontSize: 10, color: 'hsl(0 60% 60%)', marginTop: 2 }}>⏱ {timer} remaining</p>
+            <p style={{ fontSize: 10, color: '#e07070', marginTop: 2 }}>⏱ {timer} remaining</p>
           )}
         </div>
-        <div style={{ width: 40 }} />
+        {isActive && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0,
+            background: 'rgba(220,50,50,0.1)', border: '1px solid rgba(220,50,50,0.25)',
+            borderRadius: 12, padding: '6px 10px' }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#e05555',
+              animation: 'pulse 1.2s ease-in-out infinite' }}/>
+            <span style={{ fontSize: 9, fontWeight: 800, color: '#e07070' }}>LIVE</span>
+          </div>
+        )}
       </div>
 
-      <div style={{ padding: '16px 20px 0' }}>
-        {/* Big VS hero */}
-        <div className="glass-elevated" style={{ borderRadius: 22, overflow: 'hidden', marginBottom: 14,
-          border: `1px solid ${isActive ? 'hsl(215 28% 24%/0.5)' : 'hsl(215 22% 16%)'}`,
-          background: isActive ? 'linear-gradient(145deg,hsl(225 28% 11%),hsl(215 30% 14%))' : 'hsl(225 26% 9%)' }}>
-          {battle.description && (
-            <p style={{ fontSize: 12, color: 'hsl(215 18% 52%)', padding: '12px 16px 0',
-              textAlign: 'center' }}>{battle.description}</p>
+      <div style={{ padding: '16px 16px 0' }}>
+
+        {/* Description */}
+        {battle.description && (
+          <div style={{ padding: '10px 14px', borderRadius: 14, background: 'rgba(139,174,214,0.05)',
+            border: '1px solid rgba(139,174,214,0.1)', marginBottom: 14 }}>
+            <p style={{ fontSize: 12, color: 'rgba(139,174,214,0.6)', lineHeight: 1.6, textAlign: 'center' }}>
+              {battle.description}
+            </p>
+          </div>
+        )}
+
+        {/* BIG VS PANEL */}
+        <div style={{ borderRadius: 22, overflow: 'hidden', marginBottom: 14,
+          border: `1px solid ${isActive ? 'rgba(139,174,214,0.2)' : 'rgba(139,174,214,0.1)'}`,
+          background: 'linear-gradient(145deg,#0e1828,#0b1420)' }}>
+
+          {/* Shimmer top */}
+          {isActive && (
+            <div style={{ height: 2, background: 'linear-gradient(90deg,transparent,rgba(172,202,254,0.6),transparent)',
+              position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', inset: 0,
+                background: 'linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)',
+                animation: 'shimmer 2s linear infinite', width: '50%' }}/>
+            </div>
           )}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 44px 1fr',
-            padding: '18px 12px 16px', gap: 0, alignItems: 'center' }}>
-            {/* Side A */}
-            <motion.div whileTap={{ scale: 0.96 }} onClick={() => isActive && !existingVote && setSide('a')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                padding: '16px 10px', borderRadius: 16, cursor: isActive && !existingVote ? 'pointer' : 'default',
-                transition: 'all 0.2s',
-                background: pick === 'a' ? 'hsl(215 35% 62%/0.12)' : battle.winner_side === 'a' ? 'hsl(38 55% 52%/0.08)' : 'hsl(215 26% 10%)',
-                border: `2px solid ${pick === 'a' ? 'hsl(215 35% 62%/0.5)' : battle.winner_side === 'a' ? 'hsl(38 55% 52%/0.4)' : 'hsl(215 22% 17%)'}` }}>
-              <SideImg src={battle.side_a_image} name={battle.side_a_name} size={72} circle />
-              <p style={{ fontSize: 12, fontWeight: 800, color: 'hsl(215 18% 84%)', textAlign: 'center',
-                textTransform: 'uppercase', letterSpacing: '0.04em' }}>{battle.side_a_name}</p>
-              <div style={{ fontSize: 28, fontWeight: 800,
-                color: battle.winner_side === 'a' ? 'hsl(38 55% 58%)' : pick === 'a' ? 'hsl(215 35% 72%)' : 'hsl(215 20% 88%)' }}>
-                {pctA}%
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 52px 1fr',
+            padding: '20px 10px 16px', gap: 0 }}>
+
+            {/* SIDE A */}
+            <motion.div whileTap={isActive && !existingVote ? { scale: 0.97 } : {}}
+              onClick={() => isActive && !existingVote && setSide('a')}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                padding: '16px 8px', borderRadius: 18, cursor: isActive && !existingVote ? 'pointer' : 'default',
+                transition: 'all 0.25s',
+                background: pick === 'a' ? 'rgba(172,202,254,0.1)' : aWon ? 'rgba(245,166,35,0.06)' : 'rgba(139,174,214,0.03)',
+                border: `2px solid ${pick === 'a' ? 'rgba(172,202,254,0.45)' : aWon ? 'rgba(245,166,35,0.4)' : 'rgba(139,174,214,0.1)'}`,
+                opacity: battle.winner_side && bWon ? 0.5 : 1,
+              }}>
+              <div style={{ position: 'relative' }}>
+                <SideImg src={battle.side_a_image} name={battle.side_a_name} size={80} shape="circle"/>
+                {aWon && (
+                  <div style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24,
+                    borderRadius: '50%', background: '#f5a623', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 12, boxShadow: '0 0 12px rgba(245,166,35,0.7)' }}>👑</div>
+                )}
               </div>
-              <p style={{ fontSize: 10, color: 'hsl(215 14% 40%)', textAlign: 'center' }}>
-                {battle.side_a_power.toLocaleString()} ARX-P
+              <p style={{ fontSize: 13, fontWeight: 800, color: 'rgba(240,244,255,0.95)',
+                textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em',
+                maxWidth: 90, lineHeight: 1.25 }}>
+                {battle.side_a_name}
               </p>
-              {battle.winner_side === 'a' && <p style={{ fontSize: 12, color: 'hsl(38 55% 58%)', fontWeight: 700 }}>👑 Winner</p>}
-              {pick === 'a' && isActive && <p style={{ fontSize: 11, color: 'hsl(155 45% 55%)', fontWeight: 700 }}>✓ Your pick</p>}
+              {/* Big odds */}
+              <div style={{ padding: '8px 16px', borderRadius: 14,
+                background: pick === 'a' ? 'rgba(172,202,254,0.18)' : aWon ? 'rgba(245,166,35,0.15)' : 'rgba(139,174,214,0.08)',
+                border: `1.5px solid ${pick === 'a' ? 'rgba(172,202,254,0.45)' : aWon ? 'rgba(245,166,35,0.35)' : 'rgba(139,174,214,0.15)'}` }}>
+                <div style={{ fontSize: 22, fontWeight: 900, textAlign: 'center', letterSpacing: '-0.03em',
+                  color: aWon ? '#f5a623' : pick === 'a' ? '#accafe' : 'rgba(240,244,255,0.85)' }}>
+                  {oddsA}×
+                </div>
+                <div style={{ fontSize: 9, textAlign: 'center', marginTop: 2, letterSpacing: '.04em',
+                  color: 'rgba(139,174,214,0.5)', textTransform: 'uppercase' }}>
+                  {pctA}% · {battle.side_a_power.toLocaleString()}
+                </div>
+              </div>
+              {aWon && <div style={{ fontSize: 11, fontWeight: 700, color: '#f5a623' }}>👑 Winner</div>}
+              {pick === 'a' && isActive && !existingVote && (
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#2dd4a0' }}>✓ Selected</div>
+              )}
             </motion.div>
 
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div style={{ fontWeight: 900, fontSize: 11, color: 'hsl(215 18% 35%)' }}>VS</div>
+            {/* VS */}
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center',
+              justifyContent: 'center', gap: 6 }}>
+              <div style={{ width: 38, height: 38, borderRadius: 12,
+                background: 'rgba(139,174,214,0.08)', border: '1px solid rgba(139,174,214,0.15)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontSize: 10, fontWeight: 900, color: 'rgba(139,174,214,0.6)' }}>VS</span>
+              </div>
+              <div style={{ fontSize: 8, color: 'rgba(139,174,214,0.3)', textAlign: 'center' }}>
+                {total.toLocaleString()}<br/>ARX-P
+              </div>
             </div>
 
-            {/* Side B */}
-            <motion.div whileTap={{ scale: 0.96 }} onClick={() => isActive && !existingVote && setSide('b')}
-              style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                padding: '16px 10px', borderRadius: 16, cursor: isActive && !existingVote ? 'pointer' : 'default',
-                transition: 'all 0.2s',
-                background: pick === 'b' ? 'hsl(215 35% 62%/0.12)' : battle.winner_side === 'b' ? 'hsl(38 55% 52%/0.08)' : 'hsl(215 26% 10%)',
-                border: `2px solid ${pick === 'b' ? 'hsl(215 35% 62%/0.5)' : battle.winner_side === 'b' ? 'hsl(38 55% 52%/0.4)' : 'hsl(215 22% 17%)'}` }}>
-              <SideImg src={battle.side_b_image} name={battle.side_b_name} size={72} circle />
-              <p style={{ fontSize: 12, fontWeight: 800, color: 'hsl(215 18% 84%)', textAlign: 'center',
-                textTransform: 'uppercase', letterSpacing: '0.04em' }}>{battle.side_b_name}</p>
-              <div style={{ fontSize: 28, fontWeight: 800,
-                color: battle.winner_side === 'b' ? 'hsl(38 55% 58%)' : pick === 'b' ? 'hsl(215 35% 72%)' : 'hsl(215 20% 88%)' }}>
-                {pctB}%
+            {/* SIDE B */}
+            <motion.div whileTap={isActive && !existingVote ? { scale: 0.97 } : {}}
+              onClick={() => isActive && !existingVote && setSide('b')}
+              style={{
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                padding: '16px 8px', borderRadius: 18, cursor: isActive && !existingVote ? 'pointer' : 'default',
+                transition: 'all 0.25s',
+                background: pick === 'b' ? 'rgba(245,166,35,0.08)' : bWon ? 'rgba(245,166,35,0.06)' : 'rgba(139,174,214,0.03)',
+                border: `2px solid ${pick === 'b' ? 'rgba(245,166,35,0.45)' : bWon ? 'rgba(245,166,35,0.4)' : 'rgba(139,174,214,0.1)'}`,
+                opacity: battle.winner_side && aWon ? 0.5 : 1,
+              }}>
+              <div style={{ position: 'relative' }}>
+                <SideImg src={battle.side_b_image} name={battle.side_b_name} size={80} shape="circle"/>
+                {bWon && (
+                  <div style={{ position: 'absolute', top: -8, right: -8, width: 24, height: 24,
+                    borderRadius: '50%', background: '#f5a623', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', fontSize: 12, boxShadow: '0 0 12px rgba(245,166,35,0.7)' }}>👑</div>
+                )}
               </div>
-              <p style={{ fontSize: 10, color: 'hsl(215 14% 40%)', textAlign: 'center' }}>
-                {battle.side_b_power.toLocaleString()} ARX-P
+              <p style={{ fontSize: 13, fontWeight: 800, color: 'rgba(240,244,255,0.95)',
+                textAlign: 'center', textTransform: 'uppercase', letterSpacing: '0.04em',
+                maxWidth: 90, lineHeight: 1.25 }}>
+                {battle.side_b_name}
               </p>
-              {battle.winner_side === 'b' && <p style={{ fontSize: 12, color: 'hsl(38 55% 58%)', fontWeight: 700 }}>👑 Winner</p>}
-              {pick === 'b' && isActive && <p style={{ fontSize: 11, color: 'hsl(155 45% 55%)', fontWeight: 700 }}>✓ Your pick</p>}
+              <div style={{ padding: '8px 16px', borderRadius: 14,
+                background: pick === 'b' ? 'rgba(245,166,35,0.15)' : bWon ? 'rgba(245,166,35,0.15)' : 'rgba(139,174,214,0.08)',
+                border: `1.5px solid ${pick === 'b' ? 'rgba(245,166,35,0.45)' : bWon ? 'rgba(245,166,35,0.35)' : 'rgba(139,174,214,0.15)'}` }}>
+                <div style={{ fontSize: 22, fontWeight: 900, textAlign: 'center', letterSpacing: '-0.03em',
+                  color: bWon ? '#f5a623' : pick === 'b' ? '#f5a623' : 'rgba(240,244,255,0.85)' }}>
+                  {oddsB}×
+                </div>
+                <div style={{ fontSize: 9, textAlign: 'center', marginTop: 2, letterSpacing: '.04em',
+                  color: 'rgba(139,174,214,0.5)', textTransform: 'uppercase' }}>
+                  {pctB}% · {battle.side_b_power.toLocaleString()}
+                </div>
+              </div>
+              {bWon && <div style={{ fontSize: 11, fontWeight: 700, color: '#f5a623' }}>👑 Winner</div>}
+              {pick === 'b' && isActive && !existingVote && (
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#2dd4a0' }}>✓ Selected</div>
+              )}
             </motion.div>
           </div>
 
-          {/* Progress */}
-          <div style={{ margin: '0 16px 8px', height: 6, borderRadius: 3,
-            background: 'hsl(215 26% 12%)', overflow: 'hidden' }}>
+          {/* Progress bar */}
+          <div style={{ margin: '0 14px 14px', height: 8, borderRadius: 4,
+            background: 'rgba(139,174,214,0.06)', overflow: 'hidden' }}>
             <motion.div initial={{ width: 0 }} animate={{ width: `${pctA}%` }} transition={{ duration: 0.8 }}
-              style={{ height: '100%', borderRadius: 3,
-                background: 'linear-gradient(90deg,hsl(215 35% 50%),hsl(215 45% 65%))' }} />
+              style={{ height: '100%', borderRadius: '4px 0 0 4px',
+                background: 'linear-gradient(90deg,rgba(139,174,214,0.6),rgba(172,202,254,0.9))' }}/>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 16px 14px',
-            fontSize: 10, color: 'hsl(215 14% 35%)' }}>
-            <span>Total: {total.toLocaleString()} ARX-P</span>
-            <span>{participants.length} stakers</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 14px 14px',
+            fontSize: 9, color: 'rgba(139,174,214,0.35)' }}>
+            <span>{battle.side_a_name} · {pctA}%</span>
+            <span>{battle.side_b_name} · {pctB}%</span>
           </div>
         </div>
 
-        {/* Stats */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
+        {/* Stats row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
           {[
-            { label: 'Pool A', val: battle.side_a_power.toLocaleString(), col: 'hsl(215 35% 62%)' },
-            { label: 'Stakers', val: String(participants.length), col: 'hsl(155 45% 50%)' },
-            { label: 'Pool B', val: battle.side_b_power.toLocaleString(), col: 'hsl(255 50% 65%)' },
-          ].map((s, i) => (
-            <div key={i} className="glass-card" style={{ borderRadius: 16, padding: '12px 8px', textAlign: 'center' }}>
-              <p style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '0.1em',
-                color: 'hsl(215 14% 32%)', fontWeight: 600, marginBottom: 4 }}>{s.label}</p>
-              <p style={{ fontSize: 14, fontWeight: 700, color: s.col }}>{s.val}</p>
+            { label:'Pool', val:`${total.toLocaleString()}`, sub:'ARX-P', col:'#accafe' },
+            { label:'Stakers', val:String(participants.length), sub:'players', col:'#2dd4a0' },
+            { label:'Bonus', val:`${((battle as any).bonus_percentage || 200)}%`, sub:'reward', col:'#f5a623' },
+          ].map(s => (
+            <div key={s.label} style={{ borderRadius: 16, padding: '12px 8px', textAlign: 'center',
+              background: 'rgba(139,174,214,0.05)', border: '1px solid rgba(139,174,214,0.1)' }}>
+              <div style={{ fontSize: 9, color: 'rgba(139,174,214,0.4)', textTransform: 'uppercase',
+                letterSpacing: '.08em', marginBottom: 4 }}>{s.label}</div>
+              <div style={{ fontSize: 16, fontWeight: 900, color: s.col }}>{s.val}</div>
+              <div style={{ fontSize: 8, color: 'rgba(139,174,214,0.3)', marginTop: 2 }}>{s.sub}</div>
             </div>
           ))}
         </div>
 
-        {/* Stake panel */}
+        {/* STAKE PANEL */}
         {isActive && !existingVote && (
-          <div className="glass-elevated" style={{ borderRadius: 20, padding: '16px', marginBottom: 14,
-            border: '1px solid hsl(215 28% 20%)' }}>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em',
-              color: 'hsl(215 14% 35%)', fontWeight: 700, marginBottom: 10 }}>
-              Stake ARX-P · {pick ? `backing ${pick === 'a' ? battle.side_a_name : battle.side_b_name}` : 'tap a side above first'}
-            </p>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8,
-              background: 'hsl(215 26% 10%)', border: '1px solid hsl(215 26% 17%)',
+          <div style={{ borderRadius: 20, padding: '16px', marginBottom: 14,
+            background: 'rgba(139,174,214,0.05)', border: '1px solid rgba(139,174,214,0.15)' }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em',
+              color: 'rgba(139,174,214,0.5)', fontWeight: 700, marginBottom: 12 }}>
+              {pick ? `Stake on ${pick === 'a' ? battle.side_a_name : battle.side_b_name}` : '← Tap a side above to select'}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10,
+              background: 'rgba(9,12,18,0.6)', border: '1px solid rgba(139,174,214,0.15)',
               borderRadius: 14, padding: '12px 16px', marginBottom: 10 }}>
               <input type="number" value={amt} onChange={e => setAmt(e.target.value)}
-                placeholder="1,000"
-                style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 22,
-                  fontWeight: 700, color: 'hsl(215 20% 93%)',
-                  fontFamily: "'Creato Display',-apple-system,sans-serif" }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'hsl(215 35% 55%)' }}>ARX-P</span>
+                placeholder="0" style={{ flex: 1, background: 'none', border: 'none', outline: 'none',
+                  fontSize: 24, fontWeight: 900, color: 'rgba(240,244,255,0.95)',
+                  fontFamily: "'Creato Display',-apple-system,sans-serif" }}/>
+              <span style={{ fontSize: 12, fontWeight: 700, color: 'rgba(139,174,214,0.6)' }}>ARX-P</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 12 }}>
-              {[['1K', '1000'], ['5K', '5000'], ['10K', '10000'], ['Max', String(available)]].map(([l, v]) => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 6, marginBottom: 12 }}>
+              {[['1K','1000'],['5K','5000'],['10K','10000'],['Max',String(available)]].map(([l,v]) => (
                 <button key={l} onClick={() => setAmt(v)}
-                  style={{ padding: '8px', borderRadius: 11, background: 'hsl(215 25% 12%)',
-                    border: '1px solid hsl(215 25% 20%)', color: 'hsl(215 25% 55%)',
-                    fontSize: 12, fontWeight: 700, cursor: 'pointer', outline: 'none' }}>
+                  style={{ padding: '8px', borderRadius: 10, background: 'rgba(139,174,214,0.08)',
+                    border: '1px solid rgba(139,174,214,0.15)', color: 'rgba(139,174,214,0.8)',
+                    fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                   {l}
                 </button>
               ))}
             </div>
             <button onClick={doVote} disabled={voting || !pick || !amt}
-              style={{ width: '100%', padding: '15px', borderRadius: 16, fontWeight: 700, fontSize: 14,
+              style={{ width: '100%', padding: '16px', borderRadius: 16, fontWeight: 800, fontSize: 15,
                 cursor: pick && amt ? 'pointer' : 'default', outline: 'none', transition: 'all 0.2s',
                 fontFamily: "'Creato Display',-apple-system,sans-serif",
-                background: pick && amt ? 'linear-gradient(135deg,hsl(215 35% 55%),hsl(215 40% 44%))' : 'hsl(215 25% 12%)',
-                color: pick && amt ? 'white' : 'hsl(215 18% 35%)',
-                border: `1.5px solid ${pick && amt ? 'hsl(215 35% 62%/0.45)' : 'hsl(215 25% 18%)'}`,
-                boxShadow: pick && amt ? '0 4px 16px hsl(215 55% 62%/0.2)' : 'none' }}>
-              {voting ? 'Staking…' : pick ? `Stake on ${pick === 'a' ? battle.side_a_name : battle.side_b_name}` : '← Select a side above'}
+                background: pick && amt
+                  ? 'linear-gradient(135deg,rgba(139,174,214,0.3),rgba(172,202,254,0.15))'
+                  : 'rgba(139,174,214,0.06)',
+                color: pick && amt ? '#accafe' : 'rgba(139,174,214,0.3)',
+                border: `1.5px solid ${pick && amt ? 'rgba(172,202,254,0.4)' : 'rgba(139,174,214,0.1)'}` }}>
+              {voting ? 'Staking…' : pick ? `Stake on ${pick === 'a' ? battle.side_a_name : battle.side_b_name}` : 'Select a side first'}
             </button>
-            <p style={{ fontSize: 9, color: 'hsl(215 14% 30%)', marginTop: 8, textAlign: 'center' }}>
-              Min 1,000 · Max 100,000 ARX-P · Winners earn from the losing pool
+            <p style={{ fontSize: 9, color: 'rgba(139,174,214,0.3)', marginTop: 8, textAlign: 'center' }}>
+              Min 1,000 · Max 100,000 ARX-P · Winners share the losing pool
             </p>
           </div>
         )}
 
-        {/* Voted confirmation */}
+        {/* Already voted */}
         {existingVote && isActive && (
-          <div style={{ marginBottom: 14, padding: '13px 16px',
-            background: 'hsl(155 45% 43%/0.07)', border: '1px solid hsl(155 45% 43%/0.25)',
+          <div style={{ marginBottom: 14, padding: '14px 16px',
+            background: 'rgba(45,212,160,0.07)', border: '1px solid rgba(45,212,160,0.2)',
             borderRadius: 18, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 12, fontSize: 18, flexShrink: 0,
-              background: 'hsl(155 45% 43%/0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</div>
+            <div style={{ width: 36, height: 36, borderRadius: 12, background: 'rgba(45,212,160,0.12)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, flexShrink: 0 }}>✓</div>
             <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'hsl(155 45% 55%)' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#2dd4a0' }}>
                 Staked {userVote?.power_spent?.toLocaleString()} ARX-P
               </p>
-              <p style={{ fontSize: 11, color: 'hsl(155 45% 43%/0.6)', marginTop: 2 }}>
+              <p style={{ fontSize: 11, color: 'rgba(45,212,160,0.55)', marginTop: 2 }}>
                 On {existingVote === 'a' ? battle.side_a_name : battle.side_b_name} · Awaiting result
               </p>
             </div>
           </div>
         )}
 
-        {/* Live stakers */}
+        {/* Stakers list */}
         {participants.length > 0 && (
           <>
-            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em',
-              color: 'hsl(215 14% 30%)', fontWeight: 700, marginBottom: 10 }}>
+            <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.1em',
+              color: 'rgba(139,174,214,0.35)', fontWeight: 700, marginBottom: 10 }}>
               Stakers ({participants.length})
             </p>
             {participants.slice(0, 10).map((p: any) => (
               <div key={p.user_id} style={{ display: 'flex', alignItems: 'center', gap: 10,
-                padding: '10px 13px', borderRadius: 14, marginBottom: 7,
-                background: 'hsl(225 24% 8%)', border: '1px solid hsl(215 20% 13%)' }}>
-                <div style={{ width: 30, height: 30, borderRadius: 10, overflow: 'hidden', flexShrink: 0,
-                  background: 'hsl(215 25% 13%)', display: 'flex', alignItems: 'center',
-                  justifyContent: 'center', fontSize: 12, fontWeight: 700, color: 'hsl(215 25% 52%)' }}>
+                padding: '10px 12px', borderRadius: 14, marginBottom: 7,
+                background: 'rgba(139,174,214,0.04)', border: '1px solid rgba(139,174,214,0.08)' }}>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+                  background: 'rgba(139,174,214,0.1)', overflow: 'hidden',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: 12, fontWeight: 700, color: 'rgba(139,174,214,0.7)' }}>
                   {p.avatar_url
-                    ? <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ? <img src={p.avatar_url} alt="" style={{ width:'100%',height:'100%',objectFit:'cover'}}/>
                     : (p.username?.[0] || '?').toUpperCase()}
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 12, fontWeight: 600, color: 'hsl(215 18% 80%)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {p.username || 'Miner'}
-                  </p>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'hsl(215 35% 62%)', flexShrink: 0 }}>
+                <p style={{ flex: 1, fontSize: 12, fontWeight: 600, color: 'rgba(240,244,255,0.8)',
+                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {p.username || 'Miner'}
+                </p>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#accafe', flexShrink: 0 }}>
                   {p.power_spent.toLocaleString()} ARX-P
                 </span>
               </div>
@@ -453,85 +623,76 @@ function BattleDetail({ battle, isActive, userVote, participants, voting, castVo
   );
 }
 
-/* ── Leaderboard row ─────────────────────────────────────────────────────── */
+/* ── Leaderboard row ── */
 function LbRow({ entry, rank, col }: { entry: LeaderboardEntry; rank: number; col: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 13px',
-      borderRadius: 14, marginBottom: 7,
-      background: `${col}08`, border: `1px solid ${col}22` }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+      borderRadius: 14, marginBottom: 7, background: `${col}06`, border: `1px solid ${col}18` }}>
       <div style={{ width: 26, height: 26, borderRadius: 9, flexShrink: 0,
-        background: `${col}20`, border: `1px solid ${col}40`,
+        background: `${col}18`, border: `1px solid ${col}38`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: 11, fontWeight: 800, color: col }}>
-        {rank <= 3 ? ['🥇', '🥈', '🥉'][rank - 1] : rank}
+        {rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : rank}
       </div>
       <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, overflow: 'hidden',
-        background: 'hsl(225 25% 14%)', display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 12, fontWeight: 700, color: col }}>
+        background: 'rgba(139,174,214,0.1)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: 12, fontWeight: 700, color: col }}>
         {entry.avatar_url
-          ? <img src={entry.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img src={entry.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
           : (entry.username?.[0] || '?').toUpperCase()}
       </div>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 12, fontWeight: 600, color: 'hsl(215 18% 84%)',
+        <p style={{ fontSize: 12, fontWeight: 600, color: 'rgba(240,244,255,0.85)',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {entry.username || 'Miner'}
         </p>
-        <p style={{ fontSize: 9, color: 'hsl(215 14% 38%)', marginTop: 1 }}>
-          {entry.total_wins} wins · {entry.total_battles} battles
+        <p style={{ fontSize: 9, color: 'rgba(139,174,214,0.4)', marginTop: 1 }}>
+          {entry.total_wins}W · {entry.total_battles} battles
         </p>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <p style={{ fontSize: 12, fontWeight: 700, color: col }}>
-          {entry.total_power_staked.toLocaleString()}
-        </p>
-        <p style={{ fontSize: 9, color: 'hsl(215 14% 32%)', marginTop: 1 }}>ARX-P</p>
+        <p style={{ fontSize: 12, fontWeight: 700, color: col }}>{entry.total_power_staked.toLocaleString()}</p>
+        <p style={{ fontSize: 8, color: 'rgba(139,174,214,0.3)', marginTop: 1 }}>ARX-P</p>
       </div>
     </div>
   );
 }
 
-/* ── Main Arena ──────────────────────────────────────────────────────────── */
+/* ── MAIN ── */
 export default function MobileArena() {
   const { user }   = useAuth();
   const navigate   = useNavigate();
   const { points } = usePoints();
-  const {
-    activeBattle, userVote, participants, battleHistory,
-    leaderboard, loading, voting, castVote,
-  } = useArena();
+  const { activeBattle, userVote, participants, battleHistory, leaderboard, loading, voting, castVote } = useArena();
   const { membership, loading: memLoading, registering, registerMembership } = useArenaMembership();
 
-  const [showAuth, setShowAuth] = useState(false);
-  const [tab, setTab] = useState<Tab>('battles');
-  const [selected, setSelected] = useState<{ battle: ArenaBattle | BattleHistoryEntry; active: boolean } | null>(null);
+  const [showAuth, setShowAuth]   = useState(false);
+  const [tab, setTab]             = useState<Tab>('battles');
+  const [selected, setSelected]   = useState<{ battle: ArenaBattle | BattleHistoryEntry; active: boolean } | null>(null);
 
   const available  = Math.round(points?.total_points ?? 0);
   const allHistory = battleHistory as BattleHistoryEntry[];
-
-  // Split leaderboard by club
   const alphaBoard = leaderboard.filter((e: any) => e.club === 'alpha' || (!e.club && leaderboard.indexOf(e) % 2 === 0));
   const omegaBoard = leaderboard.filter((e: any) => e.club === 'omega' || (!e.club && leaderboard.indexOf(e) % 2 === 1));
   const myStakes   = allHistory.filter(b => b.user_participated);
 
-  /* Not logged in */
   if (!user) return (
-    <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex',
-      flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-      padding: '0 32px', fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'hsl(225 30% 3%)', display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center', padding:'0 32px',
+      fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif" }}>
       <style>{CSS}</style>
-      <div style={{ fontSize: 56, marginBottom: 24 }}>⚔️</div>
-      <h2 style={{ fontSize: 26, fontWeight: 700, color: 'hsl(215 20% 93%)', marginBottom: 10, textAlign: 'center' }}>
+      <div style={{ fontSize:56, marginBottom:20 }}>⚔️</div>
+      <h2 style={{ fontSize:26, fontWeight:800, color:'rgba(240,244,255,0.95)', marginBottom:10, textAlign:'center', letterSpacing:'-0.03em' }}>
         Prediction Arena
       </h2>
-      <p style={{ fontSize: 14, color: 'hsl(215 14% 42%)', textAlign: 'center', lineHeight: 1.65, marginBottom: 36 }}>
-        Stake ARX-P on battle outcomes and earn from the winning pool
+      <p style={{ fontSize:13, color:'rgba(139,174,214,0.5)', textAlign:'center', lineHeight:1.7, marginBottom:36 }}>
+        Stake ARX-P on battle outcomes.<br/>Winners share the entire losing pool.
       </p>
-      <button onClick={() => setShowAuth(true)} className="press glow-steel"
-        style={{ width: '100%', padding: '18px', borderRadius: 20, cursor: 'pointer', fontWeight: 700,
-          fontSize: 15, background: 'linear-gradient(135deg,hsl(215 35% 18%),hsl(225 32% 10%))',
-          border: '1.5px solid hsl(215 35% 62%/0.35)', color: 'hsl(215 38% 85%)', outline: 'none',
-          fontFamily: "'Creato Display',-apple-system,sans-serif" }}>
+      <button onClick={() => setShowAuth(true)} style={{ width:'100%', padding:'18px', borderRadius:20,
+        cursor:'pointer', fontWeight:800, fontSize:15,
+        background:'linear-gradient(135deg,rgba(139,174,214,0.18),rgba(139,174,214,0.08))',
+        border:'1.5px solid rgba(172,202,254,0.35)', color:'#accafe', outline:'none',
+        fontFamily:"'Creato Display',-apple-system,sans-serif" }}>
         Sign In to Enter
       </button>
       <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
@@ -539,220 +700,176 @@ export default function MobileArena() {
   );
 
   if (memLoading || loading) return (
-    <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex',
-      alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ minHeight:'100vh', background:'hsl(225 30% 3%)', display:'flex', alignItems:'center', justifyContent:'center' }}>
       <style>{CSS}</style>
-      <div style={{ width: 44, height: 44, borderRadius: '50%',
-        border: '3px solid hsl(215 35% 62%/0.2)', borderTopColor: 'hsl(215 35% 62%)',
-        animation: 'spin 1s linear infinite' }} />
+      <div style={{ width:44, height:44, borderRadius:'50%',
+        border:'3px solid rgba(139,174,214,0.15)', borderTopColor:'rgba(139,174,214,0.7)',
+        animation:'spin 1s linear infinite' }}/>
     </div>
   );
 
   if (!membership) return (
-    <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)',
-      fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'hsl(225 30% 3%)',
+      fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif" }}>
       <style>{CSS}</style>
       <ArenaOnboarding onComplete={registerMembership} isLoading={registering} />
     </div>
   );
 
   return (
-    <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', paddingBottom: 100,
-      fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif" }}>
+    <div style={{ minHeight:'100vh', background:'hsl(225 30% 3%)', paddingBottom:110,
+      fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif" }}>
       <style>{CSS}</style>
 
       {/* Detail overlay */}
       <AnimatePresence>
         {selected && (
-          <BattleDetail
-            battle={selected.battle}
-            isActive={selected.active}
+          <BattleDetail battle={selected.battle} isActive={selected.active}
             userVote={selected.active ? userVote : null}
             participants={selected.active ? participants : []}
-            voting={voting}
-            castVote={castVote}
-            available={available}
+            voting={voting} castVote={castVote} available={available}
             onClose={() => setSelected(null)} />
         )}
       </AnimatePresence>
 
-      {/* ── Header ── */}
-      <div style={{ padding: '52px 20px 0', display: 'flex', alignItems: 'center',
-        justifyContent: 'space-between' }}>
-        <button onClick={() => navigate(-1)} className="press"
-          style={{ width: 40, height: 40, borderRadius: 14, background: 'hsl(215 25% 11%)',
-            border: '1px solid hsl(215 22% 18%)', display: 'flex', alignItems: 'center',
-            justifyContent: 'center', cursor: 'pointer' }}>
-          <ChevronLeft size={20} color="hsl(215 25% 55%)" />
-        </button>
-        <div style={{ textAlign: 'center' }}>
-          <h1 style={{ fontSize: 19, fontWeight: 700, color: 'hsl(215 20% 93%)' }}>Arena</h1>
-          <p style={{ fontSize: 10, color: 'hsl(215 14% 38%)', marginTop: 2 }}>
-            Team{' '}
-            <span style={{ color: membership.club === 'alpha' ? 'hsl(215 35% 72%)' : 'hsl(255 50% 65%)',
-              fontWeight: 700, textTransform: 'uppercase' }}>
-              {membership.club}
-            </span>
+      {/* Header */}
+      <div style={{ padding:'52px 20px 0', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div>
+          <h1 style={{ fontSize:22, fontWeight:900, color:'rgba(240,244,255,0.95)', letterSpacing:'-0.02em' }}>Arena</h1>
+          <p style={{ fontSize:10, color:'rgba(139,174,214,0.45)', marginTop:2 }}>
+            Team <span style={{ color: membership.club==='alpha' ? '#accafe' : '#c084fc',
+              fontWeight:700, textTransform:'uppercase' }}>{membership.club}</span>
             {' · '}{available.toLocaleString()} ARX-P
           </p>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 5,
-          background: 'hsl(0 60% 56%/0.1)', border: '1px solid hsl(0 60% 56%/0.22)',
-          borderRadius: 20, padding: '6px 12px' }}>
-          <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: 'hsl(0 60% 56%)' }} />
-          <span style={{ fontSize: 10, fontWeight: 700, color: 'hsl(0 60% 65%)' }}>LIVE</span>
+        <div style={{ display:'flex', alignItems:'center', gap:6,
+          background:'rgba(220,50,50,0.1)', border:'1px solid rgba(220,50,50,0.22)',
+          borderRadius:20, padding:'7px 14px' }}>
+          <div style={{ width:6, height:6, borderRadius:'50%', background:'#e05555',
+            animation:'pulse 1.2s ease-in-out infinite' }}/>
+          <span style={{ fontSize:10, fontWeight:800, color:'#e07070' }}>LIVE</span>
         </div>
       </div>
 
-      {/* ── Tabs ── */}
-      <div style={{ display: 'flex', padding: '16px 20px 0' }}>
-        {([['battles', 'Battles'], ['leaderboard', 'Leaderboard'], ['my-stakes', 'My Stakes']] as [Tab, string][])
-          .map(([t, label]) => (
-            <button key={t} onClick={() => setTab(t)}
-              style={{ flex: 1, padding: '10px 0', fontSize: 12, fontWeight: 700, border: 'none',
-                cursor: 'pointer', outline: 'none', transition: 'all 0.2s', background: 'none',
-                color: tab === t ? 'hsl(215 35% 72%)' : 'hsl(215 14% 35%)',
-                borderBottom: `2px solid ${tab === t ? 'hsl(215 35% 62%)' : 'hsl(215 20% 18%)'}`,
-                fontFamily: "'Creato Display',-apple-system,sans-serif" }}>
-              {label}
-            </button>
-          ))}
+      {/* Tabs */}
+      <div style={{ display:'flex', padding:'16px 20px 0', borderBottom:'1px solid rgba(139,174,214,0.08)' }}>
+        {([['battles','Battles'],['leaderboard','Board'],['my-stakes','My Bets']] as [Tab,string][]).map(([t,label]) => (
+          <button key={t} onClick={() => setTab(t)}
+            style={{ flex:1, padding:'10px 0', fontSize:12, fontWeight:700, border:'none',
+              cursor:'pointer', outline:'none', background:'none',
+              color: tab===t ? '#accafe' : 'rgba(139,174,214,0.35)',
+              borderBottom:`2px solid ${tab===t ? '#accafe' : 'transparent'}`,
+              fontFamily:"'Creato Display',-apple-system,sans-serif",
+              transition:'all 0.2s' }}>
+            {label}
+          </button>
+        ))}
       </div>
 
-      <div style={{ padding: '16px 20px 0' }}>
+      <div style={{ padding:'16px 16px 0' }}>
 
-        {/* ═══ BATTLES ═══ */}
+        {/* BATTLES TAB */}
         {tab === 'battles' && (
           <>
             {activeBattle && (
               <>
-                <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em',
-                  color: 'hsl(215 14% 30%)', fontWeight: 700, marginBottom: 10 }}>Active Battle</p>
+                <p style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'.12em',
+                  color:'rgba(220,80,80,0.7)', fontWeight:700, marginBottom:10 }}>🔴 Active Battle</p>
                 <BannerCard battle={activeBattle} isActive
                   userVoted={!!userVote} userWon={false}
-                  onClick={() => setSelected({ battle: activeBattle, active: true })} />
+                  onClick={() => setSelected({ battle:activeBattle, active:true })} />
               </>
             )}
-
             {allHistory.length > 0 && (
               <>
-                <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em',
-                  color: 'hsl(215 14% 30%)', fontWeight: 700, marginBottom: 10,
-                  marginTop: activeBattle ? 8 : 0 }}>
-                  All Battles ({allHistory.length})
+                <p style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'.12em',
+                  color:'rgba(139,174,214,0.4)', fontWeight:700, marginBottom:10, marginTop:activeBattle?8:0 }}>
+                  Past Battles ({allHistory.length})
                 </p>
                 {allHistory.map(b => (
-                  <BannerCard key={b.id} battle={b}
-                    isActive={false}
-                    userVoted={b.user_participated}
-                    userWon={b.user_won}
-                    onClick={() => setSelected({ battle: b, active: false })} />
+                  <BannerCard key={b.id} battle={b} isActive={false}
+                    userVoted={b.user_participated} userWon={b.user_won}
+                    onClick={() => setSelected({ battle:b, active:false })} />
                 ))}
               </>
             )}
-
             {!activeBattle && allHistory.length === 0 && (
-              <div className="glass-card" style={{ borderRadius: 20, padding: '32px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>⚔️</div>
-                <p style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 18% 48%)', marginBottom: 6 }}>
-                  No battles yet
-                </p>
-                <p style={{ fontSize: 12, color: 'hsl(215 14% 32%)' }}>Check back soon!</p>
+              <div style={{ borderRadius:20, padding:'40px 20px', textAlign:'center',
+                background:'rgba(139,174,214,0.04)', border:'1px solid rgba(139,174,214,0.08)' }}>
+                <div style={{ fontSize:48, marginBottom:12 }}>⚔️</div>
+                <p style={{ fontSize:15, fontWeight:700, color:'rgba(139,174,214,0.5)', marginBottom:6 }}>No battles yet</p>
+                <p style={{ fontSize:12, color:'rgba(139,174,214,0.3)' }}>Admin will create a battle soon!</p>
               </div>
             )}
           </>
         )}
 
-        {/* ═══ LEADERBOARD ═══ */}
+        {/* LEADERBOARD TAB */}
         {tab === 'leaderboard' && (
           <>
-            {leaderboard.length === 0 ? (
-              <div className="glass-card" style={{ borderRadius: 20, padding: '32px 20px', textAlign: 'center' }}>
-                <Trophy size={36} color="hsl(215 18% 40%)" style={{ marginBottom: 12 }} />
-                <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 48%)', marginBottom: 6 }}>
-                  No leaderboard data yet
-                </p>
-                <p style={{ fontSize: 12, color: 'hsl(215 14% 32%)' }}>
-                  Stake in battles to appear here
-                </p>
-              </div>
-            ) : (
-              <>
-                {/* Team totals */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
-                  {[
-                    { label: 'Alpha Team', col: 'hsl(215 35% 62%)', count: alphaBoard.length,
-                      total: alphaBoard.reduce((s, e) => s + e.total_power_staked, 0) },
-                    { label: 'Omega Team', col: 'hsl(255 50% 65%)', count: omegaBoard.length,
-                      total: omegaBoard.reduce((s, e) => s + e.total_power_staked, 0) },
-                  ].map(t => (
-                    <div key={t.label} className="glass-elevated" style={{ borderRadius: 18, padding: '14px',
-                      border: `1px solid ${t.col}22` }}>
-                      <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em',
-                        color: t.col, fontWeight: 700, marginBottom: 6 }}>{t.label}</p>
-                      <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 20% 93%)',
-                        letterSpacing: '-0.5px' }}>{t.total.toLocaleString()}</p>
-                      <p style={{ fontSize: 9, color: 'hsl(215 14% 38%)', marginTop: 3 }}>
-                        ARX-P · {t.count} members
-                      </p>
-                    </div>
-                  ))}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:18 }}>
+              {[
+                { label:'Alpha', col:'#accafe', board:alphaBoard },
+                { label:'Omega', col:'#c084fc', board:omegaBoard },
+              ].map(t => (
+                <div key={t.label} style={{ borderRadius:18, padding:'14px',
+                  background:`${t.col}06`, border:`1px solid ${t.col}18` }}>
+                  <p style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'.1em',
+                    color:t.col, fontWeight:700, marginBottom:6 }}>{t.label} Team</p>
+                  <p style={{ fontSize:18, fontWeight:900, color:'rgba(240,244,255,0.9)', letterSpacing:'-0.03em' }}>
+                    {t.board.reduce((s,e)=>s+e.total_power_staked,0).toLocaleString()}
+                  </p>
+                  <p style={{ fontSize:9, color:'rgba(139,174,214,0.35)', marginTop:3 }}>
+                    ARX-P · {t.board.length} members
+                  </p>
                 </div>
-
-                {/* Alpha board */}
-                {alphaBoard.length > 0 && (
-                  <>
-                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em',
-                      color: 'hsl(215 35% 62%)', fontWeight: 700, marginBottom: 10 }}>
-                      ⬡ Alpha Team
-                    </p>
-                    {alphaBoard.slice(0, 10).map((e, i) => (
-                      <LbRow key={e.user_id} entry={e} rank={i + 1} col="hsl(215 35% 62%)" />
-                    ))}
-                  </>
-                )}
-
-                {/* Omega board */}
-                {omegaBoard.length > 0 && (
-                  <>
-                    <p style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em',
-                      color: 'hsl(255 50% 65%)', fontWeight: 700, marginBottom: 10,
-                      marginTop: alphaBoard.length > 0 ? 18 : 0 }}>
-                      ⬡ Omega Team
-                    </p>
-                    {omegaBoard.slice(0, 10).map((e, i) => (
-                      <LbRow key={e.user_id} entry={e} rank={i + 1} col="hsl(255 50% 65%)" />
-                    ))}
-                  </>
-                )}
+              ))}
+            </div>
+            {alphaBoard.length > 0 && (
+              <>
+                <p style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'.12em',
+                  color:'#accafe', fontWeight:700, marginBottom:10 }}>Alpha Team</p>
+                {alphaBoard.slice(0,10).map((e,i)=><LbRow key={e.user_id} entry={e} rank={i+1} col="#accafe"/>)}
               </>
+            )}
+            {omegaBoard.length > 0 && (
+              <>
+                <p style={{ fontSize:10, textTransform:'uppercase', letterSpacing:'.12em',
+                  color:'#c084fc', fontWeight:700, marginBottom:10, marginTop:alphaBoard.length?18:0 }}>Omega Team</p>
+                {omegaBoard.slice(0,10).map((e,i)=><LbRow key={e.user_id} entry={e} rank={i+1} col="#c084fc"/>)}
+              </>
+            )}
+            {leaderboard.length === 0 && (
+              <div style={{ borderRadius:20, padding:'32px 20px', textAlign:'center',
+                background:'rgba(139,174,214,0.04)', border:'1px solid rgba(139,174,214,0.08)' }}>
+                <Trophy size={36} color="rgba(139,174,214,0.3)" style={{ marginBottom:12 }}/>
+                <p style={{ fontSize:14, fontWeight:700, color:'rgba(139,174,214,0.4)', marginBottom:6 }}>No data yet</p>
+                <p style={{ fontSize:12, color:'rgba(139,174,214,0.25)' }}>Stake in battles to appear here</p>
+              </div>
             )}
           </>
         )}
 
-        {/* ═══ MY STAKES ═══ */}
+        {/* MY STAKES TAB */}
         {tab === 'my-stakes' && (
           <>
             {myStakes.length === 0 ? (
-              <div className="glass-card" style={{ borderRadius: 20, padding: '32px 20px', textAlign: 'center' }}>
-                <div style={{ fontSize: 40, marginBottom: 12 }}>🎯</div>
-                <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 48%)', marginBottom: 6 }}>
-                  No stakes yet
-                </p>
-                <p style={{ fontSize: 12, color: 'hsl(215 14% 32%)' }}>
-                  Stake ARX-P in a battle to see history here
-                </p>
+              <div style={{ borderRadius:20, padding:'40px 20px', textAlign:'center',
+                background:'rgba(139,174,214,0.04)', border:'1px solid rgba(139,174,214,0.08)' }}>
+                <div style={{ fontSize:44, marginBottom:12 }}>🎯</div>
+                <p style={{ fontSize:15, fontWeight:700, color:'rgba(139,174,214,0.4)', marginBottom:6 }}>No stakes yet</p>
+                <p style={{ fontSize:12, color:'rgba(139,174,214,0.25)' }}>Enter a battle to see your history</p>
               </div>
-            ) : myStakes.map(b => (
-              <BannerCard key={b.id} battle={b} isActive={false}
-                userVoted={b.user_participated} userWon={b.user_won}
-                onClick={() => setSelected({ battle: b, active: false })} />
-            ))}
+            ) : (
+              myStakes.map(b => (
+                <BannerCard key={b.id} battle={b} isActive={false}
+                  userVoted={b.user_participated} userWon={b.user_won}
+                  onClick={() => setSelected({ battle:b, active:false })} />
+              ))
+            )}
           </>
         )}
       </div>
-
-      <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
     </div>
   );
 }
