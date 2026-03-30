@@ -1,0 +1,559 @@
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAdmin } from '@/hooks/useAdmin';
+import { supabase } from '@/integrations/supabase/client';
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
+
+/* ── Types ── */
+interface Battle {
+  id: string; title: string; description: string | null;
+  side_a_name: string; side_a_image: string | null; side_a_color: string;
+  side_b_name: string; side_b_image: string | null; side_b_color: string;
+  side_a_power: number; side_b_power: number;
+  starts_at: string; ends_at: string;
+  is_active: boolean; winner_side: string | null;
+  category: string; prize_pool: number; bonus_percentage: number;
+}
+interface User { id: string; email: string; created_at: string; }
+interface Stats { users: number; miners: number; points: number; battles: number; }
+
+/* ── CSS ── */
+const CSS = `
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shimmer{0%{left:-120%}100%{left:160%}}
+`;
+
+const BG   = 'hsl(225 30% 3%)';
+const CARD = 'hsl(225 26% 9%)';
+const BORDER = 'hsl(215 22% 16%)';
+const TEXT  = 'hsl(215 18% 88%)';
+const MUTED = 'hsl(215 14% 38%)';
+const STEEL = '#8BAED6';
+const MINT  = '#2dd4a0';
+const ROSE  = '#ff6b8a';
+const GOLD  = '#f5a623';
+
+function Spinner() {
+  return <div style={{width:28,height:28,borderRadius:'50%',border:`2px solid ${STEEL}20`,borderTopColor:STEEL,animation:'spin 1s linear infinite'}}/>;
+}
+
+function SectionCard({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
+  return (
+    <div style={{borderRadius:20,background:CARD,border:`1px solid ${BORDER}`,overflow:'hidden',...style}}>
+      {children}
+    </div>
+  );
+}
+
+function StatBadge({ label, value, color }: { label: string; value: string | number; color: string }) {
+  return (
+    <div style={{flex:1,padding:'14px 12px',borderRadius:16,background:CARD,border:`1px solid ${BORDER}`,textAlign:'center'}}>
+      <div style={{fontSize:11,color:MUTED,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>{label}</div>
+      <div style={{fontSize:22,fontWeight:900,color,letterSpacing:'-.02em'}}>{value}</div>
+    </div>
+  );
+}
+
+/* ── Image upload helper ── */
+async function uploadBattleImage(file: File, side: 'a' | 'b', battleHint: string): Promise<string | null> {
+  const ext = file.name.split('.').pop() || 'jpg';
+  const path = `battles/${side}-${Date.now()}-${battleHint.slice(0,12).replace(/\W/g,'_')}.${ext}`;
+  const { error } = await supabase.storage.from('battle-images').upload(path, file, { upsert: true, contentType: file.type });
+  if (error) { console.error(error); return null; }
+  return supabase.storage.from('battle-images').getPublicUrl(path).data.publicUrl;
+}
+
+/* ── Create Battle Form ── */
+function CreateBattleForm({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [f, setF] = useState({
+    title: '', description: '', category: 'sports',
+    side_a_name: '', side_a_image: '', side_a_color: '#8BAED6',
+    side_b_name: '', side_b_image: '', side_b_color: '#f5a623',
+    duration_hours: '24', prize_pool: '0', bonus_percentage: '200',
+  });
+  const [imgA, setImgA] = useState<string|null>(null);
+  const [imgB, setImgB] = useState<string|null>(null);
+  const [fileA, setFileA] = useState<File|null>(null);
+  const [fileB, setFileB] = useState<File|null>(null);
+  const [saving, setSaving] = useState(false);
+  const refA = useRef<HTMLInputElement>(null);
+  const refB = useRef<HTMLInputElement>(null);
+
+  const pickFile = (side: 'a'|'b', file: File) => {
+    const url = URL.createObjectURL(file);
+    if (side === 'a') { setImgA(url); setFileA(file); setF(p=>({...p,side_a_image:''})); }
+    else              { setImgB(url); setFileB(file); setF(p=>({...p,side_b_image:''})); }
+  };
+
+  const save = async () => {
+    if (!f.title || !f.side_a_name || !f.side_b_name) { toast.error('Fill title + both sides'); return; }
+    setSaving(true);
+    try {
+      let imgUrlA = f.side_a_image || null;
+      let imgUrlB = f.side_b_image || null;
+      if (fileA) { imgUrlA = await uploadBattleImage(fileA, 'a', f.title); }
+      if (fileB) { imgUrlB = await uploadBattleImage(fileB, 'b', f.title); }
+
+      const startsAt = new Date();
+      const endsAt = new Date(startsAt.getTime() + parseInt(f.duration_hours)*3600000);
+
+      const { error } = await supabase.from('arena_battles').insert({
+        title: f.title, description: f.description || null, category: f.category,
+        side_a_name: f.side_a_name, side_a_image: imgUrlA, side_a_color: f.side_a_color,
+        side_b_name: f.side_b_name, side_b_image: imgUrlB, side_b_color: f.side_b_color,
+        prize_pool: parseFloat(f.prize_pool)||0,
+        bonus_percentage: parseFloat(f.bonus_percentage)||200,
+        starts_at: startsAt.toISOString(), ends_at: endsAt.toISOString(),
+        is_active: true, duration_hours: parseInt(f.duration_hours)||24,
+      });
+      if (error) throw error;
+      toast.success('Battle created! 🔥');
+      onCreated();
+      onClose();
+    } catch(e:any) { toast.error(e.message||'Failed'); }
+    finally { setSaving(false); }
+  };
+
+  const inp = (label: string, key: keyof typeof f, placeholder?: string, type='text') => (
+    <div style={{marginBottom:12}}>
+      <div style={{fontSize:11,color:MUTED,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>{label}</div>
+      <input type={type} placeholder={placeholder} value={f[key] as string}
+        onChange={e=>setF(p=>({...p,[key]:e.target.value}))}
+        style={{width:'100%',padding:'10px 12px',borderRadius:12,background:'hsl(225 28% 7%)',
+          border:`1px solid ${BORDER}`,color:TEXT,fontSize:13,outline:'none',boxSizing:'border-box'}}/>
+    </div>
+  );
+
+  const CATS = ['sports','politics','crypto','entertainment','tech','other'];
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:0,maxHeight:'82vh',overflowY:'auto',padding:'0 20px 24px'}}>
+      <style>{CSS}</style>
+      {inp('Battle Title *','title','Man Utd vs Arsenal — Who wins?')}
+      {inp('Description','description','Optional context...')}
+
+      {/* Category */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:MUTED,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>Category</div>
+        <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+          {CATS.map(c=>(
+            <button key={c} onClick={()=>setF(p=>({...p,category:c}))}
+              style={{padding:'6px 12px',borderRadius:20,border:`1px solid ${f.category===c?STEEL:BORDER}`,
+                background:f.category===c?`${STEEL}20`:'transparent',color:f.category===c?STEEL:MUTED,
+                fontSize:11,fontWeight:700,cursor:'pointer',textTransform:'capitalize'}}>
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Sides */}
+      <div style={{marginBottom:12}}>
+        <div style={{fontSize:11,color:MUTED,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>Sides (Teams / Candidates)</div>
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+          {(['a','b'] as const).map(side=>{
+            const nameKey = side==='a'?'side_a_name':'side_b_name';
+            const imgKey  = side==='a'?'side_a_image':'side_b_image';
+            const colKey  = side==='a'?'side_a_color':'side_b_color';
+            const preview = side==='a'?imgA:imgB;
+            const ref     = side==='a'?refA:refB;
+            const urlVal  = f[imgKey] as string;
+            const label   = side==='a'?'Side A':'Side B';
+            return (
+              <div key={side} style={{borderRadius:16,border:`1px solid ${BORDER}`,background:'hsl(225 28% 7%)',padding:12}}>
+                <div style={{fontSize:12,fontWeight:700,color:side==='a'?STEEL:GOLD,marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>{label}</div>
+
+                {/* Image preview / upload */}
+                <div onClick={()=>ref.current?.click()}
+                  style={{width:'100%',height:80,borderRadius:12,border:`1.5px dashed ${BORDER}`,
+                    display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',
+                    marginBottom:8,overflow:'hidden',background:'hsl(225 26% 6%)'}}>
+                  {(preview||urlVal)
+                    ? <img src={preview||urlVal} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                    : <div style={{textAlign:'center'}}>
+                        <div style={{fontSize:22,marginBottom:4}}>📸</div>
+                        <div style={{fontSize:10,color:MUTED}}>Upload or paste URL</div>
+                      </div>}
+                </div>
+                <input ref={ref} type="file" accept="image/*" style={{display:'none'}}
+                  onChange={e=>e.target.files?.[0]&&pickFile(side,e.target.files[0])}/>
+
+                {/* URL input */}
+                <input placeholder="Or paste image URL…" value={urlVal}
+                  onChange={e=>{setF(p=>({...p,[imgKey]:e.target.value}));if(side==='a')setImgA(null);else setImgB(null);}}
+                  style={{width:'100%',padding:'7px 10px',borderRadius:10,background:'hsl(225 28% 5%)',
+                    border:`1px solid ${BORDER}`,color:TEXT,fontSize:11,outline:'none',boxSizing:'border-box',marginBottom:8}}/>
+
+                {/* Name */}
+                <input placeholder={`${label} name *`} value={f[nameKey] as string}
+                  onChange={e=>setF(p=>({...p,[nameKey]:e.target.value}))}
+                  style={{width:'100%',padding:'8px 10px',borderRadius:10,background:'hsl(225 28% 5%)',
+                    border:`1px solid ${BORDER}`,color:TEXT,fontSize:12,fontWeight:700,outline:'none',boxSizing:'border-box',marginBottom:8}}/>
+
+                {/* Color */}
+                <div style={{display:'flex',alignItems:'center',gap:6}}>
+                  <input type="color" value={f[colKey] as string}
+                    onChange={e=>setF(p=>({...p,[colKey]:e.target.value}))}
+                    style={{width:30,height:30,borderRadius:8,cursor:'pointer',border:'none',padding:0}}/>
+                  <span style={{fontSize:10,color:MUTED}}>Accent color</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Duration & Prize */}
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:12}}>
+        <div>
+          <div style={{fontSize:11,color:MUTED,letterSpacing:'.08em',textTransform:'uppercase',marginBottom:6}}>Duration (hours)</div>
+          <div style={{display:'flex',flexWrap:'wrap',gap:5}}>
+            {[1,2,4,6,12,24,48,72].map(h=>(
+              <button key={h} onClick={()=>setF(p=>({...p,duration_hours:String(h)}))}
+                style={{padding:'5px 10px',borderRadius:10,border:`1px solid ${f.duration_hours===String(h)?STEEL:BORDER}`,
+                  background:f.duration_hours===String(h)?`${STEEL}18`:'transparent',
+                  color:f.duration_hours===String(h)?STEEL:MUTED,fontSize:11,fontWeight:700,cursor:'pointer'}}>
+                {h}h
+              </button>
+            ))}
+          </div>
+        </div>
+        <div>
+          {inp('Prize Pool (pts)','prize_pool','0','number')}
+          {inp('Bonus %','bonus_percentage','200','number')}
+        </div>
+      </div>
+
+      {/* Save */}
+      <motion.button whileTap={{scale:0.96}} onClick={save} disabled={saving}
+        style={{width:'100%',padding:'15px',borderRadius:18,fontWeight:800,fontSize:14,
+          background:`linear-gradient(135deg,${STEEL}25,${STEEL}12)`,
+          border:`1px solid ${STEEL}40`,color:STEEL,cursor:'pointer',opacity:saving?0.5:1}}>
+        {saving?<Spinner/>:'⚔️ Create Battle'}
+      </motion.button>
+    </div>
+  );
+}
+
+/* ── Main ── */
+type Section = 'dashboard' | 'battles' | 'users' | 'create';
+
+export default function MobileAdmin() {
+  const navigate = useNavigate();
+  const { isAdmin, loading: adminLoading } = useAdmin();
+  const [section, setSection] = useState<Section>('dashboard');
+  const [stats, setStats] = useState<Stats>({ users:0, miners:0, points:0, battles:0 });
+  const [battles, setBattles] = useState<Battle[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreate, setShowCreate] = useState(false);
+  const [resolving, setResolving] = useState<string|null>(null);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [bRes, uRes, ptRes] = await Promise.all([
+        supabase.from('arena_battles').select('*').order('created_at',{ascending:false}).limit(30),
+        supabase.from('profiles').select('user_id,username,created_at').order('created_at',{ascending:false}).limit(50),
+        supabase.from('user_points').select('total_points').limit(1000),
+      ]);
+      const bData = (bRes.data||[]) as Battle[];
+      setBattles(bData);
+      const totalPts = (ptRes.data||[]).reduce((s,r)=>s+Number(r.total_points||0),0);
+      setStats({
+        users: uRes.data?.length||0,
+        miners: (ptRes.data||[]).filter((r:any)=>Number(r.total_points)>0).length,
+        points: Math.round(totalPts),
+        battles: bData.length,
+      });
+      setUsers((uRes.data||[]).map((p:any)=>({id:p.user_id,email:p.username||'unknown',created_at:p.created_at})));
+    } catch(e){ console.error(e); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(()=>{ if(isAdmin) loadData(); },[isAdmin]);
+
+  const resolve = async (battleId: string, winner: 'a'|'b') => {
+    if (!confirm(`Resolve as Side ${winner.toUpperCase()} winner?`)) return;
+    setResolving(battleId);
+    try {
+      const { error } = await supabase.functions.invoke('resolve-arena-battle',{
+        body:{ battle_id:battleId, winner_side:winner, force:true }
+      });
+      if (error) throw error;
+      toast.success('Battle resolved!');
+      loadData();
+    } catch(e:any){ toast.error(e.message||'Failed'); }
+    finally { setResolving(null); }
+  };
+
+  const toggleActive = async (b: Battle) => {
+    await supabase.from('arena_battles').update({is_active:!b.is_active}).eq('id',b.id);
+    loadData();
+  };
+
+  const deleteBattle = async (id: string) => {
+    if (!confirm('Delete this battle?')) return;
+    await supabase.from('arena_battles').delete().eq('id',id);
+    toast.success('Deleted');
+    loadData();
+  };
+
+  if (adminLoading) return (
+    <div style={{minHeight:'100vh',background:BG,display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <Spinner/>
+    </div>
+  );
+
+  if (!isAdmin) return (
+    <div style={{minHeight:'100vh',background:BG,display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:32}}>
+      <div style={{fontSize:48,marginBottom:16}}>🔐</div>
+      <div style={{fontSize:20,fontWeight:900,color:TEXT,marginBottom:8}}>Access Denied</div>
+      <div style={{fontSize:13,color:MUTED,textAlign:'center',marginBottom:24}}>Admin access only.</div>
+      <button onClick={()=>navigate('/')} style={{padding:'12px 28px',borderRadius:16,background:`${STEEL}18`,border:`1px solid ${STEEL}30`,color:STEEL,fontWeight:700,cursor:'pointer'}}>Go Home</button>
+    </div>
+  );
+
+  const navItems: {id:Section;label:string;icon:string}[] = [
+    {id:'dashboard',label:'Dashboard',icon:'📊'},
+    {id:'battles',label:'Battles',icon:'⚔️'},
+    {id:'users',label:'Users',icon:'👥'},
+  ];
+
+  return (
+    <div style={{minHeight:'100vh',background:BG,fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif",paddingBottom:100}}>
+      <style>{CSS}</style>
+
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'52px 20px 16px'}}>
+        <div>
+          <div style={{fontSize:22,fontWeight:900,color:TEXT,letterSpacing:'-.02em'}}>Admin</div>
+          <div style={{fontSize:11,color:MUTED,marginTop:2,textTransform:'uppercase',letterSpacing:'.1em'}}>Control Panel</div>
+        </div>
+        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+          <button onClick={loadData} style={{width:36,height:36,borderRadius:12,background:'hsl(225 26% 12%)',border:`1px solid ${BORDER}`,display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',fontSize:16}}>
+            🔄
+          </button>
+          <button onClick={()=>navigate('/')} style={{padding:'7px 14px',borderRadius:12,background:'hsl(225 26% 12%)',border:`1px solid ${BORDER}`,color:MUTED,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+            ← App
+          </button>
+        </div>
+      </div>
+
+      {/* Nav tabs */}
+      <div style={{display:'flex',gap:8,padding:'0 20px 16px',overflowX:'auto',scrollbarWidth:'none'}}>
+        {navItems.map(n=>(
+          <button key={n.id} onClick={()=>setSection(n.id)}
+            style={{display:'flex',alignItems:'center',gap:6,padding:'8px 16px',borderRadius:20,flexShrink:0,
+              border:`1px solid ${section===n.id?STEEL+'44':BORDER}`,
+              background:section===n.id?`${STEEL}14`:'transparent',
+              color:section===n.id?STEEL:MUTED,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+            {n.icon} {n.label}
+          </button>
+        ))}
+      </div>
+
+      <div style={{padding:'0 16px'}}>
+
+        {/* ═══ DASHBOARD ═══ */}
+        {section==='dashboard' && (
+          <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}>
+            {/* Stats */}
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,marginBottom:14}}>
+              <StatBadge label="Total Users" value={stats.users.toLocaleString()} color={STEEL}/>
+              <StatBadge label="Active Miners" value={stats.miners.toLocaleString()} color={MINT}/>
+              <StatBadge label="Total ARX-P" value={stats.points>=1e6?(stats.points/1e6).toFixed(1)+'M':stats.points.toLocaleString()} color={GOLD}/>
+              <StatBadge label="Battles" value={stats.battles} color={ROSE}/>
+            </div>
+
+            {/* Quick actions */}
+            <SectionCard style={{marginBottom:14}}>
+              <div style={{padding:'16px 16px 8px',fontSize:11,color:MUTED,textTransform:'uppercase',letterSpacing:'.1em',fontWeight:700}}>Quick Actions</div>
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,padding:'0 12px 14px'}}>
+                {[
+                  {label:'Create Battle',icon:'⚔️',action:()=>{setSection('battles');setShowCreate(true);}},
+                  {label:'View Battles',icon:'📋',action:()=>setSection('battles')},
+                  {label:'View Users',icon:'👥',action:()=>setSection('users')},
+                  {label:'Refresh Data',icon:'🔄',action:loadData},
+                ].map(q=>(
+                  <motion.button key={q.label} whileTap={{scale:0.94}} onClick={q.action}
+                    style={{padding:'14px 10px',borderRadius:16,background:'hsl(225 28% 7%)',
+                      border:`1px solid ${BORDER}`,textAlign:'center',cursor:'pointer'}}>
+                    <div style={{fontSize:22,marginBottom:6}}>{q.icon}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:TEXT}}>{q.label}</div>
+                  </motion.button>
+                ))}
+              </div>
+            </SectionCard>
+
+            {/* Recent battles preview */}
+            <SectionCard>
+              <div style={{padding:'16px 16px 8px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+                <div style={{fontSize:11,color:MUTED,textTransform:'uppercase',letterSpacing:'.1em',fontWeight:700}}>Recent Battles</div>
+                <button onClick={()=>setSection('battles')} style={{fontSize:11,color:STEEL,fontWeight:700,background:'none',border:'none',cursor:'pointer'}}>See all →</button>
+              </div>
+              {loading?<div style={{padding:20,display:'flex',justifyContent:'center'}}><Spinner/></div>:
+                battles.slice(0,3).map(b=>(
+                  <div key={b.id} style={{padding:'10px 16px',borderTop:`1px solid ${BORDER}`,display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:700,color:TEXT,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.title}</div>
+                      <div style={{fontSize:10,color:MUTED,marginTop:2}}>{b.side_a_name} vs {b.side_b_name}</div>
+                    </div>
+                    <div style={{fontSize:9,fontWeight:700,padding:'3px 8px',borderRadius:10,
+                      color:b.winner_side?MINT:b.is_active?ROSE:MUTED,
+                      background:b.winner_side?`${MINT}12`:b.is_active?`${ROSE}12`:`${MUTED}10`,
+                      border:`1px solid ${b.winner_side?MINT+'30':b.is_active?ROSE+'30':BORDER}`}}>
+                      {b.winner_side?'DONE':b.is_active?'LIVE':'PAUSED'}
+                    </div>
+                  </div>
+                ))}
+            </SectionCard>
+          </motion.div>
+        )}
+
+        {/* ═══ BATTLES ═══ */}
+        {section==='battles' && (
+          <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+              <div style={{fontSize:13,color:MUTED}}>{battles.length} battles total</div>
+              <motion.button whileTap={{scale:0.94}} onClick={()=>setShowCreate(true)}
+                style={{padding:'9px 18px',borderRadius:16,background:`${STEEL}18`,border:`1px solid ${STEEL}35`,
+                  color:STEEL,fontSize:12,fontWeight:800,cursor:'pointer'}}>
+                + New Battle
+              </motion.button>
+            </div>
+
+            {loading ? <div style={{display:'flex',justifyContent:'center',padding:40}}><Spinner/></div> :
+              battles.map(b=>(
+                <SectionCard key={b.id} style={{marginBottom:10}}>
+                  {/* Battle header */}
+                  <div style={{padding:'14px 14px 10px'}}>
+                    <div style={{display:'flex',alignItems:'flex-start',gap:10,marginBottom:10}}>
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{fontSize:14,fontWeight:800,color:TEXT,marginBottom:3,lineHeight:1.3}}>{b.title}</div>
+                        {b.description&&<div style={{fontSize:11,color:MUTED,lineHeight:1.4}}>{b.description}</div>}
+                      </div>
+                      <div style={{fontSize:9,fontWeight:700,padding:'4px 9px',borderRadius:10,flexShrink:0,
+                        color:b.winner_side?MINT:b.is_active?ROSE:GOLD,
+                        border:`1px solid ${b.winner_side?MINT+'30':b.is_active?ROSE+'30':GOLD+'30'}`,
+                        background:b.winner_side?`${MINT}10`:b.is_active?`${ROSE}10`:`${GOLD}10`}}>
+                        {b.winner_side?'RESOLVED':b.is_active?'LIVE':'PAUSED'}
+                      </div>
+                    </div>
+
+                    {/* VS preview with images */}
+                    <div style={{display:'grid',gridTemplateColumns:'1fr auto 1fr',gap:6,alignItems:'center',
+                      padding:'10px',borderRadius:14,background:'hsl(225 28% 6%)',border:`1px solid ${BORDER}`}}>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
+                        {b.side_a_image
+                          ? <img src={b.side_a_image} alt="" style={{width:44,height:44,borderRadius:12,objectFit:'cover',border:`1px solid ${BORDER}`}}/>
+                          : <div style={{width:44,height:44,borderRadius:12,background:`${STEEL}18`,border:`1px solid ${STEEL}30`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:800,color:STEEL}}>
+                              {(b.side_a_name||'A').slice(0,2).toUpperCase()}
+                            </div>}
+                        <div style={{fontSize:10,fontWeight:700,color:TEXT,textAlign:'center',maxWidth:72,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.side_a_name}</div>
+                        <div style={{fontSize:11,color:STEEL,fontWeight:700}}>{b.side_a_power.toLocaleString()}</div>
+                      </div>
+                      <div style={{fontSize:10,fontWeight:900,color:MUTED,padding:'4px 6px'}}>VS</div>
+                      <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:5}}>
+                        {b.side_b_image
+                          ? <img src={b.side_b_image} alt="" style={{width:44,height:44,borderRadius:12,objectFit:'cover',border:`1px solid ${BORDER}`}}/>
+                          : <div style={{width:44,height:44,borderRadius:12,background:`${GOLD}18`,border:`1px solid ${GOLD}30`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:800,color:GOLD}}>
+                              {(b.side_b_name||'B').slice(0,2).toUpperCase()}
+                            </div>}
+                        <div style={{fontSize:10,fontWeight:700,color:TEXT,textAlign:'center',maxWidth:72,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{b.side_b_name}</div>
+                        <div style={{fontSize:11,color:GOLD,fontWeight:700}}>{b.side_b_power.toLocaleString()}</div>
+                      </div>
+                    </div>
+
+                    {/* Time */}
+                    <div style={{fontSize:10,color:MUTED,marginTop:8,textAlign:'center'}}>
+                      Ends: {new Date(b.ends_at).toLocaleString()}
+                    </div>
+                  </div>
+
+                  {/* Action row */}
+                  {!b.winner_side && (
+                    <div style={{display:'flex',gap:6,padding:'8px 12px 12px'}}>
+                      <button onClick={()=>resolve(b.id,'a')} disabled={!!resolving}
+                        style={{flex:1,padding:'9px 6px',borderRadius:12,border:`1px solid ${STEEL}30`,
+                          background:`${STEEL}10`,color:STEEL,fontSize:11,fontWeight:700,cursor:'pointer'}}>
+                        {resolving===b.id?'…':`✓ ${b.side_a_name.slice(0,8)} wins`}
+                      </button>
+                      <button onClick={()=>toggleActive(b)}
+                        style={{padding:'9px 12px',borderRadius:12,border:`1px solid ${BORDER}`,
+                          background:'transparent',color:MUTED,fontSize:11,fontWeight:700,cursor:'pointer'}}>
+                        {b.is_active?'⏸':'▶'}
+                      </button>
+                      <button onClick={()=>resolve(b.id,'b')} disabled={!!resolving}
+                        style={{flex:1,padding:'9px 6px',borderRadius:12,border:`1px solid ${GOLD}30`,
+                          background:`${GOLD}10`,color:GOLD,fontSize:11,fontWeight:700,cursor:'pointer'}}>
+                        {resolving===b.id?'…':`✓ ${b.side_b_name.slice(0,8)} wins`}
+                      </button>
+                    </div>
+                  )}
+                  <div style={{padding:'0 12px 10px',display:'flex',justifyContent:'flex-end'}}>
+                    <button onClick={()=>deleteBattle(b.id)}
+                      style={{padding:'5px 12px',borderRadius:10,border:`1px solid ${ROSE}20`,
+                        background:`${ROSE}08`,color:ROSE,fontSize:10,fontWeight:700,cursor:'pointer'}}>
+                      Delete
+                    </button>
+                  </div>
+                </SectionCard>
+              ))}
+          </motion.div>
+        )}
+
+        {/* ═══ USERS ═══ */}
+        {section==='users' && (
+          <motion.div initial={{opacity:0,y:8}} animate={{opacity:1,y:0}}>
+            <div style={{marginBottom:12,fontSize:13,color:MUTED}}>{users.length} users shown</div>
+            {loading?<div style={{display:'flex',justifyContent:'center',padding:40}}><Spinner/></div>:
+              <SectionCard>
+                {users.map((u,i)=>(
+                  <div key={u.id} style={{padding:'12px 16px',borderTop:i?`1px solid ${BORDER}`:'none',
+                    display:'flex',alignItems:'center',gap:10}}>
+                    <div style={{width:36,height:36,borderRadius:12,background:`${STEEL}18`,
+                      border:`1px solid ${STEEL}25`,display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:13,fontWeight:800,color:STEEL,flexShrink:0}}>
+                      {(u.email||'?')[0].toUpperCase()}
+                    </div>
+                    <div style={{flex:1,minWidth:0}}>
+                      <div style={{fontSize:13,fontWeight:600,color:TEXT,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{u.email}</div>
+                      <div style={{fontSize:10,color:MUTED,marginTop:1}}>{new Date(u.created_at).toLocaleDateString()}</div>
+                    </div>
+                  </div>
+                ))}
+              </SectionCard>}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Create Battle Sheet */}
+      <AnimatePresence>
+        {showCreate && (
+          <>
+            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+              onClick={()=>setShowCreate(false)}
+              style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:90}}/>
+            <motion.div initial={{y:'100%'}} animate={{y:0}} exit={{y:'100%'}}
+              transition={{type:'spring',stiffness:380,damping:36}}
+              style={{position:'fixed',bottom:0,left:0,right:0,zIndex:100,
+                background:'hsl(225 28% 7%)',borderRadius:'26px 26px 0 0',
+                border:`1px solid ${BORDER}`,borderBottom:'none',maxHeight:'90vh',overflow:'hidden'}}>
+              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'18px 20px 14px'}}>
+                <div style={{fontSize:17,fontWeight:900,color:TEXT}}>⚔️ New Battle</div>
+                <button onClick={()=>setShowCreate(false)}
+                  style={{width:32,height:32,borderRadius:10,background:'hsl(225 26% 12%)',
+                    border:`1px solid ${BORDER}`,color:MUTED,fontSize:16,cursor:'pointer',
+                    display:'flex',alignItems:'center',justifyContent:'center'}}>×</button>
+              </div>
+              <CreateBattleForm onClose={()=>setShowCreate(false)} onCreated={loadData}/>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
