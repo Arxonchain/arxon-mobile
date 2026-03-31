@@ -68,13 +68,16 @@ export const usePushNotifications = () => {
         setFcmToken(token.value);
         setPermission('granted');
 
-        // Save token to Supabase
+        // Save token to Supabase — use fcm_token as endpoint for native
         if (user) {
           await supabase.from('push_subscriptions').upsert({
             user_id: user.id,
+            endpoint: `fcm:${token.value}`,   // prefix so edge fn knows it's FCM
+            p256dh: token.value,               // store token in p256dh for FCM path
+            auth: Capacitor.getPlatform(),     // store platform in auth field
             fcm_token: token.value,
             platform: Capacitor.getPlatform(),
-          }, { onConflict: 'user_id,fcm_token' });
+          }, { onConflict: 'user_id,endpoint' });
         }
       });
 
@@ -102,47 +105,6 @@ export const usePushNotifications = () => {
     };
   }, [isNative, user]);
 
-  // ── AUTO-REQUEST permission on first load (native) ──────────────────────
-  useEffect(() => {
-    if (!isNative) return;
-    PushNotifications.checkPermissions().then(({ receive }) => {
-      if (receive === 'prompt' || receive === 'prompt-with-rationale') {
-        PushNotifications.requestPermissions().then(({ receive: r }) => {
-          if (r === 'granted') {
-            PushNotifications.register();
-            setPermission('granted');
-          }
-        });
-      } else if (receive === 'granted') {
-        PushNotifications.register();
-      }
-    });
-  }, [isNative]);
-
-  // ── AUTO-REQUEST permission on first load (web) ─────────────────────────
-  useEffect(() => {
-    if (isNative) return;
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      // Slight delay so user has interacted with page
-      const t = setTimeout(async () => {
-        const result = await Notification.requestPermission();
-        setPermission(result as 'default' | 'granted' | 'denied');
-        if (result === 'granted' && serviceWorkerRef.current) {
-          try {
-            await (serviceWorkerRef.current as any).pushManager.subscribe({
-              userVisibleOnly: true,
-              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-            });
-          } catch (e) { console.error('Web push subscribe error:', e); }
-        }
-      }, 2000);
-      return () => clearTimeout(t);
-    } else if (Notification.permission === 'granted') {
-      setPermission('granted');
-    }
-  }, [isNative]);
-
   // ── WEB (Service Worker + VAPID) ───────────────────────────────────────────
   useEffect(() => {
     if (isNative) return;
@@ -163,15 +125,66 @@ export const usePushNotifications = () => {
     registerSW();
   }, [isNative]);
 
-  // Save FCM token when user logs in after token is received
+  // ── AUTO-REQUEST permission when user logs in (web only) ──────────────────
   useEffect(() => {
-    if (!user || !fcmToken || !isNative) return;
-    supabase.from('push_subscriptions').upsert({
-      user_id: user.id,
-      fcm_token: fcmToken,
-      platform: Capacitor.getPlatform(),
-    }, { onConflict: 'user_id,fcm_token' });
-  }, [user, fcmToken, isNative]);
+    if (isNative || !user) return;
+    if (!('Notification' in window)) return;
+    // Only prompt once — if already decided, skip
+    if (Notification.permission !== 'default') {
+      setPermission(Notification.permission as any);
+      return;
+    }
+    // Delay slightly so app finishes loading before the browser prompt appears
+    const timer = setTimeout(async () => {
+      try {
+        const result = await Notification.requestPermission();
+        setPermission(result as any);
+        if (result === 'granted' && serviceWorkerRef.current) {
+          try {
+            const sub = await (serviceWorkerRef.current as any).pushManager.subscribe({
+              userVisibleOnly: true,
+              applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+            });
+            const subJson = sub.toJSON();
+            await supabase.from('push_subscriptions').upsert({
+              user_id: user.id,
+              endpoint: subJson.endpoint,
+              p256dh: subJson.keys?.p256dh || '',
+              auth: subJson.keys?.auth || '',
+            }, { onConflict: 'user_id,endpoint' });
+          } catch (e) {
+            console.error('[Push] Failed to subscribe after permission granted:', e);
+          }
+        }
+      } catch (e) {
+        console.error('[Push] Permission request error:', e);
+      }
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [user, isNative]);
+
+  // ── AUTO-REQUEST permission for native on login ────────────────────────────
+  useEffect(() => {
+    if (!isNative || !user) return;
+    const autoRegister = async () => {
+      try {
+        const { receive } = await PushNotifications.checkPermissions();
+        if (receive === 'granted') {
+          await PushNotifications.register();
+          setPermission('granted');
+        } else if (receive === 'prompt') {
+          const { receive: result } = await PushNotifications.requestPermissions();
+          if (result === 'granted') {
+            await PushNotifications.register();
+            setPermission('granted');
+          }
+        }
+      } catch (e) {
+        console.error('[Push] Native auto-register error:', e);
+      }
+    };
+    autoRegister();
+  }, [user, isNative]);
 
   // Request permission
   const requestPermission = useCallback(async () => {

@@ -128,6 +128,19 @@ const SidebarContent = ({ collapsed, onCollapse, onNavigate }: { collapsed: bool
 
       {/* Bottom section */}
       <div className="px-3 space-y-1 mt-auto border-t border-border/50 pt-4">
+        {/* Back to App button */}
+        <button
+          onClick={() => navigate('/')}
+          className={cn(
+            "flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors mb-1",
+            "text-muted-foreground hover:text-primary hover:bg-primary/10",
+            collapsed && "justify-center"
+          )}
+        >
+          <ChevronLeft className="h-5 w-5 flex-shrink-0" />
+          {!collapsed && <span className="font-medium text-sm">← Back to App</span>}
+        </button>
+
         <div className={cn(
           "flex items-center gap-3 px-3 py-2.5 text-muted-foreground",
           collapsed && "justify-center"

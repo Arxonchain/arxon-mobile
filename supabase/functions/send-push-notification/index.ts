@@ -164,19 +164,20 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { userId, userIds, title, body, url, tag, data } = await req.json();
+    const { userId, userIds, title, body, url, tag, data, broadcast } = await req.json();
 
-    console.log('Send push request:', { userId, userIds, title, body });
+    console.log('Send push request:', { userId, userIds, title, body, broadcast });
 
     // Get subscriptions for target user(s)
     let query = supabase.from('push_subscriptions').select('*');
     
-    if (userId) {
+    if (broadcast) {
+      // Send to ALL users — used for admin announcements
+      // query stays unfiltered
+    } else if (userId) {
       query = query.eq('user_id', userId);
     } else if (userIds && userIds.length > 0) {
       query = query.in('user_id', userIds);
-    } else {
-      // Send to all subscriptions
     }
 
     const { data: subscriptions, error } = await query;
@@ -203,9 +204,49 @@ serve(async (req) => {
       ...data,
     };
 
-    // Send to all subscriptions
+    // Send to all subscriptions — handle FCM (native) vs web push separately
     const results = await Promise.all(
       subscriptions.map(async (sub) => {
+        // FCM token subscriptions (native Android/iOS) — endpoint starts with "fcm:"
+        if (sub.endpoint?.startsWith('fcm:') || sub.fcm_token) {
+          const fcmToken = sub.fcm_token || sub.endpoint?.replace('fcm:', '');
+          if (!fcmToken) return false;
+
+          // Use Firebase HTTP v1 API if FCM_SERVER_KEY is set
+          const fcmKey = Deno.env.get('FCM_SERVER_KEY');
+          if (!fcmKey) {
+            console.log('FCM_SERVER_KEY not set — skipping native push for token:', fcmToken.slice(0, 20));
+            return false;
+          }
+
+          try {
+            const fcmResponse = await fetch('https://fcm.googleapis.com/fcm/send', {
+              method: 'POST',
+              headers: {
+                'Authorization': `key=${fcmKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                to: fcmToken,
+                notification: { title: title || 'ARXON', body: body || 'New notification' },
+                data: { url: url || '/', tag: tag || 'arxon', ...data },
+              }),
+            });
+            const fcmResult = await fcmResponse.json();
+            console.log('FCM result:', fcmResult);
+            if (fcmResult.failure === 1) {
+              // Invalid token, remove it
+              await supabase.from('push_subscriptions').delete().eq('id', sub.id);
+              return false;
+            }
+            return true;
+          } catch (e) {
+            console.error('FCM send error:', e);
+            return false;
+          }
+        }
+
+        // Web push subscription
         const success = await sendPushNotification(
           { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
           payload,
