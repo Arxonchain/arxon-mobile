@@ -120,17 +120,17 @@ const AdminArena = () => {
     if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return null; }
     setUploading(slot);
     try {
-      const ext      = file.name.split('.').pop() || 'jpg';
-      const path     = `battle-images/${slot}-${Date.now()}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('battle-assets').upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) {
-        // Bucket might not exist — try avatars bucket as fallback
-        const { error: upErr2 } = await supabase.storage.from('avatars').upload(path, file, { upsert: true, contentType: file.type });
-        if (upErr2) throw upErr2;
-        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-        return publicUrl;
-      }
-      const { data: { publicUrl } } = supabase.storage.from('battle-assets').getPublicUrl(path);
+      const ext  = file.name.split('.').pop() || 'jpg';
+      const path = `battles/${slot}-${Date.now()}.${ext}`;
+
+      // Always use 'avatars' bucket — it already exists and has public read access
+      const { error: upErr } = await supabase.storage
+        .from('avatars')
+        .upload(path, file, { upsert: true, contentType: file.type });
+
+      if (upErr) throw upErr;
+
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
       return publicUrl;
     } catch (err: any) {
       toast.error(`Upload failed: ${err.message}`);
