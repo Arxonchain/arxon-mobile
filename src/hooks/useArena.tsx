@@ -14,6 +14,7 @@ export interface ArenaBattle {
   side_b_name: string;
   side_b_image: string | null;
   side_b_color: string;
+  banner_image: string | null;
   side_a_power: number;
   side_b_power: number;
   starts_at: string;
@@ -21,6 +22,8 @@ export interface ArenaBattle {
   is_active: boolean;
   winner_side: string | null;
   winner_boost_percentage: number;
+  category: string | null;
+  prize_pool: number | null;
 }
 
 export interface ArenaVote {
@@ -65,7 +68,6 @@ export interface LeaderboardEntry {
   total_wins: number;
   total_battles: number;
   biggest_stake: number;
-  club?: string | null;
 }
 
 export interface BattleHistoryEntry extends ArenaBattle {
@@ -218,17 +220,6 @@ export const useArena = () => {
 
       if (error) throw error;
 
-      // Fetch club for each user from arena_members
-      const userIds = (data || []).map((e: any) => e.user_id).filter(Boolean);
-      let clubMap: Record<string,string> = {};
-      if (userIds.length > 0) {
-        const { data: members } = await supabase
-          .from('arena_members')
-          .select('user_id,club')
-          .in('user_id', userIds);
-        (members || []).forEach((m: any) => { clubMap[m.user_id] = m.club; });
-      }
-
       const leaderboardData: LeaderboardEntry[] = (data || []).map((entry: any) => ({
         user_id: entry.user_id,
         username: entry.username,
@@ -237,7 +228,6 @@ export const useArena = () => {
         total_wins: Math.floor(Number(entry.total_wins) || 0),
         total_battles: Math.floor(Number(entry.total_battles) || 0),
         biggest_stake: Math.floor(Number(entry.net_profit) || 0),
-        club: clubMap[entry.user_id] || null,
       }));
 
       setLeaderboard(leaderboardData);
@@ -253,8 +243,9 @@ export const useArena = () => {
       const { data, error } = await supabase
         .from('arena_battles')
         .select('*')
+        .eq('is_active', false)
         .order('ends_at', { ascending: false })
-        .limit(100);
+        .limit(10);
 
       if (error) throw error;
 
