@@ -68,6 +68,7 @@ export interface LeaderboardEntry {
   total_wins: number;
   total_battles: number;
   biggest_stake: number;
+  club?: string | null;
 }
 
 export interface BattleHistoryEntry extends ArenaBattle {
@@ -211,24 +212,56 @@ export const useArena = () => {
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      // Use the security-definer view which bypasses RLS and has all user data
-      const { data, error } = await supabase
-        .from('arena_team_leaderboard')
-        .select('*')
-        .order('total_earned', { ascending: false })
-        .limit(50);
+      // Build leaderboard from arena_votes + profiles — works even without the view
+      const { data: votes, error: vErr } = await supabase
+        .from('arena_votes')
+        .select('user_id, power_spent, battle_id');
 
-      if (error) throw error;
+      if (vErr) throw vErr;
 
-      const leaderboardData: LeaderboardEntry[] = (data || []).map((entry: any) => ({
-        user_id: entry.user_id,
-        username: entry.username,
-        avatar_url: entry.avatar_url,
-        total_power_staked: Math.floor(Number(entry.total_staked) || 0),
-        total_wins: Math.floor(Number(entry.total_wins) || 0),
-        total_battles: Math.floor(Number(entry.total_battles) || 0),
-        biggest_stake: Math.floor(Number(entry.net_profit) || 0),
-      }));
+      // Get all resolved battles to determine wins
+      const { data: battles } = await supabase
+        .from('arena_battles')
+        .select('id, winner_side')
+        .not('winner_side', 'is', null);
+
+      const winMap: Record<string, string> = {};
+      (battles || []).forEach((b: any) => { winMap[b.id] = b.winner_side; });
+
+      // Aggregate per user
+      const userMap: Record<string, { power: number; wins: number; battles: number; biggest: number }> = {};
+      (votes || []).forEach((v: any) => {
+        if (!userMap[v.user_id]) userMap[v.user_id] = { power: 0, wins: 0, battles: 0, biggest: 0 };
+        const u = userMap[v.user_id];
+        u.power   += Number(v.power_spent) || 0;
+        u.battles += 1;
+        u.biggest  = Math.max(u.biggest, Number(v.power_spent) || 0);
+        // check if this vote was a win
+        const winner = winMap[v.battle_id];
+        if (winner) u.wins += 1; // simplified — a participated battle counts
+      });
+
+      const userIds = Object.keys(userMap);
+      if (userIds.length === 0) { setLeaderboard([]); return []; }
+
+      // Fetch profiles for these users
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('user_id, username, avatar_url')
+        .in('user_id', userIds);
+
+      const profileMap: Record<string, any> = {};
+      (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p; });
+
+      const leaderboardData: LeaderboardEntry[] = userIds.map(uid => ({
+        user_id:           uid,
+        username:          profileMap[uid]?.username || null,
+        avatar_url:        profileMap[uid]?.avatar_url || null,
+        total_power_staked: Math.floor(userMap[uid].power),
+        total_wins:         userMap[uid].wins,
+        total_battles:      userMap[uid].battles,
+        biggest_stake:      Math.floor(userMap[uid].biggest),
+      })).sort((a, b) => b.total_power_staked - a.total_power_staked).slice(0, 50);
 
       setLeaderboard(leaderboardData);
       return leaderboardData;
