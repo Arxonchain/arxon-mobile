@@ -1,4 +1,4 @@
-﻿name: Build Android AAB
+name: Build Android AAB
 
 on:
   workflow_dispatch:
@@ -36,20 +36,10 @@ jobs:
       - name: Sync Capacitor
         run: npx cap sync android
 
-      - name: Create keystore
+      - name: Decode keystore from secret
         run: |
-          keytool -genkeypair \
-            -storetype JKS \
-            -keystore android/app/arxon-release.keystore \
-            -alias arxon \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -storepass arxon2024 \
-            -keypass arxon2024 \
-            -dname "CN=Arxon,OU=Dev,O=Arxon,L=Lagos,S=Lagos,C=NG"
-          echo "Keystore created"
-          keytool -list -keystore android/app/arxon-release.keystore -storepass arxon2024
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/arxon-release.keystore
+          echo "Keystore decoded successfully"
 
       - name: Build AAB
         run: |
@@ -57,9 +47,9 @@ jobs:
           chmod +x gradlew
           ./gradlew bundleRelease \
             -Pandroid.injected.signing.store.file=$GITHUB_WORKSPACE/android/app/arxon-release.keystore \
-            -Pandroid.injected.signing.store.password=arxon2024 \
-            -Pandroid.injected.signing.key.alias=arxon \
-            -Pandroid.injected.signing.key.password=arxon2024
+            -Pandroid.injected.signing.store.password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Pandroid.injected.signing.key.alias=${{ secrets.KEYSTORE_ALIAS }} \
+            -Pandroid.injected.signing.key.password=${{ secrets.KEY_PASSWORD }}
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4
