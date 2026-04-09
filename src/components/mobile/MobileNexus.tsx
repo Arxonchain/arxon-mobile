@@ -8,6 +8,19 @@ import { useState, useEffect } from 'react';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { Copy, Check } from 'lucide-react';
 
+// ── Time helpers ────────────────────────────────────────────────────────────
+function relativeTime(iso: string): string {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60)  return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff/86400)}d ago`;
+  return new Date(iso).toLocaleDateString([], { month:'short', day:'numeric' });
+}
+function exactTime(iso: string): string {
+  return new Date(iso).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+
 const CSS = `
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @keyframes shimmer{0%{left:-100%}100%{left:200%}}
@@ -277,14 +290,17 @@ export default function MobileNexus() {
                   </svg>
                 </div>
                 <div style={{flex:1,minWidth:0}}>
-                  <div style={{fontSize:13,fontWeight:700,color:'#EEF2F7'}}>{isSender?'Sent':'Received'}</div>
+                  <div style={{fontSize:13,fontWeight:700,color:'#EEF2F7'}}>{isSender?'Sent to':'Received from'}</div>
                   <div style={{fontSize:10,color:'rgba(139,174,214,.35)',marginTop:2,fontFamily:'monospace',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {isSender?tx.receiver_address?.slice(0,20)+'...':tx.sender_address?.slice(0,20)+'...'}
                   </div>
+                  <div style={{fontSize:9,color:'rgba(139,174,214,.25)',marginTop:3}}>{exactTime(tx.created_at)}</div>
                 </div>
                 <div style={{textAlign:'right',flexShrink:0}}>
-                  <div style={{fontSize:14,fontWeight:800,color:isSender?'#E06060':'#5DB08A'}}>{isSender?'-':'+​'}{tx.amount} ARX-P</div>
-                  <div style={{fontSize:9,color:'rgba(139,174,214,.3)',marginTop:1}}>{new Date(tx.created_at).toLocaleDateString()}</div>
+                  <div style={{fontSize:14,fontWeight:800,color:isSender?'#E06060':'#5DB08A'}}>{isSender?'-':'+'}{tx.amount} ARX-P</div>
+                  <div style={{fontSize:9,color:isSender?'rgba(224,96,96,.5)':'rgba(93,176,138,.5)',marginTop:3,
+                    background:isSender?'rgba(224,96,96,.06)':'rgba(93,176,138,.06)',
+                    borderRadius:6,padding:'1px 5px'}}>{relativeTime(tx.created_at)}</div>
                 </div>
               </div>
             );
