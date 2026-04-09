@@ -61,11 +61,14 @@ export default function MobileProfile() {
   const { profile, refetchProfile } = useProfile();
   const { isAdmin }                 = useAdmin();
 
-  const [copied,    setCopied]    = useState(false);
-  const [notif,     setNotif]     = useState(true);
-  const [mineN,     setMineN]     = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [copied,      setCopied]      = useState(false);
+  const [notif,       setNotif]       = useState(true);
+  const [mineN,       setMineN]       = useState(true);
+  const [uploading,   setUploading]   = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
+  const [xHandle,     setXHandle]     = useState('');
+  const [editingX,    setEditingX]    = useState(false);
+  const [savingX,     setSavingX]     = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const username  = profile?.username || user?.email?.split('@')[0] || 'Miner';
@@ -78,6 +81,28 @@ export default function MobileProfile() {
     const emailMatch = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
     setIsAdminUser(emailMatch || isAdmin);
   }, [user, isAdmin]);
+
+  // Load x_handle from profile
+  useEffect(() => {
+    if ((profile as any)?.x_handle) setXHandle((profile as any).x_handle);
+  }, [profile]);
+
+  const saveXHandle = async () => {
+    if (!user) return;
+    setSavingX(true);
+    try {
+      const handle = xHandle.replace('@','').trim();
+      const { error } = await supabase.from('profiles')
+        .update({ x_handle: handle || null } as any)
+        .eq('user_id', user.id);
+      if (error) throw error;
+      await refetchProfile();
+      setEditingX(false);
+      toast({ title: 'Saved!', description: handle ? `@${handle} linked` : 'X handle removed' });
+    } catch (e: any) {
+      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+    } finally { setSavingX(false); }
+  };
 
   const copyRef = async () => {
     if (!profile?.referral_code) return;
@@ -259,6 +284,59 @@ export default function MobileProfile() {
       )}
 
       <div style={{padding:'20px 20px 0'}}>
+
+        {/* ── X Handle Section ── */}
+        <motion.div variants={fadeUp} style={{marginBottom:20}}>
+          <div style={{background:'hsl(215 25% 9%)', border:'1px solid hsl(215 22% 16%)',
+            borderRadius:20, padding:'16px 18px'}}>
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom: editingX ? 12 : 0}}>
+              <div style={{display:'flex', alignItems:'center', gap:10}}>
+                {/* X logo */}
+                <div style={{width:36, height:36, borderRadius:11, background:'hsl(215 25% 12%)',
+                  border:'1px solid hsl(215 22% 18%)', display:'flex', alignItems:'center',
+                  justifyContent:'center', flexShrink:0}}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.733-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                  </svg>
+                </div>
+                <div>
+                  <p style={{fontSize:13, fontWeight:600, color:'hsl(215 18% 88%)'}}>X (Twitter)</p>
+                  <p style={{fontSize:10, color:'hsl(215 14% 38%)', marginTop:1}}>
+                    {(profile as any)?.x_handle ? `@${(profile as any).x_handle}` : 'Not linked'}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => setEditingX(e => !e)}
+                style={{padding:'6px 14px', borderRadius:12, fontSize:11, fontWeight:700,
+                  background: editingX ? 'hsl(215 25% 14%)' : 'hsl(215 35% 62%/0.12)',
+                  border:`1px solid ${editingX ? 'hsl(215 22% 20%)' : 'hsl(215 35% 62%/0.25)'}`,
+                  color: editingX ? 'hsl(215 18% 45%)' : 'hsl(215 35% 62%)',
+                  cursor:'pointer', outline:'none'}}>
+                {editingX ? 'Cancel' : (profile as any)?.x_handle ? 'Edit' : 'Link'}
+              </button>
+            </div>
+            {editingX && (
+              <div style={{display:'flex', gap:8}}>
+                <div style={{flex:1, display:'flex', alignItems:'center', gap:8,
+                  background:'hsl(215 25% 12%)', border:'1px solid hsl(215 22% 18%)',
+                  borderRadius:12, padding:'10px 14px'}}>
+                  <span style={{fontSize:14, fontWeight:700, color:'hsl(215 35% 55%)'}}>@</span>
+                  <input value={xHandle} onChange={e => setXHandle(e.target.value)}
+                    placeholder="yourhandle"
+                    style={{flex:1, background:'none', border:'none', outline:'none',
+                      fontSize:14, color:'hsl(215 18% 88%)',
+                      fontFamily:"'Creato Display',-apple-system,sans-serif"}}/>
+                </div>
+                <button onClick={saveXHandle} disabled={savingX}
+                  style={{padding:'10px 16px', borderRadius:12, fontSize:12, fontWeight:700,
+                    background:'hsl(215 35% 55%)', border:'none',
+                    color:'white', cursor:'pointer', outline:'none', flexShrink:0}}>
+                  {savingX ? '...' : 'Save'}
+                </button>
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* ── ADMIN CONTROL PANEL (only for gabemetax@gmail.com) ── */}
         {isAdminUser && (

@@ -1,18 +1,35 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { usePoints } from '@/hooks/usePoints';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, Crown } from 'lucide-react';
 
-interface Entry { user_id:string; username:string|null; total_points:number; }
+interface Entry { user_id:string; username:string|null; total_points:number; avatar_url:string|null; }
 
 const TIERS = [
   {col:'hsl(38 55% 52%)',bg:'hsl(38 55% 52%/0.14)',bd:'hsl(38 55% 52%/0.32)',glow:'hsl(38 55% 52%/0.35)'},
   {col:'hsl(215 18% 68%)',bg:'hsl(215 18% 68%/0.12)',bd:'hsl(215 18% 68%/0.26)',glow:'hsl(215 18% 68%/0.22)'},
   {col:'hsl(22 50% 48%)',bg:'hsl(22 50% 48%/0.12)',bd:'hsl(22 50% 48%/0.26)',glow:'hsl(22 50% 48%/0.22)'},
 ];
+
+function Avatar({ url, name, size=36, col='hsl(215 35% 62%)' }: { url:string|null; name:string|null; size?:number; col?:string }) {
+  const [err, setErr] = useState(false);
+  const init = (name||'?')[0].toUpperCase();
+  if (url && !err) return (
+    <div style={{width:size,height:size,borderRadius:'50%',overflow:'hidden',flexShrink:0,border:`1px solid ${col}33`}}>
+      <img src={url} alt="" onError={()=>setErr(true)} style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+    </div>
+  );
+  return (
+    <div style={{width:size,height:size,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',
+      justifyContent:'center',fontSize:size*0.38,fontWeight:700,color:col,
+      background:`${col}18`,border:`1px solid ${col}33`}}>
+      {init}
+    </div>
+  );
+}
 
 export default function MobileLeaderboard() {
   const navigate         = useNavigate();
@@ -27,9 +44,16 @@ export default function MobileLeaderboard() {
       .order('total_points',{ascending:false}).limit(100)
       .then(async ({data:pts})=>{
         if (!pts?.length){ setLoading(false); return; }
-        const {data:profiles} = await supabase.from('profiles').select('user_id,username').in('user_id',pts.map(p=>p.user_id));
-        const nameMap = new Map((profiles||[]).map(p=>[p.user_id,p.username]));
-        setLeaders(pts.map(p=>({user_id:p.user_id,username:nameMap.get(p.user_id)||null,total_points:Math.round(Number(p.total_points)||0)})));
+        const {data:profiles} = await supabase.from('profiles')
+          .select('user_id,username,avatar_url')
+          .in('user_id',pts.map(p=>p.user_id));
+        const profMap = new Map((profiles||[]).map(p=>[p.user_id,p]));
+        setLeaders(pts.map(p=>({
+          user_id:p.user_id,
+          username:(profMap.get(p.user_id) as any)?.username||null,
+          avatar_url:(profMap.get(p.user_id) as any)?.avatar_url||null,
+          total_points:Math.round(Number(p.total_points)||0)
+        })));
         setLoading(false);
       });
   },[]);
@@ -163,20 +187,16 @@ export default function MobileLeaderboard() {
               style={{display:'flex',alignItems:'center',gap:12,padding:'12px 16px',borderRadius:16,marginBottom:8,
                 background:isMe?'hsl(215 30% 12%)':isTop3?t!.bg:'hsl(225 22% 7%)',
                 border:`1px solid ${isMe?'hsl(215 35% 62%/0.28)':isTop3?t!.bd:'hsl(215 20% 12%)'}`,
-                boxShadow:isMe?'0 0 0 1px hsl(215 35% 62%/0.1)':'none'}}>
+                boxShadow:isMe?'0 0 0 1px hsl(215 35% 62%/0.1)':'none',cursor:'pointer'}}
+              onClick={() => !isMe && navigate(`/profile/${entry.user_id}`)}>
               <div style={{width:30,height:30,borderRadius:10,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
                 background:isTop3?t!.bg:'hsl(215 20% 11%)',border:`1px solid ${isTop3?t!.bd:'hsl(215 20% 16%)'}`,}}>
                 <span style={{fontSize:11,fontWeight:800,color:isTop3?t!.col:'hsl(215 14% 38%)'}}>
                   {isTop3?['🥇','🥈','🥉'][idx]:idx+1}
                 </span>
               </div>
-              <div style={{width:36,height:36,borderRadius:'50%',flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center',
-                fontSize:13,fontWeight:700,
-                background:isTop3?t!.bg:'hsl(215 25% 12%)',
-                border:`1px solid ${isTop3?t!.bd:'hsl(215 20% 18%)'}`,
-                color:isTop3?t!.col:isMe?'hsl(215 35% 62%)':'hsl(215 18% 52%)'}}>
-                {entry.username?.[0]?.toUpperCase()||'?'}
-              </div>
+              <Avatar url={entry.avatar_url} name={entry.username}
+                col={isTop3?t!.col:isMe?'hsl(215 35% 62%)':'hsl(215 18% 52%)'} size={36}/>
               <div style={{flex:1,minWidth:0}}>
                 <p style={{fontSize:13,fontWeight:600,color:'hsl(215 18% 88%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                   {entry.username||'Miner'}

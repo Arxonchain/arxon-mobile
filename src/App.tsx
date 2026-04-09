@@ -52,6 +52,7 @@ import MobileProfile     from "@/components/mobile/MobileProfile";
 import MobileWallet      from "@/components/mobile/MobileWallet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import MobileChat        from "@/components/mobile/MobileChat";
+import PublicProfile     from "@/pages/PublicProfile";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -129,6 +130,7 @@ function AppRoutes() {
             <Route path="/profile"     element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
             <Route path="/wallet"      element={<MobileWallet />} />
             <Route path="/chat"        element={<MobileChat />} />
+            <Route path="/profile/:userId" element={<PublicProfile />} />
 
             {/* Web pages with mobile wrapper */}
             <Route path="/tasks"         element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />

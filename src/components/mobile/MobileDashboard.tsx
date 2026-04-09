@@ -9,6 +9,14 @@ import { useState, useEffect } from 'react';
 import { Bell, ChevronRight } from 'lucide-react';
 import arxonLogo from '@/assets/arxon-logo.jpg';
 
+function relTime(iso: string) {
+  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (diff < 60) return 'Just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return new Date(iso).toLocaleDateString([], { month:'short', day:'numeric' });
+}
+
 const fadeUp  = { hidden:{opacity:0,y:22}, show:{opacity:1,y:0,transition:{duration:0.45,ease:[0.25,0.46,0.45,0.94]}} };
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.06,delayChildren:0.1}} };
 const scaleIn = { hidden:{opacity:0,scale:0.93}, show:{opacity:1,scale:1,transition:{duration:0.45,ease:[0.25,0.46,0.45,0.94]}} };
@@ -72,6 +80,7 @@ export default function MobileDashboard() {
   const [todayPts,  setTodayPts]  = useState(0);
   const [weekPts,   setWeekPts]   = useState(0);
   const [liveEarn,  setLiveEarn]  = useState(0);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
   const totalPts = Math.round(points?.total_points ?? 0);
   const userRank = rank ?? null;
@@ -92,6 +101,46 @@ export default function MobileDashboard() {
       const t = td?.reduce((s,r)=>s+Number(r.arx_mined||0),0)??0;
       const w = wk?.reduce((s,r)=>s+Number(r.arx_mined||0),0)??0;
       setTodayPts(t); setWeekPts(w); setLiveEarn(t);
+
+      // Fetch real recent activity
+      const [{ data: sessions }, { data: nexusTx }] = await Promise.all([
+        supabase.from('mining_sessions').select('id,arx_mined,started_at,ended_at,is_active')
+          .eq('user_id', user.id).order('started_at', { ascending: false }).limit(3),
+        supabase.from('nexus_transactions').select('id,amount,created_at,sender_id,receiver_id')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false }).limit(3),
+      ]);
+
+      const activities: any[] = [];
+      (sessions || []).forEach(s => {
+        activities.push({
+          type: s.is_active ? 'mining_active' : 'mining_done',
+          label: s.is_active ? 'Mining Session' : 'Session Completed',
+          sub: relTime(s.started_at),
+          val: s.is_active ? `+${liveEarn.toFixed(2)}` : `+${Number(s.arx_mined||0).toFixed(2)}`,
+          time: s.started_at,
+          col: 'hsl(155 45% 43%)',
+          bg: 'hsl(155 45% 43%/0.1)',
+          bd: 'hsl(155 45% 43%/0.2)',
+          vc: 'hsl(155 45% 55%)',
+        });
+      });
+      (nexusTx || []).forEach(tx => {
+        const isSend = tx.sender_id === user.id;
+        activities.push({
+          type: isSend ? 'nexus_send' : 'nexus_recv',
+          label: isSend ? 'Sent ARX-P' : 'Received ARX-P',
+          sub: relTime(tx.created_at),
+          val: `${isSend ? '-' : '+'}${tx.amount}`,
+          time: tx.created_at,
+          col: isSend ? 'hsl(0 60% 56%)' : 'hsl(155 45% 43%)',
+          bg: isSend ? 'hsl(0 60% 56%/0.08)' : 'hsl(155 45% 43%/0.08)',
+          bd: isSend ? 'hsl(0 60% 56%/0.18)' : 'hsl(155 45% 43%/0.18)',
+          vc: isSend ? 'hsl(0 60% 62%)' : 'hsl(155 45% 55%)',
+        });
+      });
+      activities.sort((a,b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+      setRecentActivity(activities.slice(0, 4));
     })();
   },[user]);
 
@@ -369,35 +418,55 @@ export default function MobileDashboard() {
             See all <ChevronRight size={13}/>
           </button>
         </div>
-        {[
-          {col:'hsl(155 45% 43%)',bg:'hsl(155 45% 43%/0.1)',bd:'hsl(155 45% 43%/0.2)',vc:'hsl(155 45% 55%)',
-           label:'Mining Session',sub:'Today · ongoing',val:`+${liveEarn.toFixed(2)}`,
-           icon:<path d="M15 5l4 4-8 8-5 1 1-5 8-8z"/>},
-          {col:'hsl(215 35% 62%)',bg:'hsl(215 35% 62%/0.08)',bd:'hsl(215 35% 62%/0.16)',vc:'hsl(215 35% 62%)',
-           label:'Session Complete',sub:'Yesterday · 8hr',val:'+1,186',
-           icon:<><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></>},
-          {col:'hsl(38 55% 52%)',bg:'hsl(38 55% 52%/0.08)',bd:'hsl(38 55% 52%/0.18)',vc:'hsl(38 55% 62%)',
-           label:'Streak Bonus',sub:`${streak}-day streak`,val:'+50',
-           icon:<path d="M12 2l2.5 7h7l-5.5 4 2 7L12 16l-6 4 2-7L2 9h7z"/>},
-        ].map((it,i)=>(
-          <motion.div key={i} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
-            transition={{delay:0.6+i*0.07}} whileTap={{scale:0.98}}
-            className="glass-card press card-lift"
-            style={{display:'flex',alignItems:'center',gap:13,padding:'14px 16px',borderRadius:18,marginBottom:9,cursor:'pointer'}}>
-            <div style={{width:42,height:42,borderRadius:14,background:it.bg,border:`1px solid ${it.bd}`,
-              display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:it.col}}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{it.icon}</svg>
-            </div>
-            <div style={{flex:1}}>
-              <p style={{fontSize:13,fontWeight:600,color:'hsl(215 20% 90%)'}}>{it.label}</p>
-              <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>{it.sub}</p>
-            </div>
-            <div style={{textAlign:'right'}}>
-              <p style={{fontSize:14,fontWeight:700,color:it.vc}}>{it.val}</p>
-              <p style={{fontSize:9,color:'hsl(215 14% 30%)',marginTop:1}}>ARX-P</p>
-            </div>
-          </motion.div>
-        ))}
+        {recentActivity.length === 0 ? (
+          [{col:'hsl(155 45% 43%)',bg:'hsl(155 45% 43%/0.1)',bd:'hsl(155 45% 43%/0.2)',vc:'hsl(155 45% 55%)',
+            label:'Mining Session',sub:'Start mining to see activity',val:'+0.00',
+            icon:<path d="M15 5l4 4-8 8-5 1 1-5 8-8z"/>}
+          ].map((it,i)=>(
+            <motion.div key={i} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
+              transition={{delay:0.6+i*0.07}} whileTap={{scale:0.98}}
+              className="glass-card press card-lift"
+              style={{display:'flex',alignItems:'center',gap:13,padding:'14px 16px',borderRadius:18,marginBottom:9,cursor:'pointer'}}>
+              <div style={{width:42,height:42,borderRadius:14,background:it.bg,border:`1px solid ${it.bd}`,
+                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:it.col}}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{it.icon}</svg>
+              </div>
+              <div style={{flex:1}}>
+                <p style={{fontSize:13,fontWeight:600,color:'hsl(215 20% 90%)'}}>{it.label}</p>
+                <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>{it.sub}</p>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <p style={{fontSize:14,fontWeight:700,color:it.vc}}>{it.val}</p>
+                <p style={{fontSize:9,color:'hsl(215 14% 30%)',marginTop:1}}>ARX-P</p>
+              </div>
+            </motion.div>
+          ))
+        ) : recentActivity.map((it,i)=>{
+          const iconPath = it.type==='mining_active'||it.type==='mining_done'
+            ? <path d="M15 5l4 4-8 8-5 1 1-5 8-8z"/>
+            : it.type==='nexus_send'
+              ? <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>
+              : <><polyline points="23 7 13.5 15.5 8.5 10.5 1 17"/><polyline points="17 7 23 7 23 13"/></>;
+          return (
+            <motion.div key={it.time+i} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
+              transition={{delay:0.6+i*0.07}} whileTap={{scale:0.98}}
+              className="glass-card press card-lift"
+              style={{display:'flex',alignItems:'center',gap:13,padding:'14px 16px',borderRadius:18,marginBottom:9,cursor:'pointer'}}>
+              <div style={{width:42,height:42,borderRadius:14,background:it.bg,border:`1px solid ${it.bd}`,
+                display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0,color:it.col}}>
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">{iconPath}</svg>
+              </div>
+              <div style={{flex:1}}>
+                <p style={{fontSize:13,fontWeight:600,color:'hsl(215 20% 90%)'}}>{it.label}</p>
+                <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>{it.sub}</p>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <p style={{fontSize:14,fontWeight:700,color:it.vc}}>{it.val}</p>
+                <p style={{fontSize:9,color:'hsl(215 14% 30%)',marginTop:1}}>ARX-P</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </motion.div>
     </motion.div>
   );

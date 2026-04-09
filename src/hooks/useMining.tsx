@@ -150,7 +150,6 @@ export const useMining = (options?: UseMiningOptions) => {
         .from('nexus_boosts')
         .select('boost_percentage, expires_at')
         .eq('user_id', user.id)
-        .eq('claimed', true)
         .gte('expires_at', new Date().toISOString());
 
       if (!error && data) {
