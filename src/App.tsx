@@ -53,6 +53,8 @@ import MobileWallet      from "@/components/mobile/MobileWallet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import MobileChat        from "@/components/mobile/MobileChat";
 import PublicProfile     from "@/pages/PublicProfile";
+import BiometricLockScreen from "@/components/mobile/BiometricLockScreen";
+import { useBiometric }  from "@/hooks/useBiometric";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -165,11 +167,12 @@ function AppWithSplash() {
   const { loading } = useAuth();
   const [splashDone, setSplashDone] = useState(false);
   const handleFinish = useCallback(() => setSplashDone(true), []);
-  // Initialize push notifications globally so they run even when pages aren't mounted
+  const { locked, enabled } = useBiometric();
   usePushNotifications();
   return (
     <>
       {isNative && !splashDone && <MobileSplash isAppReady={!loading} onFinish={handleFinish}/>}
+      {enabled && locked && <BiometricLockScreen />}
       <AppRoutes />
     </>
   );
