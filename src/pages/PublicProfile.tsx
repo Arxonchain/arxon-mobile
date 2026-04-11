@@ -27,7 +27,7 @@ export default function PublicProfile() {
     if (!userId) { setNotFound(true); setLoading(false); return; }
     (async () => {
       const [{ data: prof }, { data: pts }] = await Promise.all([
-        supabase.from('profiles').select('user_id,username,avatar_url,country,x_handle')
+        supabase.from('profiles').select('user_id,username,avatar_url,country')
           .eq('user_id', userId).maybeSingle(),
         supabase.from('user_points').select('total_points,daily_streak')
           .eq('user_id', userId).maybeSingle(),
