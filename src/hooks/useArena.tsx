@@ -273,16 +273,15 @@ export const useArena = () => {
 
   const fetchBattleHistory = useCallback(async () => {
     try {
+      // Fetch ALL battles — upcoming, live, and ended
       const { data, error } = await supabase
         .from('arena_battles')
         .select('*')
-        .eq('is_active', false)
-        .order('ends_at', { ascending: false })
-        .limit(10);
+        .order('starts_at', { ascending: false })
+        .limit(50);
 
       if (error) throw error;
 
-      // If user is logged in, get their participation
       let userVotes: any[] = [];
       if (user) {
         const { data: votes } = await supabase
