@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Trophy, Plus, Calendar, Zap, Target, Clock, Gift, 
   Trash2, Play, Pause, CheckCircle, XCircle, RefreshCw,
-  TrendingUp, Users, DollarSign, Pencil, Upload, Image, X
+  TrendingUp, Users, DollarSign, Pencil, Image, X as XIcon
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -104,51 +104,6 @@ const AdminArena = () => {
     ends_at_minute: '00',
     ends_at_period: 'PM' as 'AM' | 'PM',
   });
-
-  // Upload state
-  const [uploading, setUploading] = useState<string | null>(null);
-  const createSideARef  = useRef<HTMLInputElement>(null);
-  const createSideBRef  = useRef<HTMLInputElement>(null);
-  const createBannerRef = useRef<HTMLInputElement>(null);
-  const editSideARef    = useRef<HTMLInputElement>(null);
-  const editSideBRef    = useRef<HTMLInputElement>(null);
-  const editBannerRef   = useRef<HTMLInputElement>(null);
-
-  // Upload image to Supabase Storage and return public URL
-  const uploadImage = async (file: File, slot: string): Promise<string | null> => {
-    if (!file.type.startsWith('image/')) { toast.error('Please select an image file'); return null; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Image must be under 5MB'); return null; }
-    setUploading(slot);
-    try {
-      const ext  = file.name.split('.').pop() || 'jpg';
-      const path = `battles/${slot}-${Date.now()}.${ext}`;
-
-      // Always use 'avatars' bucket — it already exists and has public read access
-      const { error: upErr } = await supabase.storage
-        .from('avatars')
-        .upload(path, file, { upsert: true, contentType: file.type });
-
-      if (upErr) throw upErr;
-
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path);
-      return publicUrl;
-    } catch (err: any) {
-      toast.error(`Upload failed: ${err.message}`);
-      return null;
-    } finally {
-      setUploading(null);
-    }
-  };
-
-  const handleImageFile = async (
-    file: File | undefined,
-    slot: string,
-    setter: (url: string) => void
-  ) => {
-    if (!file) return;
-    const url = await uploadImage(file, slot);
-    if (url) setter(url);
-  };
 
   const fetchBattles = async () => {
     setLoading(true);
@@ -580,95 +535,78 @@ const AdminArena = () => {
                   </div>
                 </div>
 
-                {/* Images */}
-                <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
-                  <Label className="flex items-center gap-2 text-sm font-semibold">
-                    <Image className="w-4 h-4" /> Battle Images (optional)
-                  </Label>
-                  {/* Side A image */}
+
+                {/* ── Battle Images (URL paste) ── */}
+                <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Image className="w-4 h-4 text-primary" />
+                    <span className="text-sm font-semibold">Battle Images</span>
+                    <span className="text-xs text-muted-foreground ml-1">— paste direct image URLs</span>
+                  </div>
+
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">Side A Image / Logo</p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="https://... or upload below"
-                        value={formData.side_a_image}
-                        onChange={(e) => setFormData({ ...formData, side_a_image: e.target.value })}
-                        className="flex-1 text-xs"
-                      />
-                      <Button type="button" size="sm" variant="outline"
-                        disabled={uploading === 'create-a'}
-                        onClick={() => createSideARef.current?.click()}>
-                        {uploading === 'create-a' ? '...' : <Upload className="w-3 h-3" />}
-                      </Button>
+                    <Label className="text-xs font-medium text-muted-foreground">Side A — Logo / Portrait</Label>
+                    <div className="flex gap-2 items-center">
                       {formData.side_a_image && (
-                        <Button type="button" size="sm" variant="ghost"
-                          onClick={() => setFormData({ ...formData, side_a_image: '' })}>
-                          <X className="w-3 h-3" />
-                        </Button>
+                        <img src={formData.side_a_image} alt="A"
+                          className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+                          onError={e=>(e.currentTarget.style.display='none')}/>
+                      )}
+                      <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
+                        value={formData.side_a_image}
+                        onChange={(e) => setFormData({ ...formData, side_a_image: e.target.value })}/>
+                      {formData.side_a_image && (
+                        <button onClick={() => setFormData({ ...formData, side_a_image: '' })}
+                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                          <XIcon className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
-                    {formData.side_a_image && (
-                      <img src={formData.side_a_image} alt="Side A" className="h-10 w-10 rounded object-cover"/>
-                    )}
-                    <input ref={createSideARef} type="file" accept="image/*" className="hidden"
-                      onChange={(e) => handleImageFile(e.target.files?.[0], 'create-a', (url) => setFormData(f => ({ ...f, side_a_image: url })))}/>
                   </div>
-                  {/* Side B image */}
+
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">Side B Image / Logo</p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="https://... or upload below"
-                        value={formData.side_b_image}
-                        onChange={(e) => setFormData({ ...formData, side_b_image: e.target.value })}
-                        className="flex-1 text-xs"
-                      />
-                      <Button type="button" size="sm" variant="outline"
-                        disabled={uploading === 'create-b'}
-                        onClick={() => createSideBRef.current?.click()}>
-                        {uploading === 'create-b' ? '...' : <Upload className="w-3 h-3" />}
-                      </Button>
+                    <Label className="text-xs font-medium text-muted-foreground">Side B — Logo / Portrait</Label>
+                    <div className="flex gap-2 items-center">
                       {formData.side_b_image && (
-                        <Button type="button" size="sm" variant="ghost"
-                          onClick={() => setFormData({ ...formData, side_b_image: '' })}>
-                          <X className="w-3 h-3" />
-                        </Button>
+                        <img src={formData.side_b_image} alt="B"
+                          className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+                          onError={e=>(e.currentTarget.style.display='none')}/>
+                      )}
+                      <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
+                        value={formData.side_b_image}
+                        onChange={(e) => setFormData({ ...formData, side_b_image: e.target.value })}/>
+                      {formData.side_b_image && (
+                        <button onClick={() => setFormData({ ...formData, side_b_image: '' })}
+                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                          <XIcon className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
-                    {formData.side_b_image && (
-                      <img src={formData.side_b_image} alt="Side B" className="h-10 w-10 rounded object-cover"/>
-                    )}
-                    <input ref={createSideBRef} type="file" accept="image/*" className="hidden"
-                      onChange={(e) => handleImageFile(e.target.files?.[0], 'create-b', (url) => setFormData(f => ({ ...f, side_b_image: url })))}/>
                   </div>
-                  {/* Banner image */}
+
                   <div className="space-y-1">
-                    <p className="text-xs text-muted-foreground font-medium">Banner Image (wide header)</p>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        placeholder="https://... or upload below"
+                    <Label className="text-xs font-medium text-muted-foreground">Wide Banner (optional)</Label>
+                    <div className="flex gap-2 items-center">
+                      <Input placeholder="https://... wide banner URL" className="flex-1 text-xs"
                         value={formData.banner_image}
-                        onChange={(e) => setFormData({ ...formData, banner_image: e.target.value })}
-                        className="flex-1 text-xs"
-                      />
-                      <Button type="button" size="sm" variant="outline"
-                        disabled={uploading === 'create-banner'}
-                        onClick={() => createBannerRef.current?.click()}>
-                        {uploading === 'create-banner' ? '...' : <Upload className="w-3 h-3" />}
-                      </Button>
+                        onChange={(e) => setFormData({ ...formData, banner_image: e.target.value })}/>
                       {formData.banner_image && (
-                        <Button type="button" size="sm" variant="ghost"
-                          onClick={() => setFormData({ ...formData, banner_image: '' })}>
-                          <X className="w-3 h-3" />
-                        </Button>
+                        <button onClick={() => setFormData({ ...formData, banner_image: '' })}
+                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                          <XIcon className="w-4 h-4" />
+                        </button>
                       )}
                     </div>
                     {formData.banner_image && (
-                      <img src={formData.banner_image} alt="Banner" className="h-16 w-full rounded object-cover"/>
+                      <img src={formData.banner_image} alt="Banner"
+                        className="w-full h-20 rounded-lg object-cover border border-border mt-1"
+                        onError={e=>(e.currentTarget.style.display='none')}/>
                     )}
-                    <input ref={createBannerRef} type="file" accept="image/*" className="hidden"
-                      onChange={(e) => handleImageFile(e.target.files?.[0], 'create-banner', (url) => setFormData(f => ({ ...f, banner_image: url })))}/>
                   </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    💡 Use Wikipedia/Wikimedia PNG URLs. For sports logos, search "Club Name logo Wikipedia"
+                  </p>
                 </div>
 
                 {/* Category & Duration */}
@@ -1205,94 +1143,72 @@ const AdminArena = () => {
               </div>
             </div>
 
-            {/* Images */}
-            <div className="space-y-3 p-3 rounded-lg border border-border bg-muted/20">
-              <Label className="flex items-center gap-2 text-sm font-semibold">
-                <Image className="w-4 h-4" /> Battle Images
-              </Label>
-              {/* Side A */}
+
+            {/* ── Battle Images (URL paste) ── */}
+            <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
+              <div className="flex items-center gap-2 mb-1">
+                <Image className="w-4 h-4 text-primary" />
+                <span className="text-sm font-semibold">Battle Images</span>
+              </div>
+
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Side A Image / Logo</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="https://..."
-                    value={editFormData.side_a_image}
-                    onChange={(e) => setEditFormData({ ...editFormData, side_a_image: e.target.value })}
-                    className="flex-1 text-xs"
-                  />
-                  <Button type="button" size="sm" variant="outline"
-                    disabled={uploading === 'edit-a'}
-                    onClick={() => editSideARef.current?.click()}>
-                    {uploading === 'edit-a' ? '...' : <Upload className="w-3 h-3" />}
-                  </Button>
+                <Label className="text-xs font-medium text-muted-foreground">Side A — Logo / Portrait</Label>
+                <div className="flex gap-2 items-center">
                   {editFormData.side_a_image && (
-                    <Button type="button" size="sm" variant="ghost"
-                      onClick={() => setEditFormData({ ...editFormData, side_a_image: '' })}>
-                      <X className="w-3 h-3" />
-                    </Button>
+                    <img src={editFormData.side_a_image} alt="A"
+                      className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+                      onError={e=>(e.currentTarget.style.display='none')}/>
+                  )}
+                  <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
+                    value={editFormData.side_a_image}
+                    onChange={(e) => setEditFormData({ ...editFormData, side_a_image: e.target.value })}/>
+                  {editFormData.side_a_image && (
+                    <button onClick={() => setEditFormData({ ...editFormData, side_a_image: '' })}
+                      className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                      <XIcon className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
-                {editFormData.side_a_image && (
-                  <img src={editFormData.side_a_image} alt="Side A" className="h-10 w-10 rounded object-cover"/>
-                )}
-                <input ref={editSideARef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => handleImageFile(e.target.files?.[0], 'edit-a', (url) => setEditFormData(f => ({ ...f, side_a_image: url })))}/>
               </div>
-              {/* Side B */}
+
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Side B Image / Logo</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="https://..."
-                    value={editFormData.side_b_image}
-                    onChange={(e) => setEditFormData({ ...editFormData, side_b_image: e.target.value })}
-                    className="flex-1 text-xs"
-                  />
-                  <Button type="button" size="sm" variant="outline"
-                    disabled={uploading === 'edit-b'}
-                    onClick={() => editSideBRef.current?.click()}>
-                    {uploading === 'edit-b' ? '...' : <Upload className="w-3 h-3" />}
-                  </Button>
+                <Label className="text-xs font-medium text-muted-foreground">Side B — Logo / Portrait</Label>
+                <div className="flex gap-2 items-center">
                   {editFormData.side_b_image && (
-                    <Button type="button" size="sm" variant="ghost"
-                      onClick={() => setEditFormData({ ...editFormData, side_b_image: '' })}>
-                      <X className="w-3 h-3" />
-                    </Button>
+                    <img src={editFormData.side_b_image} alt="B"
+                      className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+                      onError={e=>(e.currentTarget.style.display='none')}/>
+                  )}
+                  <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
+                    value={editFormData.side_b_image}
+                    onChange={(e) => setEditFormData({ ...editFormData, side_b_image: e.target.value })}/>
+                  {editFormData.side_b_image && (
+                    <button onClick={() => setEditFormData({ ...editFormData, side_b_image: '' })}
+                      className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                      <XIcon className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
-                {editFormData.side_b_image && (
-                  <img src={editFormData.side_b_image} alt="Side B" className="h-10 w-10 rounded object-cover"/>
-                )}
-                <input ref={editSideBRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => handleImageFile(e.target.files?.[0], 'edit-b', (url) => setEditFormData(f => ({ ...f, side_b_image: url })))}/>
               </div>
-              {/* Banner */}
+
               <div className="space-y-1">
-                <p className="text-xs text-muted-foreground font-medium">Banner Image (wide header)</p>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="https://..."
+                <Label className="text-xs font-medium text-muted-foreground">Wide Banner (optional)</Label>
+                <div className="flex gap-2 items-center">
+                  <Input placeholder="https://... wide banner URL" className="flex-1 text-xs"
                     value={editFormData.banner_image}
-                    onChange={(e) => setEditFormData({ ...editFormData, banner_image: e.target.value })}
-                    className="flex-1 text-xs"
-                  />
-                  <Button type="button" size="sm" variant="outline"
-                    disabled={uploading === 'edit-banner'}
-                    onClick={() => editBannerRef.current?.click()}>
-                    {uploading === 'edit-banner' ? '...' : <Upload className="w-3 h-3" />}
-                  </Button>
+                    onChange={(e) => setEditFormData({ ...editFormData, banner_image: e.target.value })}/>
                   {editFormData.banner_image && (
-                    <Button type="button" size="sm" variant="ghost"
-                      onClick={() => setEditFormData({ ...editFormData, banner_image: '' })}>
-                      <X className="w-3 h-3" />
-                    </Button>
+                    <button onClick={() => setEditFormData({ ...editFormData, banner_image: '' })}
+                      className="text-muted-foreground hover:text-foreground flex-shrink-0">
+                      <XIcon className="w-4 h-4" />
+                    </button>
                   )}
                 </div>
                 {editFormData.banner_image && (
-                  <img src={editFormData.banner_image} alt="Banner" className="h-16 w-full rounded object-cover"/>
+                  <img src={editFormData.banner_image} alt="Banner"
+                    className="w-full h-20 rounded-lg object-cover border border-border mt-1"
+                    onError={e=>(e.currentTarget.style.display='none')}/>
                 )}
-                <input ref={editBannerRef} type="file" accept="image/*" className="hidden"
-                  onChange={(e) => handleImageFile(e.target.files?.[0], 'edit-banner', (url) => setEditFormData(f => ({ ...f, banner_image: url })))}/>
               </div>
             </div>
 

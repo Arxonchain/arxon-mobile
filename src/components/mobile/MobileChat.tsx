@@ -142,10 +142,30 @@ export default function MobileChat() {
     navigator.clipboard?.writeText(m.message).catch(()=>{});
     setMenu(null);
   };
+  const [editing, setEditing] = useState<{id:string;text:string}|null>(null);
+
   const doDelete = async (m:Msg) => {
     setMenu(null);
-    await supabase.from('chat_messages').delete().eq('id',m.id);
-    setMsgs(p=>p.filter(x=>x.id!==m.id));
+    const {error} = await supabase.from('chat_messages')
+      .delete().eq('id',m.id).eq('user_id',user?.id||'');
+    if (!error) setMsgs(p=>p.filter(x=>x.id!==m.id));
+  };
+
+  const doEdit = (m:Msg) => {
+    setMenu(null);
+    setEditing({id:m.id, text:m.message});
+    setTimeout(()=>inp.current?.focus(),120);
+  };
+
+  const saveEdit = async () => {
+    if (!editing||!editing.text.trim()) return;
+    const {error} = await supabase.from('chat_messages')
+      .update({message:editing.text.trim()})
+      .eq('id',editing.id).eq('user_id',user?.id||'');
+    if (!error) {
+      setMsgs(p=>p.map(m=>m.id===editing.id?{...m,message:editing.text.trim()}:m));
+      setEditing(null);
+    }
   };
 
   const col=CC[ch];
@@ -196,15 +216,27 @@ export default function MobileChat() {
             <Copy size={17} color="hsl(215 25% 55%)"/>
             <span style={{fontSize:14,fontWeight:600,color:'hsl(215 18% 88%)'}}>Copy</span>
           </button>
-          {/* Delete own */}
           {menu.msg.user_id===user?.id && (
-            <button onTouchEnd={e=>{e.preventDefault();doDelete(menu.msg);}}
-              onClick={()=>doDelete(menu.msg)}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:12,
-                padding:'13px 16px',background:'none',border:'none',cursor:'pointer',outline:'none'}}>
-              <Trash2 size={17} color="hsl(0 60% 56%)"/>
-              <span style={{fontSize:14,fontWeight:600,color:'hsl(0 60% 62%)'}}>Delete</span>
-            </button>
+            <>
+              <button onTouchEnd={e=>{e.preventDefault();doEdit(menu.msg);}}
+                onClick={()=>doEdit(menu.msg)}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:12,
+                  padding:'13px 16px',background:'none',border:'none',cursor:'pointer',
+                  outline:'none',borderBottom:'1px solid hsl(215 22% 13%)'}}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="hsl(215 35% 62%)" strokeWidth="2">
+                  <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                <span style={{fontSize:14,fontWeight:600,color:'hsl(215 18% 88%)'}}>Edit</span>
+              </button>
+              <button onTouchEnd={e=>{e.preventDefault();doDelete(menu.msg);}}
+                onClick={()=>doDelete(menu.msg)}
+                style={{width:'100%',display:'flex',alignItems:'center',gap:12,
+                  padding:'13px 16px',background:'none',border:'none',cursor:'pointer',outline:'none'}}>
+                <Trash2 size={17} color="hsl(0 60% 56%)"/>
+                <span style={{fontSize:14,fontWeight:600,color:'hsl(0 60% 62%)'}}>Delete</span>
+              </button>
+            </>
           )}
         </div>
       )}
@@ -366,6 +398,26 @@ export default function MobileChat() {
         <div ref={bot}/>
       </div>
 
+      {/* Edit bar */}
+      {editing&&(
+        <div style={{margin:'0 20px 6px',padding:'9px 12px',borderRadius:14,
+          background:'hsl(38 55% 52%/0.08)',border:'1px solid hsl(38 55% 52%/0.3)',
+          flexShrink:0,display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:3,alignSelf:'stretch',minHeight:32,borderRadius:2,
+            background:'hsl(38 55% 52%)',flexShrink:0}}/>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{fontSize:11,fontWeight:700,color:'hsl(38 55% 58%)',marginBottom:2}}>✏️ Editing message</p>
+            <p style={{fontSize:11,color:'hsl(215 14% 45%)',overflow:'hidden',
+              textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{editing.text}</p>
+          </div>
+          <button onClick={()=>setEditing(null)}
+            style={{padding:6,borderRadius:8,background:'hsl(215 22% 14%)',
+              border:'none',cursor:'pointer',outline:'none',flexShrink:0}}>
+            <X size={14} color="hsl(215 18% 45%)"/>
+          </button>
+        </div>
+      )}
+
       {/* Reply bar */}
       {rep&&(
         <div style={{margin:'0 20px 6px',padding:'9px 12px',borderRadius:14,
@@ -404,22 +456,30 @@ export default function MobileChat() {
             <div style={{display:'flex',alignItems:'flex-end',gap:10,
               background:'hsl(225 26% 9%)',border:`1px solid ${col}30`,
               borderRadius:20,padding:'10px 10px 10px 16px'}}>
-              <textarea ref={inp} value={txt} onChange={e=>setTxt(e.target.value)}
-                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
-                placeholder={rep?`Reply to ${rep.username||'Miner'}…`:'Type a message…'}
+              <textarea ref={inp}
+                value={editing ? editing.text : txt}
+                onChange={e=> editing ? setEditing({...editing,text:e.target.value}) : setTxt(e.target.value)}
+                onKeyDown={e=>{
+                  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();editing?saveEdit():send();}
+                  if(e.key==='Escape'&&editing){setEditing(null);}
+                }}
+                placeholder={editing?'Edit message…':rep?`Reply to ${rep.username||'Miner'}…`:'Type a message…'}
                 rows={1}
                 style={{flex:1,background:'none',border:'none',outline:'none',fontSize:14,
                   color:'hsl(215 18% 88%)',resize:'none',
                   fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif",
                   lineHeight:'1.5',maxHeight:80,overflow:'auto'}}/>
-              <button onClick={send} disabled={!txt.trim()||busy}
+              <button onClick={editing?saveEdit:send}
+                disabled={editing?!editing.text.trim():(!txt.trim()||busy)}
                 style={{width:38,height:38,borderRadius:13,flexShrink:0,
-                  cursor:txt.trim()?'pointer':'default',
-                  background:txt.trim()?`${col}22`:'hsl(215 22% 12%)',
-                  border:`1px solid ${txt.trim()?`${col}44`:'hsl(215 22% 18%)'}`,
+                  cursor:(editing?editing.text.trim():txt.trim())?'pointer':'default',
+                  background:(editing?editing.text.trim():txt.trim())?`${col}22`:'hsl(215 22% 12%)',
+                  border:`1px solid ${(editing?editing.text.trim():txt.trim())?`${col}44`:'hsl(215 22% 18%)'}`,
                   display:'flex',alignItems:'center',justifyContent:'center',
                   transition:'all .2s',outline:'none'}}>
-                <Send size={16} color={txt.trim()?col:'hsl(215 18% 35%)'}/>
+                {editing
+                  ? <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={col} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <Send size={16} color={txt.trim()?col:'hsl(215 18% 35%)'}/>}
               </button>
             </div>
           )}
