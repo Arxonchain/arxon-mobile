@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Medal, Crown, TrendingUp, Users, Flame, Target, Zap, Shield, Sword } from 'lucide-react';
+import { Trophy, Crown, Users, Zap, Shield, Sword, Star } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { EarningsLeaderboardEntry } from '@/hooks/useArenaMarkets';
 
 interface ArenaTeamLeaderboardProps {
@@ -11,6 +10,12 @@ interface ArenaTeamLeaderboardProps {
   loading?: boolean;
 }
 
+const fmt = (n: number) => {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+  return n.toLocaleString();
+};
+
 const ArenaTeamLeaderboard = ({
   leaderboard,
   currentUserId,
@@ -18,14 +23,12 @@ const ArenaTeamLeaderboard = ({
 }: ArenaTeamLeaderboardProps) => {
   const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
 
-  // Filter and sort by stakes + profit (higher stake + profit = higher rank)
   const getSortedTeam = (club: 'alpha' | 'omega') => {
-    return leaderboard
-      .filter(entry => entry.club === club)
+    return [...leaderboard]
+      .filter((e) => e.club === club)
       .sort((a, b) => {
-        // Rank by: total_staked + net_profit
-        const scoreA = (a.total_staked || 0) + (a.net_profit || 0);
-        const scoreB = (b.total_staked || 0) + (b.net_profit || 0);
+        const scoreA = (Number(a.total_staked) || 0) + (Number(a.net_profit) || 0);
+        const scoreB = (Number(b.total_staked) || 0) + (Number(b.net_profit) || 0);
         return scoreB - scoreA;
       });
   };
@@ -33,306 +36,211 @@ const ArenaTeamLeaderboard = ({
   const alphaTeam = getSortedTeam('alpha');
   const omegaTeam = getSortedTeam('omega');
 
-  // Team stats
   const alphaStats = {
-    totalStaked: alphaTeam.reduce((sum, e) => sum + (e.total_staked || 0), 0),
-    totalProfit: alphaTeam.reduce((sum, e) => sum + (e.net_profit || 0), 0),
+    totalStaked: alphaTeam.reduce((s, e) => s + (Number(e.total_staked) || 0), 0),
     members: alphaTeam.length,
-    totalWins: alphaTeam.reduce((sum, e) => sum + (e.total_wins || 0), 0),
-    bestStreak: Math.max(...alphaTeam.map(e => e.best_win_streak || 0), 0),
+    totalWins: alphaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0),
   };
-
   const omegaStats = {
-    totalStaked: omegaTeam.reduce((sum, e) => sum + (e.total_staked || 0), 0),
-    totalProfit: omegaTeam.reduce((sum, e) => sum + (e.net_profit || 0), 0),
+    totalStaked: omegaTeam.reduce((s, e) => s + (Number(e.total_staked) || 0), 0),
     members: omegaTeam.length,
-    totalWins: omegaTeam.reduce((sum, e) => sum + (e.total_wins || 0), 0),
-    bestStreak: Math.max(...omegaTeam.map(e => e.best_win_streak || 0), 0),
+    totalWins: omegaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0),
   };
 
-  // Find current user's rank in their team
-  const userEntry = leaderboard.find(e => e.user_id === currentUserId);
-  const userTeam = userEntry?.club;
-  const userRankInTeam = userTeam 
-    ? getSortedTeam(userTeam as 'alpha' | 'omega').findIndex(e => e.user_id === currentUserId) + 1
-    : 0;
-
-  const getRankIcon = (rank: number) => {
-    switch (rank) {
-      case 1:
-        return <Crown className="w-5 h-5 text-amber-500" />;
-      case 2:
-        return <Medal className="w-5 h-5 text-gray-400" />;
-      case 3:
-        return <Medal className="w-5 h-5 text-amber-700" />;
-      default:
-        return <span className="text-sm font-bold text-muted-foreground w-5 text-center">{rank}</span>;
-    }
-  };
-
-  const getRankBg = (rank: number, isAlpha: boolean) => {
-    switch (rank) {
-      case 1:
-        return 'bg-gradient-to-r from-amber-500/20 to-transparent border-amber-500/30';
-      case 2:
-        return 'bg-gradient-to-r from-gray-400/10 to-transparent border-gray-400/20';
-      case 3:
-        return 'bg-gradient-to-r from-amber-700/10 to-transparent border-amber-700/20';
-      default:
-        return `bg-card/50 border-border/30`;
-    }
-  };
-
-  const getScore = (entry: EarningsLeaderboardEntry) => {
-    return (entry.total_staked || 0) + (entry.net_profit || 0);
-  };
-
-  const getStreakBadge = (streak: number) => {
-    if (streak >= 10) return { text: '🔥 10+', color: 'text-red-500 bg-red-500/20' };
-    if (streak >= 5) return { text: '🔥 5+', color: 'text-orange-500 bg-orange-500/20' };
-    if (streak >= 3) return { text: '🔥 3', color: 'text-amber-500 bg-amber-500/20' };
-    return null;
-  };
-
-  return (
-    <div className="px-4 py-6 space-y-5">
-      {/* Header */}
-      <div className="text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-3">
-          <Sword className="w-4 h-4 text-primary" />
-          <span className="text-sm font-bold text-primary">Team Leaderboards</span>
-        </div>
-        <h2 className="text-xl font-black text-foreground">Alpha vs Omega</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          Ranked by stakes + profit
-        </p>
-      </div>
-
-      {/* Your Team Rank Card */}
-      {userEntry && userTeam && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={`p-4 rounded-2xl border ${
-            userTeam === 'alpha' 
-              ? 'bg-cyan-500/10 border-cyan-500/30' 
-              : 'bg-purple-500/10 border-purple-500/30'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                userTeam === 'alpha' ? 'bg-cyan-500/20' : 'bg-purple-500/20'
-              }`}>
-                {userTeam === 'alpha' ? (
-                  <Shield className="w-5 h-5 text-cyan-500" />
-                ) : (
-                  <Sword className="w-5 h-5 text-purple-500" />
-                )}
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Your Team Rank</p>
-                <p className={`text-lg font-bold ${
-                  userTeam === 'alpha' ? 'text-cyan-500' : 'text-purple-500'
-                }`}>
-                  Team {userTeam === 'alpha' ? 'Alpha' : 'Omega'} • #{userRankInTeam}
-                </p>
-              </div>
-            </div>
-            <div className="text-right">
-              {(userEntry.current_win_streak || 0) >= 3 && (
-                <span className={`text-xs px-2 py-1 rounded-full ${getStreakBadge(userEntry.current_win_streak || 0)?.color}`}>
-                  {getStreakBadge(userEntry.current_win_streak || 0)?.text} Streak
-                </span>
-              )}
-              <p className={`text-lg font-bold ${
-                userTeam === 'alpha' ? 'text-cyan-500' : 'text-purple-500'
-              }`}>
-                {getScore(userEntry).toLocaleString()}
-              </p>
-            </div>
-          </div>
-          <div className="grid grid-cols-4 gap-2 mt-4">
-            <div className="text-center">
-              <p className="text-lg font-bold text-foreground">{(userEntry.total_staked || 0).toLocaleString()}</p>
-              <p className="text-xs text-muted-foreground">Staked</p>
-            </div>
-            <div className="text-center">
-              <p className={`text-lg font-bold ${(userEntry.net_profit || 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {(userEntry.net_profit || 0) >= 0 ? '+' : ''}{(userEntry.net_profit || 0).toLocaleString()}
-              </p>
-              <p className="text-xs text-muted-foreground">Profit</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-amber-500">{userEntry.total_wins || 0}</p>
-              <p className="text-xs text-muted-foreground">Wins</p>
-            </div>
-            <div className="text-center">
-              <p className="text-lg font-bold text-orange-500">{userEntry.current_win_streak || 0}</p>
-              <p className="text-xs text-muted-foreground">Streak</p>
-            </div>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Team Stats Comparison */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="p-4 rounded-xl bg-cyan-500/10 border border-cyan-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Shield className="w-4 h-4 text-cyan-500" />
-            <span className="text-sm font-bold text-cyan-500">Team Alpha</span>
-          </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Members</span>
-              <span className="font-medium text-foreground">{alphaStats.members}</span>
-            </div>
-            <div className="flex justify-between">
-            <span className="text-muted-foreground">Total Staked</span>
-            <span className="font-medium text-cyan-500">{Math.floor(alphaStats.totalStaked).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Wins</span>
-              <span className="font-medium text-green-500">{alphaStats.totalWins}</span>
-            </div>
-          </div>
-        </div>
-        <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Sword className="w-4 h-4 text-purple-500" />
-            <span className="text-sm font-bold text-purple-500">Team Omega</span>
-          </div>
-          <div className="space-y-1 text-xs">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Members</span>
-              <span className="font-medium text-foreground">{omegaStats.members}</span>
-            </div>
-            <div className="flex justify-between">
-            <span className="text-muted-foreground">Total Staked</span>
-            <span className="font-medium text-purple-500">{Math.floor(omegaStats.totalStaked).toLocaleString()}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Total Wins</span>
-              <span className="font-medium text-green-500">{omegaStats.totalWins}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Team Selector Tabs */}
-      <Tabs value={activeTeam} onValueChange={(v) => setActiveTeam(v as 'alpha' | 'omega')}>
-        <TabsList className="w-full grid grid-cols-2">
-          <TabsTrigger 
-            value="alpha" 
-            className="data-[state=active]:bg-cyan-500 data-[state=active]:text-white"
-          >
-            <Shield className="w-4 h-4 mr-2" />
-            Alpha ({alphaTeam.length})
-          </TabsTrigger>
-          <TabsTrigger 
-            value="omega"
-            className="data-[state=active]:bg-purple-500 data-[state=active]:text-white"
-          >
-            <Sword className="w-4 h-4 mr-2" />
-            Omega ({omegaTeam.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="alpha" className="mt-4">
-          <TeamList 
-            team={alphaTeam} 
-            isAlpha={true} 
-            currentUserId={currentUserId}
-            loading={loading}
-            getRankIcon={getRankIcon}
-            getRankBg={getRankBg}
-            getScore={getScore}
-          />
-        </TabsContent>
-
-        <TabsContent value="omega" className="mt-4">
-          <TeamList 
-            team={omegaTeam} 
-            isAlpha={false} 
-            currentUserId={currentUserId}
-            loading={loading}
-            getRankIcon={getRankIcon}
-            getRankBg={getRankBg}
-            getScore={getScore}
-          />
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-};
-
-interface TeamListProps {
-  team: EarningsLeaderboardEntry[];
-  isAlpha: boolean;
-  currentUserId?: string;
-  loading: boolean;
-  getRankIcon: (rank: number) => React.ReactNode;
-  getRankBg: (rank: number, isAlpha: boolean) => string;
-  getScore: (entry: EarningsLeaderboardEntry) => number;
-}
-
-const TeamList = ({ team, isAlpha, currentUserId, loading, getRankIcon, getRankBg, getScore }: TeamListProps) => {
-  const teamColor = isAlpha ? 'cyan' : 'purple';
+  const getScore = (e: EarningsLeaderboardEntry) =>
+    (Number(e.total_staked) || 0) + (Number(e.net_profit) || 0);
 
   if (loading) {
     return (
-      <div className="space-y-2">
-        {[1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-16 rounded-xl bg-secondary/30 animate-pulse" />
+      <div className="px-4 py-6 space-y-3">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-16 rounded-2xl bg-secondary/40 animate-pulse" />
         ))}
       </div>
     );
   }
 
+  return (
+    <div className="pb-6">
+      {/* Header */}
+      <div className="px-4 pt-5 pb-4 text-center">
+        <div
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border mb-3"
+          style={{ background: 'hsl(215 35% 62% / 0.12)', borderColor: 'hsl(215 35% 62% / 0.3)' }}
+        >
+          <Zap className="w-3.5 h-3.5" style={{ color: 'hsl(215 35% 62%)' }} />
+          <span className="text-xs font-bold tracking-widest uppercase" style={{ color: 'hsl(215 35% 62%)' }}>
+            Team Leaderboards
+          </span>
+        </div>
+        <h2 className="text-2xl font-black text-foreground tracking-tight">Alpha vs Omega</h2>
+        <p className="text-xs text-muted-foreground mt-1">Ranked by stakes + profit</p>
+      </div>
+
+      {/* Team Stats Cards */}
+      <div className="px-4 grid grid-cols-2 gap-3 mb-4">
+        <motion.div
+          whileTap={{ scale: 0.97 }}
+          className="rounded-2xl p-4 border cursor-pointer transition-all"
+          style={{
+            background: 'linear-gradient(135deg, hsl(195 80% 50% / 0.12), hsl(195 80% 50% / 0.04))',
+            borderColor: activeTeam === 'alpha' ? 'hsl(195 80% 50% / 0.6)' : 'hsl(195 80% 50% / 0.2)',
+          }}
+          onClick={() => setActiveTeam('alpha')}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'hsl(195 80% 50% / 0.2)' }}>
+              <Shield className="w-3.5 h-3.5" style={{ color: 'hsl(195 80% 50%)' }} />
+            </div>
+            <span className="text-xs font-black" style={{ color: 'hsl(195 80% 50%)' }}>Team Alpha</span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Members</span>
+              <span className="font-bold text-foreground">{alphaStats.members}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Total Staked</span>
+              <span className="font-bold" style={{ color: 'hsl(195 80% 50%)' }}>{fmt(alphaStats.totalStaked)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Total Wins</span>
+              <span className="font-bold text-green-400">{alphaStats.totalWins}</span>
+            </div>
+          </div>
+        </motion.div>
+
+        <motion.div
+          whileTap={{ scale: 0.97 }}
+          className="rounded-2xl p-4 border cursor-pointer transition-all"
+          style={{
+            background: 'linear-gradient(135deg, hsl(255 60% 65% / 0.12), hsl(255 60% 65% / 0.04))',
+            borderColor: activeTeam === 'omega' ? 'hsl(255 60% 65% / 0.6)' : 'hsl(255 60% 65% / 0.2)',
+          }}
+          onClick={() => setActiveTeam('omega')}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: 'hsl(255 60% 65% / 0.2)' }}>
+              <Sword className="w-3.5 h-3.5" style={{ color: 'hsl(255 60% 65%)' }} />
+            </div>
+            <span className="text-xs font-black" style={{ color: 'hsl(255 60% 65%)' }}>Team Omega</span>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Members</span>
+              <span className="font-bold text-foreground">{omegaStats.members}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Total Staked</span>
+              <span className="font-bold" style={{ color: 'hsl(255 60% 65%)' }}>{fmt(omegaStats.totalStaked)}</span>
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-muted-foreground">Total Wins</span>
+              <span className="font-bold text-green-400">{omegaStats.totalWins}</span>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+
+      {/* Team Selector Tab Strip */}
+      <div className="px-4 mb-4">
+        <div className="flex rounded-2xl overflow-hidden border" style={{ borderColor: 'hsl(225 20% 13%)' }}>
+          {(['alpha', 'omega'] as const).map((team) => {
+            const isActive = activeTeam === team;
+            const color = team === 'alpha' ? 'hsl(195 80% 50%)' : 'hsl(255 60% 65%)';
+            const Icon = team === 'alpha' ? Shield : Sword;
+            const count = team === 'alpha' ? alphaTeam.length : omegaTeam.length;
+            return (
+              <button
+                key={team}
+                onClick={() => setActiveTeam(team)}
+                className="flex-1 flex items-center justify-center gap-2 py-3 transition-all duration-200 text-sm font-bold"
+                style={{
+                  background: isActive ? `${color.replace(')', '')} / 0.12)`.replace('hsl(', 'hsl(') : 'transparent',
+                  color: isActive ? color : 'hsl(215 14% 38%)',
+                  boxShadow: isActive ? `inset 0 -2px 0 ${color}` : 'none',
+                }}
+              >
+                <Icon className="w-4 h-4" />
+                {team === 'alpha' ? 'Alpha' : 'Omega'} ({count})
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Animated Team Roster */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTeam}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -8 }}
+          transition={{ duration: 0.18 }}
+          className="px-4"
+        >
+          <TeamRoster
+            team={activeTeam === 'alpha' ? alphaTeam : omegaTeam}
+            isAlpha={activeTeam === 'alpha'}
+            currentUserId={currentUserId}
+            getScore={getScore}
+          />
+        </motion.div>
+      </AnimatePresence>
+    </div>
+  );
+};
+
+interface TeamRosterProps {
+  team: EarningsLeaderboardEntry[];
+  isAlpha: boolean;
+  currentUserId?: string;
+  getScore: (e: EarningsLeaderboardEntry) => number;
+}
+
+const TeamRoster = ({ team, isAlpha, currentUserId, getScore }: TeamRosterProps) => {
+  const color = isAlpha ? 'hsl(195 80% 50%)' : 'hsl(255 60% 65%)';
+  const colorMuted = isAlpha ? 'hsl(195 80% 50% / 0.15)' : 'hsl(255 60% 65% / 0.15)';
+
   if (team.length === 0) {
     return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="py-12 text-center"
-      >
-        <Users className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
-        <p className="text-muted-foreground">
-          No {isAlpha ? 'Alpha' : 'Omega'} team members yet
-        </p>
-      </motion.div>
+      <div className="py-16 text-center">
+        <Users className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
+        <p className="text-sm text-muted-foreground">No {isAlpha ? 'Alpha' : 'Omega'} members yet</p>
+        <p className="text-xs text-muted-foreground/60 mt-1">Be the first to join and stake!</p>
+      </div>
     );
   }
 
-  // Show top 3 podium if enough members
-  const hasEnoughForPodium = team.length >= 3;
+  const top3 = team.slice(0, Math.min(3, team.length));
+  const rest = team.slice(top3.length);
+  const hasTop3 = top3.length >= 3;
 
   return (
     <div className="space-y-4">
-      {/* Top 3 Podium */}
-      {hasEnoughForPodium && (
-        <div className="flex items-end justify-center gap-2 py-4">
+      {/* Podium */}
+      {hasTop3 && (
+        <div className="flex items-end justify-center gap-3 pt-4 pb-2">
           {/* 2nd Place */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="flex flex-col items-center"
+            className="flex flex-col items-center gap-1.5"
           >
-            <Avatar className="w-12 h-12 border-2 border-gray-400">
-              <AvatarImage src={team[1].avatar_url || undefined} />
-              <AvatarFallback className="bg-gray-400/20 text-gray-400">
-                {team[1].username?.[0]?.toUpperCase() || '?'}
+            <Avatar className="w-12 h-12" style={{ outline: '2px solid hsl(215 18% 40%)', outlineOffset: 2 }}>
+              <AvatarImage src={top3[1]?.avatar_url || undefined} />
+              <AvatarFallback style={{ background: 'hsl(215 18% 16%)', color: 'hsl(215 18% 60%)', fontWeight: 700 }}>
+                {(top3[1]?.username || '?')[0].toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <p className="text-xs font-medium text-foreground mt-2 truncate max-w-[70px]">
-              {team[1].username || 'Anonymous'}
+            <p className="text-[10px] font-semibold text-muted-foreground truncate max-w-[68px] text-center">
+              {top3[1]?.username || 'Anonymous'}
             </p>
-            <p className={`text-xs font-bold text-${teamColor}-500`}>
-              {getScore(team[1]).toLocaleString()}
-            </p>
-            <div className="w-14 h-14 bg-gray-400/20 rounded-t-lg mt-2 flex items-end justify-center pb-2">
-              <span className="text-xl font-black text-gray-400">2</span>
+            <p className="text-[10px] font-black" style={{ color }}>{fmt(getScore(top3[1]))}</p>
+            <div className="w-14 h-12 rounded-t-xl flex items-center justify-center"
+              style={{ background: 'hsl(215 22% 10%)', border: '1px solid hsl(215 22% 18%)' }}>
+              <span className="text-2xl font-black" style={{ color: 'hsl(215 18% 45%)' }}>2</span>
             </div>
           </motion.div>
 
@@ -340,27 +248,24 @@ const TeamList = ({ team, isAlpha, currentUserId, loading, getRankIcon, getRankB
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center -mx-1"
+            className="flex flex-col items-center gap-1.5 -mx-1"
           >
-            <div className="relative">
-              <Avatar className={`w-16 h-16 border-2 border-${teamColor}-500`}>
-                <AvatarImage src={team[0].avatar_url || undefined} />
-                <AvatarFallback className={`bg-${teamColor}-500/20 text-${teamColor}-500`}>
-                  {team[0].username?.[0]?.toUpperCase() || '?'}
+            <div className="relative mb-1">
+              <Crown className="absolute -top-5 left-1/2 -translate-x-1/2 w-5 h-5 text-amber-400 drop-shadow-[0_0_8px_rgba(251,191,36,0.6)]" />
+              <Avatar className="w-16 h-16" style={{ outline: `2px solid ${color}`, outlineOffset: 2 }}>
+                <AvatarImage src={top3[0]?.avatar_url || undefined} />
+                <AvatarFallback style={{ background: colorMuted, color, fontWeight: 700, fontSize: 18 }}>
+                  {(top3[0]?.username || '?')[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <Crown className={`absolute -top-3 left-1/2 -translate-x-1/2 w-6 h-6 text-amber-500`} />
             </div>
-            <p className="text-sm font-bold text-foreground mt-2 truncate max-w-[90px]">
-              {team[0].username || 'Anonymous'}
+            <p className="text-xs font-bold text-foreground truncate max-w-[90px] text-center">
+              {top3[0]?.username || 'Anonymous'}
             </p>
-            <p className={`text-sm font-bold ${isAlpha ? 'text-cyan-500' : 'text-purple-500'}`}>
-              {getScore(team[0]).toLocaleString()}
-            </p>
-            <div className={`w-18 h-20 rounded-t-lg mt-2 flex items-end justify-center pb-2 border-t-2 ${
-              isAlpha ? 'bg-cyan-500/20 border-cyan-500' : 'bg-purple-500/20 border-purple-500'
-            }`}>
-              <Trophy className={`w-8 h-8 ${isAlpha ? 'text-cyan-500' : 'text-purple-500'}`} />
+            <p className="text-xs font-black" style={{ color }}>{fmt(getScore(top3[0]))}</p>
+            <div className="w-16 h-16 rounded-t-xl flex items-center justify-center"
+              style={{ background: colorMuted, border: `1px solid ${color}40` }}>
+              <Trophy className="w-7 h-7" style={{ color }} />
             </div>
           </motion.div>
 
@@ -369,87 +274,86 @@ const TeamList = ({ team, isAlpha, currentUserId, loading, getRankIcon, getRankB
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="flex flex-col items-center"
+            className="flex flex-col items-center gap-1.5"
           >
-            <Avatar className="w-12 h-12 border-2 border-amber-700">
-              <AvatarImage src={team[2].avatar_url || undefined} />
-              <AvatarFallback className="bg-amber-700/20 text-amber-700">
-                {team[2].username?.[0]?.toUpperCase() || '?'}
+            <Avatar className="w-12 h-12" style={{ outline: '2px solid hsl(38 55% 45%)', outlineOffset: 2 }}>
+              <AvatarImage src={top3[2]?.avatar_url || undefined} />
+              <AvatarFallback style={{ background: 'hsl(38 55% 16%)', color: 'hsl(38 55% 55%)', fontWeight: 700 }}>
+                {(top3[2]?.username || '?')[0].toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <p className="text-xs font-medium text-foreground mt-2 truncate max-w-[70px]">
-              {team[2].username || 'Anonymous'}
+            <p className="text-[10px] font-semibold text-muted-foreground truncate max-w-[68px] text-center">
+              {top3[2]?.username || 'Anonymous'}
             </p>
-            <p className={`text-xs font-bold text-${teamColor}-500`}>
-              {getScore(team[2]).toLocaleString()}
-            </p>
-            <div className="w-14 h-10 bg-amber-700/20 rounded-t-lg mt-2 flex items-end justify-center pb-2">
-              <span className="text-lg font-black text-amber-700">3</span>
+            <p className="text-[10px] font-black" style={{ color }}>{fmt(getScore(top3[2]))}</p>
+            <div className="w-14 h-10 rounded-t-xl flex items-center justify-center"
+              style={{ background: 'hsl(38 55% 52% / 0.1)', border: '1px solid hsl(38 55% 52% / 0.25)' }}>
+              <span className="text-xl font-black" style={{ color: 'hsl(38 55% 52%)' }}>3</span>
             </div>
           </motion.div>
         </div>
       )}
 
-      {/* Rest of the list */}
+      {/* Row list for #4+ (or all if less than 3 total) */}
       <div className="space-y-2">
-        <AnimatePresence mode="popLayout">
-          {team.slice(hasEnoughForPodium ? 3 : 0).map((entry, index) => {
-            const rank = hasEnoughForPodium ? index + 4 : index + 1;
-            const isCurrentUser = entry.user_id === currentUserId;
-            
-            return (
-              <motion.div
-                key={entry.user_id}
-                layout
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ delay: index * 0.03 }}
-                className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-                  isCurrentUser
-                    ? isAlpha 
-                      ? 'bg-cyan-500/10 border-cyan-500/30'
-                      : 'bg-purple-500/10 border-purple-500/30'
-                    : getRankBg(rank, isAlpha)
-                }`}
-              >
-                {getRankIcon(rank)}
-                
-                <Avatar className="w-10 h-10">
-                  <AvatarImage src={entry.avatar_url || undefined} />
-                  <AvatarFallback className="bg-secondary text-foreground">
-                    {entry.username?.[0]?.toUpperCase() || '?'}
-                  </AvatarFallback>
-                </Avatar>
-                
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium truncate ${
-                    isCurrentUser 
-                      ? isAlpha ? 'text-cyan-500' : 'text-purple-500'
-                      : 'text-foreground'
-                  }`}>
-                    {entry.username || 'Anonymous'}
-                    {isCurrentUser && <span className="text-xs ml-1">(You)</span>}
-                  </p>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{entry.total_wins || 0}W / {(entry.total_battles || 0) - (entry.total_wins || 0)}L</span>
-                    <span>•</span>
-                    <span className={(entry.net_profit || 0) >= 0 ? 'text-green-500' : 'text-red-500'}>
-                      {(entry.net_profit || 0) >= 0 ? '+' : ''}{(entry.net_profit || 0).toLocaleString()}
-                    </span>
-                  </div>
+        {(hasTop3 ? rest : team).map((entry, idx) => {
+          const rank = hasTop3 ? idx + 4 : idx + 1;
+          const isMe = entry.user_id === currentUserId;
+          const wins = Number(entry.total_wins) || 0;
+          const battles = Number(entry.total_battles) || 0;
+          const losses = Math.max(0, battles - wins);
+          const profit = Number(entry.net_profit) || 0;
+
+          return (
+            <motion.div
+              key={entry.user_id || `rank-${rank}`}
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: idx * 0.025 }}
+              className="flex items-center gap-3 px-3 py-3 rounded-2xl border"
+              style={{
+                background: isMe ? colorMuted : 'hsl(225 25% 6%)',
+                borderColor: isMe ? `${color.replace(')', ' / 0.35)')}` : 'hsl(225 20% 11%)',
+              }}
+            >
+              <div className="w-6 text-center flex-shrink-0">
+                {rank <= 3 ? (
+                  <Star className="w-3.5 h-3.5 mx-auto text-amber-400" />
+                ) : (
+                  <span className="text-xs font-bold text-muted-foreground">{rank}</span>
+                )}
+              </div>
+
+              <Avatar className="w-9 h-9 flex-shrink-0">
+                <AvatarImage src={entry.avatar_url || undefined} />
+                <AvatarFallback style={{ background: colorMuted, color, fontSize: 12, fontWeight: 700 }}>
+                  {(entry.username || '?')[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate" style={{ color: isMe ? color : 'hsl(215 20% 86%)' }}>
+                  {entry.username || 'Anonymous'}
+                  {isMe && <span className="text-[10px] ml-1 opacity-50">(You)</span>}
+                </p>
+                <div className="flex items-center gap-1 text-[10px] text-muted-foreground mt-0.5">
+                  <span className="text-green-400 font-semibold">{wins}W</span>
+                  <span>/</span>
+                  <span className="text-red-400 font-semibold">{losses}L</span>
+                  <span className="opacity-40">•</span>
+                  <span className={profit >= 0 ? 'text-green-400' : 'text-red-400'}>
+                    {profit >= 0 ? '+' : ''}{fmt(profit)}
+                  </span>
                 </div>
-                
-                <div className="text-right">
-                  <p className={`text-sm font-bold ${isAlpha ? 'text-cyan-500' : 'text-purple-500'}`}>
-                    {getScore(entry).toLocaleString()}
-                  </p>
-                  <p className="text-xs text-muted-foreground">Score</p>
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+              </div>
+
+              <div className="text-right flex-shrink-0">
+                <p className="text-sm font-black" style={{ color }}>{fmt(getScore(entry))}</p>
+                <p className="text-[10px] text-muted-foreground">Score</p>
+              </div>
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
