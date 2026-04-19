@@ -244,23 +244,33 @@ export const useArena = () => {
       const userIds = Object.keys(userMap);
       if (userIds.length === 0) { setLeaderboard([]); return []; }
 
-      // Fetch profiles for these users
+      // Fetch profiles + club membership for these users
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, username, avatar_url')
         .in('user_id', userIds);
 
+      // Fetch arena membership to get club (alpha/omega)
+      const { data: memberships } = await supabase
+        .from('arena_members')
+        .select('user_id, club')
+        .in('user_id', userIds);
+
       const profileMap: Record<string, any> = {};
       (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p; });
 
+      const clubMap: Record<string, string | null> = {};
+      (memberships || []).forEach((m: any) => { clubMap[m.user_id] = m.club || null; });
+
       const leaderboardData: LeaderboardEntry[] = userIds.map(uid => ({
-        user_id:           uid,
-        username:          profileMap[uid]?.username || null,
-        avatar_url:        profileMap[uid]?.avatar_url || null,
+        user_id:            uid,
+        username:           profileMap[uid]?.username || null,
+        avatar_url:         profileMap[uid]?.avatar_url || null,
         total_power_staked: Math.floor(userMap[uid].power),
         total_wins:         userMap[uid].wins,
         total_battles:      userMap[uid].battles,
         biggest_stake:      Math.floor(userMap[uid].biggest),
+        club:               clubMap[uid] || null,
       })).sort((a, b) => b.total_power_staked - a.total_power_staked).slice(0, 50);
 
       setLeaderboard(leaderboardData);
