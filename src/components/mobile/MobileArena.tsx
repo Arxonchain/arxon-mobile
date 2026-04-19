@@ -413,6 +413,152 @@ function BattleDetail({
   );
 }
 
+// ── LeaderboardTab Component ───────────────────────────────────────────────
+function LeaderboardTab({ leaderboard, loading, currentUserId }: {
+  leaderboard: any[];
+  loading: boolean;
+  currentUserId?: string;
+}) {
+  const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
+
+  const fmt = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return n.toLocaleString();
+  };
+
+  const alphaTeam = leaderboard
+    .filter(e => e.club === 'alpha')
+    .sort((a, b) => (b.total_power_staked || 0) - (a.total_power_staked || 0));
+
+  const omegaTeam = leaderboard
+    .filter(e => e.club === 'omega')
+    .sort((a, b) => (b.total_power_staked || 0) - (a.total_power_staked || 0));
+
+  const hasClubData = leaderboard.some(e => e.club === 'alpha' || e.club === 'omega');
+  const allPlayers = [...leaderboard].sort((a, b) => (b.total_power_staked || 0) - (a.total_power_staked || 0));
+
+  const alphaStaked = alphaTeam.reduce((s, e) => s + (e.total_power_staked || 0), 0);
+  const omegaStaked = omegaTeam.reduce((s, e) => s + (e.total_power_staked || 0), 0);
+
+  const ALPHA = 'hsl(195 80% 50%)';
+  const OMEGA = 'hsl(255 60% 65%)';
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px 0' }}>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} style={{ height: 60, borderRadius: 16, background: 'hsl(215 22% 10%)', marginBottom: 8, opacity: 1 - i * 0.15 }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!hasClubData) {
+    return (
+      <div>
+        <p style={{ fontSize: 11, color: 'hsl(215 14% 36%)', marginBottom: 12, textAlign: 'center' }}>Overall Rankings</p>
+        {allPlayers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 40%)' }}>No rankings yet</p>
+            <p style={{ fontSize: 12, color: 'hsl(215 14% 30%)', marginTop: 4 }}>Participate in battles to appear here</p>
+          </div>
+        ) : allPlayers.map((e, i) => (
+          <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        {([
+          { label: 'Team Alpha', count: alphaTeam.length, staked: alphaStaked, col: ALPHA, team: 'alpha' as const },
+          { label: 'Team Omega', count: omegaTeam.length, staked: omegaStaked, col: OMEGA, team: 'omega' as const },
+        ] as const).map(t => (
+          <button
+            key={t.team}
+            onClick={() => setActiveTeam(t.team)}
+            style={{
+              flex: 1, padding: '12px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', textAlign: 'left',
+              background: activeTeam === t.team ? `${t.col}15` : 'hsl(215 22% 8%)',
+              boxShadow: activeTeam === t.team ? `0 0 0 1.5px ${t.col}50` : '0 0 0 1px hsl(215 20% 13%)',
+              transition: 'all 0.18s',
+            }}
+          >
+            <p style={{ fontSize: 11, fontWeight: 800, color: t.col, marginBottom: 4 }}>{t.label}</p>
+            <p style={{ fontSize: 16, fontWeight: 900, color: 'hsl(215 18% 90%)' }}>{fmt(t.staked)}</p>
+            <p style={{ fontSize: 10, color: 'hsl(215 14% 38%)', marginTop: 2 }}>{t.count} members</p>
+          </button>
+        ))}
+      </div>
+      {(activeTeam === 'alpha' ? alphaTeam : omegaTeam).length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 38%)' }}>No {activeTeam} members yet</p>
+          <p style={{ fontSize: 12, color: 'hsl(215 14% 28%)', marginTop: 4 }}>Join {activeTeam} team in Arena to appear here</p>
+        </div>
+      ) : (activeTeam === 'alpha' ? alphaTeam : omegaTeam).map((e, i) => (
+        <PlayerRow
+          key={e.user_id} entry={e} rank={i + 1}
+          color={activeTeam === 'alpha' ? ALPHA : OMEGA}
+          isMe={e.user_id === currentUserId} fmt={fmt}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PlayerRow({ entry, rank, color, isMe, fmt }: {
+  entry: any; rank: number; color: string; isMe: boolean; fmt: (n: number) => string;
+}) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const wins = Number(entry.total_wins) || 0;
+  const battles = Number(entry.total_battles) || 0;
+  const losses = Math.max(0, battles - wins);
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 14px', borderRadius: 16, marginBottom: 7,
+      background: isMe ? `${color}12` : 'hsl(225 25% 6%)',
+      border: `1px solid ${isMe ? `${color}35` : 'hsl(215 20% 11%)'}`,
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: rank <= 3 ? 14 : 10, fontWeight: 800, color,
+      }}>
+        {rank <= 3 ? medals[rank - 1] : rank}
+      </div>
+      <div style={{
+        width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: 12, fontWeight: 700, color,
+        border: `1.5px solid ${color}25`,
+      }}>
+        {entry.avatar_url
+          ? <img src={entry.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : (entry.username?.[0]?.toUpperCase() || '?')
+        }
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: isMe ? color : 'hsl(215 18% 86%)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {entry.username || 'Miner'}{isMe ? ' (You)' : ''}
+        </p>
+        <p style={{ fontSize: 10, color: 'hsl(215 14% 36%)', marginTop: 1 }}>
+          <span style={{ color: 'hsl(142 60% 50%)' }}>{wins}W</span>{' / '}
+          <span style={{ color: 'hsl(0 60% 56%)' }}>{losses}L</span>
+        </p>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 800, color }}>{fmt(entry.total_power_staked || 0)}</p>
+        <p style={{ fontSize: 9, color: 'hsl(215 14% 32%)' }}>Score</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Arena Component ───────────────────────────────────────────────────
 export default function MobileArena() {
   const { user }    = useAuth();
@@ -609,38 +755,7 @@ export default function MobileArena() {
 
         {/* LEADERBOARD TAB */}
         {tab==='leaderboard' && (
-          <>
-            {[{team:'Alpha',board:alphaBoard,col:'hsl(215 35% 62%)',bg:'hsl(215 35% 62%/0.05)',bd:'hsl(215 30% 18%)'},
-              {team:'Omega',board:omegaBoard,col:'hsl(255 50% 65%)',bg:'hsl(255 50% 60%/0.05)',bd:'hsl(255 40% 22%)'}
-            ].map(({team,board,col,bg,bd})=>(
-              <div key={team} style={{marginBottom:20}}>
-                <p style={{fontSize:11,textTransform:'uppercase',letterSpacing:'0.14em',fontWeight:700,marginBottom:10,color:col}}>
-                  {team} Team
-                </p>
-                {board.length===0
-                  ? <p style={{fontSize:12,color:'hsl(215 14% 35%)'}}>No {team.toLowerCase()} members yet</p>
-                  : board.slice(0,10).map((e:any,i:number)=>(
-                    <div key={e.user_id} style={{display:'flex',alignItems:'center',gap:10,
-                      padding:'10px 14px',borderRadius:14,marginBottom:7,background:bg,border:`1px solid ${bd}`}}>
-                      <div style={{width:26,height:26,borderRadius:9,background:`${col}22`,
-                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:col,flexShrink:0}}>
-                        {i<3?['🥇','🥈','🥉'][i]:i+1}
-                      </div>
-                      <div style={{width:30,height:30,borderRadius:'50%',overflow:'hidden',
-                        background:'hsl(225 25% 13%)',display:'flex',alignItems:'center',justifyContent:'center',
-                        fontSize:12,fontWeight:700,color:col,flexShrink:0}}>
-                        {e.avatar_url?<img src={e.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:e.username?.[0]?.toUpperCase()||'?'}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <p style={{fontSize:12,fontWeight:600,color:'hsl(215 18% 82%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.username||'Miner'}</p>
-                      </div>
-                      <p style={{fontSize:12,fontWeight:700,color}}>{(e.total_power_staked||0).toLocaleString()}</p>
-                    </div>
-                  ))
-                }
-              </div>
-            ))}
-          </>
+          <LeaderboardTab leaderboard={leaderboard} loading={loading} currentUserId={user?.id} />
         )}
 
         {/* MY STAKES TAB */}
