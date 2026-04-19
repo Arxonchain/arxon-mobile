@@ -89,6 +89,10 @@ export default function MobileChat() {
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const uname = profile?.username || user?.email?.split('@')[0] || 'Miner';
+  // Store userId persistently — user object can be null when menu re-renders on mobile
+  const [myUserId, setMyUserId] = useState<string | null>(null);
+  useEffect(() => { if (user?.id) setMyUserId(user.id); }, [user?.id]);
+  const effectiveUserId = myUserId || user?.id || null;
   const canPost = (c: Channel) =>
     c === 'alpha' ? membership?.club === 'alpha' :
     c === 'omega' ? membership?.club === 'omega' : true;
@@ -171,7 +175,7 @@ export default function MobileChat() {
       .from('chat_messages')
       .update({ message: editing.text.trim() })
       .eq('id', editing.id)
-      .eq('user_id', user?.id || '');
+      .eq('user_id', effectiveUserId || '');
     if (!error) {
       setMsgs(p => p.map(m => m.id === editing.id ? { ...m, message: editing.text.trim() } : m));
       setEditing(null);
@@ -192,7 +196,7 @@ export default function MobileChat() {
     setDeleting(m.id);
     const { error } = await supabase
       .from('chat_messages').delete()
-      .eq('id', m.id).eq('user_id', user?.id || '');
+      .eq('id', m.id).eq('user_id', effectiveUserId || '');
     if (!error) setMsgs(p => p.filter(x => x.id !== m.id));
     setDeleting(null);
   };
@@ -281,14 +285,14 @@ export default function MobileChat() {
           <button
             onTouchEnd={e => { e.preventDefault(); doCopy(menu.msg); }}
             onClick={() => doCopy(menu.msg)}
-            style={{ ...menuBtn, borderBottom: menu.msg.user_id === user?.id ? '1px solid hsl(215 22% 12%)' : 'none' }}
+            style={{ ...menuBtn, borderBottom: effectiveUserId && menu.msg.user_id === effectiveUserId ? '1px solid hsl(215 22% 12%)' : 'none' }}
           >
             <Copy size={16} color="hsl(215 25% 50%)" />
             <span style={menuLabel}>Copy text</span>
           </button>
 
           {/* Edit + Delete — only own messages */}
-          {menu.msg.user_id === user?.id && (
+          {effectiveUserId && menu.msg.user_id === effectiveUserId && (
             <>
               <button
                 onTouchEnd={e => { e.preventDefault(); doEdit(menu.msg); }}
