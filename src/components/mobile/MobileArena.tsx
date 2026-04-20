@@ -91,7 +91,10 @@ function BattleCard({
       {isActive && <div style={{position:'absolute',top:0,left:0,right:0,height:2,
         background:'linear-gradient(90deg,transparent,hsl(215 35% 62%/0.5),transparent)'}}/>}
 
-      <div style={{padding:'14px 14px 12px'}}>
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* HEADER: Always on top, full z-index, never covered */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <div style={{padding:'14px 14px 12px', position:'relative', zIndex:20, background:'hsl(225 26% 9%)'}}>
         {/* Header row */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
           <div style={{flex:1,minWidth:0,paddingRight:8}}>
@@ -129,66 +132,88 @@ function BattleCard({
             <ChevronRight size={14} color="hsl(215 18% 35%)" style={{marginLeft:6}}/>
           </div>
         </div>
+      </div>
 
-        {/* VS row — compact with images */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 36px 1fr',gap:8,alignItems:'center',marginBottom:10}}>
-          {/* Side A */}
-          <div style={{display:'flex',alignItems:'center',gap:8,
-            padding:'10px 10px',borderRadius:13,
-            background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
-            border:`1px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
-          }}>
-            <SideImage imageUrl={battle.side_a_image} name={battle.side_a_name} size={38}/>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_a_name}</p>
-              <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctA}%</p>
-            </div>
-            {battle.winner_side==='a' && <span style={{fontSize:14}}>👑</span>}
+      {/* ═══════════════════════════════════════════��═══════════════ */}
+      {/* BANNER IMAGE: Below header, fixed height */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {(battle as any).banner_image && (
+        <div style={{position:'relative',width:'100%',height:100,overflow:'hidden',
+          background:'linear-gradient(135deg,hsl(225 30% 15%),hsl(225 30% 8%))'}}>
+          <img src={(battle as any).banner_image} alt={battle.title}
+            style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',display:'block'}}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}/>
+          {/* Subtle overlay for text safety */}
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.1) 100%)',
+            pointerEvents:'none'}}/>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* VS ROW: Always visible, compact */}
+      {/* ══════��════════════════════════════════════════════════════ */}
+      <div style={{padding:'12px 14px',display:'grid',gridTemplateColumns:'1fr 36px 1fr',gap:8,alignItems:'center'}}>
+        {/* Side A */}
+        <div style={{display:'flex',alignItems:'center',gap:8,
+          padding:'10px 10px',borderRadius:13,
+          background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
+          border:`1px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
+        }}>
+          <SideImage imageUrl={battle.side_a_image} name={battle.side_a_name} size={38}/>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_a_name}</p>
+            <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctA}%</p>
           </div>
+          {battle.winner_side==='a' && <span style={{fontSize:14}}>👑</span>}
+        </div>
 
-          {/* VS */}
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{width:32,height:32,borderRadius:10,background:'hsl(215 26% 12%)',
-              border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <span style={{fontSize:9,fontWeight:900,color:'hsl(215 22% 38%)'}}>VS</span>
-            </div>
-          </div>
-
-          {/* Side B */}
-          <div style={{display:'flex',alignItems:'center',gap:8,
-            padding:'10px 10px',borderRadius:13,
-            background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
-            border:`1px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
-          }}>
-            <SideImage imageUrl={battle.side_b_image} name={battle.side_b_name} size={38}/>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_b_name}</p>
-              <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctB}%</p>
-            </div>
-            {battle.winner_side==='b' && <span style={{fontSize:14}}>👑</span>}
+        {/* VS */}
+        <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+          <div style={{width:32,height:32,borderRadius:10,background:'hsl(215 26% 12%)',
+            border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <span style={{fontSize:9,fontWeight:900,color:'hsl(215 22% 38%)'}}>VS</span>
           </div>
         </div>
 
-        {/* Progress bar */}
-        <div style={{height:4,borderRadius:2,background:'hsl(215 26% 12%)',overflow:'hidden',marginBottom:7}}>
+        {/* Side B */}
+        <div style={{display:'flex',alignItems:'center',gap:8,
+          padding:'10px 10px',borderRadius:13,
+          background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
+          border:`1px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
+        }}>
+          <SideImage imageUrl={battle.side_b_image} name={battle.side_b_name} size={38}/>
+          <div style={{flex:1,minWidth:0}}>
+            <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_b_name}</p>
+            <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctB}%</p>
+          </div>
+          {battle.winner_side==='b' && <span style={{fontSize:14}}>👑</span>}
+        </div>
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* PROGRESS BAR: Always visible */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <div style={{padding:'0 14px 12px'}}>
+        <div style={{height:4,borderRadius:2,background:'hsl(215 26% 12%)',overflow:'hidden'}}>
           <div style={{height:'100%',borderRadius:2,width:`${pctA}%`,
             background:'linear-gradient(90deg,hsl(215 35% 50%),hsl(215 45% 65%))',transition:'width 0.5s ease'}}/>
         </div>
+      </div>
 
-        {/* Footer */}
-        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-          <span style={{fontSize:9,color:'hsl(215 14% 35%)'}}>
-            {totalPow.toLocaleString()} ARX-P staked
-          </span>
-          <span style={{fontSize:9,color:'hsl(215 14% 32%)'}}>
-            {new Date(isActive?battle.ends_at:battle.starts_at).toLocaleDateString()}
-          </span>
-        </div>
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* FOOTER: Metadata */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      <div style={{padding:'0 14px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:9,color:'hsl(215 14% 35%)'}}>
+          {totalPow.toLocaleString()} ARX-P staked
+        </span>
+        <span style={{fontSize:9,color:'hsl(215 14% 32%)'}}>
+          {new Date(isActive?battle.ends_at:battle.starts_at).toLocaleDateString()}
+        </span>
       </div>
     </motion.div>
   );
 }
-
 // ── Battle Detail View (full page) ─────────────────────────────────────────
 function BattleDetail({
   battle, isActive, userVote, participants, voting, castVote, available, onClose
