@@ -1,0 +1,85 @@
+name: Build iOS, Android AAB, and APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/setup-java@v3
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: android-actions/setup-android@v2
+      - run: npm install @capacitor/cli
+      - run: npx cap add android || true
+      - run: npx cap sync android
+      - name: Build APK
+        run: |
+          cd android
+          chmod +x ./gradlew
+          ./gradlew assembleRelease
+      - name: Build AAB
+        run: |
+          cd android
+          ./gradlew bundleRelease
+      - uses: actions/upload-artifact@v3
+        with:
+          name: arxon-android-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v3
+        with:
+          name: arxon-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - run: npm install @capacitor/cli
+      - run: npx cap add ios || true
+      - run: npx cap sync ios
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+      - name: Install Pods
+        run: |
+          cd ios/App
+          pod install
+      - name: Build iOS
+        run: |
+          cd ios/App
+          xcodebuild -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -derivedDataPath build \
+            -archivePath build/App.xcarchive \
+            archive
+      - name: Export IPA
+        run: |
+          cd ios/App
+          xcodebuild -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath build/ipa
+      - uses: actions/upload-artifact@v3
+        with:
+          name: arxon-ios-ipa
+          path: ios/App/build/ipa/*.ipa
