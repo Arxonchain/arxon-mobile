@@ -1,3 +1,4 @@
+import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -69,11 +70,85 @@ const Spinner = () => (
   </div>
 );
 
+// ── Global Error Boundary — prevents any single component crash from blanking the app ──
+class AppErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error) {
+    console.error('[AppErrorBoundary]', error);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',flexDirection:'column',
+          alignItems:'center',justifyContent:'center',padding:24,fontFamily:'system-ui,sans-serif'}}>
+          <div style={{fontSize:40,marginBottom:16}}>⚡</div>
+          <p style={{fontSize:18,fontWeight:700,color:'hsl(215 20% 88%)',marginBottom:8}}>Something went wrong</p>
+          <p style={{fontSize:12,color:'hsl(215 14% 40%)',marginBottom:24,textAlign:'center',maxWidth:280,lineHeight:1.5}}>
+            {this.state.error?.message || 'An unexpected error occurred'}
+          </p>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
+            style={{padding:'12px 28px',borderRadius:14,background:'hsl(215 35% 62%/0.15)',
+              border:'1px solid hsl(215 35% 62%/0.35)',color:'hsl(215 35% 72%)',
+              fontSize:14,fontWeight:600,cursor:'pointer'}}
+          >
+            Reload App
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner/>;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
+}
+
+// ── Per-screen error boundary — catches crashes in individual screens ──────
+class ScreenErrorBoundary extends React.Component<
+  { children: React.ReactNode; name?: string },
+  { hasError: boolean }
+> {
+  constructor(props: any) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(e: Error) { console.error(`[Screen:${this.props.name}]`, e); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex',
+          flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+          <p style={{ fontSize: 36, marginBottom: 12 }}>😵</p>
+          <p style={{ fontSize: 16, fontWeight: 700, color: 'hsl(215 20% 80%)', marginBottom: 8 }}>
+            {this.props.name || 'Screen'} crashed
+          </p>
+          <button onClick={() => this.setState({ hasError: false })}
+            style={{ marginTop: 16, padding: '10px 24px', borderRadius: 12,
+              background: 'hsl(215 35% 62%/0.12)', border: '1px solid hsl(215 35% 62%/0.3)',
+              color: 'hsl(215 35% 72%)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+            Retry
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function Safe({ name, children }: { name: string; children: React.ReactNode }) {
+  return <ScreenErrorBoundary name={name}>{children}</ScreenErrorBoundary>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -122,17 +197,17 @@ function AppRoutes() {
         {isNative ? (
           <>
             {/* Home / Dashboard */}
-            <Route path="/" element={user ? <MobileDashboard /> : <Landing />} />
+            <Route path="/" element={user ? <Safe name="Dashboard"><MobileDashboard /></Safe> : <Landing />} />
 
             {/* Core mobile screens */}
-            <Route path="/mining"      element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
-            <Route path="/arena"       element={<MobileArena />} />
-            <Route path="/leaderboard" element={<MobileLeaderboard />} />
-            <Route path="/nexus"       element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
-            <Route path="/profile"     element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
-            <Route path="/wallet"      element={<MobileWallet />} />
-            <Route path="/chat"        element={<MobileChat />} />
-            <Route path="/profile/:userId" element={<PublicProfile />} />
+            <Route path="/mining"      element={<ProtectedRoute><Safe name="Mining"><MobileMining /></Safe></ProtectedRoute>} />
+            <Route path="/arena"       element={<Safe name="Arena"><MobileArena /></Safe>} />
+            <Route path="/leaderboard" element={<Safe name="Leaderboard"><MobileLeaderboard /></Safe>} />
+            <Route path="/nexus"       element={<ProtectedRoute><Safe name="Nexus"><MobileNexus /></Safe></ProtectedRoute>} />
+            <Route path="/profile"     element={<ProtectedRoute><Safe name="Profile"><MobileProfile /></Safe></ProtectedRoute>} />
+            <Route path="/wallet"      element={<Safe name="Wallet"><MobileWallet /></Safe>} />
+            <Route path="/chat"        element={<Safe name="Chat"><MobileChat /></Safe>} />
+            <Route path="/profile/:userId" element={<Safe name="PublicProfile"><PublicProfile /></Safe>} />
 
             {/* Web pages with mobile wrapper */}
             <Route path="/tasks"         element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
@@ -180,18 +255,22 @@ function AppWithSplash() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <PointsProvider>
-          <TooltipProvider>
-            <Toaster />
-            <BrowserRouter>
-              <AppWithSplash />
-            </BrowserRouter>
-          </TooltipProvider>
-        </PointsProvider>
-      </AuthProvider>
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>
+          <PointsProvider>
+            <TooltipProvider>
+              <Toaster />
+              <BrowserRouter>
+                <AppErrorBoundary>
+                  <AppWithSplash />
+                </AppErrorBoundary>
+              </BrowserRouter>
+            </TooltipProvider>
+          </PointsProvider>
+        </AuthProvider>
+      </QueryClientProvider>
+    </AppErrorBoundary>
   );
 }
 
