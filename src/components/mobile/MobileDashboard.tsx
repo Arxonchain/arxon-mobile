@@ -83,6 +83,16 @@ export default function MobileDashboard() {
   const [liveEarn,  setLiveEarn]  = useState(0);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
+  // Arena battles for dashboard — safe with try/catch
+  const { activeBattle, battleHistory, loading: arenaLoading } = useArena();
+  const dashBattles = (() => {
+    try {
+      const live = activeBattle ? [{ ...activeBattle, _live: true }] : [];
+      const ended = (battleHistory || []).slice(0, 4).map((b: any) => ({ ...b, _live: false }));
+      return [...live, ...ended].slice(0, 5);
+    } catch { return []; }
+  })();
+
   const totalPts = Math.round(points?.total_points ?? 0);
   const userRank = rank ?? null;
   const streak   = points?.daily_streak ?? 0;
