@@ -91,10 +91,16 @@ function BattleCard({
       {isActive && <div style={{position:'absolute',top:0,left:0,right:0,height:2,
         background:'linear-gradient(90deg,transparent,hsl(215 35% 62%/0.5),transparent)'}}/>}
 
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* HEADER: Always on top, full z-index, never covered */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      <div style={{padding:'14px 14px 12px', position:'relative', zIndex:20, background:'hsl(225 26% 9%)'}}>
+      {/* Banner — full bleed at top, BEFORE all text */}
+      {(battle as any).banner_image && (
+        <div style={{height:90,overflow:'hidden',position:'relative',flexShrink:0}}>
+          <img src={(battle as any).banner_image} alt=""
+            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+            onError={e=>{(e.target as HTMLImageElement).parentElement!.style.display='none'}}/>
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(to bottom,transparent 35%,rgba(8,9,16,0.72))'}}/>
+        </div>
+      )}
+      <div style={{padding:'12px 14px 12px'}}>
         {/* Header row */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
           <div style={{flex:1,minWidth:0,paddingRight:8}}>
@@ -132,88 +138,62 @@ function BattleCard({
             <ChevronRight size={14} color="hsl(215 18% 35%)" style={{marginLeft:6}}/>
           </div>
         </div>
-      </div>
 
-      {/* ═══════════════════════════════════════════��═══════════════ */}
-      {/* BANNER IMAGE: Below header, fixed height */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {(battle as any).banner_image && (
-        <div style={{position:'relative',width:'100%',height:100,overflow:'hidden',
-          background:'linear-gradient(135deg,hsl(225 30% 15%),hsl(225 30% 8%))'}}>
-          <img src={(battle as any).banner_image} alt={battle.title}
-            style={{width:'100%',height:'100%',objectFit:'cover',objectPosition:'center',display:'block'}}
-            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}/>
-          {/* Subtle overlay for text safety */}
-          <div style={{position:'absolute',inset:0,background:'linear-gradient(180deg,transparent 0%,rgba(0,0,0,0.1) 100%)',
-            pointerEvents:'none'}}/>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* VS ROW: Always visible, compact */}
-      {/* ══════��════════════════════════════════════════════════════ */}
-      <div style={{padding:'12px 14px',display:'grid',gridTemplateColumns:'1fr 36px 1fr',gap:8,alignItems:'center'}}>
-        {/* Side A */}
-        <div style={{display:'flex',alignItems:'center',gap:8,
-          padding:'10px 10px',borderRadius:13,
-          background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
-          border:`1px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
-        }}>
-          <SideImage imageUrl={battle.side_a_image} name={battle.side_a_name} size={38}/>
-          <div style={{flex:1,minWidth:0}}>
-            <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_a_name}</p>
-            <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctA}%</p>
+        {/* VS row — clean text pills */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 32px 1fr',gap:8,alignItems:'stretch',marginBottom:10}}>
+          {/* Side A */}
+          <div style={{
+            padding:'10px 12px',borderRadius:14,
+            background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
+            border:`1.5px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 17%)'}`,
+            display:'flex',flexDirection:'column',gap:3,
+          }}>
+            <p style={{fontSize:11,fontWeight:700,color:'hsl(215 18% 84%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',lineHeight:1.3}}>{battle.side_a_name}</p>
+            <p style={{fontSize:15,fontWeight:900,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 35% 72%)',lineHeight:1}}>{pctA}%</p>
+            {battle.winner_side==='a' && <span style={{fontSize:9,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</span>}
           </div>
-          {battle.winner_side==='a' && <span style={{fontSize:14}}>👑</span>}
-        </div>
 
-        {/* VS */}
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-          <div style={{width:32,height:32,borderRadius:10,background:'hsl(215 26% 12%)',
-            border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <span style={{fontSize:9,fontWeight:900,color:'hsl(215 22% 38%)'}}>VS</span>
+          {/* VS badge */}
+          <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div style={{width:28,height:28,borderRadius:9,background:'hsl(215 26% 12%)',
+              border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span style={{fontSize:8,fontWeight:900,color:'hsl(215 22% 42%)'}}>VS</span>
+            </div>
+          </div>
+
+          {/* Side B */}
+          <div style={{
+            padding:'10px 12px',borderRadius:14,
+            background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
+            border:`1.5px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 17%)'}`,
+            display:'flex',flexDirection:'column',gap:3,
+          }}>
+            <p style={{fontSize:11,fontWeight:700,color:'hsl(215 18% 84%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',lineHeight:1.3}}>{battle.side_b_name}</p>
+            <p style={{fontSize:15,fontWeight:900,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 35% 72%)',lineHeight:1}}>{pctB}%</p>
+            {battle.winner_side==='b' && <span style={{fontSize:9,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</span>}
           </div>
         </div>
 
-        {/* Side B */}
-        <div style={{display:'flex',alignItems:'center',gap:8,
-          padding:'10px 10px',borderRadius:13,
-          background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
-          border:`1px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
-        }}>
-          <SideImage imageUrl={battle.side_b_image} name={battle.side_b_name} size={38}/>
-          <div style={{flex:1,minWidth:0}}>
-            <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_b_name}</p>
-            <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctB}%</p>
-          </div>
-          {battle.winner_side==='b' && <span style={{fontSize:14}}>👑</span>}
-        </div>
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* PROGRESS BAR: Always visible */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      <div style={{padding:'0 14px 12px'}}>
-        <div style={{height:4,borderRadius:2,background:'hsl(215 26% 12%)',overflow:'hidden'}}>
+        {/* Progress bar */}
+        <div style={{height:4,borderRadius:2,background:'hsl(215 26% 12%)',overflow:'hidden',marginBottom:7}}>
           <div style={{height:'100%',borderRadius:2,width:`${pctA}%`,
             background:'linear-gradient(90deg,hsl(215 35% 50%),hsl(215 45% 65%))',transition:'width 0.5s ease'}}/>
         </div>
-      </div>
 
-      {/* ═══════════════════════════════════════════════════════════ */}
-      {/* FOOTER: Metadata */}
-      {/* ═══════════════════════════════════════════════════════════ */}
-      <div style={{padding:'0 14px 12px',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span style={{fontSize:9,color:'hsl(215 14% 35%)'}}>
-          {totalPow.toLocaleString()} ARX-P staked
-        </span>
-        <span style={{fontSize:9,color:'hsl(215 14% 32%)'}}>
-          {new Date(isActive?battle.ends_at:battle.starts_at).toLocaleDateString()}
-        </span>
+        {/* Footer */}
+        <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+          <span style={{fontSize:9,color:'hsl(215 14% 35%)'}}>
+            {totalPow.toLocaleString()} ARX-P staked
+          </span>
+          <span style={{fontSize:9,color:'hsl(215 14% 32%)'}}>
+            {new Date(isActive?battle.ends_at:battle.starts_at).toLocaleDateString()}
+          </span>
+        </div>
       </div>
     </motion.div>
   );
 }
+
 // ── Battle Detail View (full page) ─────────────────────────────────────────
 function BattleDetail({
   battle, isActive, userVote, participants, voting, castVote, available, onClose
@@ -295,7 +275,6 @@ function BattleDetail({
                 background:activeSide==='a'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
                 border:`2px solid ${activeSide==='a'?'hsl(215 35% 62%/0.45)':battle.winner_side==='a'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
               }}>
-              <SideImage imageUrl={battle.side_a_image} name={battle.side_a_name} size={62}/>
               <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)',textAlign:'center'}}>{battle.side_a_name}</p>
               <div style={{fontSize:24,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':activeSide==='a'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctA}%</div>
               <p style={{fontSize:10,color:'hsl(215 14% 40%)',textAlign:'center'}}>{battle.side_a_power.toLocaleString()} ARX-P</p>
@@ -316,7 +295,6 @@ function BattleDetail({
                 background:activeSide==='b'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
                 border:`2px solid ${activeSide==='b'?'hsl(215 35% 62%/0.45)':battle.winner_side==='b'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
               }}>
-              <SideImage imageUrl={battle.side_b_image} name={battle.side_b_name} size={62}/>
               <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)',textAlign:'center'}}>{battle.side_b_name}</p>
               <div style={{fontSize:24,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':activeSide==='b'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctB}%</div>
               <p style={{fontSize:10,color:'hsl(215 14% 40%)',textAlign:'center'}}>{battle.side_b_power.toLocaleString()} ARX-P</p>
@@ -435,6 +413,152 @@ function BattleDetail({
         )}
       </div>
     </motion.div>
+  );
+}
+
+// ── LeaderboardTab Component ───────────────────────────────────────────────
+function LeaderboardTab({ leaderboard, loading, currentUserId }: {
+  leaderboard: any[];
+  loading: boolean;
+  currentUserId?: string;
+}) {
+  const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
+
+  const fmt = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return n.toLocaleString();
+  };
+
+  const alphaTeam = leaderboard
+    .filter(e => e.club === 'alpha')
+    .sort((a, b) => (b.total_power_staked || 0) - (a.total_power_staked || 0));
+
+  const omegaTeam = leaderboard
+    .filter(e => e.club === 'omega')
+    .sort((a, b) => (b.total_power_staked || 0) - (a.total_power_staked || 0));
+
+  const hasClubData = leaderboard.some(e => e.club === 'alpha' || e.club === 'omega');
+  const allPlayers = [...leaderboard].sort((a, b) => (b.total_power_staked || 0) - (a.total_power_staked || 0));
+
+  const alphaStaked = alphaTeam.reduce((s, e) => s + (e.total_power_staked || 0), 0);
+  const omegaStaked = omegaTeam.reduce((s, e) => s + (e.total_power_staked || 0), 0);
+
+  const ALPHA = 'hsl(195 80% 50%)';
+  const OMEGA = 'hsl(255 60% 65%)';
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px 0' }}>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} style={{ height: 60, borderRadius: 16, background: 'hsl(215 22% 10%)', marginBottom: 8, opacity: 1 - i * 0.15 }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!hasClubData) {
+    return (
+      <div>
+        <p style={{ fontSize: 11, color: 'hsl(215 14% 36%)', marginBottom: 12, textAlign: 'center' }}>Overall Rankings</p>
+        {allPlayers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 40%)' }}>No rankings yet</p>
+            <p style={{ fontSize: 12, color: 'hsl(215 14% 30%)', marginTop: 4 }}>Participate in battles to appear here</p>
+          </div>
+        ) : allPlayers.map((e, i) => (
+          <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        {([
+          { label: 'Team Alpha', count: alphaTeam.length, staked: alphaStaked, col: ALPHA, team: 'alpha' as const },
+          { label: 'Team Omega', count: omegaTeam.length, staked: omegaStaked, col: OMEGA, team: 'omega' as const },
+        ] as const).map(t => (
+          <button
+            key={t.team}
+            onClick={() => setActiveTeam(t.team)}
+            style={{
+              flex: 1, padding: '12px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', textAlign: 'left',
+              background: activeTeam === t.team ? `${t.col}15` : 'hsl(215 22% 8%)',
+              boxShadow: activeTeam === t.team ? `0 0 0 1.5px ${t.col}50` : '0 0 0 1px hsl(215 20% 13%)',
+              transition: 'all 0.18s',
+            }}
+          >
+            <p style={{ fontSize: 11, fontWeight: 800, color: t.col, marginBottom: 4 }}>{t.label}</p>
+            <p style={{ fontSize: 16, fontWeight: 900, color: 'hsl(215 18% 90%)' }}>{fmt(t.staked)}</p>
+            <p style={{ fontSize: 10, color: 'hsl(215 14% 38%)', marginTop: 2 }}>{t.count} members</p>
+          </button>
+        ))}
+      </div>
+      {(activeTeam === 'alpha' ? alphaTeam : omegaTeam).length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 38%)' }}>No {activeTeam} members yet</p>
+          <p style={{ fontSize: 12, color: 'hsl(215 14% 28%)', marginTop: 4 }}>Join {activeTeam} team in Arena to appear here</p>
+        </div>
+      ) : (activeTeam === 'alpha' ? alphaTeam : omegaTeam).map((e, i) => (
+        <PlayerRow
+          key={e.user_id} entry={e} rank={i + 1}
+          color={activeTeam === 'alpha' ? ALPHA : OMEGA}
+          isMe={e.user_id === currentUserId} fmt={fmt}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PlayerRow({ entry, rank, color, isMe, fmt }: {
+  entry: any; rank: number; color: string; isMe: boolean; fmt: (n: number) => string;
+}) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const wins = Number(entry.total_wins) || 0;
+  const battles = Number(entry.total_battles) || 0;
+  const losses = Math.max(0, battles - wins);
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 14px', borderRadius: 16, marginBottom: 7,
+      background: isMe ? `${color}12` : 'hsl(225 25% 6%)',
+      border: `1px solid ${isMe ? `${color}35` : 'hsl(215 20% 11%)'}`,
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: rank <= 3 ? 14 : 10, fontWeight: 800, color,
+      }}>
+        {rank <= 3 ? medals[rank - 1] : rank}
+      </div>
+      <div style={{
+        width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: 12, fontWeight: 700, color,
+        border: `1.5px solid ${color}25`,
+      }}>
+        {entry.avatar_url
+          ? <img src={entry.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : (entry.username?.[0]?.toUpperCase() || '?')
+        }
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: isMe ? color : 'hsl(215 18% 86%)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {entry.username || 'Miner'}{isMe ? ' (You)' : ''}
+        </p>
+        <p style={{ fontSize: 10, color: 'hsl(215 14% 36%)', marginTop: 1 }}>
+          <span style={{ color: 'hsl(142 60% 50%)' }}>{wins}W</span>{' / '}
+          <span style={{ color: 'hsl(0 60% 56%)' }}>{losses}L</span>
+        </p>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 800, color }}>{fmt(entry.total_power_staked || 0)}</p>
+        <p style={{ fontSize: 9, color: 'hsl(215 14% 32%)' }}>Score</p>
+      </div>
+    </div>
   );
 }
 
@@ -634,38 +758,7 @@ export default function MobileArena() {
 
         {/* LEADERBOARD TAB */}
         {tab==='leaderboard' && (
-          <>
-            {[{team:'Alpha',board:alphaBoard,col:'hsl(215 35% 62%)',bg:'hsl(215 35% 62%/0.05)',bd:'hsl(215 30% 18%)'},
-              {team:'Omega',board:omegaBoard,col:'hsl(255 50% 65%)',bg:'hsl(255 50% 60%/0.05)',bd:'hsl(255 40% 22%)'}
-            ].map(({team,board,col,bg,bd})=>(
-              <div key={team} style={{marginBottom:20}}>
-                <p style={{fontSize:11,textTransform:'uppercase',letterSpacing:'0.14em',fontWeight:700,marginBottom:10,color:col}}>
-                  {team} Team
-                </p>
-                {board.length===0
-                  ? <p style={{fontSize:12,color:'hsl(215 14% 35%)'}}>No {team.toLowerCase()} members yet</p>
-                  : board.slice(0,10).map((e:any,i:number)=>(
-                    <div key={e.user_id} style={{display:'flex',alignItems:'center',gap:10,
-                      padding:'10px 14px',borderRadius:14,marginBottom:7,background:bg,border:`1px solid ${bd}`}}>
-                      <div style={{width:26,height:26,borderRadius:9,background:`${col}22`,
-                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:col,flexShrink:0}}>
-                        {i<3?['🥇','🥈','🥉'][i]:i+1}
-                      </div>
-                      <div style={{width:30,height:30,borderRadius:'50%',overflow:'hidden',
-                        background:'hsl(225 25% 13%)',display:'flex',alignItems:'center',justifyContent:'center',
-                        fontSize:12,fontWeight:700,color:col,flexShrink:0}}>
-                        {e.avatar_url?<img src={e.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:e.username?.[0]?.toUpperCase()||'?'}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <p style={{fontSize:12,fontWeight:600,color:'hsl(215 18% 82%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.username||'Miner'}</p>
-                      </div>
-                      <p style={{fontSize:12,fontWeight:700,color}}>{(e.total_power_staked||0).toLocaleString()}</p>
-                    </div>
-                  ))
-                }
-              </div>
-            ))}
-          </>
+          <LeaderboardTab leaderboard={leaderboard} loading={loading} currentUserId={user?.id} />
         )}
 
         {/* MY STAKES TAB */}
