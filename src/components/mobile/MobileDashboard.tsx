@@ -378,7 +378,7 @@ export default function MobileDashboard() {
             View all <ChevronRight size={13}/>
           </button>
         </div>
-        <div className="scrollbar-none" style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4}}>
+        <div className="scrollbar-none" style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4,WebkitOverflowScrolling:'touch',touchAction:'pan-x'}}>
           {arenaLoading && !dashBattles.length && [0,1,2].map(i=>(
             <div key={i} style={{minWidth:200,height:155,borderRadius:20,flexShrink:0,
               background:'hsl(215 22% 9%)',border:'1px solid hsl(215 22% 13%)'}}/>
@@ -390,7 +390,7 @@ export default function MobileDashboard() {
             const isLive=battle._live||battle.status==='active';
             return (
               <motion.div key={battle.id} whileTap={{scale:0.97}}
-                onPointerDown={()=>navigate('/arena')}
+                onClick={()=>navigate('/arena')}
                 style={{minWidth:200,borderRadius:20,flexShrink:0,cursor:'pointer',overflow:'hidden',
                   background:'hsl(225 26% 8%)',border:'1px solid hsl(215 22% 14%)',display:'flex',flexDirection:'column'}}>
                 {battle.banner_image ? (
