@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useArena, type ArenaBattle, type BattleHistoryEntry } from '@/hooks/useArena';
+import { useArenaMarkets } from '@/hooks/useArenaMarkets';
 import { useArenaMembership } from '@/hooks/useArenaMembership';
 import { usePoints } from '@/hooks/usePoints';
 import { supabase } from '@/integrations/supabase/client';
@@ -568,6 +569,10 @@ export default function MobileArena() {
   const navigate    = useNavigate();
   const { points }  = usePoints();
   const { activeBattle, userVote, participants, battleHistory, leaderboard, loading, voting, castVote } = useArena();
+  // earningsLeaderboard has ALL arena members with club data — public, not just battle participants
+  const { earningsLeaderboard, loading: lbLoading } = useArenaMarkets();
+  // Prefer earningsLeaderboard (fuller data) over battle-only leaderboard
+  const fullLeaderboard = earningsLeaderboard?.length ? earningsLeaderboard : leaderboard;
   const { membership, loading: memLoading, registering, registerMembership } = useArenaMembership();
 
   const [showAuth,      setShowAuth]      = useState(false);
@@ -758,7 +763,7 @@ export default function MobileArena() {
 
         {/* LEADERBOARD TAB */}
         {tab==='leaderboard' && (
-          <LeaderboardTab leaderboard={leaderboard} loading={loading} currentUserId={user?.id} />
+          <LeaderboardTab leaderboard={fullLeaderboard} loading={loading || lbLoading} currentUserId={user?.id} />
         )}
 
         {/* MY STAKES TAB */}
