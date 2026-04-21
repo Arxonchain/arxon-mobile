@@ -288,7 +288,9 @@ export default function MobileChat() {
   const hasTxt = editing ? editing.text.trim().length > 0 : txtRef.current.trim().length > 0;
 
   return (
-    <div style={{ height: '100vh', background: 'hsl(225 30% 3%)', display: 'flex', flexDirection: 'column',
+    <div style={{ position: 'fixed', top: 0, left: 0, right: 0,
+      bottom: 'calc(env(safe-area-inset-bottom, 0px) + 72px)',
+      background: 'hsl(225 30% 3%)', display: 'flex', flexDirection: 'column',
       fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif", overflow: 'hidden' }}>
       <style>{`
         @keyframes spin{to{transform:rotate(360deg)}}
@@ -413,7 +415,7 @@ export default function MobileChat() {
       )}
 
       {/* ── Messages ── */}
-      <div className="no-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 0', minHeight: 0 }}>
+      <div className="no-scroll" style={{ flex: 1, overflowY: 'auto', padding: '4px 20px 12px', minHeight: 0 }}>
         {load && (
           <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 40 }}>
             <div style={{ width: 28, height: 28, borderRadius: '50%', border: `2px solid ${col}20`, borderTopColor: col, animation: 'spin 1s linear infinite' }} />
