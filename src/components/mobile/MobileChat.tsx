@@ -549,7 +549,7 @@ export default function MobileChat() {
       )}
 
       {/* ── Input bar ── */}
-      {user && dbOk === true ? (
+      {user && dbOk !== false ? (
         <div style={{ padding: '4px 14px 14px', flexShrink: 0 }}>
           {!canPost(ch) ? (
             <div style={{ padding: '13px', borderRadius: 16, textAlign: 'center', background: 'hsl(215 22% 8%)', border: '1px solid hsl(215 20% 13%)' }}>
