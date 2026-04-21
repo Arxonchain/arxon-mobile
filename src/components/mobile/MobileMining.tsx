@@ -39,11 +39,14 @@ export default function MobileMining() {
   const [showAuth, setShowAuth] = useState(false);
 
   const {
-    isMining, earnedPoints, elapsedSeconds, pointsPerHour,
-    boostPercentage, sessionId,
+    isMining,
+    earnedPoints,
+    elapsedTime: elapsedSeconds,   // hook returns elapsedTime, component uses elapsedSeconds
+    pointsPerHour,
+    totalBoostPercentage: boostPercentage,
     startMining, stopMining, claimPoints,
     isStarting, isStopping, isClaiming,
-  } = useMining({ tickMs: 1000 });
+  } = useMining({ tickMs: 1000 }) as any;
 
   const totalPoints  = Math.round(points?.total_points ?? 0);
   const username     = profile?.username || user?.email?.split('@')[0] || 'Miner';
