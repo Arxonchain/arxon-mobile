@@ -121,8 +121,7 @@ export default function MobileLeaderboard() {
 
   const totalPts = Math.round(points?.total_points ?? 0);
   const userRank = rank ?? null;
-  const topPct = leaders.length > 0 && userRank
-    ? ((userRank / leaders.length) * 100).toFixed(1) : null;
+  // topPct removed — not user-facing
   const top3 = leaders.slice(0, 3);
 
   return (
@@ -168,8 +167,8 @@ export default function MobileLeaderboard() {
             </div>
             <div style={{ background: 'hsl(215 25% 18%)', height: 40 }} />
             <div style={{ textAlign: 'center' }}>
-              <p style={{ fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'hsl(215 14% 35%)', fontWeight: 600, marginBottom: 8 }}>Top</p>
-              <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(155 45% 43%)' }}>{topPct ? `${topPct}%` : '—'}</p>
+              <p style={{ fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'hsl(215 14% 35%)', fontWeight: 600, marginBottom: 8 }}>Streak</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(155 45% 43%)' }}>{points?.daily_streak ?? 0}d</p>
             </div>
           </div>
         </div>
