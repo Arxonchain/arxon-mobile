@@ -7,7 +7,9 @@ import { supabase } from '@/integrations/supabase/client';
 import {
   ChevronLeft, Send, X, CornerUpLeft,
   Copy, Trash2, Pencil, Check, Smile, Menu, RefreshCw,
+  ZoomIn, Shield,
 } from 'lucide-react';
+import { useAdmin } from '@/hooks/useAdmin';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type Channel = 'general' | 'alpha' | 'omega' | 'nexus_exchange';
@@ -122,6 +124,7 @@ export default function MobileChat() {
   const { user }       = useAuth();
   const { profile }    = useProfile();
   const { membership } = useArenaMembership();
+  const { isAdmin } = useAdmin();
 
   // chat state
   const [ch,       setCh]      = useState<Channel>('general');
@@ -148,6 +151,9 @@ export default function MobileChat() {
   const inpRef     = useRef<HTMLTextAreaElement>(null);
   const holdTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileId     = useRef(`fi-${Date.now()}`);
+  const [imgPreview, setImgPreview] = useState<{ file: File; objectUrl: string } | null>(null);
+  const [uploadPct,  setUploadPct]  = useState<number>(0);
+  const [viewerUrl,  setViewerUrl]  = useState<string | null>(null);
   const killed     = useRef(new Set<string>());  // optimistically deleted ids
   const txtRef     = useRef('');
   const repRef     = useRef<Msg | null>(null);
@@ -313,38 +319,79 @@ export default function MobileChat() {
     }, 20);
   }, []);
 
-  // ── Image upload ──────────────────────────────────────────────────────────
-  const pickImage = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // ── Compress image client-side before upload ─────────────────────────────
+  const compressImage = (file: File, maxPx = 1280, quality = 0.82): Promise<Blob> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+        const w = Math.round(img.width * scale);
+        const h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        const ctx = canvas.getContext('2d')!;
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(b => b ? resolve(b) : reject(new Error('Compress failed')), 'image/jpeg', quality);
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+
+  // ── Pick image — shows preview, compress, then send on confirm ────────────
+  const pickImage = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-    if (file.size > 8 * 1024 * 1024) { toast('Max 8 MB'); return; }
-    setUpload(true);
+    if (file.size > 20 * 1024 * 1024) { toast('Max 20 MB'); return; }
+    const objectUrl = URL.createObjectURL(file);
+    setImgPreview({ file, objectUrl });
+    e.target.value = '';
+  }, [user]);
+
+  const cancelPreview = useCallback(() => {
+    if (imgPreview) URL.revokeObjectURL(imgPreview.objectUrl);
+    setImgPreview(null);
+    setUploadPct(0);
+  }, [imgPreview]);
+
+  const sendImage = useCallback(async () => {
+    if (!imgPreview || !user || uploading) return;
+    setUpload(true); setUploadPct(5);
     try {
-      const ext  = file.name.split('.').pop() ?? 'jpg';
-      const path = `chat/${user.id}/${Date.now()}.${ext}`;
+      // Compress
+      const blob = await compressImage(imgPreview.file);
+      setUploadPct(30);
+      const path = `chat/${user.id}/${Date.now()}.jpg`;
+      // Upload with manual progress simulation (Supabase SDK doesn't expose XHR progress)
+      const pInterval = setInterval(() => setUploadPct(p => Math.min(p + 8, 88)), 300);
       const { error: upErr } = await supabase.storage
-        .from('chat-images').upload(path, file, { upsert: true, contentType: file.type });
+        .from('chat-images').upload(path, blob, { upsert: true, contentType: 'image/jpeg' });
+      clearInterval(pInterval);
       if (upErr) throw upErr;
+      setUploadPct(92);
       const { data: pub } = supabase.storage.from('chat-images').getPublicUrl(path);
-      // Try with rich columns first, fall back to URL-in-text
-      let { error: msgErr } = await supabase.from('chat_messages').insert({
+      const { error: msgErr } = await supabase.from('chat_messages').insert({
         channel: ch, user_id: user.id, username: uname,
         avatar_url: profile?.avatar_url ?? null,
         message: '📷 Image', msg_type: 'image', image_url: pub.publicUrl,
       });
       if (msgErr) {
-        const { error: fbErr } = await supabase.from('chat_messages').insert({
+        await supabase.from('chat_messages').insert({
           channel: ch, user_id: user.id, username: uname,
           avatar_url: profile?.avatar_url ?? null,
           message: `📷 ${pub.publicUrl}`,
         });
-        if (fbErr) throw fbErr;
       }
-      toast('📷 Sent!');
+      setUploadPct(100);
+      setTimeout(() => { setUploadPct(0); }, 400);
+      URL.revokeObjectURL(imgPreview.objectUrl);
+      setImgPreview(null);
     } catch (err: any) {
       toast(err?.message?.includes('Bucket') ? 'Create chat-images bucket in Supabase' : 'Upload failed');
-    } finally { setUpload(false); e.target.value = ''; }
-  }, [user, ch, uname, profile]);
+      setUploadPct(0);
+    } finally { setUpload(false); }
+  }, [imgPreview, user, uploading, ch, uname, profile]);
 
   // ── Edit ──────────────────────────────────────────────────────────────────
   const saveEdit = useCallback(async () => {
@@ -367,15 +414,17 @@ export default function MobileChat() {
     killed.current.add(m.id);
     setMsgs(p => p.filter(x => x.id !== m.id));
     setDelId(m.id);
-    const { error } = await supabase.from('chat_messages').delete()
-      .eq('id', m.id).eq('user_id', uid ?? '');
+    // Admin can delete any message — no user_id filter needed
+    const query = supabase.from('chat_messages').delete().eq('id', m.id);
+    const finalQuery = isAdmin ? query : query.eq('user_id', uid ?? '');
+    const { error } = await finalQuery;
     if (error) {
       killed.current.delete(m.id);
       setMsgs(p => [...p, m].sort((a, b) => a.created_at.localeCompare(b.created_at)));
       toast('Delete failed');
     }
     setDelId(null);
-  }, [uid]);
+  }, [uid, isAdmin]);
 
   const doReply = useCallback((m: Msg) => {
     setRep(m); setCtx(null); setEdit(null); setTxt('');
@@ -450,6 +499,34 @@ export default function MobileChat() {
           animation: 'toastUp 2.2s ease forwards',
           boxShadow: '0 8px 32px rgba(0,0,0,.6)',
         }}>{toastTxt}</div>
+      )}
+
+      {/* ── Full-screen image viewer ── */}
+      {viewerUrl && (
+        <div
+          onClick={() => setViewerUrl(null)}
+          style={{ position:'fixed', inset:0, zIndex:20000,
+            background:'rgba(0,0,0,.95)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            flexDirection:'column' }}>
+          {/* Close */}
+          <button
+            onClick={() => setViewerUrl(null)}
+            style={{ position:'absolute', top:52, right:18,
+              width:40, height:40, borderRadius:12,
+              background:'hsl(215 22% 14%)', border:'1px solid hsl(215 22% 24%)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              cursor:'pointer', zIndex:1 }}>
+            <X size={18} color="hsl(215 18% 80%)" />
+          </button>
+          <img
+            src={viewerUrl}
+            alt="Full view"
+            onClick={e => e.stopPropagation()}
+            style={{ maxWidth:'100vw', maxHeight:'86vh',
+              objectFit:'contain', borderRadius:8,
+              boxShadow:'0 8px 48px rgba(0,0,0,.6)' }} />
+        </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════════
@@ -574,11 +651,14 @@ export default function MobileChat() {
             {(!ctxMenu.msg.msg_type || ctxMenu.msg.msg_type === 'text') && (
               <CMRow icon={<Copy size={15} color="hsl(215 25% 52%)" />}       label="Copy text" onTap={() => doCopy(ctxMenu.msg)} divider={isOwn(ctxMenu.msg)} />
             )}
-            {isOwn(ctxMenu.msg) && <>
-              {(!ctxMenu.msg.msg_type || ctxMenu.msg.msg_type === 'text') && (
+            {(isOwn(ctxMenu.msg) || isAdmin) && <>
+              {isOwn(ctxMenu.msg) && (!ctxMenu.msg.msg_type || ctxMenu.msg.msg_type === 'text') && (
                 <CMRow icon={<Pencil size={15} color={col} />} label="Edit" onTap={() => doEdit(ctxMenu.msg)} />
               )}
-              <CMRow icon={<Trash2 size={15} color="hsl(0 62% 55%)" />} label="Delete" onTap={() => doDelete(ctxMenu.msg)} danger divider={false} />
+              <CMRow
+                icon={<Trash2 size={15} color="hsl(0 62% 55%)" />}
+                label={isAdmin && !isOwn(ctxMenu.msg) ? '🛡 Delete (Admin)' : 'Delete'}
+                onTap={() => doDelete(ctxMenu.msg)} danger divider={false} />
             </>}
           </div>
         </div>
@@ -595,6 +675,11 @@ export default function MobileChat() {
           <h1 style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 20% 93%)', margin: 0 }}>Community</h1>
           <p style={{ fontSize: 11, color: col, marginTop: 2, fontWeight: 600 }}>
             {chInfo.icon} {chInfo.label}
+            {isAdmin && <span style={{ marginLeft:5, fontSize:9, fontWeight:700,
+              background:'hsl(38 55% 52%/0.15)', border:'1px solid hsl(38 55% 52%/0.3)',
+              borderRadius:6, padding:'1px 5px', color:'hsl(38 55% 60%)' }}>
+              ADMIN
+            </span>}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
@@ -683,10 +768,18 @@ export default function MobileChat() {
                       filter: 'drop-shadow(0 3px 12px rgba(0,0,0,.4))', borderRadius: 8 }}
                     onError={e => { (e.target as HTMLImageElement).style.opacity = '.2'; }} />
                 ) : isImg && m.image_url ? (
-                  <div style={{ borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    overflow: 'hidden', border: `1px solid ${col}25`, maxWidth: 220 }}>
+                  <div
+                    onClick={e => { e.stopPropagation(); setViewerUrl(m.image_url!); }}
+                    style={{ borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                      overflow: 'hidden', border: `1px solid ${col}25`, maxWidth: 220,
+                      cursor: 'pointer', position: 'relative' }}>
                     <img src={m.image_url} alt="img"
                       style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' }} />
+                    <div style={{ position:'absolute', bottom:6, right:6,
+                      background:'rgba(0,0,0,.5)', borderRadius:8, padding:'3px 6px',
+                      display:'flex', alignItems:'center', gap:4 }}>
+                      <ZoomIn size={11} color="white" />
+                    </div>
                   </div>
                 ) : (
                   <div style={{
@@ -781,6 +874,58 @@ export default function MobileChat() {
           </div>
           <button onPointerDown={() => setRep(null)} style={IB}>
             <X size={12} color="hsl(215 18% 42%)" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Image preview bar (shown after picking, before sending) ── */}
+      {imgPreview && (
+        <div style={{ margin:'0 14px 6px', padding:'10px 12px', borderRadius:16,
+          background:'hsl(225 26% 7%)', border:`1px solid ${col}30`,
+          flexShrink:0, display:'flex', alignItems:'center', gap:10 }}>
+          {/* Thumbnail */}
+          <div style={{ width:58, height:58, borderRadius:10, overflow:'hidden', flexShrink:0,
+            border:`1px solid ${col}25` }}>
+            <img src={imgPreview.objectUrl} alt="preview"
+              style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+          </div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <p style={{ fontSize:12, fontWeight:700, color:'hsl(215 18% 80%)', marginBottom:3,
+              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+              {imgPreview.file.name}
+            </p>
+            <p style={{ fontSize:10, color:'hsl(215 14% 38%)' }}>
+              {(imgPreview.file.size / 1024 / 1024).toFixed(1)} MB
+              {imgPreview.file.size > 500_000 ? ' → will compress' : ' · ready'}
+            </p>
+            {/* Upload progress bar */}
+            {uploadPct > 0 && uploadPct < 100 && (
+              <div style={{ marginTop:5, height:3, borderRadius:3, background:'hsl(215 22% 14%)' }}>
+                <div style={{ height:'100%', borderRadius:3, background:col,
+                  width:`${uploadPct}%`, transition:'width 0.3s ease' }} />
+              </div>
+            )}
+          </div>
+          {/* Cancel preview */}
+          <button onPointerDown={cancelPreview}
+            style={{ width:28, height:28, borderRadius:9, background:'hsl(215 22% 12%)',
+              border:'none', cursor:'pointer', outline:'none', flexShrink:0,
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+            <X size={13} color="hsl(215 18% 44%)" />
+          </button>
+          {/* Send image button */}
+          <button onPointerDown={e => { e.preventDefault(); sendImage(); }}
+            disabled={uploading}
+            style={{ width:40, height:40, borderRadius:12, background:`${col}22`,
+              border:`1px solid ${col}45`, cursor: uploading ? 'default' : 'pointer',
+              outline:'none', flexShrink:0, opacity: uploading ? 0.6 : 1,
+              display:'flex', alignItems:'center', justifyContent:'center' }}>
+            {uploading
+              ? <div style={{ width:14, height:14, borderRadius:'50%',
+                  border:`2px solid ${col}30`, borderTopColor:col,
+                  animation:'spin .8s linear infinite' }} />
+              : <Send size={15} color={col} />
+            }
           </button>
         </div>
       )}
