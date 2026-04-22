@@ -411,19 +411,52 @@ export default function MobileChat() {
   // ── Delete ────────────────────────────────────────────────────────────────
   const doDelete = useCallback(async (m: Msg) => {
     setCtx(null);
+
+    // Mark as killed BEFORE optimistic removal so realtime INSERT can't re-add it
     killed.current.add(m.id);
     setMsgs(p => p.filter(x => x.id !== m.id));
     setDelId(m.id);
-    // Admin can delete any message — no user_id filter needed
-    const query = supabase.from('chat_messages').delete().eq('id', m.id);
-    const finalQuery = isAdmin ? query : query.eq('user_id', uid ?? '');
-    const { error } = await finalQuery;
-    if (error) {
+
+    try {
+      // Admin deletes without user_id filter — bypasses RLS ownership check
+      const { error, count } = await (
+        isAdmin
+          ? supabase.from('chat_messages').delete({ count: 'exact' }).eq('id', m.id)
+          : supabase.from('chat_messages').delete({ count: 'exact' }).eq('id', m.id).eq('user_id', uid ?? '')
+      );
+
+      if (error) throw error;
+
+      // count === 0 means RLS silently blocked the delete (row wasn't actually deleted)
+      if (count === 0) {
+        // Retry once as admin path (handles edge case where uid mismatch)
+        const { error: retryErr, count: retryCount } = await supabase
+          .from('chat_messages').delete({ count: 'exact' }).eq('id', m.id);
+        if (retryErr || retryCount === 0) {
+          // Truly failed — restore the message
+          killed.current.delete(m.id);
+          setMsgs(p => {
+            const exists = p.some(x => x.id === m.id);
+            return exists ? p : [...p, m].sort((a, b) => a.created_at.localeCompare(b.created_at));
+          });
+          toast('Delete failed — check permissions');
+          return;
+        }
+      }
+
+      // Success — message is permanently gone, keep it in killed set
+      // so realtime events can never bring it back
+      toast('Deleted');
+    } catch (err: any) {
       killed.current.delete(m.id);
-      setMsgs(p => [...p, m].sort((a, b) => a.created_at.localeCompare(b.created_at)));
+      setMsgs(p => {
+        const exists = p.some(x => x.id === m.id);
+        return exists ? p : [...p, m].sort((a, b) => a.created_at.localeCompare(b.created_at));
+      });
       toast('Delete failed');
+    } finally {
+      setDelId(null);
     }
-    setDelId(null);
   }, [uid, isAdmin]);
 
   const doReply = useCallback((m: Msg) => {
@@ -769,15 +802,16 @@ export default function MobileChat() {
                     onError={e => { (e.target as HTMLImageElement).style.opacity = '.2'; }} />
                 ) : isImg && m.image_url ? (
                   <div
-                    onClick={e => { e.stopPropagation(); setViewerUrl(m.image_url!); }}
                     style={{ borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                       overflow: 'hidden', border: `1px solid ${col}25`, maxWidth: 220,
-                      cursor: 'pointer', position: 'relative' }}>
+                      cursor: 'pointer', position: 'relative' }}
+                    onClick={e => { e.stopPropagation(); pressEnd(); setViewerUrl(m.image_url!); }}>
                     <img src={m.image_url} alt="img"
-                      style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block' }} />
+                      style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block',
+                        WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }} />
                     <div style={{ position:'absolute', bottom:6, right:6,
                       background:'rgba(0,0,0,.5)', borderRadius:8, padding:'3px 6px',
-                      display:'flex', alignItems:'center', gap:4 }}>
+                      display:'flex', alignItems:'center', gap:4, pointerEvents:'none' }}>
                       <ZoomIn size={11} color="white" />
                     </div>
                   </div>
