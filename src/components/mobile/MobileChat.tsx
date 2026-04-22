@@ -216,37 +216,89 @@ export default function MobileChat() {
 
   useEffect(() => { botRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [msgs]);
 
-  // ── Send text ─────────────────────────────────────────────────────────────
+  // ── Send text — resilient with column-aware fallback ─────────────────────
+  // If the DB is missing rich columns (msg_type, reply_to_*), we fall back
+  // to the minimal payload that always works. Retries up to 3x on 5xx errors.
   const sendText = useCallback(async () => {
     const text = txtRef.current.trim();
     if (!user || !text || busy) return;
     const reply = repRef.current;
     setTxt(''); setRep(null); setBusy(true);
-    const row: Record<string, unknown> = {
+
+    // Full payload — requires new columns
+    const fullRow: Record<string, unknown> = {
       channel: ch, user_id: user.id, username: uname,
       avatar_url: profile?.avatar_url ?? null,
       message: text, msg_type: 'text',
     };
     if (reply) {
-      row.reply_to_id       = reply.id;
-      row.reply_to_username = reply.username ?? 'Miner';
-      row.reply_to_message  = reply.message.slice(0, 80);
+      fullRow.reply_to_id       = reply.id;
+      fullRow.reply_to_username = reply.username ?? 'Miner';
+      fullRow.reply_to_message  = reply.message.slice(0, 80);
     }
-    const { error } = await supabase.from('chat_messages').insert(row);
-    if (error) { setTxt(text); setRep(reply); toast('Failed to send'); }
+
+    // Minimal payload — works even on old schema
+    const minRow: Record<string, unknown> = {
+      channel: ch, user_id: user.id, username: uname,
+      avatar_url: profile?.avatar_url ?? null,
+      message: text,
+    };
+
+    let sent = false;
+
+    // Attempt 1-3: full payload with retry
+    for (let attempt = 0; attempt < 3 && !sent; attempt++) {
+      const { error } = await supabase.from('chat_messages').insert(fullRow);
+      if (!error) { sent = true; break; }
+      // 400/42xxx = schema mismatch — don't retry full, fall back immediately
+      if (error.code?.startsWith('42') || error.code === 'PGRST204' ||
+          (error.message && (error.message.includes('column') || error.message.includes('schema')))) {
+        break;
+      }
+      // 5xx — wait and retry
+      if (attempt < 2) await new Promise(r => setTimeout(r, 600 * (attempt + 1)));
+    }
+
+    // Fallback: minimal payload (no rich columns)
+    if (!sent) {
+      const { error: minErr } = await supabase.from('chat_messages').insert(minRow);
+      if (!minErr) {
+        sent = true;
+        // Alert developer once that migration is needed
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[Chat] Sent with minimal schema. Run the chat migration SQL to enable replies/stickers.');
+        }
+      }
+    }
+
+    if (!sent) {
+      setTxt(text); setRep(reply);
+      toast('Could not send — check connection');
+    }
     setBusy(false);
   }, [user, busy, ch, uname, profile]);
 
-  // ── Send sticker ──────────────────────────────────────────────────────────
+  // ── Send sticker — with minimal fallback ────────────────────────────────
   const sendSticker = useCallback(async (url: string) => {
     if (!user || busy) return;
     setPanel('none'); setBusy(true);
-    const { error } = await supabase.from('chat_messages').insert({
+
+    // Try full payload first
+    let { error } = await supabase.from('chat_messages').insert({
       channel: ch, user_id: user.id, username: uname,
       avatar_url: profile?.avatar_url ?? null,
       message: '🐉', msg_type: 'sticker', image_url: url,
     });
-    if (error) toast('Sticker failed');
+
+    // Fallback: send as text message with the URL embedded
+    if (error) {
+      const { error: fallbackErr } = await supabase.from('chat_messages').insert({
+        channel: ch, user_id: user.id, username: uname,
+        avatar_url: profile?.avatar_url ?? null,
+        message: `🐉 [sticker] ${url}`,
+      });
+      if (fallbackErr) toast('Sticker failed');
+    }
     setBusy(false);
   }, [user, busy, ch, uname, profile]);
 
@@ -274,12 +326,20 @@ export default function MobileChat() {
         .from('chat-images').upload(path, file, { upsert: true, contentType: file.type });
       if (upErr) throw upErr;
       const { data: pub } = supabase.storage.from('chat-images').getPublicUrl(path);
-      const { error: msgErr } = await supabase.from('chat_messages').insert({
+      // Try with rich columns first, fall back to URL-in-text
+      let { error: msgErr } = await supabase.from('chat_messages').insert({
         channel: ch, user_id: user.id, username: uname,
         avatar_url: profile?.avatar_url ?? null,
         message: '📷 Image', msg_type: 'image', image_url: pub.publicUrl,
       });
-      if (msgErr) throw msgErr;
+      if (msgErr) {
+        const { error: fbErr } = await supabase.from('chat_messages').insert({
+          channel: ch, user_id: user.id, username: uname,
+          avatar_url: profile?.avatar_url ?? null,
+          message: `📷 ${pub.publicUrl}`,
+        });
+        if (fbErr) throw fbErr;
+      }
       toast('📷 Sent!');
     } catch (err: any) {
       toast(err?.message?.includes('Bucket') ? 'Create chat-images bucket in Supabase' : 'Upload failed');
