@@ -38,9 +38,13 @@ const THEME: Record<Channel, string> = {
 };
 
 const SB_URL  = (import.meta as any).env?.VITE_SUPABASE_URL ?? '';
-const stUrl   = (f: string) => SB_URL
-  ? `${SB_URL}/storage/v1/object/public/chat-images/stickers/${f}`
-  : `/${f}`;
+// Stickers are served from the app's own public/ folder — not Supabase storage.
+// Using window.location.origin ensures the URL works for all users (absolute path
+// stored in DB resolves correctly regardless of who loads it).
+const stUrl = (f: string) =>
+  typeof window !== 'undefined'
+    ? `${window.location.origin}/${f}`
+    : `/${f}`;
 
 const STICKERS = [
   { id: 's1', file: 'sticker_1.png', label: 'Welcome'  },
@@ -49,6 +53,54 @@ const STICKERS = [
   { id: 's4', file: 'sticker_4.png', label: 'Wen?'      },
   { id: 's5', file: 'sticker_5.png', label: 'LOL'       },
 ];
+
+// ── StickerImg — smart 3-step fallback chain ───────────────────────────────
+// Step 1: try the stored URL (may be local /sticker_N.png or Supabase URL)
+// Step 2: if Supabase URL, extract filename and try local /sticker_N.png
+// Step 3: if all fail, render the emoji card
+const KNOWN_STICKER_FILES = ['sticker_1.png','sticker_2.png','sticker_3.png','sticker_4.png','sticker_5.png'];
+
+function StickerImg({ src }: { src: string }) {
+  const [attempt, setAttempt] = useState(0);
+  const [currentSrc, setCurrentSrc] = useState(src);
+
+  const handleError = () => {
+    if (attempt === 0) {
+      // Try extracting filename and loading from local public path
+      const filename = src.split('/').pop() || '';
+      if (filename && KNOWN_STICKER_FILES.includes(filename)) {
+        setCurrentSrc(`/${filename}`);
+        setAttempt(1);
+        return;
+      }
+    }
+    // All attempts failed → show emoji card
+    setAttempt(99);
+  };
+
+  if (attempt === 99) {
+    return (
+      <div style={{ width: 120, height: 100, borderRadius: 12,
+        background: 'hsl(215 22% 10%)', border: '1px solid hsl(215 22% 18%)',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        justifyContent: 'center', gap: 4 }}>
+        <span style={{ fontSize: 40 }}>🐉</span>
+        <span style={{ fontSize: 9, color: 'hsl(215 14% 38%)', fontWeight: 600 }}>Sticker</span>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      key={attempt}
+      src={currentSrc}
+      alt="sticker"
+      style={{ width: 120, height: 120, objectFit: 'contain', display: 'block',
+        filter: 'drop-shadow(0 3px 12px rgba(0,0,0,.4))', borderRadius: 8 }}
+      onError={handleError}
+    />
+  );
+}
 
 const EMOJIS = [
   '😀','😂','🤣','😍','🥰','😎','🤩','😅','🤔','😤',
@@ -285,26 +337,28 @@ export default function MobileChat() {
     setBusy(false);
   }, [user, busy, ch, uname, profile]);
 
-  // ── Send sticker — with minimal fallback ────────────────────────────────
-  const sendSticker = useCallback(async (url: string) => {
+  // ── Send sticker ─────────────────────────────────────────────────────────
+  // imageUrl  = local /sticker_N.png (always correct, bundled with the app)
+  // sbUrl     = optional Supabase URL stored as backup in the message text
+  const sendSticker = useCallback(async (imageUrl: string, sbUrl?: string) => {
     if (!user || busy) return;
     setPanel('none'); setBusy(true);
 
-    // Try full payload first
+    // Store the local path as image_url — it always resolves to the right sticker
     let { error } = await supabase.from('chat_messages').insert({
       channel: ch, user_id: user.id, username: uname,
       avatar_url: profile?.avatar_url ?? null,
-      message: '🐉', msg_type: 'sticker', image_url: url,
+      message: '🐉', msg_type: 'sticker', image_url: imageUrl,
     });
 
-    // Fallback: send as text message with the URL embedded
+    // Minimal fallback if rich columns missing
     if (error) {
-      const { error: fallbackErr } = await supabase.from('chat_messages').insert({
+      const { error: e2 } = await supabase.from('chat_messages').insert({
         channel: ch, user_id: user.id, username: uname,
         avatar_url: profile?.avatar_url ?? null,
-        message: `🐉 [sticker] ${url}`,
+        message: `🐉 [sticker] ${imageUrl}`,
       });
-      if (fallbackErr) toast('Sticker failed');
+      if (e2) toast('Sticker failed');
     }
     setBusy(false);
   }, [user, busy, ch, uname, profile]);
@@ -798,30 +852,8 @@ export default function MobileChat() {
                       textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 190 }}>{m.reply_to_message}</p>
                   </div>
                 )}
-                {isStick && m.image_url ? (
-                  <img src={m.image_url} alt="sticker"
-                    style={{ width: 120, height: 120, objectFit: 'contain', display: 'block',
-                      filter: 'drop-shadow(0 3px 12px rgba(0,0,0,.4))', borderRadius: 8 }}
-                    onError={e => {
-                      const img = e.target as HTMLImageElement;
-                      const parent = img.parentElement;
-                      if (!parent) return;
-                      img.style.display = 'none';
-                      if (!parent.querySelector('.stk-fallback')) {
-                        const fb = document.createElement('div');
-                        fb.className = 'stk-fallback';
-                        fb.style.cssText = 'width:120px;height:80px;border-radius:12px;background:hsl(215 22% 10%);border:1px solid hsl(215 22% 18%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px';
-                        fb.innerHTML = "<span style='font-size:32px'>🐉</span><span style='font-size:9px;color:hsl(215 14% 38%);font-weight:600'>Sticker</span>";
-                        parent.appendChild(fb);
-                      }
-                    }} />
-                ) : isStick && !m.image_url ? (
-                  <div style={{ width:120, height:80, borderRadius:12,
-                    background:'hsl(215 22% 10%)', border:'1px solid hsl(215 22% 18%)',
-                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
-                    <span style={{ fontSize:32 }}>🐉</span>
-                    <span style={{ fontSize:9, color:'hsl(215 14% 38%)', fontWeight:600 }}>Sticker</span>
-                  </div>
+                {isStick ? (
+                  <StickerImg src={m.image_url || ''} />
                 ) : isImg && m.image_url ? (
                   <div
                     style={{ borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
@@ -867,15 +899,16 @@ export default function MobileChat() {
           <div className="hs" style={{ display: 'flex', gap: 9, overflowX: 'auto' }}>
             {STICKERS.map(s => {
               const url = stUrl(s.file);
+              const localPath = `/${s.file}`;
               return (
                 <button key={s.id}
-                  onPointerDown={e => { e.preventDefault(); e.stopPropagation(); sendSticker(url); }}
+                  onPointerDown={e => { e.preventDefault(); e.stopPropagation(); sendSticker(localPath, url); }}
                   style={{ flexShrink: 0, width: 76, height: 76, borderRadius: 14,
                     border: '1px solid hsl(215 22% 15%)', background: 'hsl(215 22% 9%)',
                     cursor: 'pointer', padding: 5, outline: 'none',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
                   <img src={url} alt={s.label} style={{ width: 50, height: 50, objectFit: 'contain' }}
-                    onError={e => { const img = e.target as HTMLImageElement; if (!img.dataset.t) { img.dataset.t = '1'; img.src = `/${s.file}`; } }} />
+                    onError={e => { const img = e.target as HTMLImageElement; img.style.opacity = '0.3'; }} />
                   <span style={{ fontSize: 8, color: 'hsl(215 14% 38%)', fontWeight: 600 }}>{s.label}</span>
                 </button>
               );
