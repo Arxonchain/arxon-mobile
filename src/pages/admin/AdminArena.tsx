@@ -64,28 +64,60 @@ const AdminArena = () => {
   const [bannerUploading, setBannerUploading] = useState(false);
   const [editBannerUploading, setEditBannerUploading] = useState(false);
 
-  const uploadBannerImage = async (file: File, isEdit: boolean) => {
+  const uploadBannerImage = async (file: File, isEdit: boolean): Promise<string | null> => {
     const setter = isEdit ? setEditBannerUploading : setBannerUploading;
     setter(true);
     try {
-      const ext = file.name.split('.').pop() || 'jpg';
-      const path = `banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
-      const { error: upErr } = await supabase.storage
-        .from('arena-images')
-        .upload(path, file, { upsert: true, contentType: file.type });
-      if (upErr) {
-        // Try alternate bucket name
-        const { error: upErr2 } = await supabase.storage
-          .from('arena_images')
-          .upload(path, file, { upsert: true, contentType: file.type });
-        if (upErr2) throw upErr2;
-        const { data: pub2 } = supabase.storage.from('arena_images').getPublicUrl(path);
-        return pub2.publicUrl;
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const uniqueName = `arena-banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      // Compress large images client-side before upload
+      let uploadBlob: Blob = file;
+      if (file.size > 2 * 1024 * 1024) {
+        try {
+          uploadBlob = await new Promise<Blob>((resolve, reject) => {
+            const img = new window.Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+              URL.revokeObjectURL(url);
+              const maxPx = 1600;
+              const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.round(img.width * scale);
+              canvas.height = Math.round(img.height * scale);
+              canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+              canvas.toBlob(b => b ? resolve(b) : reject(new Error('Compress failed')), 'image/jpeg', 0.88);
+            };
+            img.onerror = reject;
+            img.src = url;
+          });
+        } catch { /* use original if compress fails */ }
       }
-      const { data: pub } = supabase.storage.from('arena-images').getPublicUrl(path);
+
+      // Use chat-images bucket — it's already provisioned and public
+      const { error: upErr } = await supabase.storage
+        .from('chat-images')
+        .upload(uniqueName, uploadBlob, {
+          upsert: true,
+          contentType: uploadBlob.type || 'image/jpeg',
+        });
+
+      if (upErr) {
+        console.error('[BannerUpload] Storage error:', upErr);
+        toast.error(
+          upErr.message?.includes('Bucket') || upErr.message?.includes('bucket')
+            ? 'Storage bucket not found — ensure "chat-images" bucket exists in Supabase'
+            : upErr.message?.includes('policy') || upErr.message?.includes('violates')
+            ? 'Upload blocked by storage policy — enable "insert" policy for admins in Supabase'
+            : `Upload failed: ${upErr.message}`
+        );
+        return null;
+      }
+
+      const { data: pub } = supabase.storage.from('chat-images').getPublicUrl(uniqueName);
       return pub.publicUrl;
     } catch (err: any) {
-      toast.error('Banner upload failed: ' + (err.message || 'Unknown error'));
+      toast.error('Banner upload failed: ' + (err?.message || 'Unknown error'));
       return null;
     } finally {
       setter(false);
