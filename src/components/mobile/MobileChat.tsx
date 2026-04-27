@@ -149,7 +149,8 @@ export default function MobileChat() {
   const botRef     = useRef<HTMLDivElement>(null);
   const subRef     = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const inpRef     = useRef<HTMLTextAreaElement>(null);
-  const holdTimer  = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdTimer     = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const didLongPress   = useRef(false);
   const fileId     = useRef(`fi-${Date.now()}`);
   const [imgPreview, setImgPreview] = useState<{ file: File; objectUrl: string } | null>(null);
   const [uploadPct,  setUploadPct]  = useState<number>(0);
@@ -476,7 +477,9 @@ export default function MobileChat() {
   // ── Long press ────────────────────────────────────────────────────────────
   const pressStart = useCallback((e: React.TouchEvent | React.MouseEvent, m: Msg) => {
     const t = 'touches' in e ? e.touches[0] : (e as unknown as MouseEvent);
+    didLongPress.current = false;
     holdTimer.current = setTimeout(() => {
+      didLongPress.current = true;
       setPanel('none');
       setCtx({ msg: m, x: t.clientX, y: t.clientY });
     }, 480);
@@ -799,13 +802,32 @@ export default function MobileChat() {
                   <img src={m.image_url} alt="sticker"
                     style={{ width: 120, height: 120, objectFit: 'contain', display: 'block',
                       filter: 'drop-shadow(0 3px 12px rgba(0,0,0,.4))', borderRadius: 8 }}
-                    onError={e => { (e.target as HTMLImageElement).style.opacity = '.2'; }} />
+                    onError={e => {
+                      const img = e.target as HTMLImageElement;
+                      const parent = img.parentElement;
+                      if (!parent) return;
+                      img.style.display = 'none';
+                      if (!parent.querySelector('.stk-fallback')) {
+                        const fb = document.createElement('div');
+                        fb.className = 'stk-fallback';
+                        fb.style.cssText = 'width:120px;height:80px;border-radius:12px;background:hsl(215 22% 10%);border:1px solid hsl(215 22% 18%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px';
+                        fb.innerHTML = "<span style='font-size:32px'>🐉</span><span style='font-size:9px;color:hsl(215 14% 38%);font-weight:600'>Sticker</span>";
+                        parent.appendChild(fb);
+                      }
+                    }} />
+                ) : isStick && !m.image_url ? (
+                  <div style={{ width:120, height:80, borderRadius:12,
+                    background:'hsl(215 22% 10%)', border:'1px solid hsl(215 22% 18%)',
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:4 }}>
+                    <span style={{ fontSize:32 }}>🐉</span>
+                    <span style={{ fontSize:9, color:'hsl(215 14% 38%)', fontWeight:600 }}>Sticker</span>
+                  </div>
                 ) : isImg && m.image_url ? (
                   <div
                     style={{ borderRadius: me ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
                       overflow: 'hidden', border: `1px solid ${col}25`, maxWidth: 220,
                       cursor: 'pointer', position: 'relative' }}
-                    onClick={e => { e.stopPropagation(); pressEnd(); setViewerUrl(m.image_url!); }}>
+                    onClick={e => { e.stopPropagation(); if (didLongPress.current) { didLongPress.current = false; return; } pressEnd(); setViewerUrl(m.image_url!); }}>
                     <img src={m.image_url} alt="img"
                       style={{ width: '100%', maxHeight: 260, objectFit: 'cover', display: 'block',
                         WebkitUserSelect: 'none', userSelect: 'none', WebkitTouchCallout: 'none' }} />
