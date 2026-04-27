@@ -247,12 +247,16 @@ export const usePushNotifications = () => {
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
-        table: 'arena_markets',
+        table: 'arena_battles',
       }, async (payload) => {
-        if ((payload.new as any)?.is_active) {
+        const battle = payload.new as any;
+        if (battle?.is_active) {
+          const startsNow = !battle.starts_at || new Date(battle.starts_at) <= new Date();
           await sendServerPush(
-            '⚔️ New Arena Battle is LIVE!',
-            'A new arena battle has started. Join now and stake your ARX-P!',
+            startsNow ? '⚔️ New Arena Battle is LIVE!' : '🗓️ New Arena Battle Scheduled!',
+            startsNow
+              ? `${battle.title} just started — stake your ARX-P now!`
+              : `${battle.title} is coming. Get ready!`,
             { url: '/arena', tag: 'arena-live' }
           );
         }
@@ -270,8 +274,7 @@ export const usePushNotifications = () => {
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
-        table: 'arena_markets',
-        filter: `is_active=eq.false`,
+        table: 'arena_battles',
       }, async (payload) => {
         const market = payload.new as any;
         if (market?.resolved_at) {
