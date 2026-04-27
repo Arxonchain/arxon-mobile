@@ -66,10 +66,11 @@ function SideImage({ imageUrl, name, size = 52 }: { imageUrl: string|null; name:
 
 // ── Compact Battle Card (list view) ───────────────────────────────────────
 function BattleCard({
-  battle, isActive, userVoted, userWon, onClick
+  battle, isActive, isEnded, userVoted, userWon, onClick
 }: {
   battle: ArenaBattle | BattleHistoryEntry;
   isActive?: boolean;
+  isEnded?: boolean;
   userVoted?: boolean;
   userWon?: boolean;
   onClick: () => void;
@@ -78,7 +79,8 @@ function BattleCard({
   const totalPow = (battle.side_a_power??0) + (battle.side_b_power??0);
   const pctA = totalPow > 0 ? Math.round((battle.side_a_power/totalPow)*100) : 50;
   const pctB = 100 - pctA;
-  const concluded = !isActive && battle.winner_side;
+  const concluded = (isEnded || !isActive) && battle.winner_side;
+  const totalVoters = (battle as any).total_participants ?? 0;
 
   return (
     <motion.div whileTap={{scale:0.97}} onClick={onClick}
@@ -130,10 +132,16 @@ function BattleCard({
                 {userVoted?(userWon?'🏆 Won':'💧 Lost'):'Ended'}
               </div>
             )}
-            {!isActive && !concluded && (
+            {!isActive && !concluded && !isEnded && (
               <div style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,
                 color:'hsl(215 18% 42%)',background:'hsl(215 22% 12%)',border:'1px solid hsl(215 22% 18%)'}}>
                 Upcoming
+              </div>
+            )}
+            {!isActive && !concluded && isEnded && (
+              <div style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,
+                color:'hsl(0 55% 55%)',background:'hsl(0 55% 55%/0.1)',border:'1px solid hsl(0 55% 55%/0.25)'}}>
+                Ended
               </div>
             )}
             <ChevronRight size={14} color="hsl(215 18% 35%)" style={{marginLeft:6}}/>
@@ -184,7 +192,7 @@ function BattleCard({
         {/* Footer */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontSize:9,color:'hsl(215 14% 35%)'}}>
-            {totalPow.toLocaleString()} ARX-P staked
+            {totalPow.toLocaleString()} ARX-P · {totalVoters} voter{totalVoters !== 1 ? 's' : ''}
           </span>
           <span style={{fontSize:9,color:'hsl(215 14% 32%)'}}>
             {new Date(isActive?battle.ends_at:battle.starts_at).toLocaleDateString()}
@@ -833,7 +841,7 @@ export default function MobileArena() {
                         </div>
                       ) : (
                         endedList.map(b=>(
-                          <BattleCard key={b.id} battle={b}
+                          <BattleCard key={b.id} battle={b} isEnded
                             userVoted={b.user_participated} userWon={b.user_won}
                             onClick={()=>openBattle(b,false)}/>
                         ))
