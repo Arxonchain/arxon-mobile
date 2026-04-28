@@ -54,31 +54,35 @@ export const usePushNotifications = () => {
   }, []);
 
   // ── NATIVE (Android/iOS via Capacitor + Firebase) ──────────────────────────
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
   useEffect(() => {
     if (!isNative) return;
 
     const setupNative = async () => {
-      // Check current permission
-      const { receive } = await PushNotifications.checkPermissions();
-      if (receive === 'granted') setPermission('granted');
-
-      // Listen for FCM token
       PushNotifications.addListener('registration', async (token) => {
-        console.log('FCM Token:', token.value);
+        console.log('[Push] FCM Token received:', token.value);
         setFcmToken(token.value);
         setPermission('granted');
 
-        // Save token to Supabase — use fcm_token as endpoint for native
-        if (user) {
-          await supabase.from('push_subscriptions').upsert({
-            user_id: user.id,
-            endpoint: `fcm:${token.value}`,   // prefix so edge fn knows it's FCM
-            p256dh: token.value,               // store token in p256dh for FCM path
-            auth: Capacitor.getPlatform(),     // store platform in auth field
-            fcm_token: token.value,
-            platform: Capacitor.getPlatform(),
-          }, { onConflict: 'user_id,endpoint' });
+        const currentUser = userRef.current;
+        if (!currentUser) {
+          console.warn('[Push] No user when token received');
+          return;
         }
+
+        const { error } = await supabase.from('push_subscriptions').upsert({
+          user_id:   currentUser.id,
+          endpoint:  `fcm:${token.value}`,
+          p256dh:    token.value,
+          auth:      Capacitor.getPlatform(),
+          fcm_token: token.value,
+          platform:  Capacitor.getPlatform(),
+        }, { onConflict: 'endpoint' });
+
+        if (error) console.error('[Push] Failed to save token:', error);
+        else console.log('[Push] Token saved OK');
       });
 
       PushNotifications.addListener('registrationError', (err) => {
@@ -172,19 +176,22 @@ export const usePushNotifications = () => {
         if (receive === 'granted') {
           await PushNotifications.register();
           setPermission('granted');
-        } else if (receive === 'prompt') {
+        } else if (receive === 'prompt' || receive === 'prompt-with-rationale') {
           const { receive: result } = await PushNotifications.requestPermissions();
           if (result === 'granted') {
             await PushNotifications.register();
             setPermission('granted');
+          } else {
+            setPermission('denied');
           }
         }
       } catch (e) {
         console.error('[Push] Native auto-register error:', e);
       }
     };
-    autoRegister();
-  }, [user, isNative]);
+    const t = setTimeout(autoRegister, 1500);
+    return () => clearTimeout(t);
+  }, [user?.id, isNative]);
 
   // Request permission
   const requestPermission = useCallback(async () => {
