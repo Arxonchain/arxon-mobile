@@ -52,7 +52,6 @@ import MobileNexus       from "@/components/mobile/MobileNexus";
 import MobileProfile     from "@/components/mobile/MobileProfile";
 import MobileWallet      from "@/components/mobile/MobileWallet";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import MobileChat        from "@/components/mobile/MobileChat";
 import PublicProfile     from "@/pages/PublicProfile";
 import BiometricLockScreen from "@/components/mobile/BiometricLockScreen";
 import { useBiometric }  from "@/hooks/useBiometric";
@@ -206,7 +205,6 @@ function AppRoutes() {
             <Route path="/nexus"       element={<ProtectedRoute><Safe name="Nexus"><MobileNexus /></Safe></ProtectedRoute>} />
             <Route path="/profile"     element={<ProtectedRoute><Safe name="Profile"><MobileProfile /></Safe></ProtectedRoute>} />
             <Route path="/wallet"      element={<Safe name="Wallet"><MobileWallet /></Safe>} />
-            <Route path="/chat"        element={<Safe name="Chat"><MobileChat /></Safe>} />
             <Route path="/profile/:userId" element={<Safe name="PublicProfile"><PublicProfile /></Safe>} />
 
             {/* Web pages with mobile wrapper */}
