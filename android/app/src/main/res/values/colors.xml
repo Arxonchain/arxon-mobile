@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Used for default FCM notification tint -->
-    <color name="notification_accent">#4F46E5</color>
+    <color name="notification_accent">#7C93C3</color>
+    <color name="arxon_primary">#7C93C3</color>
+    <color name="ic_launcher_background">#07080F</color>
 </resources>
