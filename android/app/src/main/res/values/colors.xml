@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Used for default FCM notification tint -->
+    <color name="notification_accent">#4F46E5</color>
+</resources>
