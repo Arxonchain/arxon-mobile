@@ -1,8 +1,8 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { Capacitor } from "@capacitor/core";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
+import { Capacitor } from "@capacitor/core";
 
 function showFatal(message: string, details?: unknown) {
   const el = document.createElement("div");
@@ -21,7 +21,7 @@ function showFatal(message: string, details?: unknown) {
 }
 
 window.addEventListener("error", (e) => {
-  showFatal("window error", e.error || e.message);
+  showFatal("window error", (e as ErrorEvent).error || (e as ErrorEvent).message);
 });
 
 window.addEventListener("unhandledrejection", (e) => {
@@ -29,7 +29,6 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 try {
-  // Avoid app rollback loop issues crashing startup
   if (Capacitor.isNativePlatform()) {
     try {
       CapacitorUpdater.notifyAppReady();
