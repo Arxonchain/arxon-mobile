@@ -2,7 +2,7 @@ import React from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
@@ -58,8 +58,8 @@ const queryClient = new QueryClient({
 const isNative = Capacitor.isNativePlatform();
 
 const Spinner = () => (
-  <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-    <div style={{width:44,height:44,borderRadius:'50%',border:'3px solid hsl(215 35% 62%/0.2)',borderTopColor:'hsl(215 35% 62%)',animation:'spin 1s linear infinite'}}/>
+  <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <div style={{ width: 44, height: 44, borderRadius: '50%', border: '3px solid hsl(215 35% 62%/0.2)', borderTopColor: 'hsl(215 35% 62%)', animation: 'spin 1s linear infinite' }} />
     <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
   </div>
 );
@@ -81,18 +81,33 @@ class AppErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',display:'flex',flexDirection:'column',
-          alignItems:'center',justifyContent:'center',padding:24,fontFamily:'system-ui,sans-serif'}}>
-          <div style={{fontSize:40,marginBottom:16}}>⚡</div>
-          <p style={{fontSize:18,fontWeight:700,color:'hsl(215 20% 88%)',marginBottom:8}}>Something went wrong</p>
-          <p style={{fontSize:12,color:'hsl(215 14% 40%)',marginBottom:24,textAlign:'center',maxWidth:320,lineHeight:1.5}}>
+        <div style={{
+          minHeight: '100vh',
+          background: 'hsl(225 30% 3%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 24,
+          fontFamily: 'system-ui,sans-serif'
+        }}>
+          <div style={{ fontSize: 40, marginBottom: 16 }}>⚡</div>
+          <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 20% 88%)', marginBottom: 8 }}>Something went wrong</p>
+          <p style={{ fontSize: 12, color: 'hsl(215 14% 40%)', marginBottom: 24, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
             {this.state.error?.message || 'Unexpected runtime error'}
           </p>
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
-            style={{padding:'12px 28px',borderRadius:14,background:'hsl(215 35% 62%/0.15)',
-              border:'1px solid hsl(215 35% 62%/0.35)',color:'hsl(215 35% 72%)',
-              fontSize:14,fontWeight:600,cursor:'pointer'}}
+            style={{
+              padding: '12px 28px',
+              borderRadius: 14,
+              background: 'hsl(215 35% 62%/0.15)',
+              border: '1px solid hsl(215 35% 62%/0.35)',
+              color: 'hsl(215 35% 72%)',
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
           >
             Reload App
           </button>
@@ -119,8 +134,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function MobilePage({ children }: { children: React.ReactNode }) {
   return (
-    <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
-      fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
+    <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', paddingBottom: 100, fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif" }}>
       {children}
     </div>
   );
@@ -155,7 +169,6 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            {/* Native: go to auth instead of heavy landing when signed out */}
             <Route path="/" element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
             <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena" element={<MobileArena />} />
@@ -193,6 +206,10 @@ function AppRoutes() {
   );
 }
 
+function RouterShell({ children }: { children: React.ReactNode }) {
+  return isNative ? <HashRouter>{children}</HashRouter> : <BrowserRouter>{children}</BrowserRouter>;
+}
+
 function App() {
   return (
     <AppErrorBoundary>
@@ -201,9 +218,9 @@ function App() {
           <PointsProvider>
             <TooltipProvider>
               <Toaster />
-              <BrowserRouter>
+              <RouterShell>
                 <AppRoutes />
-              </BrowserRouter>
+              </RouterShell>
             </TooltipProvider>
           </PointsProvider>
         </AuthProvider>
