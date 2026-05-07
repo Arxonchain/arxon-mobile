@@ -7,7 +7,7 @@
       "presentationOptions": ["badge", "sound", "alert"]
     },
     "CapacitorUpdater": {
-      "autoUpdate": true
+      "autoUpdate": false
     }
   }
 }
