@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
-import { useState, useCallback } from "react";
 
 // Web pages
 import Landing from "@/pages/Landing";
@@ -41,20 +40,16 @@ import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 
-// Mobile — legendary redesign
-import MobileDashboard   from "@/components/mobile/MobileDashboard";
-import MobileMining      from "@/components/mobile/MobileMining";
+// Mobile
+import MobileDashboard from "@/components/mobile/MobileDashboard";
+import MobileMining from "@/components/mobile/MobileMining";
 import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
-import MobileBottomNav   from "@/components/mobile/MobileBottomNav";
-import MobileSplash      from "@/components/mobile/MobileSplash";
-import MobileArena       from "@/components/mobile/MobileArena";
-import MobileNexus       from "@/components/mobile/MobileNexus";
-import MobileProfile     from "@/components/mobile/MobileProfile";
-import MobileWallet      from "@/components/mobile/MobileWallet";
-import { usePushNotifications } from "@/hooks/usePushNotifications";
-import PublicProfile     from "@/pages/PublicProfile";
-import BiometricLockScreen from "@/components/mobile/BiometricLockScreen";
-import { useBiometric }  from "@/hooks/useBiometric";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileArena from "@/components/mobile/MobileArena";
+import MobileNexus from "@/components/mobile/MobileNexus";
+import MobileProfile from "@/components/mobile/MobileProfile";
+import MobileWallet from "@/components/mobile/MobileWallet";
+import PublicProfile from "@/pages/PublicProfile";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -69,7 +64,6 @@ const Spinner = () => (
   </div>
 );
 
-// ── Global Error Boundary — prevents any single component crash from blanking the app ──
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { hasError: boolean; error: Error | null }
@@ -91,8 +85,8 @@ class AppErrorBoundary extends React.Component<
           alignItems:'center',justifyContent:'center',padding:24,fontFamily:'system-ui,sans-serif'}}>
           <div style={{fontSize:40,marginBottom:16}}>⚡</div>
           <p style={{fontSize:18,fontWeight:700,color:'hsl(215 20% 88%)',marginBottom:8}}>Something went wrong</p>
-          <p style={{fontSize:12,color:'hsl(215 14% 40%)',marginBottom:24,textAlign:'center',maxWidth:280,lineHeight:1.5}}>
-            {this.state.error?.message || 'An unexpected error occurred'}
+          <p style={{fontSize:12,color:'hsl(215 14% 40%)',marginBottom:24,textAlign:'center',maxWidth:320,lineHeight:1.5}}>
+            {this.state.error?.message || 'Unexpected runtime error'}
           </p>
           <button
             onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
@@ -111,48 +105,14 @@ class AppErrorBoundary extends React.Component<
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <Spinner/>;
+  if (loading) return <Spinner />;
   if (!user) return <Navigate to="/auth" replace />;
   return <>{children}</>;
 }
 
-// ── Per-screen error boundary — catches crashes in individual screens ──────
-class ScreenErrorBoundary extends React.Component<
-  { children: React.ReactNode; name?: string },
-  { hasError: boolean }
-> {
-  constructor(props: any) { super(props); this.state = { hasError: false }; }
-  static getDerivedStateFromError() { return { hasError: true }; }
-  componentDidCatch(e: Error) { console.error(`[Screen:${this.props.name}]`, e); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex',
-          flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-          <p style={{ fontSize: 36, marginBottom: 12 }}>😵</p>
-          <p style={{ fontSize: 16, fontWeight: 700, color: 'hsl(215 20% 80%)', marginBottom: 8 }}>
-            {this.props.name || 'Screen'} crashed
-          </p>
-          <button onClick={() => this.setState({ hasError: false })}
-            style={{ marginTop: 16, padding: '10px 24px', borderRadius: 12,
-              background: 'hsl(215 35% 62%/0.12)', border: '1px solid hsl(215 35% 62%/0.3)',
-              color: 'hsl(215 35% 72%)', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            Retry
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-function Safe({ name, children }: { name: string; children: React.ReactNode }) {
-  return <ScreenErrorBoundary name={name}>{children}</ScreenErrorBoundary>;
-}
-
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
-  if (loading) return <Spinner/>;
+  if (loading) return <Spinner />;
   if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 }
@@ -168,62 +128,59 @@ function MobilePage({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <Spinner/>;
+  if (loading) return <Spinner />;
 
   return (
     <>
       <Routes>
-        {/* Shared */}
-        <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
-        <Route path="/auth/confirm"   element={<AuthCallback />} />
+        <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
+        <Route path="/auth/confirm" element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/litepaper"      element={<Litepaper />} />
-        <Route path="/admin/login"    element={<AdminLogin />} />
+        <Route path="/litepaper" element={<Litepaper />} />
+        <Route path="/admin/login" element={<AdminLogin />} />
+
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index                 element={<AdminDashboard />} />
-          <Route path="users"          element={<AdminUsers />} />
-          <Route path="signups"        element={<AdminSignups />} />
-          <Route path="controls"       element={<AdminControls />} />
-          <Route path="arena"          element={<AdminArena />} />
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="signups" element={<AdminSignups />} />
+          <Route path="controls" element={<AdminControls />} />
+          <Route path="arena" element={<AdminArena />} />
           <Route path="battle-history" element={<AdminBattleHistory />} />
           <Route path="reconciliation" element={<AdminReconciliation />} />
-          <Route path="export-filter"  element={<AdminExportFilter />} />
-          <Route path="import-users"   element={<AdminImportUsers />} />
-          <Route path="global-map"     element={<AdminGlobalMap />} />
-          <Route path="pitch-deck"     element={<AdminPitchDeck />} />
+          <Route path="export-filter" element={<AdminExportFilter />} />
+          <Route path="import-users" element={<AdminImportUsers />} />
+          <Route path="global-map" element={<AdminGlobalMap />} />
+          <Route path="pitch-deck" element={<AdminPitchDeck />} />
         </Route>
 
         {isNative ? (
           <>
-            {/* Home / Dashboard */}
-            <Route path="/" element={user ? <Safe name="Dashboard"><MobileDashboard /></Safe> : <Landing />} />
+            {/* Native: go to auth instead of heavy landing when signed out */}
+            <Route path="/" element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
+            <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
+            <Route path="/arena" element={<MobileArena />} />
+            <Route path="/leaderboard" element={<MobileLeaderboard />} />
+            <Route path="/nexus" element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
+            <Route path="/profile" element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
+            <Route path="/wallet" element={<MobileWallet />} />
+            <Route path="/profile/:userId" element={<PublicProfile />} />
 
-            {/* Core mobile screens */}
-            <Route path="/mining"      element={<ProtectedRoute><Safe name="Mining"><MobileMining /></Safe></ProtectedRoute>} />
-            <Route path="/arena"       element={<Safe name="Arena"><MobileArena /></Safe>} />
-            <Route path="/leaderboard" element={<Safe name="Leaderboard"><MobileLeaderboard /></Safe>} />
-            <Route path="/nexus"       element={<ProtectedRoute><Safe name="Nexus"><MobileNexus /></Safe></ProtectedRoute>} />
-            <Route path="/profile"     element={<ProtectedRoute><Safe name="Profile"><MobileProfile /></Safe></ProtectedRoute>} />
-            <Route path="/wallet"      element={<Safe name="Wallet"><MobileWallet /></Safe>} />
-            <Route path="/profile/:userId" element={<Safe name="PublicProfile"><PublicProfile /></Safe>} />
-
-            {/* Web pages with mobile wrapper */}
-            <Route path="/tasks"         element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
-            <Route path="/referrals"     element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
-            <Route path="/settings"      element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
+            <Route path="/tasks" element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
+            <Route path="/referrals" element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><MobilePage><Notifications /></MobilePage></ProtectedRoute>} />
           </>
         ) : (
           <>
-            <Route path="/"            element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
-            <Route path="/mining"      element={<Mining />} />
-            <Route path="/tasks"       element={<Tasks />} />
+            <Route path="/" element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
+            <Route path="/mining" element={<Mining />} />
+            <Route path="/tasks" element={<Tasks />} />
             <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/arena"       element={<Arena />} />
-            <Route path="/referrals"   element={<Referrals />} />
-            <Route path="/nexus"       element={<Nexus />} />
-            <Route path="/profile"     element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
-            <Route path="/settings"    element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/arena" element={<Arena />} />
+            <Route path="/referrals" element={<Referrals />} />
+            <Route path="/nexus" element={<Nexus />} />
+            <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           </>
         )}
@@ -232,21 +189,6 @@ function AppRoutes() {
       </Routes>
 
       {isNative && <MobileBottomNav />}
-    </>
-  );
-}
-
-function AppWithSplash() {
-  const { loading } = useAuth();
-  const [splashDone, setSplashDone] = useState(false);
-  const handleFinish = useCallback(() => setSplashDone(true), []);
-  const { locked, enabled } = useBiometric();
-  usePushNotifications();
-  return (
-    <>
-      {isNative && !splashDone && <MobileSplash isAppReady={!loading} onFinish={handleFinish}/>}
-      {enabled && locked && <BiometricLockScreen />}
-      <AppRoutes />
     </>
   );
 }
@@ -260,9 +202,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <BrowserRouter>
-                <AppErrorBoundary>
-                  <AppWithSplash />
-                </AppErrorBoundary>
+                <AppRoutes />
               </BrowserRouter>
             </TooltipProvider>
           </PointsProvider>
