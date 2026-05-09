@@ -4,8 +4,13 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 export default defineConfig(({ mode }) => ({
-  // CRITICAL for Capacitor (file://): make asset URLs relative
+  // Capacitor loads from file:// → must be relative
   base: "./",
+
+  // IMPORTANT: support older Android WebView (Android 7/8 devices)
+  esbuild: {
+    target: "es2017",
+  },
 
   server: {
     host: "::",
@@ -19,6 +24,7 @@ export default defineConfig(({ mode }) => ({
     dedupe: ["react", "react-dom"],
   },
   build: {
+    target: "es2017",
     chunkSizeWarningLimit: 2000,
   },
 }));
