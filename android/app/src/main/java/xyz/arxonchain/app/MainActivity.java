@@ -1,83 +1,69 @@
 package xyz.arxonchain.app;
 
+import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
-import android.webkit.ConsoleMessage;
-import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
 import android.widget.Toast;
 
 import androidx.core.splashscreen.SplashScreen;
 
+import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
+import com.getcapacitor.BridgeWebViewClient;
 
+/**
+ * Capacitor loads the bundled app via BridgeWebViewClient#shouldInterceptRequest (virtual
+ * https://localhost). Replacing the WebViewClient with a plain WebViewClient breaks that and
+ * causes net::ERR_CONNECTION_REFUSED.
+ */
 public class MainActivity extends BridgeActivity {
-  private static final String TAG = "ArxonWebView";
-  private boolean showedFatalOnce = false;
+
+  private static final String TAG = "ArxonCapacitor";
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
-    // Required for Theme.SplashScreen on Android 12+
     SplashScreen.installSplashScreen(this);
-
-    // Enables chrome://inspect WebView debugging
     WebView.setWebContentsDebuggingEnabled(true);
-
     super.onCreate(savedInstanceState);
 
-    // Proof native launched
-    Toast.makeText(this, "Arxon native started", Toast.LENGTH_SHORT).show();
-
-    tryAttachWebViewDiagnostics();
+    Bridge bridge = getBridge();
+    if (bridge != null) {
+      bridge.setWebViewClient(new DiagnosticBridgeWebViewClient(bridge, this));
+    } else {
+      Log.w(TAG, "Bridge was null after onCreate; skipping WebViewClient wrapper");
+    }
   }
 
-  private void tryAttachWebViewDiagnostics() {
-    try {
-      final WebView webView = getBridge() != null ? getBridge().getWebView() : null;
-      if (webView == null) {
-        Log.w(TAG, "Bridge WebView not available");
+  private static final class DiagnosticBridgeWebViewClient extends BridgeWebViewClient {
+
+    private final Activity activity;
+    private boolean showedMainFrameError;
+
+    DiagnosticBridgeWebViewClient(Bridge bridge, Activity activity) {
+      super(bridge);
+      this.activity = activity;
+    }
+
+    @Override
+    public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+      super.onReceivedError(view, request, error);
+
+      if (request == null || !request.isForMainFrame() || showedMainFrameError) {
         return;
       }
+      showedMainFrameError = true;
 
-      webView.setWebChromeClient(new WebChromeClient() {
-        @Override
-        public boolean onConsoleMessage(ConsoleMessage cm) {
-          final String msg =
-              cm.message() + " (" + cm.sourceId() + ":" + cm.lineNumber() + ")";
+      final String url = request.getUrl() != null ? request.getUrl().toString() : "(unknown)";
+      final String desc = error != null ? String.valueOf(error.getDescription()) : "(no description)";
+      Log.e(TAG, "Main frame load error: " + desc + " @ " + url);
 
-          Log.d(TAG, "[console] " + msg);
-
-          if (!showedFatalOnce && cm.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
-            showedFatalOnce = true;
-            Toast.makeText(MainActivity.this, "Web error: " + cm.message(), Toast.LENGTH_LONG).show();
-          }
-          return super.onConsoleMessage(cm);
-        }
-      });
-
-      webView.setWebViewClient(new WebViewClient() {
-        @Override
-        public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-          super.onReceivedError(view, request, error);
-
-          final String url =
-              request != null && request.getUrl() != null ? request.getUrl().toString() : "(unknown)";
-          final String desc = error != null ? String.valueOf(error.getDescription()) : "(no description)";
-          final String msg = "Load error: " + desc + " @ " + url;
-
-          Log.e(TAG, msg);
-
-          if (!showedFatalOnce) {
-            showedFatalOnce = true;
-            Toast.makeText(MainActivity.this, msg, Toast.LENGTH_LONG).show();
-          }
-        }
-      });
-    } catch (Throwable t) {
-      Log.e(TAG, "Failed to attach diagnostics", t);
+      activity.runOnUiThread(
+          () ->
+              Toast.makeText(activity, "Load error: " + desc + " @ " + url, Toast.LENGTH_LONG)
+                  .show());
     }
   }
 }
