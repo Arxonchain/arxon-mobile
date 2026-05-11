@@ -10,20 +10,25 @@ const HomeIcon = (a: boolean) => (
     <rect x="14" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.35)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
   </svg>
 );
-const ChatIcon = (a: boolean) => (
+
+const ArenaIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-      fill={a?'hsl(155 45% 43%/0.2)':'none'} stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
-    <line x1="8" y1="10" x2="16" y2="10" stroke={a?'hsl(155 45% 55%)':'hsl(215 14% 30%)'} strokeWidth="1.4" strokeLinecap="round"/>
-    <line x1="8" y1="14" x2="13" y2="14" stroke={a?'hsl(155 45% 55%)':'hsl(215 14% 30%)'} strokeWidth="1.4" strokeLinecap="round"/>
+    <path d="M14.5 17.5L3 6V3h3l11.5 11.5"
+      fill={a?'hsl(255 50% 65%/0.15)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="19" cy="19" r="2.2"
+      fill={a?'hsl(255 50% 65%/0.2)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <circle cx="5" cy="5" r="2.2"
+      fill={a?'hsl(255 50% 65%/0.2)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
   </svg>
 );
+
 const LeaderboardIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"
       fill={a?'hsl(38 55% 52%/0.22)':'none'} stroke={a?'hsl(38 55% 52%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
   </svg>
 );
+
 const ProfileIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="8" r="4" fill={a?'hsl(215 35% 62%/0.2)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
