@@ -40,6 +40,9 @@ import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 
+// Push notifications — must be initialized at app level
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+
 // Mobile
 import MobileDashboard from "@/components/mobile/MobileDashboard";
 import MobileMining from "@/components/mobile/MobileMining";
@@ -118,6 +121,13 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
+// Initializes push notifications as soon as the user is authenticated
+function PushNotificationInit() {
+  const { user } = useAuth();
+  usePushNotifications();
+  return null;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
@@ -146,6 +156,7 @@ function AppRoutes() {
 
   return (
     <>
+      <PushNotificationInit />
       <Routes>
         <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
         <Route path="/auth/confirm" element={<AuthCallback />} />
