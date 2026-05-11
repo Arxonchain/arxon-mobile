@@ -62,13 +62,13 @@ export const usePushNotifications = () => {
 
     const setupNative = async () => {
       PushNotifications.addListener('registration', async (token) => {
-        console.log('[Push] FCM Token received:', token.value);
+        console.log('[Push] FCM Token received:', token.value.substring(0, 20) + '...');
         setFcmToken(token.value);
         setPermission('granted');
 
         const currentUser = userRef.current;
         if (!currentUser) {
-          console.warn('[Push] No user when token received');
+          console.warn('[Push] No user when token received — will retry on next login');
           return;
         }
 
@@ -81,21 +81,22 @@ export const usePushNotifications = () => {
           platform:  Capacitor.getPlatform(),
         }, { onConflict: 'endpoint' });
 
-        if (error) console.error('[Push] Failed to save token:', error);
-        else console.log('[Push] Token saved OK');
+        if (error) {
+          console.error('[Push] Failed to save token:', error.message, error.details);
+        } else {
+          console.log('[Push] Token saved OK for user', currentUser.id);
+        }
       });
 
       PushNotifications.addListener('registrationError', (err) => {
-        console.error('FCM registration error:', err);
+        console.error('[Push] FCM registration error:', JSON.stringify(err));
         setPermission('denied');
       });
 
-      // Handle notification received while app is open
       PushNotifications.addListener('pushNotificationReceived', (notification) => {
-        console.log('Notification received:', notification);
+        console.log('[Push] Notification received in foreground:', notification.title);
       });
 
-      // Handle notification tap (app was in background)
       PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
         const url = action.notification.data?.url;
         if (url) window.location.hash = url;
@@ -107,7 +108,7 @@ export const usePushNotifications = () => {
     return () => {
       PushNotifications.removeAllListeners();
     };
-  }, [isNative, user]);
+  }, [isNative]);
 
   // ── WEB (Service Worker + VAPID) ───────────────────────────────────────────
   useEffect(() => {
@@ -133,12 +134,10 @@ export const usePushNotifications = () => {
   useEffect(() => {
     if (isNative || !user) return;
     if (!('Notification' in window)) return;
-    // Only prompt once — if already decided, skip
     if (Notification.permission !== 'default') {
       setPermission(Notification.permission as any);
       return;
     }
-    // Delay slightly so app finishes loading before the browser prompt appears
     const timer = setTimeout(async () => {
       try {
         const result = await Notification.requestPermission();
@@ -170,35 +169,70 @@ export const usePushNotifications = () => {
   // ── AUTO-REQUEST permission for native on login ────────────────────────────
   useEffect(() => {
     if (!isNative || !user) return;
+
     const autoRegister = async () => {
       try {
         const { receive } = await PushNotifications.checkPermissions();
+        console.log('[Push] Native permission status:', receive);
+
         if (receive === 'granted') {
+          console.log('[Push] Permission already granted — registering');
           await PushNotifications.register();
           setPermission('granted');
         } else if (receive === 'prompt' || receive === 'prompt-with-rationale') {
+          console.log('[Push] Prompting for permission');
           const { receive: result } = await PushNotifications.requestPermissions();
           if (result === 'granted') {
             await PushNotifications.register();
             setPermission('granted');
           } else {
+            console.warn('[Push] User denied notification permission');
             setPermission('denied');
           }
+        } else {
+          // 'denied' — Android won't show the dialog again
+          // User must enable manually in Settings → Apps → Arxon → Notifications
+          console.warn('[Push] Notification permission denied by OS. User must enable in Settings.');
+          setPermission('denied');
         }
       } catch (e) {
         console.error('[Push] Native auto-register error:', e);
       }
     };
+
     const t = setTimeout(autoRegister, 1500);
     return () => clearTimeout(t);
   }, [user?.id, isNative]);
 
-  // Request permission
+  // ── Open OS notification settings (for denied state) ──────────────────────
+  const openNotificationSettings = useCallback(async () => {
+    if (!isNative) return;
+    try {
+      // On Android/iOS this opens the app's notification settings page
+      const { NativeSettings } = await import('@capgo/capacitor-native-settings');
+      await NativeSettings.openAndroid({ option: 'application' as any });
+    } catch {
+      // Fallback — try Capacitor App plugin if NativeSettings not available
+      try {
+        const { App } = await import('@capacitor/app');
+        // This won't open settings directly but at least won't crash
+        console.log('[Push] NativeSettings not available — user must open Settings manually');
+      } catch {}
+    }
+  }, [isNative]);
+
+  // ── Manual requestPermission ───────────────────────────────────────────────
   const requestPermission = useCallback(async () => {
     try {
       if (isNative) {
-        const { receive } = await PushNotifications.requestPermissions();
-        if (receive === 'granted') {
+        const { receive } = await PushNotifications.checkPermissions();
+        if (receive === 'denied') {
+          // Can't prompt again — open settings instead
+          await openNotificationSettings();
+          return false;
+        }
+        const { receive: result } = await PushNotifications.requestPermissions();
+        if (result === 'granted') {
           await PushNotifications.register();
           setPermission('granted');
           return true;
@@ -206,7 +240,6 @@ export const usePushNotifications = () => {
         setPermission('denied');
         return false;
       } else {
-        // Web fallback
         const result = await Notification.requestPermission();
         setPermission(result);
         if (result === 'granted' && serviceWorkerRef.current) {
@@ -221,9 +254,23 @@ export const usePushNotifications = () => {
       console.error('Error requesting permission:', error);
       return false;
     }
+  }, [isNative, openNotificationSettings]);
+
+  // ── Re-register token (call this after returning from Settings) ────────────
+  const reRegisterToken = useCallback(async () => {
+    if (!isNative) return;
+    try {
+      const { receive } = await PushNotifications.checkPermissions();
+      if (receive === 'granted') {
+        await PushNotifications.register();
+        setPermission('granted');
+      }
+    } catch (e) {
+      console.error('[Push] Re-register error:', e);
+    }
   }, [isNative]);
 
-  // Send server push via Supabase Edge Function
+  // ── Send server push via Supabase Edge Function ───────────────────────────
   const sendServerPush = useCallback(async (
     title: string,
     body: string,
@@ -248,41 +295,28 @@ export const usePushNotifications = () => {
   // ── ARENA NOTIFICATIONS ────────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !preferences.arenaLive) return;
-
     const channel = supabase
       .channel('arena-live-notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'arena_battles',
-      }, async (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'arena_battles' }, async (payload) => {
         const battle = payload.new as any;
         if (battle?.is_active) {
           const startsNow = !battle.starts_at || new Date(battle.starts_at) <= new Date();
           await sendServerPush(
             startsNow ? '⚔️ New Arena Battle is LIVE!' : '🗓️ New Arena Battle Scheduled!',
-            startsNow
-              ? `${battle.title} just started — stake your ARX-P now!`
-              : `${battle.title} is coming. Get ready!`,
+            startsNow ? `${battle.title} just started — stake your ARX-P now!` : `${battle.title} is coming. Get ready!`,
             { url: '/arena', tag: 'arena-live' }
           );
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [user, preferences.arenaLive, sendServerPush]);
 
   useEffect(() => {
     if (!user || !preferences.arenaResults) return;
-
     const channel = supabase
       .channel('arena-result-notifications')
-      .on('postgres_changes', {
-        event: 'UPDATE',
-        schema: 'public',
-        table: 'arena_battles',
-      }, async (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'arena_battles' }, async (payload) => {
         const market = payload.new as any;
         if (market?.resolved_at) {
           await sendServerPush(
@@ -293,20 +327,16 @@ export const usePushNotifications = () => {
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [user, preferences.arenaResults, sendServerPush]);
 
   // ── REWARD DISTRIBUTION ───────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !preferences.rewardDistributed) return;
-
     const channel = supabase
       .channel('reward-distribution-notifications')
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'user_notifications',
+        event: 'INSERT', schema: 'public', table: 'user_notifications',
         filter: `user_id=eq.${user.id}`,
       }, async (payload) => {
         const notif = payload.new as any;
@@ -319,21 +349,15 @@ export const usePushNotifications = () => {
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [user, preferences.rewardDistributed, sendServerPush]);
 
   // ── ADMIN ANNOUNCEMENTS ───────────────────────────────────────────────────
   useEffect(() => {
     if (!user || !preferences.adminAnnouncements) return;
-
     const channel = supabase
       .channel('announcements-notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'announcements',
-      }, async (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, async (payload) => {
         if ((payload.new as any)?.is_active) {
           await sendServerPush(
             '📢 Arxon Announcement',
@@ -343,7 +367,6 @@ export const usePushNotifications = () => {
         }
       })
       .subscribe();
-
     return () => { supabase.removeChannel(channel); };
   }, [user, preferences.adminAnnouncements, sendServerPush]);
 
@@ -364,7 +387,6 @@ export const usePushNotifications = () => {
           .maybeSingle();
 
         if (!session) return;
-
         const elapsed = (Date.now() - new Date(session.started_at).getTime()) / 1000;
         const maxTime = 8 * 60 * 60;
         const tenMinsBefore = maxTime - 10 * 60;
@@ -372,22 +394,14 @@ export const usePushNotifications = () => {
         if (preferences.miningAlerts && elapsed >= tenMinsBefore && elapsed < maxTime) {
           if (!notifiedSessionsRef.current.has(`${session.id}-warning`)) {
             notifiedSessionsRef.current.add(`${session.id}-warning`);
-            await sendServerPush(
-              '⏰ Mining Session Ending Soon',
-              'Your mining session ends in 10 minutes. Get ready to claim!',
-              { url: '/mining', tag: 'mining-warning' }
-            );
+            await sendServerPush('⏰ Mining Session Ending Soon', 'Your mining session ends in 10 minutes. Get ready to claim!', { url: '/mining', tag: 'mining-warning' });
           }
         }
 
         if (preferences.claimNotifications && elapsed >= maxTime) {
           if (!notifiedSessionsRef.current.has(`${session.id}-complete`)) {
             notifiedSessionsRef.current.add(`${session.id}-complete`);
-            await sendServerPush(
-              '🎉 Mining Complete!',
-              'Your 8-hour session is done. Claim your ARX-P now!',
-              { url: '/mining', tag: 'mining-complete' }
-            );
+            await sendServerPush('🎉 Mining Complete!', 'Your 8-hour session is done. Claim your ARX-P now!', { url: '/mining', tag: 'mining-complete' });
           }
         }
       } catch (error) {
@@ -400,26 +414,15 @@ export const usePushNotifications = () => {
     return () => { if (miningSessionCheckRef.current) clearInterval(miningSessionCheckRef.current); };
   }, [user, preferences.miningAlerts, preferences.claimNotifications, sendServerPush]);
 
-
   // ── CHAT NOTIFICATIONS ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!user) return;
     const channel = supabase
       .channel('chat-message-notifications')
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-      }, async (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages' }, async (payload) => {
         const msg = payload.new as any;
-        // Don't notify of own messages
         if (msg?.user_id === user.id) return;
-        const chanLabels: Record<string, string> = {
-          general: 'General',
-          alpha: 'Alpha Team',
-          omega: 'Omega Team',
-          nexus_exchange: 'Nexus Exchange',
-        };
+        const chanLabels: Record<string, string> = { general: 'General', alpha: 'Alpha Team', omega: 'Omega Team', nexus_exchange: 'Nexus Exchange' };
         await sendServerPush(
           `💬 ${msg.username || 'Someone'} in ${chanLabels[msg.channel] || 'Chat'}`,
           msg.message?.slice(0, 80) || 'New message',
@@ -436,36 +439,18 @@ export const usePushNotifications = () => {
     const channel = supabase
       .channel('arena-personal-result-notifications')
       .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'user_notifications',
+        event: 'INSERT', schema: 'public', table: 'user_notifications',
         filter: `user_id=eq.${user.id}`,
       }, async (payload) => {
         const notif = payload.new as any;
         if (notif?.notification_type === 'arena_win') {
-          await sendServerPush(
-            '🏆 You Won the Arena Battle!',
-            `You won ${notif.amount?.toLocaleString() || ''} ARX-P has been credited to your balance!`,
-            { url: '/arena', tag: 'arena-win' }
-          );
+          await sendServerPush('🏆 You Won the Arena Battle!', `You won ${notif.amount?.toLocaleString() || ''} ARX-P!`, { url: '/arena', tag: 'arena-win' });
         } else if (notif?.notification_type === 'arena_loss') {
-          await sendServerPush(
-            '💧 Arena Battle Result',
-            `Your team lost. ${Math.abs(notif.amount || 0).toLocaleString()} ARX-P has been removed from your balance.`,
-            { url: '/arena', tag: 'arena-loss' }
-          );
+          await sendServerPush('💧 Arena Battle Result', `Your team lost. ${Math.abs(notif.amount || 0).toLocaleString()} ARX-P deducted.`, { url: '/arena', tag: 'arena-loss' });
         } else if (notif?.notification_type === 'arena_new_battle') {
-          await sendServerPush(
-            '⚔️ New Arena Battle Added!',
-            notif.message || 'A new battle has been added to the Arena. Stake your ARX-P!',
-            { url: '/arena', tag: 'arena-new-battle' }
-          );
+          await sendServerPush('⚔️ New Arena Battle Added!', notif.message || 'A new battle has been added. Stake your ARX-P!', { url: '/arena', tag: 'arena-new-battle' });
         } else if (notif?.notification_type === 'announcement') {
-          await sendServerPush(
-            '📢 ' + (notif.title || 'Arxon Announcement'),
-            notif.message || 'New announcement from the Arxon team.',
-            { url: '/notifications', tag: 'announcement' }
-          );
+          await sendServerPush('📢 ' + (notif.title || 'Arxon Announcement'), notif.message || 'New announcement from the Arxon team.', { url: '/notifications', tag: 'announcement' });
         }
       })
       .subscribe();
@@ -482,6 +467,8 @@ export const usePushNotifications = () => {
     preferences,
     fcmToken,
     requestPermission,
+    reRegisterToken,        // call this after returning from OS Settings
+    openNotificationSettings, // opens Android Settings for this app
     sendServerPush,
     updatePreferences,
     isSupported: isNative || ('serviceWorker' in navigator && 'PushManager' in window),
