@@ -1,5 +1,4 @@
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
 import "./index.css";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { Capacitor } from "@capacitor/core";
@@ -28,18 +27,22 @@ window.addEventListener("unhandledrejection", (e) => {
   showFatal("unhandled promise rejection", (e as PromiseRejectionEvent).reason);
 });
 
-try {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      CapacitorUpdater.notifyAppReady();
-    } catch (e) {
-      console.warn("CapacitorUpdater.notifyAppReady failed:", e);
+void (async () => {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        CapacitorUpdater.notifyAppReady();
+      } catch (e) {
+        console.warn("CapacitorUpdater.notifyAppReady failed:", e);
+      }
     }
-  }
 
-  const rootEl = document.getElementById("root");
-  if (!rootEl) throw new Error("Missing #root element");
-  createRoot(rootEl).render(<App />);
-} catch (e) {
-  showFatal("bootstrap failure", e);
-}
+    const { default: App } = await import("./App.tsx");
+
+    const rootEl = document.getElementById("root");
+    if (!rootEl) throw new Error("Missing #root element");
+    createRoot(rootEl).render(<App />);
+  } catch (e) {
+    showFatal("bootstrap failure", e);
+  }
+})();
