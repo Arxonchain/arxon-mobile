@@ -1,13 +1,13 @@
 {
   "project_info": {
-    "project_number": "164339669335",
-    "project_id": "arxon-d0efb",
-    "storage_bucket": "arxon-d0efb.firebasestorage.app"
+    "project_number": "503462802451",
+    "project_id": "arxon-cb305",
+    "storage_bucket": "arxon-cb305.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:164339669335:android:b0484cad143ee357308612",
+        "mobilesdk_app_id": "1:503462802451:android:a5af2a6ce9fafb73eabbe6",
         "android_client_info": {
           "package_name": "xyz.arxonchain.app"
         }
@@ -15,7 +15,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyCy_rHfVYKMRNd11XNW52-OIs1WtcpMlSc"
+          "current_key": "AIzaSyAj3e_5IHr39XpQ-0hz73HTqjRBn6XjBqA"
         }
       ],
       "services": {
