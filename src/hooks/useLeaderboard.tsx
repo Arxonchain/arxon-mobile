@@ -13,11 +13,8 @@ interface LeaderboardEntry {
   rank: number;
 }
 
-// Leaderboard feels "broken" without periodic refresh.
-// Keep a lightweight poll *only while tab is visible*.
-// NOTE: if 100k users sit on the leaderboard page simultaneously, any polling cadence will be expensive.
-const POLL_MS = 120_000; // 2 minutes (reduced from 10s to save egress)
-const WAKE_THROTTLE_MS = 5000; // Prevent rapid fire on visibility + focus events
+const POLL_MS = 120_000;
+const WAKE_THROTTLE_MS = 5000;
 
 export const useLeaderboard = (limit: number = 100) => {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -33,22 +30,21 @@ export const useLeaderboard = (limit: number = 100) => {
     inFlightRef.current = true;
 
     try {
-      // Fetch both sources in parallel
       const [minerRes, arenaRes] = await Promise.all([
         supabase
           .from('leaderboard_view')
           .select('user_id, username, avatar_url, total_points, daily_streak')
-          .limit(limit * 2), // fetch more so merging doesn't miss anyone
+          .order('total_points', { ascending: false })
+          .limit(limit * 2),
         supabase
           .from('arena_team_leaderboard')
           .select('user_id, username, avatar_url, total_staked, net_profit')
+          .order('net_profit', { ascending: false })
           .limit(limit * 2),
       ]);
 
       if (!mountedRef.current) return;
 
-      // Build a map of arena scores keyed by user_id
-      // Arena score = total_staked + net_profit (same logic as Arena page)
       const arenaScoreMap = new Map<string, number>();
       for (const entry of arenaRes.data || []) {
         if (!entry.user_id) continue;
@@ -58,15 +54,12 @@ export const useLeaderboard = (limit: number = 100) => {
         arenaScoreMap.set(entry.user_id, score);
       }
 
-      // Merge: for every miner entry, add their arena score on top
-      // Also include arena-only users who may not appear in leaderboard_view
       const minerMap = new Map<string, any>();
       for (const entry of minerRes.data || []) {
         if (!entry.user_id) continue;
         minerMap.set(entry.user_id, entry);
       }
 
-      // Add arena users not in miner map (they may have 0 mining points)
       for (const entry of arenaRes.data || []) {
         if (!entry.user_id || minerMap.has(entry.user_id)) continue;
         minerMap.set(entry.user_id, {
@@ -83,14 +76,13 @@ export const useLeaderboard = (limit: number = 100) => {
         const arenaScore = arenaScoreMap.get(entry.user_id) || 0;
         return {
           user_id: entry.user_id || '',
-          total_points: miningPts + arenaScore, // combined total
+          total_points: miningPts + arenaScore,
           daily_streak: entry.daily_streak || 0,
           username: entry.username || `Miner${(entry.user_id || '').slice(0, 4)}`,
           avatar_url: entry.avatar_url || undefined,
         };
       });
 
-      // Sort by combined total descending, then assign ranks
       merged.sort((a, b) => b.total_points - a.total_points);
 
       const leaderboardWithRanks: LeaderboardEntry[] = merged
@@ -112,7 +104,6 @@ export const useLeaderboard = (limit: number = 100) => {
 
     const cached = cacheGet<LeaderboardEntry[]>(cacheKey, { maxAgeMs: 5 * 60_000 });
     if (cached?.data?.length) {
-      // Sanitize cached data to ensure whole numbers
       const sanitizedCache = cached.data.map(entry => ({
         ...entry,
         total_points: formatPoints(entry.total_points),
@@ -120,7 +111,6 @@ export const useLeaderboard = (limit: number = 100) => {
       setLeaderboard(sanitizedCache);
       setLoading(false);
     } else {
-      // Don't hard-block UI; we'll render quickly even if fresh fetch is in progress.
       setLoading(false);
     }
 
@@ -132,7 +122,6 @@ export const useLeaderboard = (limit: number = 100) => {
       }
     }, POLL_MS);
 
-    // Throttled wake handler to prevent duplicate fetches from visibility + focus firing together
     const throttledFetch = throttle(() => {
       if (document.visibilityState === 'visible') {
         void fetchLeaderboard();

@@ -61,6 +61,68 @@ const AdminArena = () => {
   const [editingBattle, setEditingBattle] = useState<ArenaBattle | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [updating, setUpdating] = useState(false);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [editBannerUploading, setEditBannerUploading] = useState(false);
+
+  const uploadBannerImage = async (file: File, isEdit: boolean): Promise<string | null> => {
+    const setter = isEdit ? setEditBannerUploading : setBannerUploading;
+    setter(true);
+    try {
+      const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const uniqueName = `arena-banners/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`;
+
+      // Compress large images client-side before upload
+      let uploadBlob: Blob = file;
+      if (file.size > 2 * 1024 * 1024) {
+        try {
+          uploadBlob = await new Promise<Blob>((resolve, reject) => {
+            const img = new window.Image();
+            const url = URL.createObjectURL(file);
+            img.onload = () => {
+              URL.revokeObjectURL(url);
+              const maxPx = 1600;
+              const scale = Math.min(1, maxPx / Math.max(img.width, img.height));
+              const canvas = document.createElement('canvas');
+              canvas.width = Math.round(img.width * scale);
+              canvas.height = Math.round(img.height * scale);
+              canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+              canvas.toBlob(b => b ? resolve(b) : reject(new Error('Compress failed')), 'image/jpeg', 0.88);
+            };
+            img.onerror = reject;
+            img.src = url;
+          });
+        } catch { /* use original if compress fails */ }
+      }
+
+      // Use chat-images bucket — it's already provisioned and public
+      const { error: upErr } = await supabase.storage
+        .from('chat-images')
+        .upload(uniqueName, uploadBlob, {
+          upsert: true,
+          contentType: uploadBlob.type || 'image/jpeg',
+        });
+
+      if (upErr) {
+        console.error('[BannerUpload] Storage error:', upErr);
+        toast.error(
+          upErr.message?.includes('Bucket') || upErr.message?.includes('bucket')
+            ? 'Storage bucket not found — ensure "chat-images" bucket exists in Supabase'
+            : upErr.message?.includes('policy') || upErr.message?.includes('violates')
+            ? 'Upload blocked by storage policy — enable "insert" policy for admins in Supabase'
+            : `Upload failed: ${upErr.message}`
+        );
+        return null;
+      }
+
+      const { data: pub } = supabase.storage.from('chat-images').getPublicUrl(uniqueName);
+      return pub.publicUrl;
+    } catch (err: any) {
+      toast.error('Banner upload failed: ' + (err?.message || 'Unknown error'));
+      return null;
+    } finally {
+      setter(false);
+    }
+  };
   
   // Form state
   const [formData, setFormData] = useState({
@@ -68,10 +130,8 @@ const AdminArena = () => {
     description: '',
     side_a_name: '',
     side_a_color: '#4ade80',
-    side_a_image: '',
     side_b_name: '',
     side_b_color: '#f87171',
-    side_b_image: '',
     banner_image: '',
     category: 'crypto',
     duration_hours: '24',
@@ -91,10 +151,8 @@ const AdminArena = () => {
     description: '',
     side_a_name: '',
     side_a_color: '#4ade80',
-    side_a_image: '',
     side_b_name: '',
     side_b_color: '#f87171',
-    side_b_image: '',
     banner_image: '',
     category: 'crypto',
     prize_pool: '0',
@@ -195,10 +253,10 @@ const AdminArena = () => {
         description: formData.description || null,
         side_a_name: formData.side_a_name,
         side_a_color: formData.side_a_color,
-        side_a_image: formData.side_a_image || null,
+        side_a_image: null,
         side_b_name: formData.side_b_name,
         side_b_color: formData.side_b_color,
-        side_b_image: formData.side_b_image || null,
+        side_b_image: null,
         banner_image: formData.banner_image || null,
         category: formData.category,
         duration_hours: hours,
@@ -219,10 +277,8 @@ const AdminArena = () => {
         description: '',
         side_a_name: '',
         side_a_color: '#4ade80',
-        side_a_image: '',
         side_b_name: '',
         side_b_color: '#f87171',
-        side_b_image: '',
         banner_image: '',
         category: 'crypto',
         duration_hours: '24',
@@ -334,10 +390,8 @@ const AdminArena = () => {
       description: battle.description || '',
       side_a_name: battle.side_a_name,
       side_a_color: battle.side_a_color,
-      side_a_image: battle.side_a_image || '',
       side_b_name: battle.side_b_name,
       side_b_color: battle.side_b_color,
-      side_b_image: battle.side_b_image || '',
       banner_image: battle.banner_image || '',
       category: battle.category,
       prize_pool: String(battle.prize_pool || 0),
@@ -374,10 +428,10 @@ const AdminArena = () => {
           description: editFormData.description || null,
           side_a_name: editFormData.side_a_name,
           side_a_color: editFormData.side_a_color,
-          side_a_image: editFormData.side_a_image || null,
+          side_a_image: null,
           side_b_name: editFormData.side_b_name,
           side_b_color: editFormData.side_b_color,
-          side_b_image: editFormData.side_b_image || null,
+          side_b_image: null,
           banner_image: editFormData.banner_image || null,
           category: editFormData.category,
           prize_pool: parseFloat(editFormData.prize_pool) || 0,
@@ -536,77 +590,52 @@ const AdminArena = () => {
                 </div>
 
 
-                {/* ── Battle Images (URL paste) ── */}
+                {/* ── Banner Image Upload ── */}
                 <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
                   <div className="flex items-center gap-2 mb-1">
                     <Image className="w-4 h-4 text-primary" />
-                    <span className="text-sm font-semibold">Battle Images</span>
-                    <span className="text-xs text-muted-foreground ml-1">— paste direct image URLs</span>
+                    <span className="text-sm font-semibold">Banner Image</span>
                   </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Side A — Logo / Portrait</Label>
-                    <div className="flex gap-2 items-center">
-                      {formData.side_a_image && (
-                        <img src={formData.side_a_image} alt="A"
-                          className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="create-banner-upload"
+                      className="flex items-center justify-center gap-2 w-full h-24 rounded-xl border-2 border-dashed border-border bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors"
+                    >
+                      {bannerUploading ? (
+                        <span className="text-sm text-muted-foreground animate-pulse">Uploading…</span>
+                      ) : formData.banner_image ? (
+                        <img src={formData.banner_image} alt="Banner"
+                          className="w-full h-full object-cover rounded-xl"
                           onError={e=>(e.currentTarget.style.display='none')}/>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                          <Image className="w-6 h-6" />
+                          <span className="text-xs font-medium">Tap to upload banner</span>
+                          <span className="text-xs opacity-60">JPG, PNG, WEBP · max 10 MB</span>
+                        </div>
                       )}
-                      <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
-                        value={formData.side_a_image}
-                        onChange={(e) => setFormData({ ...formData, side_a_image: e.target.value })}/>
-                      {formData.side_a_image && (
-                        <button onClick={() => setFormData({ ...formData, side_a_image: '' })}
-                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                          <XIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Side B — Logo / Portrait</Label>
-                    <div className="flex gap-2 items-center">
-                      {formData.side_b_image && (
-                        <img src={formData.side_b_image} alt="B"
-                          className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
-                          onError={e=>(e.currentTarget.style.display='none')}/>
-                      )}
-                      <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
-                        value={formData.side_b_image}
-                        onChange={(e) => setFormData({ ...formData, side_b_image: e.target.value })}/>
-                      {formData.side_b_image && (
-                        <button onClick={() => setFormData({ ...formData, side_b_image: '' })}
-                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                          <XIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label className="text-xs font-medium text-muted-foreground">Wide Banner (optional)</Label>
-                    <div className="flex gap-2 items-center">
-                      <Input placeholder="https://... wide banner URL" className="flex-1 text-xs"
-                        value={formData.banner_image}
-                        onChange={(e) => setFormData({ ...formData, banner_image: e.target.value })}/>
-                      {formData.banner_image && (
-                        <button onClick={() => setFormData({ ...formData, banner_image: '' })}
-                          className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                          <XIcon className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                    </label>
+                    <input
+                      id="create-banner-upload"
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.size > 10 * 1024 * 1024) { toast.error('Max 10 MB'); return; }
+                        const url = await uploadBannerImage(file, false);
+                        if (url) setFormData(p => ({ ...p, banner_image: url }));
+                        e.target.value = '';
+                      }}
+                    />
                     {formData.banner_image && (
-                      <img src={formData.banner_image} alt="Banner"
-                        className="w-full h-20 rounded-lg object-cover border border-border mt-1"
-                        onError={e=>(e.currentTarget.style.display='none')}/>
+                      <Button type="button" variant="ghost" size="sm"
+                        onClick={() => setFormData(p => ({ ...p, banner_image: '' }))}>
+                        <XIcon className="w-3 h-3 mr-1" /> Remove banner
+                      </Button>
                     )}
                   </div>
-
-                  <p className="text-xs text-muted-foreground">
-                    💡 Use Wikipedia/Wikimedia PNG URLs. For sports logos, search "Club Name logo Wikipedia"
-                  </p>
                 </div>
 
                 {/* Category & Duration */}
@@ -1144,70 +1173,50 @@ const AdminArena = () => {
             </div>
 
 
-            {/* ── Battle Images (URL paste) ── */}
+            {/* ── Banner Image Upload ── */}
             <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
               <div className="flex items-center gap-2 mb-1">
                 <Image className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold">Battle Images</span>
+                <span className="text-sm font-semibold">Banner Image</span>
               </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">Side A — Logo / Portrait</Label>
-                <div className="flex gap-2 items-center">
-                  {editFormData.side_a_image && (
-                    <img src={editFormData.side_a_image} alt="A"
-                      className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
+              <div className="space-y-2">
+                <label
+                  htmlFor="edit-banner-upload"
+                  className="flex items-center justify-center gap-2 w-full h-24 rounded-xl border-2 border-dashed border-border bg-muted/20 cursor-pointer hover:bg-muted/40 transition-colors overflow-hidden"
+                >
+                  {editBannerUploading ? (
+                    <span className="text-sm text-muted-foreground animate-pulse">Uploading…</span>
+                  ) : editFormData.banner_image ? (
+                    <img src={editFormData.banner_image} alt="Banner"
+                      className="w-full h-full object-cover"
                       onError={e=>(e.currentTarget.style.display='none')}/>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1 text-muted-foreground">
+                      <Image className="w-6 h-6" />
+                      <span className="text-xs font-medium">Tap to upload banner</span>
+                      <span className="text-xs opacity-60">JPG, PNG, WEBP · max 10 MB</span>
+                    </div>
                   )}
-                  <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
-                    value={editFormData.side_a_image}
-                    onChange={(e) => setEditFormData({ ...editFormData, side_a_image: e.target.value })}/>
-                  {editFormData.side_a_image && (
-                    <button onClick={() => setEditFormData({ ...editFormData, side_a_image: '' })}
-                      className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                      <XIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">Side B — Logo / Portrait</Label>
-                <div className="flex gap-2 items-center">
-                  {editFormData.side_b_image && (
-                    <img src={editFormData.side_b_image} alt="B"
-                      className="w-12 h-12 rounded-lg object-cover border border-border flex-shrink-0"
-                      onError={e=>(e.currentTarget.style.display='none')}/>
-                  )}
-                  <Input placeholder="https://upload.wikimedia.org/..." className="flex-1 text-xs"
-                    value={editFormData.side_b_image}
-                    onChange={(e) => setEditFormData({ ...editFormData, side_b_image: e.target.value })}/>
-                  {editFormData.side_b_image && (
-                    <button onClick={() => setEditFormData({ ...editFormData, side_b_image: '' })}
-                      className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                      <XIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label className="text-xs font-medium text-muted-foreground">Wide Banner (optional)</Label>
-                <div className="flex gap-2 items-center">
-                  <Input placeholder="https://... wide banner URL" className="flex-1 text-xs"
-                    value={editFormData.banner_image}
-                    onChange={(e) => setEditFormData({ ...editFormData, banner_image: e.target.value })}/>
-                  {editFormData.banner_image && (
-                    <button onClick={() => setEditFormData({ ...editFormData, banner_image: '' })}
-                      className="text-muted-foreground hover:text-foreground flex-shrink-0">
-                      <XIcon className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
+                </label>
+                <input
+                  id="edit-banner-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) { toast.error('Max 10 MB'); return; }
+                    const url = await uploadBannerImage(file, true);
+                    if (url) setEditFormData(p => ({ ...p, banner_image: url }));
+                    e.target.value = '';
+                  }}
+                />
                 {editFormData.banner_image && (
-                  <img src={editFormData.banner_image} alt="Banner"
-                    className="w-full h-20 rounded-lg object-cover border border-border mt-1"
-                    onError={e=>(e.currentTarget.style.display='none')}/>
+                  <Button type="button" variant="ghost" size="sm"
+                    onClick={() => setEditFormData(p => ({ ...p, banner_image: '' }))}>
+                    <XIcon className="w-3 h-3 mr-1" /> Remove banner
+                  </Button>
                 )}
               </div>
             </div>

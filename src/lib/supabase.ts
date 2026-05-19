@@ -1,15 +1,22 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from "@supabase/supabase-js";
 
-// PRODUCTION Supabase project: lgytumkuqflksbcukjek
-// These are the ONLY credentials that should be used.
-// The anon key is a publishable/public key - safe to include in client code.
-const supabaseUrl = 'https://lgytumkuqflksbcukjek.supabase.co';
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxneXR1bWt1cWZsa3NiY3VramVrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyODU3MzYsImV4cCI6MjA4NTg2MTczNn0.2bVWmCBo4Psx7wR1IygmGWGJXtiEmBJO9UdNVcNrbk8';
+const SUPABASE_URL = (import.meta.env.VITE_SUPABASE_URL ?? "").trim();
+const SUPABASE_KEY = (
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+  import.meta.env.VITE_SUPABASE_ANON_KEY ??
+  ""
+).trim();
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  throw new Error(
+    "Supabase client misconfigured. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY).",
+  );
+}
+
+export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: {
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
 });

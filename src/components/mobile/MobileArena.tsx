@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useArena, type ArenaBattle, type BattleHistoryEntry } from '@/hooks/useArena';
+import { useArenaMarkets } from '@/hooks/useArenaMarkets';
 import { useArenaMembership } from '@/hooks/useArenaMembership';
 import { usePoints } from '@/hooks/usePoints';
 import { supabase } from '@/integrations/supabase/client';
@@ -65,10 +66,11 @@ function SideImage({ imageUrl, name, size = 52 }: { imageUrl: string|null; name:
 
 // ── Compact Battle Card (list view) ───────────────────────────────────────
 function BattleCard({
-  battle, isActive, userVoted, userWon, onClick
+  battle, isActive, isEnded, userVoted, userWon, onClick
 }: {
   battle: ArenaBattle | BattleHistoryEntry;
   isActive?: boolean;
+  isEnded?: boolean;
   userVoted?: boolean;
   userWon?: boolean;
   onClick: () => void;
@@ -77,7 +79,8 @@ function BattleCard({
   const totalPow = (battle.side_a_power??0) + (battle.side_b_power??0);
   const pctA = totalPow > 0 ? Math.round((battle.side_a_power/totalPow)*100) : 50;
   const pctB = 100 - pctA;
-  const concluded = !isActive && battle.winner_side;
+  const concluded = (isEnded || !isActive) && battle.winner_side;
+  const totalVoters = (battle as any).total_participants ?? 0;
 
   return (
     <motion.div whileTap={{scale:0.97}} onClick={onClick}
@@ -91,7 +94,16 @@ function BattleCard({
       {isActive && <div style={{position:'absolute',top:0,left:0,right:0,height:2,
         background:'linear-gradient(90deg,transparent,hsl(215 35% 62%/0.5),transparent)'}}/>}
 
-      <div style={{padding:'14px 14px 12px'}}>
+      {/* Banner — full bleed at top, BEFORE all text */}
+      {(battle as any).banner_image && (
+        <div style={{height:90,overflow:'hidden',position:'relative',flexShrink:0}}>
+          <img src={(battle as any).banner_image} alt=""
+            style={{width:'100%',height:'100%',objectFit:'cover',display:'block'}}
+            onError={e=>{(e.target as HTMLImageElement).parentElement!.style.display='none'}}/>
+          <div style={{position:'absolute',inset:0,background:'linear-gradient(to bottom,transparent 35%,rgba(8,9,16,0.72))'}}/>
+        </div>
+      )}
+      <div style={{padding:'12px 14px 12px'}}>
         {/* Header row */}
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
           <div style={{flex:1,minWidth:0,paddingRight:8}}>
@@ -120,52 +132,54 @@ function BattleCard({
                 {userVoted?(userWon?'🏆 Won':'💧 Lost'):'Ended'}
               </div>
             )}
-            {!isActive && !concluded && (
+            {!isActive && !concluded && !isEnded && (
               <div style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,
                 color:'hsl(215 18% 42%)',background:'hsl(215 22% 12%)',border:'1px solid hsl(215 22% 18%)'}}>
                 Upcoming
+              </div>
+            )}
+            {!isActive && !concluded && isEnded && (
+              <div style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,
+                color:'hsl(0 55% 55%)',background:'hsl(0 55% 55%/0.1)',border:'1px solid hsl(0 55% 55%/0.25)'}}>
+                Ended
               </div>
             )}
             <ChevronRight size={14} color="hsl(215 18% 35%)" style={{marginLeft:6}}/>
           </div>
         </div>
 
-        {/* VS row — compact with images */}
-        <div style={{display:'grid',gridTemplateColumns:'1fr 36px 1fr',gap:8,alignItems:'center',marginBottom:10}}>
+        {/* VS row — clean text pills */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 32px 1fr',gap:8,alignItems:'stretch',marginBottom:10}}>
           {/* Side A */}
-          <div style={{display:'flex',alignItems:'center',gap:8,
-            padding:'10px 10px',borderRadius:13,
+          <div style={{
+            padding:'10px 12px',borderRadius:14,
             background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
-            border:`1px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
+            border:`1.5px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 17%)'}`,
+            display:'flex',flexDirection:'column',gap:3,
           }}>
-            <SideImage imageUrl={battle.side_a_image} name={battle.side_a_name} size={38}/>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_a_name}</p>
-              <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctA}%</p>
-            </div>
-            {battle.winner_side==='a' && <span style={{fontSize:14}}>👑</span>}
+            <p style={{fontSize:11,fontWeight:700,color:'hsl(215 18% 84%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',lineHeight:1.3}}>{battle.side_a_name}</p>
+            <p style={{fontSize:15,fontWeight:900,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 35% 72%)',lineHeight:1}}>{pctA}%</p>
+            {battle.winner_side==='a' && <span style={{fontSize:9,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</span>}
           </div>
 
-          {/* VS */}
+          {/* VS badge */}
           <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{width:32,height:32,borderRadius:10,background:'hsl(215 26% 12%)',
+            <div style={{width:28,height:28,borderRadius:9,background:'hsl(215 26% 12%)',
               border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <span style={{fontSize:9,fontWeight:900,color:'hsl(215 22% 38%)'}}>VS</span>
+              <span style={{fontSize:8,fontWeight:900,color:'hsl(215 22% 42%)'}}>VS</span>
             </div>
           </div>
 
           {/* Side B */}
-          <div style={{display:'flex',alignItems:'center',gap:8,
-            padding:'10px 10px',borderRadius:13,
+          <div style={{
+            padding:'10px 12px',borderRadius:14,
             background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
-            border:`1px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.3)':'hsl(215 22% 18%)'}`,
+            border:`1.5px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 17%)'}`,
+            display:'flex',flexDirection:'column',gap:3,
           }}>
-            <SideImage imageUrl={battle.side_b_image} name={battle.side_b_name} size={38}/>
-            <div style={{flex:1,minWidth:0}}>
-              <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 80%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_b_name}</p>
-              <p style={{fontSize:12,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 32% 72%)'}}>{pctB}%</p>
-            </div>
-            {battle.winner_side==='b' && <span style={{fontSize:14}}>👑</span>}
+            <p style={{fontSize:11,fontWeight:700,color:'hsl(215 18% 84%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',lineHeight:1.3}}>{battle.side_b_name}</p>
+            <p style={{fontSize:15,fontWeight:900,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 35% 72%)',lineHeight:1}}>{pctB}%</p>
+            {battle.winner_side==='b' && <span style={{fontSize:9,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</span>}
           </div>
         </div>
 
@@ -178,7 +192,7 @@ function BattleCard({
         {/* Footer */}
         <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
           <span style={{fontSize:9,color:'hsl(215 14% 35%)'}}>
-            {totalPow.toLocaleString()} ARX-P staked
+            {totalPow.toLocaleString()} ARX-P · {totalVoters} voter{totalVoters !== 1 ? 's' : ''}
           </span>
           <span style={{fontSize:9,color:'hsl(215 14% 32%)'}}>
             {new Date(isActive?battle.ends_at:battle.starts_at).toLocaleDateString()}
@@ -270,7 +284,6 @@ function BattleDetail({
                 background:activeSide==='a'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
                 border:`2px solid ${activeSide==='a'?'hsl(215 35% 62%/0.45)':battle.winner_side==='a'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
               }}>
-              <SideImage imageUrl={battle.side_a_image} name={battle.side_a_name} size={62}/>
               <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)',textAlign:'center'}}>{battle.side_a_name}</p>
               <div style={{fontSize:24,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':activeSide==='a'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctA}%</div>
               <p style={{fontSize:10,color:'hsl(215 14% 40%)',textAlign:'center'}}>{battle.side_a_power.toLocaleString()} ARX-P</p>
@@ -291,7 +304,6 @@ function BattleDetail({
                 background:activeSide==='b'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
                 border:`2px solid ${activeSide==='b'?'hsl(215 35% 62%/0.45)':battle.winner_side==='b'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
               }}>
-              <SideImage imageUrl={battle.side_b_image} name={battle.side_b_name} size={62}/>
               <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)',textAlign:'center'}}>{battle.side_b_name}</p>
               <div style={{fontSize:24,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':activeSide==='b'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctB}%</div>
               <p style={{fontSize:10,color:'hsl(215 14% 40%)',textAlign:'center'}}>{battle.side_b_power.toLocaleString()} ARX-P</p>
@@ -413,16 +425,172 @@ function BattleDetail({
   );
 }
 
+// ── LeaderboardTab Component ───────────────────────────────────────────────
+function LeaderboardTab({ leaderboard, loading, currentUserId }: {
+  leaderboard: any[];
+  loading: boolean;
+  currentUserId?: string;
+}) {
+  const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
+
+  const fmt = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
+    return n.toLocaleString();
+  };
+
+  const getScore = (e: any) => Number(e.total_staked || e.total_power_staked || 0);
+  const getTotalPoints = (e: any) => Number(e.total_staked || e.total_power_staked || 0);
+
+  const alphaTeam = leaderboard
+    .filter(e => e.club === 'alpha')
+    .sort((a, b) => getScore(b) - getScore(a));
+
+  const omegaTeam = leaderboard
+    .filter(e => e.club === 'omega')
+    .sort((a, b) => getScore(b) - getScore(a));
+
+  const hasClubData = leaderboard.some(e => e.club === 'alpha' || e.club === 'omega');
+  const allPlayers = [...leaderboard].sort((a, b) => getScore(b) - getScore(a));
+
+  const alphaStaked = alphaTeam.reduce((s, e) => s + getScore(e), 0);
+  const omegaStaked = omegaTeam.reduce((s, e) => s + getScore(e), 0);
+  const alphaWins   = alphaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0);
+  const omegaWins   = omegaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0);
+
+  const ALPHA = 'hsl(195 80% 50%)';
+  const OMEGA = 'hsl(255 60% 65%)';
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px 0' }}>
+        {[...Array(5)].map((_, i) => (
+          <div key={i} style={{ height: 60, borderRadius: 16, background: 'hsl(215 22% 10%)', marginBottom: 8, opacity: 1 - i * 0.15 }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (!hasClubData) {
+    return (
+      <div>
+        <p style={{ fontSize: 11, color: 'hsl(215 14% 36%)', marginBottom: 12, textAlign: 'center' }}>Overall Rankings</p>
+        {allPlayers.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0' }}>
+            <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+            <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 40%)' }}>No rankings yet</p>
+            <p style={{ fontSize: 12, color: 'hsl(215 14% 30%)', marginTop: 4 }}>Participate in battles to appear here</p>
+          </div>
+        ) : allPlayers.map((e, i) => (
+          <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+        {([
+          { label: 'Team Alpha', count: alphaTeam.length, staked: alphaStaked, wins: alphaWins, col: ALPHA, team: 'alpha' as const },
+          { label: 'Team Omega', count: omegaTeam.length, staked: omegaStaked, wins: omegaWins, col: OMEGA, team: 'omega' as const },
+        ] as const).map(t => (
+          <button
+            key={t.team}
+            onClick={() => setActiveTeam(t.team)}
+            style={{
+              flex: 1, padding: '12px 14px', borderRadius: 16, border: 'none', cursor: 'pointer', textAlign: 'left',
+              background: activeTeam === t.team ? `${t.col}15` : 'hsl(215 22% 8%)',
+              boxShadow: activeTeam === t.team ? `0 0 0 1.5px ${t.col}50` : '0 0 0 1px hsl(215 20% 13%)',
+              transition: 'all 0.18s',
+            }}
+          >
+            <p style={{ fontSize: 11, fontWeight: 800, color: t.col, marginBottom: 4 }}>{t.label}</p>
+            <p style={{ fontSize: 16, fontWeight: 900, color: 'hsl(215 18% 90%)' }}>{fmt(t.staked)}</p>
+            <p style={{ fontSize: 10, color: 'hsl(215 14% 38%)', marginTop: 2 }}>{t.count} members · {t.wins}W</p>
+          </button>
+        ))}
+      </div>
+      {(activeTeam === 'alpha' ? alphaTeam : omegaTeam).length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '32px 0' }}>
+          <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 38%)' }}>No {activeTeam} members yet</p>
+          <p style={{ fontSize: 12, color: 'hsl(215 14% 28%)', marginTop: 4 }}>Join {activeTeam} team in Arena to appear here</p>
+        </div>
+      ) : (activeTeam === 'alpha' ? alphaTeam : omegaTeam).map((e, i) => (
+        <PlayerRow
+          key={e.user_id} entry={e} rank={i + 1}
+          color={activeTeam === 'alpha' ? ALPHA : OMEGA}
+          isMe={e.user_id === currentUserId} fmt={fmt}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PlayerRow({ entry, rank, color, isMe, fmt }: {
+  entry: any; rank: number; color: string; isMe: boolean; fmt: (n: number) => string;
+}) {
+  const medals = ['🥇', '🥈', '🥉'];
+  const wins = Number(entry.total_wins) || 0;
+  const battles = Number(entry.total_battles) || 0;
+  const losses = Math.max(0, battles - wins);
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '10px 14px', borderRadius: 16, marginBottom: 7,
+      background: isMe ? `${color}12` : 'hsl(225 25% 6%)',
+      border: `1px solid ${isMe ? `${color}35` : 'hsl(215 20% 11%)'}`,
+    }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 9, flexShrink: 0,
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: rank <= 3 ? 14 : 10, fontWeight: 800, color,
+      }}>
+        {rank <= 3 ? medals[rank - 1] : rank}
+      </div>
+      <div style={{
+        width: 32, height: 32, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+        background: `${color}18`, display: 'flex', alignItems: 'center',
+        justifyContent: 'center', fontSize: 12, fontWeight: 700, color,
+        border: `1.5px solid ${color}25`,
+      }}>
+        {entry.avatar_url
+          ? <img src={entry.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+          : (entry.username?.[0]?.toUpperCase() || '?')
+        }
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 600, color: isMe ? color : 'hsl(215 18% 86%)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {entry.username || 'Miner'}{isMe ? ' (You)' : ''}
+        </p>
+        <p style={{ fontSize: 10, color: 'hsl(215 14% 36%)', marginTop: 1 }}>
+          <span style={{ color: 'hsl(142 60% 50%)' }}>{wins}W</span>{' / '}
+          <span style={{ color: 'hsl(0 60% 56%)' }}>{losses}L</span>
+        </p>
+      </div>
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <p style={{ fontSize: 13, fontWeight: 800, color }}>{fmt(Number(entry.total_staked || entry.total_power_staked) || 0)}</p>
+        <p style={{ fontSize: 9, color: 'hsl(215 14% 32%)' }}>ARX-P Staked</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Main Arena Component ───────────────────────────────────────────────────
 export default function MobileArena() {
   const { user }    = useAuth();
   const navigate    = useNavigate();
   const { points }  = usePoints();
   const { activeBattle, userVote, participants, battleHistory, leaderboard, loading, voting, castVote } = useArena();
+  // earningsLeaderboard has ALL arena members with club data — public, not just battle participants
+  const { earningsLeaderboard, liveMarkets, upcomingMarkets, endedMarkets, loading: lbLoading } = useArenaMarkets();
+  // Prefer earningsLeaderboard (fuller data) over battle-only leaderboard
+  const fullLeaderboard = earningsLeaderboard?.length ? earningsLeaderboard : leaderboard;
   const { membership, loading: memLoading, registering, registerMembership } = useArenaMembership();
 
   const [showAuth,      setShowAuth]      = useState(false);
   const [tab,           setTab]           = useState<Tab>('battles');
+  const [battleFilter,  setBattleFilter]  = useState<'live'|'upcoming'|'ended'>('live');
   const [selectedBattle,setSelectedBattle]= useState<(ArenaBattle|BattleHistoryEntry)|null>(null);
   const [isBattleActive,setIsBattleActive]= useState(false);
 
@@ -471,7 +639,14 @@ export default function MobileArena() {
   const alphaBoard = leaderboard.filter((e:any)=>e.club==='alpha'||!e.club);
   const omegaBoard = leaderboard.filter((e:any)=>e.club==='omega');
   const myStakes   = (battleHistory as BattleHistoryEntry[]).filter(b=>b.user_participated);
-  const allHistory = battleHistory as BattleHistoryEntry[];
+  // Merge useArena battleHistory with useArenaMarkets data so all battles appear
+  const seenIds = new Set((battleHistory as BattleHistoryEntry[]).map(b => b.id));
+  const allHistory: any[] = [
+    ...(battleHistory as BattleHistoryEntry[]),
+    ...liveMarkets.filter(m => !seenIds.has(m.id)),
+    ...upcomingMarkets.filter(m => !seenIds.has(m.id)),
+    ...endedMarkets.filter(m => !seenIds.has(m.id)),
+  ];
 
   return (
     <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
@@ -536,70 +711,142 @@ export default function MobileArena() {
           <>
             {(() => {
               const now = new Date();
-              const upcoming = allHistory.filter(b => new Date(b.starts_at) > now && b.is_active && !b.winner_side);
-              const live     = allHistory.filter(b => new Date(b.starts_at) <= now && new Date(b.ends_at) > now && b.is_active && !b.winner_side);
-              const ended    = allHistory.filter(b => b.winner_side || new Date(b.ends_at) <= now);
+              const liveList     = allHistory.filter(b => {
+                const s = new Date(b.starts_at); const e = new Date(b.ends_at);
+                return s <= now && e > now && (b.is_active ?? true) && !b.winner_side;
+              });
+              const upcomingList = allHistory.filter(b => new Date(b.starts_at) > now && !b.winner_side);
+              const endedList    = allHistory.filter(b => b.winner_side || new Date(b.ends_at) <= now);
+
+              // count for pills
+              const liveCt     = liveList.length + (activeBattle && !liveList.find(b=>b.id===activeBattle?.id) ? 1 : 0);
+              const upcomingCt = upcomingList.length;
+              const endedCt    = endedList.length;
+
+              type BF = 'live'|'upcoming'|'ended';
+              const pills: {id:BF; label:string; count:number; dot?:boolean}[] = [
+                { id:'live',     label:'Live',     count:liveCt,     dot:true  },
+                { id:'upcoming', label:'Upcoming', count:upcomingCt              },
+                { id:'ended',    label:'Ended',    count:endedCt                 },
+              ];
 
               return (
                 <>
-                  {/* LIVE */}
-                  {(activeBattle || live.length > 0) && (
+                  {/* ── Sub-tab pill strip ── */}
+                  <div style={{display:'flex',gap:8,marginBottom:16,padding:'2px 0'}}>
+                    {pills.map(p => {
+                      const isActive = battleFilter === p.id;
+                      const baseCol =
+                        p.id === 'live'     ? 'hsl(0 60% 56%)'       :
+                        p.id === 'upcoming' ? 'hsl(215 35% 62%)'     :
+                                              'hsl(215 14% 38%)';
+                      return (
+                        <button
+                          key={p.id}
+                          onClick={() => setBattleFilter(p.id)}
+                          style={{
+                            display:'flex', alignItems:'center', gap:6,
+                            padding:'8px 14px', borderRadius:24, border:'none', cursor:'pointer',
+                            fontFamily:"'Creato Display',-apple-system,sans-serif",
+                            fontSize:11, fontWeight:700, outline:'none',
+                            transition:'all 0.18s',
+                            background: isActive ? `${baseCol}18` : 'hsl(215 22% 8%)',
+                            boxShadow: isActive ? `0 0 0 1.5px ${baseCol}55` : '0 0 0 1px hsl(215 20% 13%)',
+                            color: isActive ? baseCol : 'hsl(215 14% 38%)',
+                          }}
+                        >
+                          {/* pulsing dot for live */}
+                          {p.dot && (
+                            <div style={{
+                              width:6, height:6, borderRadius:'50%',
+                              background: isActive ? baseCol : 'hsl(215 14% 28%)',
+                              boxShadow: isActive ? `0 0 8px ${baseCol}` : 'none',
+                              animation: isActive ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                              flexShrink:0,
+                            }}/>
+                          )}
+                          {p.label}
+                          <span style={{
+                            fontSize:9, fontWeight:800,
+                            padding:'2px 6px', borderRadius:12,
+                            background: isActive ? `${baseCol}25` : 'hsl(215 20% 12%)',
+                            color: isActive ? baseCol : 'hsl(215 14% 30%)',
+                          }}>
+                            {p.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* ── LIVE panel ── */}
+                  {battleFilter === 'live' && (
                     <>
-                      <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                        <div style={{width:6,height:6,borderRadius:'50%',background:'hsl(0 60% 56%)',boxShadow:'0 0 8px hsl(0 60% 56%)',animation:'pulse 1.5s ease-in-out infinite'}}/>
-                        <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.14em',color:'hsl(0 60% 62%)',fontWeight:700}}>
-                          Live Now {live.length + (activeBattle ? 1 : 0) > 0 ? `(${live.length + (activeBattle ? 1 : 0)})` : ''}
-                        </p>
-                      </div>
-                      {activeBattle && (
-                        <BattleCard battle={activeBattle} isActive
-                          userVoted={!!userVote} userWon={false}
-                          onClick={()=>openBattle(activeBattle,true)}/>
+                      {liveCt === 0 ? (
+                        <div style={{borderRadius:20,padding:'40px 20px',textAlign:'center',
+                          background:'hsl(215 22% 7%)',border:'1px solid hsl(215 20% 11%)'}}>
+                          <div style={{fontSize:40,marginBottom:12}}>🔴</div>
+                          <p style={{fontSize:15,fontWeight:700,color:'hsl(215 18% 44%)',marginBottom:6}}>No live battles right now</p>
+                          <p style={{fontSize:12,color:'hsl(215 14% 28%)'}}>Check Upcoming for battles starting soon</p>
+                        </div>
+                      ) : (
+                        <>
+                          {activeBattle && (
+                            <BattleCard battle={activeBattle} isActive
+                              userVoted={!!userVote} userWon={false}
+                              onClick={()=>openBattle(activeBattle,true)}/>
+                          )}
+                          {liveList
+                            .filter(b => b.id !== activeBattle?.id)
+                            .map(b=>(
+                              <BattleCard key={b.id} battle={b} isActive
+                                userVoted={b.user_participated} userWon={b.user_won}
+                                onClick={()=>openBattle(b,true)}/>
+                            ))
+                          }
+                        </>
                       )}
-                      {live.filter(b => b.id !== activeBattle?.id).map(b=>(
-                        <BattleCard key={b.id} battle={b} isActive
-                          userVoted={b.user_participated} userWon={b.user_won}
-                          onClick={()=>openBattle(b,true)}/>
-                      ))}
                     </>
                   )}
 
-                  {/* UPCOMING */}
-                  {upcoming.length > 0 && (
+                  {/* ── UPCOMING panel ── */}
+                  {battleFilter === 'upcoming' && (
                     <>
-                      <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.14em',
-                        color:'hsl(215 35% 62%)',fontWeight:700,marginBottom:10,marginTop:activeBattle||live.length>0?16:0}}>
-                        Upcoming ({upcoming.length})
-                      </p>
-                      {upcoming.map(b=>(
-                        <BattleCard key={b.id} battle={b} isActive={false}
-                          userVoted={b.user_participated} userWon={b.user_won}
-                          onClick={()=>openBattle(b,false)}/>
-                      ))}
+                      {upcomingCt === 0 ? (
+                        <div style={{borderRadius:20,padding:'40px 20px',textAlign:'center',
+                          background:'hsl(215 22% 7%)',border:'1px solid hsl(215 20% 11%)'}}>
+                          <div style={{fontSize:40,marginBottom:12}}>🕐</div>
+                          <p style={{fontSize:15,fontWeight:700,color:'hsl(215 18% 44%)',marginBottom:6}}>No upcoming battles scheduled</p>
+                          <p style={{fontSize:12,color:'hsl(215 14% 28%)'}}>New battles will appear here when scheduled</p>
+                        </div>
+                      ) : (
+                        upcomingList.map(b=>(
+                          <BattleCard key={b.id} battle={b} isActive={false}
+                            userVoted={b.user_participated} userWon={b.user_won}
+                            onClick={()=>openBattle(b,false)}/>
+                        ))
+                      )}
                     </>
                   )}
 
-                  {/* ENDED */}
-                  {ended.length > 0 && (
+                  {/* ── ENDED panel ── */}
+                  {battleFilter === 'ended' && (
                     <>
-                      <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.14em',
-                        color:'hsl(215 14% 30%)',fontWeight:700,marginBottom:10,marginTop:upcoming.length>0||live.length>0?16:0}}>
-                        Ended ({ended.length})
-                      </p>
-                      {ended.map(b=>(
-                        <BattleCard key={b.id} battle={b}
-                          userVoted={b.user_participated} userWon={b.user_won}
-                          onClick={()=>openBattle(b,false)}/>
-                      ))}
+                      {endedCt === 0 ? (
+                        <div style={{borderRadius:20,padding:'40px 20px',textAlign:'center',
+                          background:'hsl(215 22% 7%)',border:'1px solid hsl(215 20% 11%)'}}>
+                          <div style={{fontSize:40,marginBottom:12}}>🏁</div>
+                          <p style={{fontSize:15,fontWeight:700,color:'hsl(215 18% 44%)',marginBottom:6}}>No ended battles yet</p>
+                          <p style={{fontSize:12,color:'hsl(215 14% 28%)'}}>Results will appear here once battles conclude</p>
+                        </div>
+                      ) : (
+                        endedList.map(b=>(
+                          <BattleCard key={b.id} battle={b} isEnded
+                            userVoted={b.user_participated} userWon={b.user_won}
+                            onClick={()=>openBattle(b,false)}/>
+                        ))
+                      )}
                     </>
-                  )}
-
-                  {!activeBattle && allHistory.length===0 && (
-                    <div className="glass-card" style={{borderRadius:20,padding:'32px 20px',textAlign:'center'}}>
-                      <div style={{fontSize:44,marginBottom:12}}>⚔️</div>
-                      <p style={{fontSize:15,fontWeight:700,color:'hsl(215 18% 50%)',marginBottom:6}}>No battles yet</p>
-                      <p style={{fontSize:12,color:'hsl(215 14% 35%)'}}>Check back soon for upcoming battles</p>
-                    </div>
                   )}
                 </>
               );
@@ -609,38 +856,7 @@ export default function MobileArena() {
 
         {/* LEADERBOARD TAB */}
         {tab==='leaderboard' && (
-          <>
-            {[{team:'Alpha',board:alphaBoard,col:'hsl(215 35% 62%)',bg:'hsl(215 35% 62%/0.05)',bd:'hsl(215 30% 18%)'},
-              {team:'Omega',board:omegaBoard,col:'hsl(255 50% 65%)',bg:'hsl(255 50% 60%/0.05)',bd:'hsl(255 40% 22%)'}
-            ].map(({team,board,col,bg,bd})=>(
-              <div key={team} style={{marginBottom:20}}>
-                <p style={{fontSize:11,textTransform:'uppercase',letterSpacing:'0.14em',fontWeight:700,marginBottom:10,color:col}}>
-                  {team} Team
-                </p>
-                {board.length===0
-                  ? <p style={{fontSize:12,color:'hsl(215 14% 35%)'}}>No {team.toLowerCase()} members yet</p>
-                  : board.slice(0,10).map((e:any,i:number)=>(
-                    <div key={e.user_id} style={{display:'flex',alignItems:'center',gap:10,
-                      padding:'10px 14px',borderRadius:14,marginBottom:7,background:bg,border:`1px solid ${bd}`}}>
-                      <div style={{width:26,height:26,borderRadius:9,background:`${col}22`,
-                        display:'flex',alignItems:'center',justifyContent:'center',fontSize:10,fontWeight:800,color:col,flexShrink:0}}>
-                        {i<3?['🥇','🥈','🥉'][i]:i+1}
-                      </div>
-                      <div style={{width:30,height:30,borderRadius:'50%',overflow:'hidden',
-                        background:'hsl(225 25% 13%)',display:'flex',alignItems:'center',justifyContent:'center',
-                        fontSize:12,fontWeight:700,color:col,flexShrink:0}}>
-                        {e.avatar_url?<img src={e.avatar_url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>:e.username?.[0]?.toUpperCase()||'?'}
-                      </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <p style={{fontSize:12,fontWeight:600,color:'hsl(215 18% 82%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.username||'Miner'}</p>
-                      </div>
-                      <p style={{fontSize:12,fontWeight:700,color}}>{(e.total_power_staked||0).toLocaleString()}</p>
-                    </div>
-                  ))
-                }
-              </div>
-            ))}
-          </>
+          <LeaderboardTab leaderboard={fullLeaderboard} loading={loading || lbLoading} currentUserId={user?.id} />
         )}
 
         {/* MY STAKES TAB */}
