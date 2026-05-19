@@ -9,6 +9,7 @@ import { useState, useEffect } from 'react';
 import { Bell, ChevronRight, Zap } from 'lucide-react';
 import { useArena } from '@/hooks/useArena';
 import arxonLogo from '@/assets/arxon-icon.svg';
+import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return 'Just now';
@@ -52,7 +53,7 @@ function ArxonCoin({ active }: { active: boolean }) {
         <circle cx="48" cy="48" r="40" fill="none" stroke="url(#dcr2)" strokeWidth="3"/>
         <ellipse cx="40" cy="32" rx="22" ry="11" fill="url(#dch2)" style={{transform:'rotate(-22deg)',transformOrigin:'40px 32px'}}/>
         {/* Real Arxon logo inside coin */}
-        <image href={arxonLogo} x="20" y="20" width="56" height="56" clipPath="url(#coinClip2)"/>
+        <image href={arxonLogoDark} x="29" y="29" width="38" height="38" clipPath="url(#coinClip2)"/>
         <circle cx="48" cy="48" r="28" fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="1"/>
       </svg>
       {/* Orbit A */}
@@ -180,7 +181,7 @@ export default function MobileDashboard() {
         <div style={{display:'flex',alignItems:'center',gap:12}}>
           <div style={{width:44,height:44,borderRadius:14,overflow:'hidden',
             border:'1px solid hsl(215 35% 62%/0.2)',boxShadow:'0 0 16px hsl(215 55% 62%/0.12)'}}>
-            <img src={arxonLogo} alt="Arxon" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+            <img src={arxonLogo} alt="Arxon" style={{width:'65%',height:'65%',objectFit:'contain',margin:'auto',display:'block'}}/>
           </div>
           <div>
             <p style={{fontSize:10,color:'hsl(215 14% 38%)',textTransform:'uppercase',letterSpacing:'0.16em',fontWeight:500,marginBottom:3}}>Welcome back</p>
@@ -202,7 +203,7 @@ export default function MobileDashboard() {
               border:'1.5px solid hsl(215 35% 62%/0.25)',
               boxShadow:'0 0 12px hsl(215 55% 62%/0.12)'}}>
             {avatarUrl
-              ? <img src={avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              ? <img src={avatarUrl} alt="" style={{width:'65%',height:'65%',objectFit:'contain',margin:'auto',display:'block'}}/>
               : <div style={{width:'100%',height:'100%',background:'linear-gradient(135deg,hsl(215 30% 18%),hsl(215 40% 28%))',
                   display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:15,color:'hsl(215 20% 93%)'}}>
                   {username[0]?.toUpperCase()}
@@ -393,7 +394,7 @@ export default function MobileDashboard() {
                   background:'hsl(225 26% 8%)',border:'1px solid hsl(215 22% 14%)',display:'flex',flexDirection:'column'}}>
                 {battle.banner_image ? (
                   <div style={{height:76,overflow:'hidden',position:'relative',flexShrink:0}}>
-                    <img src={battle.banner_image} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}
+                    <img src={battle.banner_image} alt="" style={{width:'65%',height:'65%',objectFit:'contain',margin:'auto',display:'block'}}
                       onError={e=>{(e.target as HTMLImageElement).parentElement!.style.display='none'}}/>
                     <div style={{position:'absolute',inset:0,background:'linear-gradient(to bottom,transparent 30%,hsl(225 26% 8%))'}}/>
                     {isLive&&(<div style={{position:'absolute',top:7,right:8,display:'flex',alignItems:'center',gap:3,
