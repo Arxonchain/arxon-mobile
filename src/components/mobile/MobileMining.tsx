@@ -147,8 +147,10 @@ export default function MobileMining() {
                 border:'2.5px solid hsl(215 35% 62%/0.35)',
                 boxShadow:`0 0 ${isMining?'40px':'20px'} hsl(215 55% 62%/${isMining?'0.35':'0.15'}), inset 0 0 20px hsl(215 35% 62%/0.1)`,
                 animation:isMining?'miningCore 2s ease-in-out infinite':'idleFloat 5s ease-in-out infinite',
-                transition:'box-shadow 0.5s'}}>
-                <img src={arxonLogo} alt="ARX" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+                transition:'box-shadow 0.5s',
+                display:'flex',alignItems:'center',justifyContent:'center',
+                background:'radial-gradient(circle,hsl(215 40% 14%) 0%,hsl(215 35% 8%) 100%)'}}>
+                <img src={arxonLogo} alt="ARX" style={{width:'62%',height:'62%',objectFit:'contain'}}/>
               </div>
             </div>
 
@@ -256,8 +258,10 @@ export default function MobileMining() {
               </div>
             </div>
             <div style={{width:50,height:50,borderRadius:16,overflow:'hidden',
-              border:'1px solid hsl(215 35% 62%/0.2)',boxShadow:'0 0 16px hsl(215 55% 62%/0.12)'}}>
-              <img src={arxonLogo} alt="ARX" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
+              border:'1px solid hsl(215 35% 62%/0.2)',boxShadow:'0 0 16px hsl(215 55% 62%/0.12)',
+              display:'flex',alignItems:'center',justifyContent:'center',
+              background:'hsl(215 28% 8%)'}}>
+              <img src={arxonLogo} alt="ARX" style={{width:'68%',height:'68%',objectFit:'contain'}}/>
             </div>
           </div>
         </GlassCard>
