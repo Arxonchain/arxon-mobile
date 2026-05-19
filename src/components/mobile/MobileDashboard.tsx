@@ -6,8 +6,9 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMiningStatus } from '@/hooks/useMiningStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
-import { Bell, ChevronRight } from 'lucide-react';
-import arxonLogo from '@/assets/arxon-logo.jpg';
+import { Bell, ChevronRight, Zap } from 'lucide-react';
+import { useArena } from '@/hooks/useArena';
+import arxonLogo from '@/assets/arxon-icon.svg';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -82,6 +83,16 @@ export default function MobileDashboard() {
   const [liveEarn,  setLiveEarn]  = useState(0);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
+  // Arena battles for dashboard — safe with try/catch
+  const { activeBattle, battleHistory, loading: arenaLoading } = useArena();
+  const dashBattles = (() => {
+    try {
+      const live = activeBattle ? [{ ...activeBattle, _live: true }] : [];
+      const ended = (battleHistory || []).slice(0, 4).map((b: any) => ({ ...b, _live: false }));
+      return [...live, ...ended].slice(0, 5);
+    } catch { return []; }
+  })();
+
   const totalPts = Math.round(points?.total_points ?? 0);
   const userRank = rank ?? null;
   const streak   = points?.daily_streak ?? 0;
@@ -150,14 +161,13 @@ export default function MobileDashboard() {
     return ()=>clearInterval(t);
   },[isMining]);
 
-  // All quick action items — same color palette
+  // All quick action items — same color palette (CHAT REMOVED)
   const quickItems = [
     { id:'arena',    label:'Arena',     path:'/arena',    icon:<path d="M14.5 17.5L3 6V3h3l11.5 11.5"/>, icon2:<><circle cx="19" cy="19" r="2"/><circle cx="5" cy="5" r="2"/></> },
     { id:'nexus',    label:'Nexus',     path:'/nexus',    icon:<><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></> },
     { id:'tasks',    label:'Tasks',     path:'/tasks',    icon:<><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></> },
     { id:'referrals',label:'Referrals', path:'/referrals',icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
     { id:'wallet',   label:'Wallet',    path:'/wallet',   icon:<><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 11h20"/><circle cx="17" cy="15.5" r="1.5" fill="currentColor"/></> },
-    { id:'chat',     label:'Chat',      path:'/chat',     icon:<path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/> },
   ];
 
   return (
@@ -362,50 +372,83 @@ export default function MobileDashboard() {
       <motion.div variants={fadeUp} style={{padding:'24px 20px 0'}}>
         <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
           <p style={{fontSize:15,fontWeight:700,color:'hsl(215 20% 93%)'}}>Live Battles</p>
-          <button onClick={()=>navigate('/arena')}
+          <button onPointerDown={()=>navigate('/arena')}
             style={{display:'flex',alignItems:'center',gap:3,fontSize:11,color:'hsl(215 35% 62%)',fontWeight:600,background:'none',border:'none',cursor:'pointer'}}>
             View all <ChevronRight size={13}/>
           </button>
         </div>
-        <div className="scrollbar-none" style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4}}>
-          <motion.div whileTap={{scale:0.97}} onClick={()=>navigate('/arena')} className="press"
-            style={{minWidth:210,borderRadius:20,overflow:'hidden',height:126,flexShrink:0,cursor:'pointer',
-              position:'relative',background:'linear-gradient(135deg,hsl(225 28% 10%),hsl(215 30% 14%),hsl(225 26% 8%))',
-              border:'1px solid hsl(215 30% 22%/0.3)'}}>
-            <div style={{position:'absolute',top:0,bottom:0,left:'50%',width:1,
-              background:'linear-gradient(to bottom,transparent,hsl(215 35% 62%/0.3),transparent)'}}/>
-            <div style={{position:'absolute',left:0,top:0,bottom:0,width:'50%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5}}>
-              <div style={{width:36,height:36,borderRadius:'50%',background:'linear-gradient(135deg,#F7931A,#E8820A)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900,color:'white',boxShadow:'0 0 14px rgba(247,147,26,0.4)'}}>₿</div>
-              <span style={{fontSize:10,fontWeight:700,color:'hsl(215 20% 90%)'}}>ALPHA</span>
-              <span style={{fontSize:9,color:'hsl(215 18% 45%)'}}>Team</span>
+        <div className="scrollbar-none" style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4,WebkitOverflowScrolling:'touch',touchAction:'pan-x'}}>
+          {arenaLoading && !dashBattles.length && [0,1,2].map(i=>(
+            <div key={i} style={{minWidth:200,height:155,borderRadius:20,flexShrink:0,
+              background:'hsl(215 22% 9%)',border:'1px solid hsl(215 22% 13%)'}}/>
+          ))}
+          {dashBattles.map((battle:any)=>{
+            const total=(battle.side_a_power||0)+(battle.side_b_power||0);
+            const pctA=total>0?Math.round((battle.side_a_power||0)/total*100):50;
+            const pctB=100-pctA;
+            const isLive=battle._live||battle.status==='active';
+            return (
+              <motion.div key={battle.id} whileTap={{scale:0.97}}
+                onClick={()=>navigate('/arena')}
+                style={{minWidth:200,borderRadius:20,flexShrink:0,cursor:'pointer',overflow:'hidden',
+                  background:'hsl(225 26% 8%)',border:'1px solid hsl(215 22% 14%)',display:'flex',flexDirection:'column'}}>
+                {battle.banner_image ? (
+                  <div style={{height:76,overflow:'hidden',position:'relative',flexShrink:0}}>
+                    <img src={battle.banner_image} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}
+                      onError={e=>{(e.target as HTMLImageElement).parentElement!.style.display='none'}}/>
+                    <div style={{position:'absolute',inset:0,background:'linear-gradient(to bottom,transparent 30%,hsl(225 26% 8%))'}}/>
+                    {isLive&&(<div style={{position:'absolute',top:7,right:8,display:'flex',alignItems:'center',gap:3,
+                      background:'hsl(155 45% 40%/0.92)',borderRadius:8,padding:'2px 7px'}}>
+                      <div style={{width:4,height:4,borderRadius:'50%',background:'white'}}/>
+                      <span style={{fontSize:7,fontWeight:800,color:'white'}}>LIVE</span>
+                    </div>)}
+                  </div>
+                ):(
+                  <div style={{height:38,background:'linear-gradient(135deg,hsl(215 35% 12%),hsl(225 28% 9%))',
+                    display:'flex',alignItems:'center',justifyContent:'space-between',padding:'0 12px',flexShrink:0}}>
+                    <span style={{fontSize:9,fontWeight:700,color:'hsl(215 18% 48%)'}}>Arena Battle</span>
+                    {isLive&&(<div style={{display:'flex',alignItems:'center',gap:3,background:'hsl(155 45% 43%/0.14)',
+                      border:'1px solid hsl(155 45% 43%/0.3)',borderRadius:7,padding:'2px 6px'}}>
+                      <div style={{width:4,height:4,borderRadius:'50%',background:'hsl(155 45% 55%)'}}/>
+                      <span style={{fontSize:7,fontWeight:800,color:'hsl(155 45% 55%)'}}>LIVE</span>
+                    </div>)}
+                  </div>
+                )}
+                <div style={{padding:'8px 11px 11px',flex:1}}>
+                  <p style={{fontSize:11,fontWeight:600,color:'hsl(215 18% 80%)',marginBottom:7,lineHeight:1.3,
+                    overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
+                    {battle.title||'Arena Battle'}
+                  </p>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 20px 1fr',gap:5,alignItems:'stretch'}}>
+                    <div style={{padding:'6px 8px',borderRadius:10,
+                      background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 12%)',
+                      border:`1px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.35)':'hsl(215 22% 18%)'}`}}>
+                      <p style={{fontSize:9,fontWeight:600,color:'hsl(215 18% 72%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_a_name}</p>
+                      <p style={{fontSize:13,fontWeight:900,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 35% 68%)'}}>{pctA}%</p>
+                    </div>
+                    <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+                      <span style={{fontSize:7,fontWeight:900,color:'hsl(215 22% 34%)'}}>VS</span>
+                    </div>
+                    <div style={{padding:'6px 8px',borderRadius:10,
+                      background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 12%)',
+                      border:`1px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.35)':'hsl(215 22% 18%)'}`}}>
+                      <p style={{fontSize:9,fontWeight:600,color:'hsl(215 18% 72%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_b_name}</p>
+                      <p style={{fontSize:13,fontWeight:900,color:battle.winner_side==='b'?'hsl(38 55% 58%)':'hsl(215 35% 68%)'}}>{pctB}%</p>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+          {!arenaLoading&&dashBattles.length===0&&(
+            <div style={{minWidth:180,height:130,borderRadius:20,flexShrink:0,opacity:0.5,
+              border:'1px dashed hsl(215 25% 18%)',display:'flex',flexDirection:'column',
+              alignItems:'center',justifyContent:'center',gap:7,background:'hsl(225 28% 6%)'}}>
+              <Zap size={26} color="hsl(215 25% 34%)"/>
+              <p style={{fontSize:11,fontWeight:600,color:'hsl(215 18% 33%)'}}>No battles yet</p>
+              <p style={{fontSize:9,color:'hsl(215 14% 22%)'}}>Check Arena</p>
             </div>
-            <div style={{position:'absolute',right:0,top:0,bottom:0,width:'50%',display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',gap:5}}>
-              <div style={{width:36,height:36,borderRadius:'50%',background:'linear-gradient(135deg,#627EEA,#4060C8)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900,color:'white',boxShadow:'0 0 14px rgba(98,126,234,0.4)'}}>Ξ</div>
-              <span style={{fontSize:10,fontWeight:700,color:'hsl(215 20% 90%)'}}>OMEGA</span>
-              <span style={{fontSize:9,color:'hsl(215 18% 45%)'}}>Team</span>
-            </div>
-            <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',
-              background:'hsl(215 30% 15%)',border:'1px solid hsl(215 35% 28%)',borderRadius:8,padding:'3px 8px'}}>
-              <span style={{fontSize:9,fontWeight:900,color:'hsl(215 32% 72%)'}}>VS</span>
-            </div>
-            <div style={{position:'absolute',bottom:0,left:0,right:0,padding:'6px 10px',
-              background:'linear-gradient(to top,hsl(225 35% 3%/0.8),transparent)',
-              display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontSize:9,fontWeight:600,color:'hsl(215 18% 50%)'}}>Arena Battle</span>
-              <div style={{display:'flex',alignItems:'center',gap:3,background:'hsl(155 45% 43%/0.14)',
-                border:'1px solid hsl(155 45% 43%/0.28)',borderRadius:8,padding:'2px 7px'}}>
-                <div className="mining-pulse" style={{width:5,height:5,borderRadius:'50%',background:'hsl(155 45% 43%)'}}/>
-                <span style={{fontSize:8,fontWeight:700,color:'hsl(155 45% 55%)'}}>LIVE</span>
-              </div>
-            </div>
-          </motion.div>
-          <div style={{minWidth:150,borderRadius:20,height:126,flexShrink:0,opacity:0.6,
-            border:'1px dashed hsl(215 25% 20%)',display:'flex',flexDirection:'column',
-            alignItems:'center',justifyContent:'center',gap:7,background:'hsl(225 28% 6%)'}}>
-            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="hsl(215 25% 38%)" strokeWidth="1.6"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            <p style={{fontSize:11,fontWeight:600,color:'hsl(215 18% 38%)'}}>Next Battle</p>
-            <p style={{fontSize:9,color:'hsl(215 14% 26%)'}}>Coming soon</p>
-          </div>
+          )}
         </div>
       </motion.div>
 

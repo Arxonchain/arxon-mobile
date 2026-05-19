@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import arxonLogo from "@/assets/arxon-logo.jpg";
+import arxonLogo from "@/assets/arxon-icon.svg";
 
 /**
  * Allows an already-authenticated user to set a new password.

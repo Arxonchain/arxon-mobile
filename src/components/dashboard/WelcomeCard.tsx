@@ -1,5 +1,5 @@
 import { memo } from "react";
-import arxonLogo from "@/assets/arxon-logo.jpg";
+import arxonLogo from "@/assets/arxon-icon.svg";
 
 interface WelcomeCardProps {
   title: string;

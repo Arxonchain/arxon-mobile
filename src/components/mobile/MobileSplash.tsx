@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect } from 'react';
-import arxonLogo from '@/assets/arxon-logo.jpg';
+import arxonLogo from '@/assets/arxon-icon.svg';
 
 interface Props { isAppReady: boolean; onFinish: () => void; }
 

@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { getPasswordResetRedirectUrl, getMagicLinkRedirectUrl } from "@/lib/auth/getRedirectUrl";
 import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
-import arxonLogo from "@/assets/arxon-logo.jpg";
+import arxonLogo from "@/assets/arxon-icon.svg";
 
 type Mode = "signin" | "signup" | "forgot";
 

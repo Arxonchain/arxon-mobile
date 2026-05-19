@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Swords, Trophy, Shield, Zap, Target, Crown, Flame, ChevronDown } from 'lucide-react';
-import arxonLogo from '@/assets/arxon-logo.jpg';
+import arxonLogo from '@/assets/arxon-icon.svg';
 
 interface ArenaHeroHeaderProps {
   onScrollToContent?: () => void;

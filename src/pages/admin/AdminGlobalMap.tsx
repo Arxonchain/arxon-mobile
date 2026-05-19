@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Globe, TrendingUp, Users, Zap, Activity } from "lucide-react";
-import arxonLogo from "@/assets/arxon-logo-new.jpg";
+import arxonLogo from "@/assets/arxon-icon.svg";
 import GlobeMap from "@/components/admin/GlobeMap";
 const MINING_COUNTRIES = [
   { code: "NG", name: "Nigeria", flag: "🇳🇬", miners: 4850, color: "#22c55e" },

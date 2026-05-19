@@ -5,7 +5,7 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
-import arxonLogo from "@/assets/arxon-logo-new.jpg";
+import arxonLogo from "@/assets/arxon-icon.svg";
 import miningScreenshot from "@/assets/mining-screenshot.jpg";
 import walletScreenshot from "@/assets/wallet-screenshot.jpg";
 

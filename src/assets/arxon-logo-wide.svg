@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 120" fill="none">
+  <!-- Icon (scaled to 120h, proportionally) -->
+  <!-- Top pill -->
+  <rect x="36" y="16" width="56" height="21" rx="10.5" fill="#B8CCEE"/>
+  <!-- Middle left pill -->
+  <rect x="10" y="48" width="54" height="21" rx="10.5" fill="#B8CCEE"/>
+  <!-- Middle right pill -->
+  <rect x="72" y="48" width="54" height="21" rx="10.5" fill="#B8CCEE"/>
+  <!-- Bottom wide pill -->
+  <rect x="2" y="82" width="130" height="26" rx="13" fill="#B8CCEE"/>
+  <!-- Keyhole circle -->
+  <circle cx="67" cy="95" r="5" fill="#0a0a0f"/>
+  <!-- Keyhole stem -->
+  <rect x="63.5" y="99" width="7" height="6.5" rx="1.5" fill="#0a0a0f"/>
+
+  <!-- ARXON wordmark -->
+  <text
+    x="152"
+    y="97"
+    font-family="'Arial Black', 'Arial Bold', 'Helvetica Neue', Arial, sans-serif"
+    font-weight="900"
+    font-size="72"
+    letter-spacing="1"
+    fill="#B8CCEE"
+  >ARXON</text>
+</svg>
