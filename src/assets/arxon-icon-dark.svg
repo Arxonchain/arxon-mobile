@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- Top pill -->
+  <rect x="62" y="48" width="76" height="28" rx="14" fill="#111827"/>
+  <!-- Middle left pill -->
+  <rect x="26" y="90" width="74" height="28" rx="14" fill="#111827"/>
+  <!-- Middle right pill -->
+  <rect x="108" y="90" width="74" height="28" rx="14" fill="#111827"/>
+  <!-- Bottom wide pill -->
+  <rect x="14" y="132" width="172" height="34" rx="17" fill="#111827"/>
+  <!-- Keyhole circle -->
+  <circle cx="100" cy="147" r="6.5" fill="#B8CCEE"/>
+  <!-- Keyhole stem -->
+  <rect x="96.5" y="151.5" width="7" height="8.5" rx="1.5" fill="#B8CCEE"/>
+</svg>
