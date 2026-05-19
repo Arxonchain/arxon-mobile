@@ -180,8 +180,10 @@ export default function MobileDashboard() {
         style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'52px 20px 0'}}>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
           <div style={{width:44,height:44,borderRadius:14,overflow:'hidden',
-            border:'1px solid hsl(215 35% 62%/0.2)',boxShadow:'0 0 16px hsl(215 55% 62%/0.12)'}}>
-            <img src={arxonLogo} alt="Arxon" style={{width:'65%',height:'65%',objectFit:'contain',margin:'auto',display:'block'}}/>
+            border:'1px solid hsl(215 35% 62%/0.2)',boxShadow:'0 0 16px hsl(215 55% 62%/0.12)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            background:'hsl(215 28% 8%)'}}>
+            <img src={arxonLogo} alt="Arxon" style={{width:'70%',height:'70%',objectFit:'contain'}}/>
           </div>
           <div>
             <p style={{fontSize:10,color:'hsl(215 14% 38%)',textTransform:'uppercase',letterSpacing:'0.16em',fontWeight:500,marginBottom:3}}>Welcome back</p>
@@ -203,7 +205,7 @@ export default function MobileDashboard() {
               border:'1.5px solid hsl(215 35% 62%/0.25)',
               boxShadow:'0 0 12px hsl(215 55% 62%/0.12)'}}>
             {avatarUrl
-              ? <img src={avatarUrl} alt="" style={{width:'65%',height:'65%',objectFit:'contain',margin:'auto',display:'block'}}/>
+              ? <img src={avatarUrl} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
               : <div style={{width:'100%',height:'100%',background:'linear-gradient(135deg,hsl(215 30% 18%),hsl(215 40% 28%))',
                   display:'flex',alignItems:'center',justifyContent:'center',fontWeight:700,fontSize:15,color:'hsl(215 20% 93%)'}}>
                   {username[0]?.toUpperCase()}
@@ -394,7 +396,7 @@ export default function MobileDashboard() {
                   background:'hsl(225 26% 8%)',border:'1px solid hsl(215 22% 14%)',display:'flex',flexDirection:'column'}}>
                 {battle.banner_image ? (
                   <div style={{height:76,overflow:'hidden',position:'relative',flexShrink:0}}>
-                    <img src={battle.banner_image} alt="" style={{width:'65%',height:'65%',objectFit:'contain',margin:'auto',display:'block'}}
+                    <img src={battle.banner_image} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}
                       onError={e=>{(e.target as HTMLImageElement).parentElement!.style.display='none'}}/>
                     <div style={{position:'absolute',inset:0,background:'linear-gradient(to bottom,transparent 30%,hsl(225 26% 8%))'}}/>
                     {isLive&&(<div style={{position:'absolute',top:7,right:8,display:'flex',alignItems:'center',gap:3,
