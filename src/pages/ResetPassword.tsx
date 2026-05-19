@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePasswordRecoverySession } from "@/hooks/usePasswordRecoverySession";
-import arxonLogo from "@/assets/arxon-logo.jpg";
+import arxonLogo from "@/assets/arxon-icon.svg";
 
 export default function ResetPassword() {
   const navigate = useNavigate();

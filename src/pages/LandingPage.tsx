@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Zap, Shield, Users, ArrowRight } from 'lucide-react';
-import arxonLogo from '@/assets/arxon-logo.jpg';
+import arxonLogo from '@/assets/arxon-icon.svg';
 
 export default function LandingPage() {
   const navigate = useNavigate();

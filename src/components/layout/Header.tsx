@@ -1,7 +1,7 @@
 import { Bell, ChevronDown, Zap, LogIn, Megaphone } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import arxonLogo from "@/assets/arxon-logo-header.jpeg";
+import arxonLogo from "@/assets/arxon-logo-wide.svg";
 import MobileNav from "./MobileNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";

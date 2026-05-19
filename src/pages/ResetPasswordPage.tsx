@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
-import arxonLogo from '@/assets/arxon-logo.jpg';
+import arxonLogo from '@/assets/arxon-icon.svg';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');

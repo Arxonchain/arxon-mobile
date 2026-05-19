@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Fingerprint, Eye, AlertCircle } from 'lucide-react';
 import { useBiometric } from '@/hooks/useBiometric';
-import arxonLogo from '@/assets/arxon-icon.svg';
+import arxonLogo from '@/assets/arxon-logo.jpg';
 
 export default function BiometricLockScreen() {
   const { authenticate, checking } = useBiometric();

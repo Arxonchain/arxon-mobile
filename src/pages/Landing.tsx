@@ -16,7 +16,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import XIcon from "@/components/icons/XIcon";
- import arxonLogo from "@/assets/arxon-logo-full.jpg";
+ import arxonLogo from "@/assets/arxon-logo-wide.svg";
 import { useState, useEffect, memo, useRef } from "react";
 
 // Animated counter
