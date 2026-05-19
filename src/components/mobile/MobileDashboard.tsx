@@ -8,12 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
 import { Bell, ChevronRight, Zap } from 'lucide-react';
 import { useArena } from '@/hooks/useArena';
-<<<<<<< HEAD
 import arxonLogo from '@/assets/arxon-icon.svg';
-=======
-import arxonLogo from '@/assets/arxon-icon.svg';
->>>>>>> 21e46417e5d3903ae9e686dd5d20d5b47d539ea1
-
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return 'Just now';
