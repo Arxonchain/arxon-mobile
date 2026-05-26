@@ -228,16 +228,21 @@ export const useReferrals = (user: User | null) => {
       return { success: false, error: 'You cannot use your own referral code' };
     }
 
-    // Create the referral record
+    // FIX: Set points_awarded = 0 here — the on_new_referral DB trigger sets it to 100 instantly.
+    // Setting it to 100 on the client caused a conflict with the trigger's BEFORE INSERT update.
     const { error: insertError } = await supabase.from('referrals').insert({
       referrer_id: referrerProfile.user_id,
       referred_id: user.id,
       referral_code_used: code.toUpperCase(),
-      points_awarded: 100, // Base referral bonus
+      points_awarded: 0,
     });
 
     if (insertError) {
-      return { success: false, error: 'Failed to apply referral code' };
+      // 23505 = unique_violation — already referred
+      if ((insertError as any).code === '23505') {
+        return { success: false, error: 'You have already used a referral code' };
+      }
+      return { success: false, error: 'Failed to apply referral code. Please try again.' };
     }
 
     // Keep UI fresh
@@ -256,22 +261,22 @@ export const useReferrals = (user: User | null) => {
       return;
     }
 
-    // Hydrate from cache initially
+    // FIX: Bust the referrals cache on every mount so stale "empty" state
+    // (from before RLS was fixed) never blocks real data from showing.
+    // The referral CODE cache is safe to keep (it's per-user and stable).
+    try {
+      localStorage.removeItem(referralsCacheKey(user.id));
+      localStorage.removeItem(referralStatsCacheKey(user.id));
+    } catch {}
+
+    // Hydrate referral CODE from long-lived cache only
     const cachedCode = cacheGet<string>(referralCodeCacheKey(user.id), { maxAgeMs: 24 * 60 * 60_000 });
-    if (cachedCode?.data) setReferralCode(cachedCode.data);
-
-    const cachedRefs = cacheGet<ReferralData[]>(referralsCacheKey(user.id), { maxAgeMs: 5 * 60_000 });
-    if (cachedRefs?.data) setReferrals(cachedRefs.data);
-
-    const cachedStats = cacheGet<ReferralStats>(referralStatsCacheKey(user.id), { maxAgeMs: 5 * 60_000 });
-    if (cachedStats?.data) setStats(cachedStats.data);
-
-    // Don't show loading if we have cached data
     if (cachedCode?.data) {
+      setReferralCode(cachedCode.data);
       setLoading(false);
     }
 
-    // Always fetch fresh data from server (force refresh to bypass any stale cache)
+    // Always fetch fresh data from server
     void fetchReferralCode(true);
     void fetchReferrals();
   }, [user, fetchReferralCode, fetchReferrals]);
