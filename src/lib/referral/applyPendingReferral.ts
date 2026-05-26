@@ -1,18 +1,27 @@
 import { supabase } from "@/integrations/supabase/client";
 
+const MAX_ATTEMPTS = 5;
+const RETRY_DELAY_MS = 800;
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /**
- * Reads a pending referral code from sessionStorage, validates it,
- * and inserts a row into the referrals table.
+ * Reads a pending referral code from localStorage (or sessionStorage as fallback),
+ * validates it, and inserts a row into the referrals table.
  *
- * Safe to call multiple times — it clears the code on success or
- * if the user already has a referral, preventing duplicate inserts.
+ * Safe to call multiple times — clears the code on success or if already referred.
+ * Retries up to MAX_ATTEMPTS times so transient network errors don't silently drop referrals.
+ *
+ * IMPORTANT: Must only be called AFTER the user has a valid session (after email confirmation).
  */
 export async function applyPendingReferralCode(): Promise<void> {
   let code: string | null = null;
   try {
     // Try localStorage first (persists across tabs/email confirmation redirects),
     // fall back to sessionStorage for backwards compatibility
-    code = localStorage.getItem("arxon_referral_code") || sessionStorage.getItem("arxon_referral_code");
+    code =
+      localStorage.getItem("arxon_referral_code") ||
+      sessionStorage.getItem("arxon_referral_code");
   } catch {
     return;
   }
@@ -20,7 +29,7 @@ export async function applyPendingReferralCode(): Promise<void> {
   if (!code || !code.trim()) return;
   code = code.trim().toUpperCase();
 
-  // Need an authenticated user
+  // Need an authenticated user — if no session yet, bail (caller must retry after session exists)
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -34,11 +43,7 @@ export async function applyPendingReferralCode(): Promise<void> {
     .maybeSingle();
 
   if (existing) {
-    // Already referred — clear the pending code
-    try {
-      localStorage.removeItem("arxon_referral_code");
-      sessionStorage.removeItem("arxon_referral_code");
-    } catch {}
+    _clearCode();
     return;
   }
 
@@ -50,36 +55,49 @@ export async function applyPendingReferralCode(): Promise<void> {
     .maybeSingle();
 
   if (!referrerProfile) {
-    // Invalid code — clear it
-    try {
-      localStorage.removeItem("arxon_referral_code");
-      sessionStorage.removeItem("arxon_referral_code");
-    } catch {}
+    // Invalid code — clear it so we don't retry forever
+    _clearCode();
     return;
   }
 
   // Can't refer yourself
   if (referrerProfile.user_id === user.id) {
-    try {
-      localStorage.removeItem("arxon_referral_code");
-      sessionStorage.removeItem("arxon_referral_code");
-    } catch {}
+    _clearCode();
     return;
   }
 
-  // Insert referral record — the on_new_referral trigger handles points + boost
-  const { error } = await supabase.from("referrals").insert({
-    referrer_id: referrerProfile.user_id,
-    referred_id: user.id,
-    referral_code_used: code,
-    points_awarded: 0, // trigger will set this to 100
-  });
+  // Insert with retries — the on_new_referral trigger sets points_awarded = 100 instantly
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    const { error } = await supabase.from("referrals").insert({
+      referrer_id: referrerProfile.user_id,
+      referred_id: user.id,
+      referral_code_used: code,
+      points_awarded: 0, // trigger sets this to 100 immediately on insert
+    });
 
-  if (!error) {
-    try {
-      localStorage.removeItem("arxon_referral_code");
-      sessionStorage.removeItem("arxon_referral_code");
-    } catch {}
-    console.log("[referral] Applied referral code:", code);
+    if (!error) {
+      _clearCode();
+      console.log("[referral] Applied referral code:", code);
+      return;
+    }
+
+    // 23505 = unique_violation — row already inserted concurrently, treat as success
+    if ((error as any).code === "23505") {
+      _clearCode();
+      return;
+    }
+
+    console.warn(
+      `[referral] Insert attempt ${attempt + 1} failed:`,
+      error.message
+    );
+    await sleep(RETRY_DELAY_MS * (attempt + 1));
   }
+}
+
+function _clearCode() {
+  try {
+    localStorage.removeItem("arxon_referral_code");
+    sessionStorage.removeItem("arxon_referral_code");
+  } catch {}
 }
