@@ -3,10 +3,15 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import OtpEmailPrompt from "@/components/auth/OtpEmailPrompt";
+import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
 
 /**
  * Handles all auth callbacks from email links (confirmation, recovery, magic links).
  * This page processes the tokens and redirects appropriately.
+ *
+ * FIX: applyPendingReferralCode() is now called on every successful sign-up confirmation
+ * before navigating to "/". This is the only place where the session is guaranteed to
+ * exist right after email confirmation — which is why referrals were never being recorded.
  */
 const AuthConfirm = () => {
   const [searchParams] = useSearchParams();
@@ -17,6 +22,15 @@ const AuthConfirm = () => {
   const [otpType, setOtpType] = useState<string | null>(null);
   const [otpNext, setOtpNext] = useState<string>("/");
   const [otpError, setOtpError] = useState<string | null>(null);
+
+  // Helper: apply referral then navigate — used on every successful signup confirmation
+  const applyReferralAndNavigate = async (destination: string) => {
+    // Only attempt referral apply when navigating to the main app (not recovery/magiclink flows)
+    if (destination !== "/reset-password" && destination !== "/change-password") {
+      await applyPendingReferralCode().catch(() => {});
+    }
+    navigate(destination);
+  };
 
   useEffect(() => {
     const processAuthCallback = async () => {
@@ -43,14 +57,14 @@ const AuthConfirm = () => {
             ? "/change-password"
             : "/");
 
-       console.log("AuthConfirm: Processing callback", { 
-        hasTokenHash: !!token_hash, 
-        type, 
-        hasCode: !!code, 
+      console.log("AuthConfirm: Processing callback", {
+        hasTokenHash: !!token_hash,
+        type,
+        hasCode: !!code,
         hasAccessToken: !!accessToken,
         hashType,
-         flowType,
-         next,
+        flowType,
+        next,
         hasToken: !!token,
         hasEmail: !!email,
       });
@@ -63,8 +77,8 @@ const AuthConfirm = () => {
 
       try {
         // 0. Handle legacy OTP links: ?token=...&type=recovery[&email=...]
-         if (token && (type || hashType || "recovery")) {
-           const t = (type || hashType || "recovery").toLowerCase();
+        if (token && (type || hashType || "recovery")) {
+          const t = (type || hashType || "recovery").toLowerCase();
 
           // If the template didn't include email, we must ask for it.
           if (!email) {
@@ -90,23 +104,24 @@ const AuthConfirm = () => {
             return;
           }
 
-           if (t === "recovery") {
+          if (t === "recovery") {
             setStatus("success");
             setMessage("Verified! Redirecting to password reset...");
             setTimeout(() => navigate("/reset-password"), 800);
             return;
           }
 
-           if (t === "magiclink") {
-             setStatus("success");
-             setMessage("Verified! Redirecting...");
-             setTimeout(() => navigate("/change-password"), 800);
-             return;
-           }
+          if (t === "magiclink") {
+            setStatus("success");
+            setMessage("Verified! Redirecting...");
+            setTimeout(() => navigate("/change-password"), 800);
+            return;
+          }
 
-           setStatus("success");
-           setMessage("Verified! Redirecting...");
-           setTimeout(() => navigate(next), 1000);
+          setStatus("success");
+          setMessage("Verified! Redirecting...");
+          // Apply referral before navigating — session is live at this point
+          await applyReferralAndNavigate(next);
           return;
         }
 
@@ -126,23 +141,24 @@ const AuthConfirm = () => {
             return;
           }
 
-           if (flowType === "recovery") {
-             setStatus("success");
-             setMessage("Verified! Redirecting to password reset...");
-             setTimeout(() => navigate("/reset-password"), 800);
-             return;
-           }
+          if (flowType === "recovery") {
+            setStatus("success");
+            setMessage("Verified! Redirecting to password reset...");
+            setTimeout(() => navigate("/reset-password"), 800);
+            return;
+          }
 
-           if (flowType === "magiclink") {
-             setStatus("success");
-             setMessage("Verified! Redirecting...");
-             setTimeout(() => navigate("/change-password"), 800);
-             return;
-           }
+          if (flowType === "magiclink") {
+            setStatus("success");
+            setMessage("Verified! Redirecting...");
+            setTimeout(() => navigate("/change-password"), 800);
+            return;
+          }
 
-           setStatus("success");
-           setMessage("Verified! Redirecting...");
-           setTimeout(() => navigate(next), 1000);
+          setStatus("success");
+          setMessage("Verified! Redirecting...");
+          // Apply referral before navigating — session is live at this point
+          await applyReferralAndNavigate(next);
           return;
         }
 
@@ -159,23 +175,24 @@ const AuthConfirm = () => {
             return;
           }
 
-           if (flowType === "recovery") {
-             setStatus("success");
-             setMessage("Verified! Redirecting to password reset...");
-             setTimeout(() => navigate("/reset-password"), 800);
-             return;
-           }
+          if (flowType === "recovery") {
+            setStatus("success");
+            setMessage("Verified! Redirecting to password reset...");
+            setTimeout(() => navigate("/reset-password"), 800);
+            return;
+          }
 
-           if (flowType === "magiclink") {
-             setStatus("success");
-             setMessage("Verified! Redirecting...");
-             setTimeout(() => navigate("/change-password"), 800);
-             return;
-           }
+          if (flowType === "magiclink") {
+            setStatus("success");
+            setMessage("Verified! Redirecting...");
+            setTimeout(() => navigate("/change-password"), 800);
+            return;
+          }
 
-           setStatus("success");
-           setMessage("Verified! Redirecting...");
-           setTimeout(() => navigate(next), 1000);
+          setStatus("success");
+          setMessage("Verified! Redirecting...");
+          // Apply referral before navigating — session is live at this point
+          await applyReferralAndNavigate(next);
           return;
         }
 
@@ -195,23 +212,24 @@ const AuthConfirm = () => {
             return;
           }
 
-           if (flowType === "recovery") {
-             setStatus("success");
-             setMessage("Verified! Redirecting to password reset...");
-             setTimeout(() => navigate("/reset-password"), 800);
-             return;
-           }
+          if (flowType === "recovery") {
+            setStatus("success");
+            setMessage("Verified! Redirecting to password reset...");
+            setTimeout(() => navigate("/reset-password"), 800);
+            return;
+          }
 
-           if (flowType === "magiclink") {
-             setStatus("success");
-             setMessage("Verified! Redirecting...");
-             setTimeout(() => navigate("/change-password"), 800);
-             return;
-           }
+          if (flowType === "magiclink") {
+            setStatus("success");
+            setMessage("Verified! Redirecting...");
+            setTimeout(() => navigate("/change-password"), 800);
+            return;
+          }
 
-           setStatus("success");
-           setMessage("Email confirmed! Redirecting...");
-           setTimeout(() => navigate(next), 1500);
+          setStatus("success");
+          setMessage("Email confirmed! Redirecting...");
+          // Apply referral before navigating — session is live at this point
+          await applyReferralAndNavigate(next);
           return;
         }
 
@@ -220,26 +238,27 @@ const AuthConfirm = () => {
           data: { session },
         } = await supabase.auth.getSession();
 
-         if (session) {
-           if (flowType === "recovery") {
-             setStatus("success");
-             setMessage("Session found! Redirecting to password reset...");
-             setTimeout(() => navigate("/reset-password"), 500);
-             return;
-           }
+        if (session) {
+          if (flowType === "recovery") {
+            setStatus("success");
+            setMessage("Session found! Redirecting to password reset...");
+            setTimeout(() => navigate("/reset-password"), 500);
+            return;
+          }
 
-           if (flowType === "magiclink") {
-             setStatus("success");
-             setMessage("Session found! Redirecting...");
-             setTimeout(() => navigate("/change-password"), 500);
-             return;
-           }
+          if (flowType === "magiclink") {
+            setStatus("success");
+            setMessage("Session found! Redirecting...");
+            setTimeout(() => navigate("/change-password"), 500);
+            return;
+          }
 
-           setStatus("success");
-           setMessage("Already signed in! Redirecting...");
-           setTimeout(() => navigate(next), 500);
-           return;
-         }
+          setStatus("success");
+          setMessage("Already signed in! Redirecting...");
+          // Apply referral before navigating — session is live at this point
+          await applyReferralAndNavigate(next);
+          return;
+        }
 
         // No valid parameters and no session
         setStatus("error");
@@ -288,7 +307,8 @@ const AuthConfirm = () => {
 
     setStatus("success");
     setMessage("Verified! Redirecting...");
-    setTimeout(() => navigate(otpNext || "/"), 1000);
+    // Apply referral before navigating — session is live at this point
+    await applyReferralAndNavigate(otpNext || "/");
   };
 
   return (
