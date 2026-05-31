@@ -9,7 +9,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { getPasswordResetRedirectUrl, getMagicLinkRedirectUrl } from "@/lib/auth/getRedirectUrl";
-import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
 import arxonLogo from "@/assets/arxon-icon.svg";
 
 type Mode = "signin" | "signup" | "forgot";
@@ -65,10 +64,6 @@ export default function Auth() {
     setSearchParams({ mode: next });
   };
 
-  /**
-   * Send a magic link (passwordless sign-in) for password change flow.
-   * This is more reliable than the reset link on custom domains.
-   */
   const handleMagicLink = async () => {
     if (!email.trim()) {
       setErrorText("Please enter your email first.");
@@ -79,7 +74,6 @@ export default function Auth() {
     setMagicLinkLoading(true);
 
     try {
-      // Use edge function to send magic link for existing users only
       const { data, error } = await supabase.functions.invoke("send-magic-link", {
         body: {
           email: email.trim(),
@@ -87,12 +81,9 @@ export default function Auth() {
         },
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
       if (data?.error) {
-        // "Signups not allowed" means user doesn't exist
         if (data.error.toLowerCase().includes("not allowed") || data.error.toLowerCase().includes("not found")) {
           setErrorText("No account found with this email. Please check and try again.");
         } else {
@@ -120,7 +111,6 @@ export default function Auth() {
     setLoading(true);
 
     try {
-      // Use proper redirect URL for custom domain support
       const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
         redirectTo: getPasswordResetRedirectUrl(),
       });
@@ -132,9 +122,9 @@ export default function Auth() {
       }
 
       setResetSent(true);
-      toast({ 
-        title: "Check your email", 
-        description: "We sent you a password reset link" 
+      toast({
+        title: "Check your email",
+        description: "We sent you a password reset link",
       });
     } finally {
       setLoading(false);
@@ -143,7 +133,7 @@ export default function Auth() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (mode === "forgot") {
       return handleForgotPassword(e);
     }
@@ -153,24 +143,22 @@ export default function Auth() {
 
     try {
       if (mode === "signin") {
-        // Force clear any stale localStorage/sessionStorage auth remnants before attempting sign-in
         try {
           const keysToRemove: string[] = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && (key.startsWith('sb-') || key.includes('supabase'))) {
+            if (key && (key.startsWith("sb-") || key.includes("supabase"))) {
               keysToRemove.push(key);
             }
           }
-          keysToRemove.forEach(k => localStorage.removeItem(k));
-        } catch (e) { /* ignore */ }
+          keysToRemove.forEach((k) => localStorage.removeItem(k));
+        } catch { /* ignore */ }
 
         const { error } = await signIn(email, password);
         if (error) {
-          // If "Invalid login credentials", give clearer guidance
-          const msg = error.message?.toLowerCase().includes('invalid')
+          const msg = error.message?.toLowerCase().includes("invalid")
             ? "Invalid email or password. Please check your credentials and try again."
-            : (error.message || "Sign in failed");
+            : error.message || "Sign in failed";
           setErrorText(msg);
           toast({ title: "Sign In Failed", description: msg, variant: "destructive" });
           return;
@@ -179,7 +167,18 @@ export default function Auth() {
         return;
       }
 
-      // signup
+      // ── SIGNUP ──────────────────────────────────────────────────────────
+      const ref = referralCode.trim().toUpperCase();
+
+      // FIX 1: Always persist the referral code to both storages BEFORE signup
+      // so AuthConfirm.tsx can reliably pick it up after email confirmation.
+      if (ref) {
+        try {
+          localStorage.setItem("arxon_referral_code", ref);
+          sessionStorage.setItem("arxon_referral_code", ref);
+        } catch { /* ignore */ }
+      }
+
       const { error } = await signUp(email, password);
       if (error) {
         setErrorText(error.message || "Sign up failed");
@@ -187,18 +186,37 @@ export default function Auth() {
         return;
       }
 
-      // Apply referral code immediately after signup (non-blocking)
-      const ref = referralCode.trim().toUpperCase();
+      // FIX 2: After signup, also write referred_by to the new user's profile row.
+      // This is the database-level safety net — even if AuthConfirm.tsx is never
+      // reached (e.g. user ignores the confirmation email), the DB trigger
+      // handle_profile_referral() will fire on profile creation and insert the referral row.
       if (ref) {
         try {
-          localStorage.setItem("arxon_referral_code", ref);
-          sessionStorage.setItem("arxon_referral_code", ref);
-        } catch {
-          // ignore
-        }
-        // Fire and forget — applyPendingReferralCode will retry on next login if it fails
-        applyPendingReferralCode().catch(() => {});
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            // Session exists (auto-confirm is on OR the edge function returned a session)
+            await supabase
+              .from("profiles")
+              .update({ referred_by: ref } as any)
+              .eq("user_id", user.id);
+            // Also try to apply it immediately since we have a live session
+            const { applyPendingReferralCode } = await import("@/lib/referral/applyPendingReferral");
+            applyPendingReferralCode().catch(() => {});
+          } else {
+            // No session yet (email confirmation required) — referred_by will be
+            // written to the profile by AuthConfirm.tsx when the user confirms their email.
+            // The code is already saved in localStorage above.
+          }
+        } catch { /* non-blocking — AuthConfirm.tsx will handle it */ }
       }
+
+      // Show confirmation message instead of navigating immediately
+      toast({
+        title: "Account created!",
+        description: ref
+          ? "Check your email to confirm your account. Your referral will be credited once confirmed."
+          : "Check your email to confirm your account.",
+      });
 
       navigate("/");
     } finally {
@@ -221,10 +239,10 @@ export default function Auth() {
         <Card className="border-border/50 bg-card/95 backdrop-blur-xl">
           <CardHeader className="space-y-3">
             <CardTitle className="text-2xl font-bold">
-              {mode === "signup" 
-                ? "Create your account" 
-                : mode === "signin" 
-                  ? "Sign in to ARXON" 
+              {mode === "signup"
+                ? "Create your account"
+                : mode === "signin"
+                  ? "Sign in to ARXON"
                   : "Reset your password"}
             </CardTitle>
 
@@ -265,7 +283,7 @@ export default function Auth() {
                   </svg>
                 </div>
                 <p className="text-muted-foreground">
-                  {magicLinkSent 
+                  {magicLinkSent
                     ? "Check your email for a magic sign-in link. After signing in, you can set a new password."
                     : "Check your email for a password reset link"}
                 </p>
@@ -353,12 +371,12 @@ export default function Auth() {
                 )}
 
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading 
-                    ? "Working…" 
-                    : mode === "signup" 
-                      ? "Create account" 
-                      : mode === "signin" 
-                        ? "Sign in" 
+                  {loading
+                    ? "Working…"
+                    : mode === "signup"
+                      ? "Create account"
+                      : mode === "signin"
+                        ? "Sign in"
                         : "Send reset link"}
                 </Button>
 
