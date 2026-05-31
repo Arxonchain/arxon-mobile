@@ -327,14 +327,14 @@ export const useReferrals = (user: User | null) => {
   const getReferralLink = () => {
     if (!referralCode) return '';
 
-    // Prefer a canonical public URL (set this in Vercel as VITE_PUBLIC_SITE_URL=https://arxonchain.xyz)
+    // Prefer a canonical public URL (set this in Cloudflare Pages as VITE_PUBLIC_SITE_URL=https://arxonchain.xyz)
     const configured = (import.meta.env as any).VITE_PUBLIC_SITE_URL as string | undefined;
     const normalizedConfigured = configured?.replace(/\/+$/, '');
 
-    // Fallback: if someone is on a vercel.app preview URL, still generate the arxonchain.xyz link
+    // Fallback: if someone is on a pages.dev preview URL, still generate the arxonchain.xyz link
     const origin =
       normalizedConfigured ||
-      (window.location.hostname.endsWith('vercel.app') ? 'https://arxonchain.xyz' : window.location.origin);
+      (window.location.hostname.endsWith('pages.dev') ? 'https://arxonchain.xyz' : window.location.origin);
 
     return `${origin}/?ref=${referralCode}`;
   };
