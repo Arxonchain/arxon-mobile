@@ -39,8 +39,8 @@ import AdminExportFilter from "@/pages/admin/AdminExportFilter";
 import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
+import AdminTasks from "@/pages/admin/AdminTasks";   // ← NEW
 
-// Push notifications — must be initialized at app level
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 // Mobile
@@ -75,43 +75,19 @@ class AppErrorBoundary extends React.Component<
     super(props);
     this.state = { hasError: false, error: null };
   }
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-  componentDidCatch(error: Error) {
-    console.error('[AppErrorBoundary]', error);
-  }
+  static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
+  componentDidCatch(error: Error) { console.error('[AppErrorBoundary]', error); }
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          minHeight: '100vh',
-          background: 'hsl(225 30% 3%)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 24,
-          fontFamily: 'system-ui,sans-serif'
-        }}>
+        <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'system-ui,sans-serif' }}>
           <div style={{ fontSize: 40, marginBottom: 16 }}>⚡</div>
           <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 20% 88%)', marginBottom: 8 }}>Something went wrong</p>
           <p style={{ fontSize: 12, color: 'hsl(215 14% 40%)', marginBottom: 24, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
             {this.state.error?.message || 'Unexpected runtime error'}
           </p>
-          <button
-            onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
-            style={{
-              padding: '12px 28px',
-              borderRadius: 14,
-              background: 'hsl(215 35% 62%/0.15)',
-              border: '1px solid hsl(215 35% 62%/0.35)',
-              color: 'hsl(215 35% 72%)',
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: 'pointer'
-            }}
-          >
+          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
+            style={{ padding: '12px 28px', borderRadius: 14, background: 'hsl(215 35% 62%/0.15)', border: '1px solid hsl(215 35% 62%/0.35)', color: 'hsl(215 35% 72%)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Reload App
           </button>
         </div>
@@ -121,9 +97,7 @@ class AppErrorBoundary extends React.Component<
   }
 }
 
-// Initializes push notifications as soon as the user is authenticated
 function PushNotificationInit() {
-  const { user } = useAuth();
   usePushNotifications();
   return null;
 }
@@ -158,53 +132,53 @@ function AppRoutes() {
     <>
       <PushNotificationInit />
       <Routes>
-        <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
-        <Route path="/auth/confirm" element={<AuthCallback />} />
+        <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
+        <Route path="/auth/confirm"   element={<AuthCallback />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/litepaper" element={<Litepaper />} />
-        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/litepaper"      element={<Litepaper />} />
+        <Route path="/admin/login"    element={<AdminLogin />} />
 
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
-          <Route path="signups" element={<AdminSignups />} />
-          <Route path="controls" element={<AdminControls />} />
-          <Route path="arena" element={<AdminArena />} />
-          <Route path="battle-history" element={<AdminBattleHistory />} />
-          <Route path="reconciliation" element={<AdminReconciliation />} />
-          <Route path="export-filter" element={<AdminExportFilter />} />
-          <Route path="import-users" element={<AdminImportUsers />} />
-          <Route path="global-map" element={<AdminGlobalMap />} />
-          <Route path="pitch-deck" element={<AdminPitchDeck />} />
+          <Route index                  element={<AdminDashboard />} />
+          <Route path="users"           element={<AdminUsers />} />
+          <Route path="signups"         element={<AdminSignups />} />
+          <Route path="controls"        element={<AdminControls />} />
+          <Route path="arena"           element={<AdminArena />} />
+          <Route path="battle-history"  element={<AdminBattleHistory />} />
+          <Route path="tasks"           element={<AdminTasks />} />     {/* ← NEW */}
+          <Route path="reconciliation"  element={<AdminReconciliation />} />
+          <Route path="export-filter"   element={<AdminExportFilter />} />
+          <Route path="import-users"    element={<AdminImportUsers />} />
+          <Route path="global-map"      element={<AdminGlobalMap />} />
+          <Route path="pitch-deck"      element={<AdminPitchDeck />} />
         </Route>
 
         {isNative ? (
           <>
-            <Route path="/" element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
-            <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
-            <Route path="/arena" element={<MobileArena />} />
-            <Route path="/leaderboard" element={<MobileLeaderboard />} />
-            <Route path="/nexus" element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
-            <Route path="/wallet" element={<MobileWallet />} />
+            <Route path="/"             element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
+            <Route path="/mining"       element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
+            <Route path="/arena"        element={<MobileArena />} />
+            <Route path="/leaderboard"  element={<MobileLeaderboard />} />
+            <Route path="/nexus"        element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
+            <Route path="/profile"      element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
+            <Route path="/wallet"       element={<MobileWallet />} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
-
-            <Route path="/tasks" element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
-            <Route path="/referrals" element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
+            <Route path="/tasks"        element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
+            <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
+            <Route path="/settings"     element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><MobilePage><Notifications /></MobilePage></ProtectedRoute>} />
           </>
         ) : (
           <>
-            <Route path="/" element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
-            <Route path="/mining" element={<Mining />} />
-            <Route path="/tasks" element={<Tasks />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/arena" element={<Arena />} />
-            <Route path="/referrals" element={<Referrals />} />
-            <Route path="/nexus" element={<Nexus />} />
-            <Route path="/profile" element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
-            <Route path="/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/"             element={user ? <DashboardLayout><Dashboard /></DashboardLayout> : <Landing />} />
+            <Route path="/mining"       element={<Mining />} />
+            <Route path="/tasks"        element={<Tasks />} />
+            <Route path="/leaderboard"  element={<Leaderboard />} />
+            <Route path="/arena"        element={<Arena />} />
+            <Route path="/referrals"    element={<Referrals />} />
+            <Route path="/nexus"        element={<Nexus />} />
+            <Route path="/profile"      element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
+            <Route path="/settings"     element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           </>
         )}
