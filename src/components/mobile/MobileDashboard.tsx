@@ -1,4 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import CampaignBanner from '@/components/CampaignBanner';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
@@ -214,6 +215,11 @@ export default function MobileDashboard() {
           </motion.button>
         </div>
       </motion.div>
+
+      {/* ── Campaign Banner ── */}
+      <div style={{padding:'14px 20px 0'}}>
+        <CampaignBanner />
+      </div>
 
       {/* ── Hero Balance Card ── */}
       <motion.div variants={scaleIn} style={{margin:'18px 20px 0'}} className="shine">
