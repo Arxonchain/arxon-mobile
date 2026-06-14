@@ -3,56 +3,43 @@ import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-// Gets or creates a persistent device ID using Capacitor Preferences
-async function getDeviceId(): Promise<string> {
+// ── Device ID — stored in localStorage, persists across app opens ──────────
+function getDeviceId(): string {
   try {
-    const { Preferences } = await import('@capacitor/preferences');
-    const { value } = await Preferences.get({ key: 'arxon_device_id' });
-    if (value) return value;
-    const id = `dev_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-    await Preferences.set({ key: 'arxon_device_id', value: id });
+    const key = 'arxon_device_id';
+    const existing = localStorage.getItem(key);
+    if (existing) return existing;
+    const id = `${Capacitor.isNativePlatform() ? 'native' : 'web'}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    localStorage.setItem(key, id);
     return id;
   } catch {
-    // Fallback for web
-    try {
-      const stored = localStorage.getItem('arxon_device_id');
-      if (stored) return stored;
-      const id = `web_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
-      localStorage.setItem('arxon_device_id', id);
-      return id;
-    } catch {
-      return 'unknown';
-    }
+    return 'unknown_' + Date.now();
   }
 }
 
-// Checks if this is a NEW device install (never opened app before)
-// Returns true only on native platform with no existing device record
-async function checkIsNewInstall(deviceId: string): Promise<boolean> {
+// ── Is this a brand new install? ───────────────────────────────────────────
+// Returns true only on native AND if 'arxon_first_open' has never been set
+function checkAndMarkFirstOpen(): boolean {
   if (!Capacitor.isNativePlatform()) return false;
   try {
-    const { Preferences } = await import('@capacitor/preferences');
-    const { value } = await Preferences.get({ key: 'arxon_first_open' });
-    return !value; // No first_open = brand new install
+    const key = 'arxon_first_open';
+    const existing = localStorage.getItem(key);
+    if (existing) return false; // Already opened before — not new
+    // First time ever opening — mark it
+    localStorage.setItem(key, new Date().toISOString());
+    return true;
   } catch {
     return false;
   }
 }
 
-async function markFirstOpen(deviceId: string) {
-  try {
-    const { Preferences } = await import('@capacitor/preferences');
-    await Preferences.set({ key: 'arxon_first_open', value: new Date().toISOString() });
-  } catch {}
-}
-
 export interface CampaignState {
-  isNewInstall: boolean;       // True only for brand new device installs
-  isEligible: boolean;         // Within 7-day window
-  daysRemaining: number;       // Days left to claim
-  daysClaimed: number;         // Days already claimed
-  canClaimToday: boolean;      // Haven't claimed yet today
-  campaignEnded: boolean;      // 7 days passed or all claimed
+  isNewInstall: boolean;
+  isEligible: boolean;
+  daysRemaining: number;
+  daysClaimed: number;
+  canClaimToday: boolean;
+  campaignEnded: boolean;
   loading: boolean;
   claiming: boolean;
   claim: () => Promise<{ success: boolean; pointsAwarded?: number; error?: string }>;
@@ -60,38 +47,36 @@ export interface CampaignState {
 
 export function useNewUserCampaign(): CampaignState {
   const { user } = useAuth();
-  const [deviceId,    setDeviceId]    = useState('');
-  const [isNewInstall,setIsNewInstall]= useState(false);
-  const [record,      setRecord]      = useState<any>(null);
-  const [loading,     setLoading]     = useState(true);
-  const [claiming,    setClaiming]    = useState(false);
+  const [isNewInstall, setIsNewInstall] = useState(false);
+  const [deviceId,     setDeviceId]     = useState('');
+  const [record,       setRecord]       = useState<any>(null);
+  const [loading,      setLoading]      = useState(true);
+  const [claiming,     setClaiming]     = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+
     const init = async () => {
-      const id = await getDeviceId();
+      const id = getDeviceId();
+      const isNew = checkAndMarkFirstOpen();
+
       if (cancelled) return;
       setDeviceId(id);
-
-      const newInstall = await checkIsNewInstall(id);
-      if (cancelled) return;
-      setIsNewInstall(newInstall);
+      setIsNewInstall(isNew);
 
       if (!user) { setLoading(false); return; }
 
       // If new install, register in DB
-      if (newInstall) {
-        await markFirstOpen(id);
-        // Register campaign record (ignore conflict — device_id UNIQUE handles dupes)
+      if (isNew) {
         await supabase.from('new_user_campaign').insert({
           user_id: user.id,
           device_id: id,
           first_open_at: new Date().toISOString(),
           is_eligible: true,
-        }).then(() => {}); // ignore error (may already exist)
+        }).then(() => {}); // ignore conflict — UNIQUE constraint handles it
       }
 
-      // Fetch campaign record for this user
+      // Fetch campaign record
       const { data } = await supabase
         .from('new_user_campaign')
         .select('*')
@@ -103,6 +88,7 @@ export function useNewUserCampaign(): CampaignState {
         setLoading(false);
       }
     };
+
     init();
     return () => { cancelled = true; };
   }, [user]);
@@ -111,7 +97,7 @@ export function useNewUserCampaign(): CampaignState {
     if (!user || !deviceId) return { success: false, error: 'Not ready' };
     setClaiming(true);
     try {
-      const { data, error } = await supabase.rpc('claim_new_user_reward', {
+      const { data, error } = await supabase.rpc('claim_new_user_reward' as any, {
         p_device_id: deviceId,
       });
       if (error) return { success: false, error: error.message };
@@ -134,19 +120,15 @@ export function useNewUserCampaign(): CampaignState {
     }
   }, [user, deviceId]);
 
-  // Derive state from record
+  // ── Derive state ───────────────────────────────────────────────────────
   const now = new Date();
-  const firstOpen = record?.first_open_at ? new Date(record.first_open_at) : now;
-  const daysSinceInstall = Math.floor((now.getTime() - firstOpen.getTime()) / 86400000);
+  const firstOpen   = record?.first_open_at ? new Date(record.first_open_at) : now;
+  const daysSince   = Math.floor((now.getTime() - firstOpen.getTime()) / 86_400_000);
   const daysClaimed = record?.days_claimed ?? 0;
-  const campaignEnded = daysSinceInstall >= 7 || daysClaimed >= 7 || record?.is_eligible === false;
+  const campaignEnded = daysSince >= 7 || daysClaimed >= 7 || record?.is_eligible === false;
   const daysRemaining = Math.max(0, 7 - daysClaimed);
-
-  const lastClaim = record?.last_claim_at ? new Date(record.last_claim_at) : null;
-  const claimedToday = lastClaim
-    ? lastClaim.toDateString() === now.toDateString()
-    : false;
-
+  const lastClaim   = record?.last_claim_at ? new Date(record.last_claim_at) : null;
+  const claimedToday = lastClaim ? lastClaim.toDateString() === now.toDateString() : false;
   const canClaimToday = !!record && isNewInstall && !campaignEnded && !claimedToday;
 
   return {
