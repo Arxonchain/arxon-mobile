@@ -23,13 +23,7 @@ const BLUE = {
   darkBorder:'hsl(215 40% 20%)',
 };
 
-// Safe native check
-const IS_NATIVE = (() => {
-  try {
-    const { Capacitor } = require('@capacitor/core');
-    return Capacitor.isNativePlatform();
-  } catch { return false; }
-})();
+// campaign.isNative comes from the campaign hook which detects it lazily at runtime
 
 // ── 3D Day progress dots ───────────────────────────────────────────────────
 function DayDots({ claimed, total = 7 }: { claimed: number; total?: number }) {
@@ -427,11 +421,11 @@ export default function CampaignBanner() {
           }}>
             {ended
               ? 'The 7-day new user campaign has ended for you.'
-              : IS_NATIVE
+              : campaign.isNative
                 ? `${campaign.canClaimToday ? "Tap to claim today's reward!" : campaign.daysClaimed > 0 ? 'Come back tomorrow for next reward.' : 'Tap to get started!'} · ${campaign.daysRemaining} days left`
                 : 'Download the mobile app to claim free daily ARX-P for 7 days!'}
           </p>
-          {!ended && IS_NATIVE && campaign.daysClaimed > 0 && (
+          {!ended && campaign.isNative && campaign.daysClaimed > 0 && (
             <div style={{ marginTop: 8 }}>
               <DayDots claimed={campaign.daysClaimed} />
             </div>
@@ -442,15 +436,15 @@ export default function CampaignBanner() {
         {!ended && (
           <div style={{
             flexShrink: 0, padding: '5px 11px', borderRadius: 20,
-            background: IS_NATIVE && campaign.canClaimToday ? BLUE.bg : 'hsl(215 25% 11%)',
-            border: `1px solid ${IS_NATIVE && campaign.canClaimToday ? BLUE.border : 'hsl(215 22% 18%)'}`,
-            boxShadow: IS_NATIVE && campaign.canClaimToday ? `0 2px 8px ${BLUE.glow}` : 'none',
+            background: campaign.isNative && campaign.canClaimToday ? BLUE.bg : 'hsl(215 25% 11%)',
+            border: `1px solid ${campaign.isNative && campaign.canClaimToday ? BLUE.border : 'hsl(215 22% 18%)'}`,
+            boxShadow: campaign.isNative && campaign.canClaimToday ? `0 2px 8px ${BLUE.glow}` : 'none',
           }}>
             <p style={{
               fontSize: 10, fontWeight: 800,
-              color: IS_NATIVE && campaign.canClaimToday ? BLUE.primary : 'hsl(215 18% 38%)',
+              color: campaign.isNative && campaign.canClaimToday ? BLUE.primary : 'hsl(215 18% 38%)',
             }}>
-              {IS_NATIVE ? (campaign.canClaimToday ? 'CLAIM' : 'CLAIMED') : 'DOWNLOAD'}
+              {campaign.isNative ? (campaign.canClaimToday ? 'CLAIM' : 'CLAIMED') : 'DOWNLOAD'}
             </p>
           </div>
         )}
@@ -458,7 +452,7 @@ export default function CampaignBanner() {
 
       <AnimatePresence>
         {showModal && (
-          IS_NATIVE
+          campaign.isNative
             ? <ClaimModal onClose={() => setShowModal(false)} campaign={campaign} />
             : <DownloadModal onClose={() => setShowModal(false)} />
         )}
