@@ -2,15 +2,25 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-// Safe native check
-const IS_NATIVE = (() => {
+// ── Native detection (lazy — called at runtime not module load) ────────────
+function isNativePlatform(): boolean {
+  // Check 1: Capacitor bridge injected by native WebView
   try {
-    const { Capacitor } = require('@capacitor/core');
-    return Capacitor.isNativePlatform();
-  } catch {
-    return false;
-  }
-})();
+    const cap = (window as any).Capacitor;
+    if (cap && typeof cap.isNativePlatform === 'function') {
+      return cap.isNativePlatform();
+    }
+  } catch {}
+
+  // Check 2: Android WebView user agent marker
+  try {
+    const ua = navigator.userAgent || '';
+    // Android WebView always contains "; wv)" in UA string
+    if (/; wv\)/.test(ua)) return true;
+  } catch {}
+
+  return false;
+}
 
 // ── Device ID ──────────────────────────────────────────────────────────────
 function getDeviceId(): string {
@@ -18,7 +28,7 @@ function getDeviceId(): string {
     const key = 'arxon_device_id';
     const existing = localStorage.getItem(key);
     if (existing) return existing;
-    const id = `${IS_NATIVE ? 'native' : 'web'}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const id = `device_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     localStorage.setItem(key, id);
     return id;
   } catch {
@@ -26,44 +36,8 @@ function getDeviceId(): string {
   }
 }
 
-// ── New install detection ──────────────────────────────────────────────────
-// FIX: A device is "new" if:
-// 1. It is a native platform (not web browser)
-// 2. The key 'arxon_first_open' has NEVER been set on this device
-// We mark it on first call so subsequent opens still know it was a new install.
-function checkIsNewInstall(): boolean {
-  if (!IS_NATIVE) return false;
-  try {
-    const key = 'arxon_first_open';
-    const existing = localStorage.getItem(key);
-    if (existing) {
-      // Already opened before — still a "new install" user if within 7 days
-      // We don't return false here — we let the DB record decide eligibility
-      return true; // Device has the app installed
-    }
-    // Very first open ever on this device
-    localStorage.setItem(key, new Date().toISOString());
-    return true; // Brand new install
-  } catch {
-    return false;
-  }
-}
-
-// FIX: Separate check for whether this is the VERY FIRST open (never opened before)
-function isVeryFirstOpen(): boolean {
-  if (!IS_NATIVE) return false;
-  try {
-    // If arxon_first_open was JUST set (within last 10 seconds), it's first open
-    const val = localStorage.getItem('arxon_first_open');
-    if (!val) return false;
-    const diff = Date.now() - new Date(val).getTime();
-    return diff < 10_000; // Set within last 10 seconds = this IS the first open
-  } catch {
-    return false;
-  }
-}
-
 export interface CampaignState {
+  isNative: boolean;
   isNewInstall: boolean;
   isEligible: boolean;
   daysRemaining: number;
@@ -77,6 +51,7 @@ export interface CampaignState {
 
 export function useNewUserCampaign(): CampaignState {
   const { user } = useAuth();
+  const [native,       setNative]       = useState(false);
   const [isNewInstall, setIsNewInstall] = useState(false);
   const [deviceId,     setDeviceId]     = useState('');
   const [record,       setRecord]       = useState<any>(null);
@@ -87,40 +62,38 @@ export function useNewUserCampaign(): CampaignState {
     let cancelled = false;
 
     const init = async () => {
+      // Detect native INSIDE useEffect so it runs after React hydration
+      // and after the Capacitor bridge has had time to inject window.Capacitor
+      const isNative = isNativePlatform();
       const id = getDeviceId();
-      
-      // FIX: Check BEFORE marking first open
-      const hadPreviousOpen = IS_NATIVE
-        ? !!localStorage.getItem('arxon_first_open')
-        : false;
-      
-      const isNativeInstall = checkIsNewInstall();
-      const firstEverOpen = !hadPreviousOpen && isNativeInstall;
+
+      // Check first open BEFORE marking it
+      const firstOpenKey = 'arxon_first_open';
+      const hadPreviousOpen = !!localStorage.getItem(firstOpenKey);
+      const isFirstEverOpen = isNative && !hadPreviousOpen;
+
+      if (isNative && !hadPreviousOpen) {
+        localStorage.setItem(firstOpenKey, new Date().toISOString());
+      }
 
       if (cancelled) return;
+      setNative(isNative);
       setDeviceId(id);
-      setIsNewInstall(isNativeInstall);
+      setIsNewInstall(isNative); // Any native device qualifies as "new install user"
 
       if (!user) { setLoading(false); return; }
 
-      // FIX: Only register in DB on the very first open of a NEW device
-      // This prevents the bug where re-opening the app creates a new record
-      // and resets eligibility
-      if (firstEverOpen) {
-        const { error } = await supabase.from('new_user_campaign').insert({
+      // Register in DB only on very first open
+      if (isFirstEverOpen) {
+        await supabase.from('new_user_campaign').insert({
           user_id: user.id,
           device_id: id,
           first_open_at: new Date().toISOString(),
           is_eligible: true,
-        });
-        // If insert failed due to conflict on device_id, that's fine
-        // (user reinstalled — they already used this device)
-        if (error && error.code !== '23505') {
-          console.warn('[campaign] insert error:', error.message);
-        }
+        }).then(() => {});
       }
 
-      // Always fetch the campaign record for this user
+      // Fetch campaign record
       const { data } = await supabase
         .from('new_user_campaign')
         .select('*')
@@ -133,8 +106,9 @@ export function useNewUserCampaign(): CampaignState {
       }
     };
 
-    init();
-    return () => { cancelled = true; };
+    // Small delay to ensure Capacitor bridge is ready
+    const timer = setTimeout(init, 200);
+    return () => { cancelled = true; clearTimeout(timer); };
   }, [user]);
 
   const claim = useCallback(async () => {
@@ -163,7 +137,6 @@ export function useNewUserCampaign(): CampaignState {
     }
   }, [user, deviceId]);
 
-  // Derive state
   const now         = new Date();
   const firstOpen   = record?.first_open_at ? new Date(record.first_open_at) : now;
   const daysSince   = Math.floor((now.getTime() - firstOpen.getTime()) / 86_400_000);
@@ -172,15 +145,10 @@ export function useNewUserCampaign(): CampaignState {
   const daysRemaining = Math.max(0, 7 - daysClaimed);
   const lastClaim   = record?.last_claim_at ? new Date(record.last_claim_at) : null;
   const claimedToday = lastClaim ? lastClaim.toDateString() === now.toDateString() : false;
-
-  // FIX: canClaimToday requires:
-  // 1. A record exists in DB (registered as new install)
-  // 2. Device is native (not web)
-  // 3. Campaign not ended
-  // 4. Not already claimed today
-  const canClaimToday = !!record && isNewInstall && !campaignEnded && !claimedToday;
+  const canClaimToday = !!record && native && !campaignEnded && !claimedToday;
 
   return {
+    isNative: native,
     isNewInstall,
     isEligible: !!record && !campaignEnded,
     daysRemaining,
