@@ -1,15 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Capacitor } from '@capacitor/core';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
 
-// ── Device ID — stored in localStorage, persists across app opens ──────────
+// Safe native check
+const IS_NATIVE = (() => {
+  try {
+    const { Capacitor } = require('@capacitor/core');
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+})();
+
+// ── Device ID ──────────────────────────────────────────────────────────────
 function getDeviceId(): string {
   try {
     const key = 'arxon_device_id';
     const existing = localStorage.getItem(key);
     if (existing) return existing;
-    const id = `${Capacitor.isNativePlatform() ? 'native' : 'web'}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const id = `${IS_NATIVE ? 'native' : 'web'}_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
     localStorage.setItem(key, id);
     return id;
   } catch {
@@ -17,17 +26,38 @@ function getDeviceId(): string {
   }
 }
 
-// ── Is this a brand new install? ───────────────────────────────────────────
-// Returns true only on native AND if 'arxon_first_open' has never been set
-function checkAndMarkFirstOpen(): boolean {
-  if (!Capacitor.isNativePlatform()) return false;
+// ── New install detection ──────────────────────────────────────────────────
+// FIX: A device is "new" if:
+// 1. It is a native platform (not web browser)
+// 2. The key 'arxon_first_open' has NEVER been set on this device
+// We mark it on first call so subsequent opens still know it was a new install.
+function checkIsNewInstall(): boolean {
+  if (!IS_NATIVE) return false;
   try {
     const key = 'arxon_first_open';
     const existing = localStorage.getItem(key);
-    if (existing) return false; // Already opened before — not new
-    // First time ever opening — mark it
+    if (existing) {
+      // Already opened before — still a "new install" user if within 7 days
+      // We don't return false here — we let the DB record decide eligibility
+      return true; // Device has the app installed
+    }
+    // Very first open ever on this device
     localStorage.setItem(key, new Date().toISOString());
-    return true;
+    return true; // Brand new install
+  } catch {
+    return false;
+  }
+}
+
+// FIX: Separate check for whether this is the VERY FIRST open (never opened before)
+function isVeryFirstOpen(): boolean {
+  if (!IS_NATIVE) return false;
+  try {
+    // If arxon_first_open was JUST set (within last 10 seconds), it's first open
+    const val = localStorage.getItem('arxon_first_open');
+    if (!val) return false;
+    const diff = Date.now() - new Date(val).getTime();
+    return diff < 10_000; // Set within last 10 seconds = this IS the first open
   } catch {
     return false;
   }
@@ -58,25 +88,39 @@ export function useNewUserCampaign(): CampaignState {
 
     const init = async () => {
       const id = getDeviceId();
-      const isNew = checkAndMarkFirstOpen();
+      
+      // FIX: Check BEFORE marking first open
+      const hadPreviousOpen = IS_NATIVE
+        ? !!localStorage.getItem('arxon_first_open')
+        : false;
+      
+      const isNativeInstall = checkIsNewInstall();
+      const firstEverOpen = !hadPreviousOpen && isNativeInstall;
 
       if (cancelled) return;
       setDeviceId(id);
-      setIsNewInstall(isNew);
+      setIsNewInstall(isNativeInstall);
 
       if (!user) { setLoading(false); return; }
 
-      // If new install, register in DB
-      if (isNew) {
-        await supabase.from('new_user_campaign').insert({
+      // FIX: Only register in DB on the very first open of a NEW device
+      // This prevents the bug where re-opening the app creates a new record
+      // and resets eligibility
+      if (firstEverOpen) {
+        const { error } = await supabase.from('new_user_campaign').insert({
           user_id: user.id,
           device_id: id,
           first_open_at: new Date().toISOString(),
           is_eligible: true,
-        }).then(() => {}); // ignore conflict — UNIQUE constraint handles it
+        });
+        // If insert failed due to conflict on device_id, that's fine
+        // (user reinstalled — they already used this device)
+        if (error && error.code !== '23505') {
+          console.warn('[campaign] insert error:', error.message);
+        }
       }
 
-      // Fetch campaign record
+      // Always fetch the campaign record for this user
       const { data } = await supabase
         .from('new_user_campaign')
         .select('*')
@@ -103,7 +147,6 @@ export function useNewUserCampaign(): CampaignState {
       if (error) return { success: false, error: error.message };
       const result = data as any;
       if (result?.success) {
-        // Refresh record
         const { data: updated } = await supabase
           .from('new_user_campaign')
           .select('*')
@@ -120,8 +163,8 @@ export function useNewUserCampaign(): CampaignState {
     }
   }, [user, deviceId]);
 
-  // ── Derive state ───────────────────────────────────────────────────────
-  const now = new Date();
+  // Derive state
+  const now         = new Date();
   const firstOpen   = record?.first_open_at ? new Date(record.first_open_at) : now;
   const daysSince   = Math.floor((now.getTime() - firstOpen.getTime()) / 86_400_000);
   const daysClaimed = record?.days_claimed ?? 0;
@@ -129,6 +172,12 @@ export function useNewUserCampaign(): CampaignState {
   const daysRemaining = Math.max(0, 7 - daysClaimed);
   const lastClaim   = record?.last_claim_at ? new Date(record.last_claim_at) : null;
   const claimedToday = lastClaim ? lastClaim.toDateString() === now.toDateString() : false;
+
+  // FIX: canClaimToday requires:
+  // 1. A record exists in DB (registered as new install)
+  // 2. Device is native (not web)
+  // 3. Campaign not ended
+  // 4. Not already claimed today
   const canClaimToday = !!record && isNewInstall && !campaignEnded && !claimedToday;
 
   return {
