@@ -1,34 +1,53 @@
 /**
- * CampaignBanner — shows on BOTH web and mobile dashboards.
- *
- * Mobile: opens claim modal (only new installs can claim)
- * Web:    opens "Download App" modal with link to Play Store
+ * CampaignBanner — BOTH web and mobile dashboards.
+ * Mobile: opens claim modal (new installs only)
+ * Web:    opens Download App modal
+ * Design: 3D light blue brand colours, no green
  */
 import { useState } from 'react';
-import { Capacitor } from '@capacitor/core';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Gift, X, Smartphone, Download, CheckCircle, Clock, Zap, Star } from 'lucide-react';
+import { Gift, X, Smartphone, Download, CheckCircle, Clock } from 'lucide-react';
 import { useNewUserCampaign } from '@/hooks/useNewUserCampaign';
 import { useToast } from '@/hooks/use-toast';
 
-const IS_NATIVE = Capacitor.isNativePlatform();
 const APP_DOWNLOAD_URL = 'https://t.co/N5qAMjQBUK';
 
-// ── Day progress dots ──────────────────────────────────────────────────────
+// Brand light blue palette
+const BLUE = {
+  primary:   'hsl(207 90% 54%)',       // #1DA1F2-ish bright blue
+  soft:      'hsl(207 85% 65%)',
+  glow:      'hsl(207 90% 54%/0.35)',
+  bg:        'hsl(207 90% 54%/0.10)',
+  border:    'hsl(207 90% 54%/0.30)',
+  dark:      'hsl(215 45% 12%)',
+  darkBorder:'hsl(215 40% 20%)',
+};
+
+// Safe native check
+const IS_NATIVE = (() => {
+  try {
+    const { Capacitor } = require('@capacitor/core');
+    return Capacitor.isNativePlatform();
+  } catch { return false; }
+})();
+
+// ── 3D Day progress dots ───────────────────────────────────────────────────
 function DayDots({ claimed, total = 7 }: { claimed: number; total?: number }) {
   return (
-    <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
+    <div style={{ display: 'flex', gap: 7, alignItems: 'center' }}>
       {Array.from({ length: total }).map((_, i) => (
         <div key={i} style={{
-          width: i < claimed ? 10 : 8,
-          height: i < claimed ? 10 : 8,
+          width: i < claimed ? 14 : 10,
+          height: i < claimed ? 14 : 10,
           borderRadius: '50%',
           background: i < claimed
-            ? 'linear-gradient(135deg,hsl(155 55% 50%),hsl(155 45% 38%))'
-            : 'hsl(215 22% 18%)',
-          border: i < claimed ? 'none' : '1px solid hsl(215 22% 25%)',
-          boxShadow: i < claimed ? '0 0 6px hsl(155 55% 50%/0.5)' : 'none',
-          transition: 'all 0.3s',
+            ? `radial-gradient(circle at 35% 35%, hsl(207 100% 80%), ${BLUE.primary})`
+            : 'hsl(215 30% 18%)',
+          border: i < claimed ? `1.5px solid ${BLUE.soft}` : '1.5px solid hsl(215 25% 28%)',
+          boxShadow: i < claimed
+            ? `0 2px 8px ${BLUE.glow}, inset 0 1px 2px hsl(207 100% 85%/0.4)`
+            : 'inset 0 1px 3px rgba(0,0,0,0.4)',
+          transition: 'all 0.35s cubic-bezier(0.34,1.56,0.64,1)',
           flexShrink: 0,
         }} />
       ))}
@@ -36,8 +55,41 @@ function DayDots({ claimed, total = 7 }: { claimed: number; total?: number }) {
   );
 }
 
-// ── Mobile claim modal ─────────────────────────────────────────────────────
-function ClaimModal({ onClose, campaign }: { onClose: () => void; campaign: ReturnType<typeof useNewUserCampaign> }) {
+// ── 3D icon container ──────────────────────────────────────────────────────
+function IconBox({ size = 80, children }: { size?: number; children: React.ReactNode }) {
+  return (
+    <div style={{
+      width: size, height: size,
+      borderRadius: size * 0.28,
+      margin: '0 auto 16px',
+      background: `linear-gradient(145deg, hsl(207 85% 30%), hsl(215 60% 16%))`,
+      border: `1.5px solid ${BLUE.border}`,
+      boxShadow: `
+        0 8px 32px ${BLUE.glow},
+        0 2px 8px rgba(0,0,0,0.5),
+        inset 0 1px 1px hsl(207 100% 75%/0.25),
+        inset 0 -1px 1px rgba(0,0,0,0.3)
+      `,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      position: 'relative', overflow: 'hidden',
+    }}>
+      {/* Top shine */}
+      <div style={{
+        position: 'absolute', top: 0, left: '15%', right: '15%', height: '40%',
+        background: 'linear-gradient(to bottom, hsl(207 100% 90%/0.15), transparent)',
+        borderRadius: '0 0 50% 50%',
+        pointerEvents: 'none',
+      }} />
+      {children}
+    </div>
+  );
+}
+
+// ── Claim Modal (mobile only) ──────────────────────────────────────────────
+function ClaimModal({ onClose, campaign }: {
+  onClose: () => void;
+  campaign: ReturnType<typeof useNewUserCampaign>;
+}) {
   const { toast } = useToast();
   const [result, setResult] = useState<{ success: boolean; points?: number } | null>(null);
 
@@ -45,7 +97,10 @@ function ClaimModal({ onClose, campaign }: { onClose: () => void; campaign: Retu
     const res = await campaign.claim();
     if (res.success) {
       setResult({ success: true, points: res.pointsAwarded });
-      toast({ title: `+${res.pointsAwarded?.toLocaleString()} ARX-P claimed! 🎉`, description: `Day ${campaign.daysClaimed + 1} of 7 complete.` });
+      toast({
+        title: `+${res.pointsAwarded?.toLocaleString()} ARX-P claimed! 🎉`,
+        description: `Day ${campaign.daysClaimed + 1} of 7 complete.`,
+      });
     } else {
       toast({ title: 'Claim failed', description: res.error, variant: 'destructive' });
     }
@@ -54,88 +109,115 @@ function ClaimModal({ onClose, campaign }: { onClose: () => void; campaign: Retu
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+      background: 'rgba(4,6,16,0.82)', backdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
       fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif",
     }} onClick={onClose}>
       <motion.div
-        initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }} transition={{ type: 'spring', damping: 24 }}
+        initial={{ y: 120, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 120, opacity: 0 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 280 }}
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 480,
-          background: 'linear-gradient(160deg,hsl(225 30% 8%),hsl(225 26% 5%))',
-          border: '1px solid hsl(155 45% 43%/0.3)',
-          borderRadius: '28px 28px 0 0', padding: '28px 24px 48px',
+          width: '100%', maxWidth: 500, position: 'relative',
+          background: 'linear-gradient(160deg,hsl(215 40% 9%),hsl(220 35% 6%))',
+          border: `1.5px solid ${BLUE.border}`,
+          borderRadius: '32px 32px 0 0',
+          padding: '32px 24px 52px',
+          boxShadow: `0 -16px 64px ${BLUE.glow}, 0 -4px 24px rgba(0,0,0,0.6)`,
         }}>
         {/* Handle */}
-        <div style={{ width: 40, height: 4, borderRadius: 2, background: 'hsl(215 20% 22%)', margin: '0 auto 24px' }} />
+        <div style={{
+          width: 44, height: 5, borderRadius: 3,
+          background: 'hsl(215 25% 25%)', margin: '0 auto 28px',
+        }} />
 
+        {/* Close */}
         <button onClick={onClose} style={{
-          position: 'absolute', top: 20, right: 20,
-          background: 'hsl(215 22% 14%)', border: '1px solid hsl(215 20% 22%)',
-          borderRadius: 10, width: 32, height: 32, cursor: 'pointer',
+          position: 'absolute', top: 22, right: 22,
+          background: 'hsl(215 30% 14%)', border: `1px solid ${BLUE.darkBorder}`,
+          borderRadius: 12, width: 36, height: 36, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><X size={16} color="hsl(215 18% 50%)" /></button>
+          boxShadow: 'inset 0 1px 1px rgba(255,255,255,0.05)',
+        }}>
+          <X size={16} color="hsl(215 20% 55%)" />
+        </button>
 
         {/* Icon */}
-        <div style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: 24, margin: '0 auto 12px',
-            background: 'linear-gradient(135deg,hsl(155 55% 42%/0.2),hsl(155 45% 30%/0.1))',
-            border: '1.5px solid hsl(155 45% 43%/0.35)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <Gift size={32} color="hsl(155 55% 55%)" />
-          </div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: 'hsl(215 20% 95%)', margin: 0 }}>
+        <div style={{ textAlign: 'center' }}>
+          <IconBox size={80}>
+            <Gift size={36} color={BLUE.soft} strokeWidth={1.8} />
+          </IconBox>
+          <h2 style={{ fontSize: 24, fontWeight: 900, color: 'hsl(215 20% 97%)', margin: '0 0 8px' }}>
             New User Reward
           </h2>
-          <p style={{ fontSize: 13, color: 'hsl(215 14% 45%)', marginTop: 6 }}>
+          <p style={{ fontSize: 13, color: 'hsl(215 18% 48%)', marginBottom: 24, lineHeight: 1.5 }}>
             Welcome to Arxon! Claim your free daily ARX-P for 7 days.
           </p>
         </div>
 
-        {/* Points display */}
+        {/* Points 3D card */}
         <div style={{
-          background: 'hsl(215 26% 10%)', border: '1px solid hsl(215 22% 18%)',
-          borderRadius: 20, padding: '18px 20px', marginBottom: 16, textAlign: 'center',
+          background: `linear-gradient(135deg, hsl(215 40% 11%), hsl(207 60% 14%))`,
+          border: `1.5px solid ${BLUE.border}`,
+          borderRadius: 22,
+          padding: '22px 20px',
+          marginBottom: 14,
+          textAlign: 'center',
+          boxShadow: `0 4px 24px ${BLUE.glow}, inset 0 1px 1px hsl(207 100% 75%/0.08)`,
+          position: 'relative', overflow: 'hidden',
         }}>
-          <p style={{ fontSize: 13, color: 'hsl(215 14% 40%)', marginBottom: 4 }}>Daily Reward</p>
-          <p style={{ fontSize: 42, fontWeight: 900, color: 'hsl(155 55% 55%)', lineHeight: 1 }}>
+          {/* Top shimmer */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+            background: `linear-gradient(90deg, transparent, ${BLUE.soft}, transparent)`,
+          }} />
+          <p style={{ fontSize: 12, color: BLUE.soft, letterSpacing: '0.12em', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>
+            Daily Reward
+          </p>
+          <p style={{
+            fontSize: 52, fontWeight: 900, lineHeight: 1,
+            background: `linear-gradient(145deg, hsl(207 100% 85%), ${BLUE.primary})`,
+            WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+            filter: `drop-shadow(0 0 16px ${BLUE.glow})`,
+            marginBottom: 6,
+          }}>
             1,000
           </p>
-          <p style={{ fontSize: 13, color: 'hsl(155 45% 45%)', marginTop: 4 }}>ARX-P per day</p>
+          <p style={{ fontSize: 13, color: BLUE.soft, fontWeight: 600 }}>ARX-P per day</p>
         </div>
 
-        {/* Progress */}
+        {/* Progress card */}
         <div style={{
-          background: 'hsl(215 26% 10%)', border: '1px solid hsl(215 22% 18%)',
-          borderRadius: 16, padding: '14px 16px', marginBottom: 20,
+          background: 'hsl(215 35% 10%)',
+          border: `1px solid ${BLUE.darkBorder}`,
+          borderRadius: 18, padding: '16px 18px', marginBottom: 20,
         }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontSize: 12, color: 'hsl(215 14% 42%)' }}>Progress</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: 'hsl(155 45% 55%)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+            <span style={{ fontSize: 12, color: 'hsl(215 16% 42%)' }}>Progress</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: BLUE.soft }}>
               {campaign.daysClaimed}/7 days claimed
             </span>
           </div>
           <DayDots claimed={campaign.daysClaimed} />
           {!campaign.campaignEnded && (
-            <p style={{ fontSize: 11, color: 'hsl(215 14% 36%)', marginTop: 8 }}>
+            <p style={{ fontSize: 11, color: 'hsl(215 14% 36%)', marginTop: 10 }}>
               {campaign.daysRemaining} day{campaign.daysRemaining !== 1 ? 's' : ''} remaining
             </p>
           )}
         </div>
 
-        {/* Claim result */}
+        {/* Success result */}
         {result?.success && (
           <div style={{
-            background: 'hsl(155 45% 43%/0.1)', border: '1px solid hsl(155 45% 43%/0.3)',
-            borderRadius: 14, padding: '12px 16px', marginBottom: 16,
-            display: 'flex', alignItems: 'center', gap: 10,
+            background: BLUE.bg,
+            border: `1px solid ${BLUE.border}`,
+            borderRadius: 16, padding: '14px 18px', marginBottom: 16,
+            display: 'flex', alignItems: 'center', gap: 12,
           }}>
-            <CheckCircle size={20} color="hsl(155 55% 55%)" />
-            <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(155 55% 60%)' }}>
+            <CheckCircle size={22} color={BLUE.primary} />
+            <p style={{ fontSize: 15, fontWeight: 700, color: BLUE.soft }}>
               +{result.points?.toLocaleString()} ARX-P added to your balance!
             </p>
           </div>
@@ -144,123 +226,122 @@ function ClaimModal({ onClose, campaign }: { onClose: () => void; campaign: Retu
         {/* CTA */}
         {campaign.campaignEnded ? (
           <div style={{
-            padding: '16px', borderRadius: 18, textAlign: 'center',
-            background: 'hsl(215 22% 10%)', border: '1px solid hsl(215 22% 16%)',
+            padding: '18px', borderRadius: 20, textAlign: 'center',
+            background: 'hsl(215 28% 9%)', border: '1px solid hsl(215 22% 16%)',
           }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 18% 45%)' }}>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 18% 42%)' }}>
               🏁 Campaign Ended
             </p>
-            <p style={{ fontSize: 12, color: 'hsl(215 14% 32%)', marginTop: 4 }}>
+            <p style={{ fontSize: 12, color: 'hsl(215 14% 30%)', marginTop: 6 }}>
               You've completed the 7-day new user reward campaign.
             </p>
           </div>
-        ) : !campaign.canClaimToday ? (
+        ) : !campaign.canClaimToday && campaign.daysClaimed > 0 ? (
           <div style={{
-            padding: '16px', borderRadius: 18, textAlign: 'center',
-            background: 'hsl(215 22% 10%)', border: '1px solid hsl(215 22% 16%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+            padding: '18px', borderRadius: 20, textAlign: 'center',
+            background: 'hsl(215 28% 9%)', border: `1px solid ${BLUE.darkBorder}`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           }}>
-            <Clock size={18} color="hsl(215 18% 45%)" />
-            <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 45%)' }}>
+            <Clock size={20} color={BLUE.primary} />
+            <p style={{ fontSize: 14, fontWeight: 700, color: BLUE.soft }}>
               Already claimed today — come back tomorrow!
             </p>
           </div>
-        ) : !campaign.isNewInstall ? (
-          <div style={{
-            padding: '16px', borderRadius: 18, textAlign: 'center',
-            background: 'hsl(215 22% 10%)', border: '1px solid hsl(215 22% 16%)',
-          }}>
-            <p style={{ fontSize: 13, color: 'hsl(215 14% 38%)' }}>
-              This reward is only available for new installs of the Arxon app.
-            </p>
-          </div>
         ) : (
-          <button onClick={handleClaim} disabled={campaign.claiming}
+          <motion.button
+            whileTap={{ scale: 0.97 }}
+            onClick={handleClaim}
+            disabled={campaign.claiming || !campaign.canClaimToday}
             style={{
-              width: '100%', padding: '18px', borderRadius: 18, cursor: 'pointer',
+              width: '100%', padding: '19px', borderRadius: 20, cursor: campaign.canClaimToday ? 'pointer' : 'default',
               border: 'none', fontFamily: "'Creato Display',-apple-system,sans-serif",
-              fontSize: 16, fontWeight: 800,
-              background: campaign.claiming
-                ? 'hsl(215 25% 14%)'
-                : 'linear-gradient(135deg,hsl(155 55% 42%),hsl(155 45% 32%))',
-              color: campaign.claiming ? 'hsl(215 18% 40%)' : 'white',
-              boxShadow: campaign.claiming ? 'none' : '0 6px 24px hsl(155 55% 42%/0.35)',
+              fontSize: 17, fontWeight: 900, outline: 'none',
+              background: campaign.canClaimToday
+                ? `linear-gradient(135deg, hsl(207 90% 58%), hsl(207 80% 42%))`
+                : 'hsl(215 28% 12%)',
+              color: campaign.canClaimToday ? 'white' : 'hsl(215 18% 35%)',
+              boxShadow: campaign.canClaimToday
+                ? `0 8px 32px ${BLUE.glow}, 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 1px hsl(207 100% 80%/0.25)`
+                : 'none',
               transition: 'all 0.2s',
             }}>
-            {campaign.claiming ? 'Claiming…' : '🎁 Claim 1,000 ARX-P'}
-          </button>
+            {campaign.claiming ? 'Claiming…' : campaign.canClaimToday ? '🎁 Claim 1,000 ARX-P' : 'Not eligible for this device'}
+          </motion.button>
         )}
       </motion.div>
     </div>
   );
 }
 
-// ── Web download modal ─────────────────────────────────────────────────────
+// ── Web Download Modal ─────────────────────────────────────────────────────
 function DownloadModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)',
+      background: 'rgba(4,6,16,0.82)', backdropFilter: 'blur(12px)',
       display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       fontFamily: 'system-ui,sans-serif',
     }} onClick={onClose}>
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: 0.88, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.88, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', damping: 24 }}
         onClick={e => e.stopPropagation()}
         style={{
-          width: '100%', maxWidth: 420,
-          background: 'linear-gradient(160deg,hsl(225 30% 8%),hsl(225 26% 5%))',
-          border: '1px solid hsl(215 30% 22%)',
-          borderRadius: 28, padding: '36px 28px',
-          textAlign: 'center', position: 'relative',
+          width: '100%', maxWidth: 420, position: 'relative',
+          background: 'linear-gradient(160deg,hsl(215 40% 9%),hsl(220 35% 6%))',
+          border: `1.5px solid ${BLUE.border}`,
+          borderRadius: 28, padding: '40px 28px',
+          textAlign: 'center',
+          boxShadow: `0 24px 80px ${BLUE.glow}, 0 8px 32px rgba(0,0,0,0.6)`,
         }}>
         <button onClick={onClose} style={{
           position: 'absolute', top: 16, right: 16,
-          background: 'hsl(215 22% 14%)', border: '1px solid hsl(215 20% 22%)',
-          borderRadius: 10, width: 32, height: 32, cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}><X size={16} color="hsl(215 18% 50%)" /></button>
-
-        <div style={{
-          width: 72, height: 72, borderRadius: 24, margin: '0 auto 20px',
-          background: 'linear-gradient(135deg,hsl(215 55% 55%/0.2),hsl(215 45% 35%/0.1))',
-          border: '1.5px solid hsl(215 45% 55%/0.3)',
+          background: 'hsl(215 30% 14%)', border: `1px solid ${BLUE.darkBorder}`,
+          borderRadius: 12, width: 36, height: 36, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          <Smartphone size={32} color="hsl(215 55% 65%)" />
-        </div>
+          <X size={16} color="hsl(215 20% 55%)" />
+        </button>
 
-        <h2 style={{ fontSize: 22, fontWeight: 800, color: 'hsl(215 20% 95%)', marginBottom: 10 }}>
+        <IconBox size={76}>
+          <Smartphone size={34} color={BLUE.soft} strokeWidth={1.8} />
+        </IconBox>
+
+        <h2 style={{ fontSize: 22, fontWeight: 900, color: 'hsl(215 20% 97%)', marginBottom: 10 }}>
           Mobile App Only 📱
         </h2>
-        <p style={{ fontSize: 14, color: 'hsl(215 14% 45%)', lineHeight: 1.6, marginBottom: 24 }}>
-          The New User Campaign is exclusively available on the <strong style={{ color: 'hsl(215 35% 70%)' }}>Arxon Mobile App</strong>.
-          Download the app on your Android device to claim <strong style={{ color: 'hsl(155 55% 55%)' }}>1,000 ARX-P free daily for 7 days</strong>!
+        <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', lineHeight: 1.65, marginBottom: 24 }}>
+          The New User Campaign is exclusively on the{' '}
+          <strong style={{ color: BLUE.soft }}>Arxon Mobile App</strong>.
+          Download now to claim{' '}
+          <strong style={{ color: BLUE.primary }}>1,000 ARX-P free daily for 7 days</strong>!
         </p>
 
         <div style={{
-          background: 'hsl(215 26% 10%)', border: '1px solid hsl(215 22% 18%)',
-          borderRadius: 18, padding: '14px 18px', marginBottom: 24,
+          background: 'hsl(215 35% 10%)', border: `1px solid ${BLUE.darkBorder}`,
+          borderRadius: 18, padding: '14px 18px', marginBottom: 24, textAlign: 'left',
         }}>
           {[
-            '✅ 1,000 free ARX-P every day',
-            '✅ 7 days straight after install',
-            '✅ New installs only',
-            '✅ Points added instantly',
+            '1,000 free ARX-P every day',
+            '7 days straight after install',
+            'New installs only',
+            'Points added instantly',
           ].map(item => (
-            <p key={item} style={{ fontSize: 13, color: 'hsl(215 18% 65%)', marginBottom: 6, textAlign: 'left' }}>{item}</p>
+            <p key={item} style={{ fontSize: 13, color: 'hsl(215 18% 62%)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: BLUE.primary, fontWeight: 700 }}>✦</span> {item}
+            </p>
           ))}
         </div>
 
-        <a href={APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            width: '100%', padding: '16px', borderRadius: 18,
-            background: 'linear-gradient(135deg,hsl(215 55% 50%),hsl(215 45% 38%))',
-            color: 'white', fontWeight: 800, fontSize: 16, textDecoration: 'none',
-            boxShadow: '0 6px 24px hsl(215 55% 50%/0.3)',
-          }}>
+        <a href={APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          width: '100%', padding: '18px', borderRadius: 20,
+          background: `linear-gradient(135deg, hsl(207 90% 58%), hsl(207 80% 42%))`,
+          color: 'white', fontWeight: 900, fontSize: 16, textDecoration: 'none',
+          boxShadow: `0 8px 32px ${BLUE.glow}, inset 0 1px 1px hsl(207 100% 80%/0.2)`,
+        }}>
           <Download size={20} />
           Download Arxon App
         </a>
@@ -269,73 +350,89 @@ function DownloadModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── The Banner itself ─────────────────────────────────────────────────────
+// ── Main Banner ────────────────────────────────────────────────────────────
 export default function CampaignBanner() {
   const campaign = useNewUserCampaign();
   const [showModal, setShowModal] = useState(false);
 
-  // Always show the banner — even for non-eligible users (they see "Campaign Ended")
-  // Loading state: show skeleton
   if (campaign.loading) return (
     <div style={{
-      height: 72, borderRadius: 18, margin: '0 0 14px',
-      background: 'hsl(215 22% 10%)', border: '1px solid hsl(215 22% 16%)',
+      height: 76, borderRadius: 20, marginBottom: 14,
+      background: 'hsl(215 30% 10%)',
+      border: `1px solid ${BLUE.darkBorder}`,
       animation: 'pulse 1.5s ease-in-out infinite',
     }} />
   );
 
   const ended = campaign.campaignEnded;
-  const eligible = campaign.isEligible && campaign.isNewInstall;
 
   return (
     <>
       <motion.div
-        whileTap={{ scale: 0.98 }}
+        whileTap={{ scale: 0.975 }}
         onClick={() => setShowModal(true)}
         style={{
-          borderRadius: 18, padding: '14px 18px', marginBottom: 14, cursor: 'pointer',
+          borderRadius: 20, padding: '15px 18px', marginBottom: 14, cursor: 'pointer',
           background: ended
-            ? 'hsl(215 22% 8%)'
-            : 'linear-gradient(135deg,hsl(155 45% 43%/0.12),hsl(215 35% 55%/0.08))',
-          border: `1.5px solid ${ended ? 'hsl(215 22% 15%)' : 'hsl(155 45% 43%/0.3)'}`,
+            ? 'hsl(215 28% 8%)'
+            : `linear-gradient(135deg, ${BLUE.bg}, hsl(215 35% 9%))`,
+          border: `1.5px solid ${ended ? 'hsl(215 22% 14%)' : BLUE.border}`,
           display: 'flex', alignItems: 'center', gap: 14,
-          boxShadow: ended ? 'none' : '0 4px 20px hsl(155 45% 43%/0.1)',
+          boxShadow: ended ? 'none' : `0 4px 24px ${BLUE.glow}`,
           position: 'relative', overflow: 'hidden',
         }}>
-        {/* Shimmer for active */}
+        {/* Shimmer */}
         {!ended && (
-          <div style={{
-            position: 'absolute', top: 0, left: '-100%', width: '60%', height: '100%',
-            background: 'linear-gradient(90deg,transparent,hsl(155 55% 55%/0.07),transparent)',
-            animation: 'shimmer 3s ease-in-out infinite',
-          }} />
+          <>
+            <div style={{
+              position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+              background: `linear-gradient(90deg, transparent, ${BLUE.soft}, transparent)`,
+            }} />
+            <div style={{
+              position: 'absolute', top: 0, left: '-100%', width: '55%', height: '100%',
+              background: `linear-gradient(90deg, transparent, hsl(207 90% 60%/0.06), transparent)`,
+              animation: 'shimmer 3.5s ease-in-out infinite',
+            }} />
+          </>
         )}
-        <style>{`@keyframes shimmer{0%{left:-100%}100%{left:200%}}`}</style>
+        <style>{`@keyframes shimmer{0%{left:-100%}100%{left:210%}}`}</style>
 
-        {/* Icon */}
+        {/* 3D Icon */}
         <div style={{
-          width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-          background: ended ? 'hsl(215 22% 12%)' : 'hsl(155 45% 43%/0.15)',
-          border: `1px solid ${ended ? 'hsl(215 22% 18%)' : 'hsl(155 45% 43%/0.25)'}`,
+          width: 48, height: 48, borderRadius: 15, flexShrink: 0,
+          background: ended
+            ? 'hsl(215 28% 12%)'
+            : `linear-gradient(145deg, hsl(207 80% 28%), hsl(215 55% 14%))`,
+          border: `1.5px solid ${ended ? 'hsl(215 22% 18%)' : BLUE.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: ended ? 'none' : `0 4px 16px ${BLUE.glow}, inset 0 1px 1px hsl(207 100% 75%/0.15)`,
         }}>
-          {ended ? <Clock size={22} color="hsl(215 18% 38%)" /> : <Gift size={22} color="hsl(155 55% 55%)" />}
+          {ended
+            ? <Clock size={22} color="hsl(215 18% 35%)" />
+            : <Gift size={22} color={BLUE.primary} strokeWidth={2} />}
         </div>
 
         {/* Text */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 800, color: ended ? 'hsl(215 18% 42%)' : 'hsl(215 20% 92%)', marginBottom: 2 }}>
-            {ended ? '🏁 New User Campaign Ended' : '🎁 New User Reward — Free 1,000 ARX-P/Day!'}
+          <p style={{
+            fontSize: 13, fontWeight: 800, marginBottom: 3,
+            color: ended ? 'hsl(215 18% 38%)' : 'hsl(215 20% 94%)',
+          }}>
+            {ended ? '🏁 New User Campaign Ended' : '✦ New User Reward — Free 1,000 ARX-P/Day!'}
           </p>
-          <p style={{ fontSize: 11, color: ended ? 'hsl(215 14% 30%)' : 'hsl(215 14% 45%)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <p style={{
+            fontSize: 11,
+            color: ended ? 'hsl(215 14% 28%)' : 'hsl(215 14% 46%)',
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
             {ended
               ? 'The 7-day new user campaign has ended for you.'
               : IS_NATIVE
-                ? `${campaign.canClaimToday ? 'Tap to claim today\'s reward!' : 'Already claimed today — come back tomorrow.'} · ${campaign.daysRemaining} days left`
+                ? `${campaign.canClaimToday ? "Tap to claim today's reward!" : campaign.daysClaimed > 0 ? 'Come back tomorrow for next reward.' : 'Tap to get started!'} · ${campaign.daysRemaining} days left`
                 : 'Download the mobile app to claim free daily ARX-P for 7 days!'}
           </p>
-          {!ended && IS_NATIVE && (
-            <div style={{ marginTop: 6 }}>
+          {!ended && IS_NATIVE && campaign.daysClaimed > 0 && (
+            <div style={{ marginTop: 8 }}>
               <DayDots claimed={campaign.daysClaimed} />
             </div>
           )}
@@ -344,14 +441,14 @@ export default function CampaignBanner() {
         {/* Badge */}
         {!ended && (
           <div style={{
-            flexShrink: 0, padding: '4px 10px', borderRadius: 20,
-            background: IS_NATIVE && campaign.canClaimToday
-              ? 'hsl(155 55% 43%/0.2)' : 'hsl(215 22% 12%)',
-            border: `1px solid ${IS_NATIVE && campaign.canClaimToday ? 'hsl(155 55% 43%/0.4)' : 'hsl(215 22% 20%)'}`,
+            flexShrink: 0, padding: '5px 11px', borderRadius: 20,
+            background: IS_NATIVE && campaign.canClaimToday ? BLUE.bg : 'hsl(215 25% 11%)',
+            border: `1px solid ${IS_NATIVE && campaign.canClaimToday ? BLUE.border : 'hsl(215 22% 18%)'}`,
+            boxShadow: IS_NATIVE && campaign.canClaimToday ? `0 2px 8px ${BLUE.glow}` : 'none',
           }}>
             <p style={{
               fontSize: 10, fontWeight: 800,
-              color: IS_NATIVE && campaign.canClaimToday ? 'hsl(155 55% 60%)' : 'hsl(215 18% 42%)',
+              color: IS_NATIVE && campaign.canClaimToday ? BLUE.primary : 'hsl(215 18% 38%)',
             }}>
               {IS_NATIVE ? (campaign.canClaimToday ? 'CLAIM' : 'CLAIMED') : 'DOWNLOAD'}
             </p>
@@ -359,7 +456,6 @@ export default function CampaignBanner() {
         )}
       </motion.div>
 
-      {/* Modal */}
       <AnimatePresence>
         {showModal && (
           IS_NATIVE
