@@ -209,21 +209,12 @@ export default function MobileDashboard() {
   // Full refresh — refetches everything
   const doRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    try {
-      await Promise.all([
-        fetchActivityData(),
-        refreshPoints(),
-        refetchProfile(),
-        refetchMining(),
-        refetchArena(),
-      ]);
-    } finally {
-      setTimeout(() => {
-        setIsRefreshing(false);
-        setPullDistance(0);
-      }, 600);
-    }
-  }, [fetchActivityData, refreshPoints, refetchProfile, refetchMining, refetchArena]);
+    // Short delay so the user sees the spinner, then force a full reload
+    // This pulls the latest JS bundle from Cloudflare AND refreshes all data
+    setTimeout(() => {
+      window.location.reload();
+    }, 700);
+  }, []);
 
   // Touch handlers for pull-to-refresh
   const onTouchStart = useCallback((e: React.TouchEvent) => {
