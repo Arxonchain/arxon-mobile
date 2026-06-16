@@ -360,12 +360,12 @@ export default function CampaignBanner() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 13, fontWeight: 800, marginBottom: 3,
             color: ended ? 'hsl(215 16% 36%)' : 'hsl(215 18% 94%)' }}>
-            {ended ? '🏁 New User Campaign Ended' : '✦ New User Reward — Free 1,000 ARX-P/Day!'}
+            {ended ? '🏁 New User Campaign Ended' : '✦ Arxon Mobile User Reward: Free 1,000 ARX-P/Day!'}
           </p>
           <p style={{ fontSize: 11, color: ended ? 'hsl(215 12% 27%)' : 'hsl(215 13% 44%)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {ended
-              ? 'The 7-day new user campaign has ended for you.'
+              ? 'The 7-day Mobile user campaign has ended for you.'
               : native
                 ? campaign.canClaimToday
                   ? "Tap to claim today's 1,000 ARX-P reward!"
