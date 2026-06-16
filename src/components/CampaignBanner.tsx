@@ -120,7 +120,7 @@ function ClaimModal({ onClose, campaign }: {
             <Gift size={34} color={B.soft} strokeWidth={1.8} />
           </IconBox>
           <h2 style={{ fontSize: 24, fontWeight: 900, color: 'hsl(215 18% 96%)', margin: '0 0 8px' }}>
-            New User Reward
+            Arxon Mobile User Reward
           </h2>
           <p style={{ fontSize: 13, color: 'hsl(215 16% 46%)', lineHeight: 1.55, marginBottom: 22 }}>
             Welcome to Arxon! Claim your free daily ARX-P for 7 days.
