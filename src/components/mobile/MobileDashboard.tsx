@@ -124,8 +124,8 @@ function RefreshIndicator({ pullDistance, isRefreshing }: { pullDistance: number
 export default function MobileDashboard() {
   const { user }         = useAuth();
   const navigate         = useNavigate();
-  const { points, rank, refetch: refetchPoints } = usePoints();
-  const { profile, refetch: refetchProfile }     = useProfile();
+  const { points, rank, refreshPoints } = usePoints();
+  const { profile, refetchProfile }     = useProfile();
   const { isMining, refetch: refetchMining }     = useMiningStatus();
   const [todayPts,  setTodayPts]  = useState(0);
   const [weekPts,   setWeekPts]   = useState(0);
@@ -140,7 +140,7 @@ export default function MobileDashboard() {
   const scrollRef   = useRef<HTMLDivElement>(null);
   const THRESHOLD   = 70;
 
-  const { activeBattle, battleHistory, loading: arenaLoading, refetch: refetchArena } = useArena();
+  const { activeBattle, battleHistory, loading: arenaLoading, refreshBattle: refetchArena } = useArena();
   const dashBattles = (() => {
     try {
       const live = activeBattle ? [{ ...activeBattle, _live: true }] : [];
@@ -212,10 +212,10 @@ export default function MobileDashboard() {
     try {
       await Promise.all([
         fetchActivityData(),
-        refetchPoints?.(),
-        refetchProfile?.(),
-        refetchMining?.(),
-        refetchArena?.(),
+        refreshPoints(),
+        refetchProfile(),
+        refetchMining(),
+        refetchArena(),
       ]);
     } finally {
       setTimeout(() => {
@@ -223,7 +223,7 @@ export default function MobileDashboard() {
         setPullDistance(0);
       }, 600);
     }
-  }, [fetchActivityData, refetchPoints, refetchProfile, refetchMining, refetchArena]);
+  }, [fetchActivityData, refreshPoints, refetchProfile, refetchMining, refetchArena]);
 
   // Touch handlers for pull-to-refresh
   const onTouchStart = useCallback((e: React.TouchEvent) => {
