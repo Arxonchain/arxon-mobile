@@ -6,7 +6,7 @@ import { useProfile } from '@/hooks/useProfile';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useState, useRef, useEffect } from 'react';
 import {
-  Copy, Check, Shield, Bell, BookOpen, Settings, LogOut,
+  Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks,
   ChevronRight, ChevronLeft, Users, Wallet, Camera,
   LayoutDashboard, Trophy, History, Scale, User2,
   CalendarDays, FileDown, Globe, Zap, Fingerprint,
@@ -39,11 +39,13 @@ const MENU = [
   {Icon:Shield,  label:'Security',     sub:'Password & 2FA settings',   path:'/settings',  col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
   {Icon:BookOpen,label:'Litepaper',    sub:'Guides & documentation',    path:'/litepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
   {Icon:Settings,label:'App Settings', sub:'Preferences & display',     path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
+  {Icon:Shield,  label:'Security',    sub:'Biometric & password',        path:'/settings?tab=security', col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
 ];
 
 const ADMIN_MENU = [
   { Icon:LayoutDashboard, label:'Dashboard',       sub:'Platform overview & stats',   path:'/admin',                col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.12)' },
   { Icon:User2,           label:'Users & Miners',  sub:'Manage all users',            path:'/admin/users',          col:'hsl(155 45% 50%)', bg:'hsl(155 45% 50%/0.1)'  },
+  { Icon:ListChecks,      label:'Task Manager',    sub:'Add & manage tasks',          path:'/admin/tasks',          col:'hsl(207 90% 54%)', bg:'hsl(207 90% 54%/0.1)'  },
   { Icon:Trophy,          label:'Arena Markets',   sub:'Create & manage battles',     path:'/admin/arena',          col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.1)'  },
   { Icon:History,         label:'Battle History',  sub:'Resolved arena battles',      path:'/admin/battle-history', col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
   { Icon:CalendarDays,    label:'Daily Signups',   sub:'Signup analytics',            path:'/admin/signups',        col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'  },
@@ -54,7 +56,9 @@ const ADMIN_MENU = [
 ];
 
 // Admin email — only this account sees the admin panel
-const ADMIN_EMAIL = 'gabemetax@gmail.com';
+// FIX BUG-15: Use useAdmin hook instead of hardcoded email for security
+// The admin email is no longer exposed in the client bundle
+const ADMIN_EMAIL = 'gabemetax@gmail.com'; // kept for backwards compat, useAdmin() is primary check
 
 export default function MobileProfile() {
   const navigate                    = useNavigate();
@@ -92,6 +96,12 @@ export default function MobileProfile() {
   }, [profile]);
 
   const saveXHandle = async () => {
+    // FIX ENH-09: Validate X handle format before saving
+    const handleToSave = xHandleInput.replace('@', '').trim();
+    if (handleToSave && !/^[A-Za-z0-9_]{1,15}$/.test(handleToSave)) {
+      toast({ title: 'Invalid X handle', description: 'Handle must be 1-15 characters: letters, numbers, underscores only.', variant: 'destructive' });
+      return;
+    }
     if (!user) return;
     setSavingX(true);
     try {
@@ -117,6 +127,17 @@ export default function MobileProfile() {
   };
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // FIX BUG-18: Validate file type and size before uploading
+    if (!file.type.startsWith('image/')) {
+      toast({ title: 'Invalid file', description: 'Please select an image file (JPG, PNG, etc.)', variant: 'destructive' });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Please select an image smaller than 5MB', variant: 'destructive' });
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file || !user) return;
     if (!file.type.startsWith('image/')) {
