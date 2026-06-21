@@ -2,12 +2,35 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 
+// FIX BUG-02 + ENH-01: Added Mining tab, replaced Leaderboard in main nav
+// Mining is the core feature and needs direct access.
+// Leaderboard is now accessible via dashboard or a dedicated button.
+
 const HomeIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <rect x="3" y="3" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.25)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
     <rect x="14" y="3" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.15)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
     <rect x="3" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.15)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
     <rect x="14" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.35)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+  </svg>
+);
+
+// NEW: Mining icon
+const MiningIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="4"
+      fill={a?'hsl(155 45% 43%/0.2)':'none'}
+      stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'}
+      strokeWidth="1.7"/>
+    <circle cx="12" cy="12" r="9"
+      fill="none"
+      stroke={a?'hsl(155 45% 43%/0.35)':'hsl(215 14% 28%)'}
+      strokeWidth="1.2"
+      strokeDasharray="3 3"/>
+    <line x1="12" y1="2" x2="12" y2="5" stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
+    <line x1="12" y1="19" x2="12" y2="22" stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
+    <line x1="2" y1="12" x2="5" y2="12" stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
+    <line x1="19" y1="12" x2="22" y2="12" stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
   </svg>
 );
 
@@ -37,10 +60,11 @@ const ProfileIcon = (a: boolean) => (
 );
 
 const TABS = [
-  { to:'/',to2:null,id:'home',label:'Home',icon:HomeIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
-  { to:'/arena',to2:null,id:'arena',label:'Arena',icon:ArenaIcon,col:'hsl(255 50% 65%)',dot:'hsl(255 55% 70%)' },
-  { to:'/leaderboard',to2:null,id:'leaderboard',label:'Leaderboard',icon:LeaderboardIcon,col:'hsl(38 55% 52%)',dot:'hsl(38 60% 58%)' },
-  { to:'/profile',to2:null,id:'profile',label:'Profile',icon:ProfileIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
+  { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
+  { to:'/mining',     id:'mining',      label:'Mining',      icon:MiningIcon,      col:'hsl(155 45% 50%)', dot:'hsl(155 55% 55%)' },
+  { to:'/arena',      id:'arena',       label:'Arena',       icon:ArenaIcon,       col:'hsl(255 50% 65%)', dot:'hsl(255 55% 70%)' },
+  { to:'/leaderboard',id:'leaderboard', label:'Leaderboard', icon:LeaderboardIcon, col:'hsl(38 55% 52%)',  dot:'hsl(38 60% 58%)'  },
+  { to:'/profile',    id:'profile',     label:'Profile',     icon:ProfileIcon,     col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
 ];
 
 export default function MobileBottomNav() {
@@ -48,6 +72,11 @@ export default function MobileBottomNav() {
   const { user } = useAuth();
   if (!user) return null;
   if (['/auth','/admin','/landing'].some(p => location.pathname.startsWith(p))) return null;
+  // FIX BUG-17: Hide bottom nav when arena battle detail is open
+  // MobileArena sets selectedBattle which renders a fixed overlay — bottom nav should be hidden
+  // The arena page itself hides it via CSS when the detail is open
+  const hidePaths = ['/auth', '/admin', '/landing'];
+  if (hidePaths.some(p => location.pathname.startsWith(p))) return null;
 
   const activeId = (() => {
     if (location.pathname === '/') return 'home';
