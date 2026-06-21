@@ -68,7 +68,7 @@ export default function MobileMining() {
 
   const handleClaim = async () => {
     if (!user) { setShowAuth(true); return; }
-    if (earnedPoints > 0) await claimPoints();
+    if (earnedPoints >= 1) await claimPoints();
   };
 
   const copyRef = async () => {
@@ -233,7 +233,7 @@ export default function MobileMining() {
           {isStarting?'Starting...' : isStopping?'Stopping...' : isMining?'■  Stop & Collect' : '▶  Start Mining'}
         </motion.button>
 
-        {earnedPoints > 0 && (
+        {earnedPoints >= 1 && (
           <motion.button whileTap={{scale:0.97}} onClick={handleClaim}
             disabled={isClaiming}
             style={{width:'100%',padding:'17px',borderRadius:20,cursor:'pointer',fontWeight:700,
