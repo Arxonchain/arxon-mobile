@@ -4,10 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { useProfile } from '@/hooks/useProfile';
+import { useMining } from '@/hooks/useMining';
 import { useMiningStatus } from '@/hooks/useMiningStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, ChevronRight, Zap } from 'lucide-react';
+import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { useArena } from '@/hooks/useArena';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
@@ -127,6 +129,8 @@ export default function MobileDashboard() {
   const { points, rank, refreshPoints } = usePoints();
   const { profile, refetchProfile }     = useProfile();
   const { isMining, refetch: refetchMining }     = useMiningStatus();
+  const { earnedPoints, pointsPerHour }          = useMining();
+  const { unread: notifUnread }                  = useInAppNotifications();
   const [todayPts,  setTodayPts]  = useState(0);
   const [weekPts,   setWeekPts]   = useState(0);
   const [liveEarn,  setLiveEarn]  = useState(0);
@@ -182,7 +186,7 @@ export default function MobileDashboard() {
         type: s.is_active ? 'mining_active' : 'mining_done',
         label: s.is_active ? 'Mining Session' : 'Session Completed',
         sub: relTime(s.started_at),
-        val: s.is_active ? `+${liveEarn.toFixed(2)}` : `+${Number(s.arx_mined||0).toFixed(2)}`,
+        val: s.is_active ? `+${(earnedPoints || liveEarn).toFixed(2)}` : `+${Number(s.arx_mined||0).toFixed(2)}`,
         time: s.started_at,
         col: 'hsl(155 45% 43%)', bg: 'hsl(155 45% 43%/0.1)',
         bd: 'hsl(155 45% 43%/0.2)', vc: 'hsl(155 45% 55%)',
@@ -248,9 +252,11 @@ export default function MobileDashboard() {
 
   useEffect(()=>{
     if (!isMining) return;
-    const t = setInterval(()=>setLiveEarn(p=>p+148.2/3600),1000);
+    // Use real mining rate from useMining hook (not hardcoded 148.2)
+    const ratePerSecond = (pointsPerHour || 0) / 3600;
+    const t = setInterval(()=>setLiveEarn(p => p + ratePerSecond), 1000);
     return ()=>clearInterval(t);
-  },[isMining]);
+  },[isMining, pointsPerHour]);
 
   const quickItems = [
     { id:'arena',    label:'Arena',     path:'/arena',    icon:<path d="M14.5 17.5L3 6V3h3l11.5 11.5"/>, icon2:<><circle cx="19" cy="19" r="2"/><circle cx="5" cy="5" r="2"/></> },
@@ -300,9 +306,11 @@ export default function MobileDashboard() {
               style={{width:40,height:40,borderRadius:14,display:'flex',alignItems:'center',
                 justifyContent:'center',position:'relative',cursor:'pointer'}}>
               <Bell size={17} color="hsl(215 25% 52%)"/>
-              <span style={{position:'absolute',top:8,right:9,width:7,height:7,borderRadius:'50%',
-                background:'hsl(0 60% 56%)',border:'2px solid hsl(225 30% 3%)',
-                boxShadow:'0 0 8px hsl(0 60% 56%/0.6)'}}/>
+              {notifUnread > 0 && (
+                <span style={{position:'absolute',top:8,right:9,width:7,height:7,borderRadius:'50%',
+                  background:'hsl(0 60% 56%)',border:'2px solid hsl(225 30% 3%)',
+                  boxShadow:'0 0 8px hsl(0 60% 56%/0.6)'}}/>
+              )}
             </motion.button>
             <motion.button whileTap={{scale:0.88}} onClick={()=>navigate('/profile')}
               style={{width:40,height:40,borderRadius:14,overflow:'hidden',cursor:'pointer',
@@ -349,8 +357,9 @@ export default function MobileDashboard() {
                   )}
                 </div>
                 <div style={{display:'flex',alignItems:'baseline',gap:7,marginBottom:3}}>
-                  <span style={{fontSize:40,fontWeight:700,letterSpacing:'-2px',color:'hsl(215 20% 95%)',lineHeight:1}}>
-                    {totalPts.toLocaleString()}
+                  <span style={{fontSize:40,fontWeight:700,letterSpacing:'-2px',color:'hsl(215 20% 95%)',lineHeight:1,
+                    opacity: totalPts === 0 ? 0.4 : 1, transition: 'opacity 0.4s'}}>
+                    {totalPts === 0 ? '···' : totalPts.toLocaleString()}
                   </span>
                   <span style={{fontSize:14,fontWeight:600,color:'hsl(215 35% 62%)'}}>ARX-P</span>
                 </div>
