@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -7,37 +7,47 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, Users } from 'lucide-react';
 import arxonLogo from '@/assets/arxon-icon.svg';
+import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
+
+// FIX BUG-23 + BUG-25 + BUG-28:
+// - This is the ONLY auth page used in routes (AuthPage.tsx). Auth.tsx is dead.
+// - Fixed: useState(() => {}) side-effect misuse → moved to useEffect
+// - Fixed: password mismatch now shows error before submitting
+// - Fixed: referral code saved to both localStorage AND sessionStorage on signup
+// - Fixed: applyPendingReferralCode called after email confirm (AuthConfirm handles it)
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const initialMode = (searchParams.get('mode') as AuthMode) || 'signin';
-  
-  const [mode, setMode] = useState<AuthMode>(initialMode);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [referralCode, setReferralCode] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  // Pre-fill referral code from URL or sessionStorage
-  useState(() => {
-    const ref = searchParams.get('ref');
-    if (ref) {
-      setReferralCode(ref.toUpperCase());
-    } else {
-      try {
-        const stored = localStorage.getItem('arxon_referral_code') || sessionStorage.getItem('arxon_referral_code');
-        if (stored) setReferralCode(stored.toUpperCase());
-      } catch {}
-    }
-  });
-  
+  const [mode,            setMode]            = useState<AuthMode>(initialMode);
+  const [email,           setEmail]           = useState('');
+  const [password,        setPassword]        = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [referralCode,    setReferralCode]    = useState('');
+  const [showPassword,    setShowPassword]    = useState(false);
+  const [loading,         setLoading]         = useState(false);
+
   const { signIn, signUp, resetPassword } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  // FIX BUG-28: Use useEffect instead of useState() with side effects
+  useEffect(() => {
+    const ref = searchParams.get('ref');
+    if (ref) {
+      setReferralCode(ref.trim().toUpperCase());
+    } else {
+      try {
+        const stored =
+          localStorage.getItem('arxon_referral_code') ||
+          sessionStorage.getItem('arxon_referral_code');
+        if (stored) setReferralCode(stored.trim().toUpperCase());
+      } catch {}
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,37 +55,69 @@ export default function AuthPage() {
 
     try {
       if (mode === 'signup') {
+        // FIX BUG-25: Validate password match BEFORE calling signUp
         if (password !== confirmPassword) {
-          toast({ title: 'Error', description: 'Passwords do not match', variant: 'destructive' });
+          toast({
+            title: 'Passwords do not match',
+            description: 'Please make sure both passwords are identical.',
+            variant: 'destructive',
+          });
+          setLoading(false);
           return;
         }
+
         if (password.length < 8) {
-          toast({ title: 'Error', description: 'Password must be at least 8 characters', variant: 'destructive' });
+          toast({
+            title: 'Password too short',
+            description: 'Password must be at least 8 characters.',
+            variant: 'destructive',
+          });
+          setLoading(false);
           return;
         }
-        // Store referral code in localStorage BEFORE signup so applyPendingReferral picks it up
-        if (referralCode.trim()) {
+
+        // FIX BUG-23: Save referral code to BOTH storages before signup
+        // so applyPendingReferralCode() in AuthConfirm.tsx picks it up
+        const ref = referralCode.trim().toUpperCase();
+        if (ref) {
           try {
-            localStorage.setItem('arxon_referral_code', referralCode.trim().toUpperCase());
-            sessionStorage.setItem('arxon_referral_code', referralCode.trim().toUpperCase());
+            localStorage.setItem('arxon_referral_code', ref);
+            sessionStorage.setItem('arxon_referral_code', ref);
           } catch {}
         }
+
         const { error } = await signUp(email, password);
         if (error) throw error;
-        toast({ title: 'Success', description: 'Check your email to confirm your account' });
+
+        // If session exists immediately (auto-confirm on), apply referral now
+        try { await applyPendingReferralCode(); } catch {}
+
+        toast({
+          title: '✅ Account Created!',
+          description: 'Check your email to confirm your account.',
+        });
         setMode('signin');
+
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;
         navigate('/');
+
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);
         if (error) throw error;
-        toast({ title: 'Success', description: 'Check your email for password reset link' });
+        toast({
+          title: '📧 Reset link sent',
+          description: 'Check your email for the password reset link.',
+        });
         setMode('signin');
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message || 'Something went wrong', variant: 'destructive' });
+      toast({
+        title: 'Error',
+        description: err.message || 'Something went wrong. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(false);
     }
@@ -86,14 +128,14 @@ export default function AuthPage() {
       {/* Background glow */}
       <div className="glow-orb glow-orb-steel w-96 h-96 top-1/4 left-1/4 opacity-30 fixed" />
       <div className="glow-orb glow-orb-blue w-64 h-64 bottom-1/4 right-1/4 opacity-20 fixed" />
-      
+
       <div className="w-full max-w-md">
         <div className="glass-card p-8">
           {/* Logo */}
           <div className="flex justify-center mb-8">
             <img src={arxonLogo} alt="Arxon" className="h-16 w-16 rounded-xl" />
           </div>
-          
+
           {/* Title */}
           <h1 className="text-2xl font-bold text-center mb-2">
             {mode === 'signin' && 'Welcome Back'}
@@ -105,7 +147,7 @@ export default function AuthPage() {
             {mode === 'signup' && 'Join Arxon and start earning'}
             {mode === 'forgot' && 'Enter your email to reset password'}
           </p>
-          
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div className="space-y-2">
@@ -120,11 +162,12 @@ export default function AuthPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="email"
                 />
               </div>
             </div>
-            
-            {/* Password (not shown for forgot mode) */}
+
+            {/* Password */}
             {mode !== 'forgot' && (
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
@@ -138,6 +181,7 @@ export default function AuthPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10 pr-10"
                     required
+                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   />
                   <button
                     type="button"
@@ -149,8 +193,8 @@ export default function AuthPage() {
                 </div>
               </div>
             )}
-            
-            {/* Confirm Password (only for signup) */}
+
+            {/* Confirm Password — signup only */}
             {mode === 'signup' && (
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm Password</Label>
@@ -162,13 +206,28 @@ export default function AuthPage() {
                     placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="pl-10"
+                    className={`pl-10 ${
+                      confirmPassword && password !== confirmPassword
+                        ? 'border-red-500 focus:border-red-500'
+                        : confirmPassword && password === confirmPassword
+                        ? 'border-green-500'
+                        : ''
+                    }`}
                     required
+                    autoComplete="new-password"
                   />
                 </div>
+                {/* Live mismatch indicator */}
+                {confirmPassword && password !== confirmPassword && (
+                  <p className="text-xs text-red-400">Passwords do not match</p>
+                )}
+                {confirmPassword && password === confirmPassword && (
+                  <p className="text-xs text-green-400">✓ Passwords match</p>
+                )}
               </div>
             )}
-            
+
+            {/* Referral Code — signup only */}
             {mode === 'signup' && (
               <div className="space-y-2">
                 <Label htmlFor="referralCode">Referral Code (optional)</Label>
@@ -186,7 +245,7 @@ export default function AuthPage() {
                 </div>
               </div>
             )}
-            
+
             {/* Forgot password link */}
             {mode === 'signin' && (
               <button
@@ -197,17 +256,23 @@ export default function AuthPage() {
                 Forgot password?
               </button>
             )}
-            
-            {/* Submit button */}
-            <Button type="submit" className="w-full btn-mining btn-glow" disabled={loading}>
-              {loading ? 'Please wait...' : (
-                mode === 'signin' ? 'Sign In' :
-                mode === 'signup' ? 'Create Account' :
-                'Send Reset Link'
-              )}
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              className="w-full btn-mining btn-glow"
+              disabled={loading || (mode === 'signup' && !!confirmPassword && password !== confirmPassword)}
+            >
+              {loading
+                ? 'Please wait...'
+                : mode === 'signin'
+                ? 'Sign In'
+                : mode === 'signup'
+                ? 'Create Account'
+                : 'Send Reset Link'}
             </Button>
           </form>
-          
+
           {/* Mode switcher */}
           <div className="mt-6 text-center">
             {mode === 'forgot' ? (
