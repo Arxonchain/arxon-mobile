@@ -38,13 +38,21 @@ export default function InAppNotificationBell() {
           cursor:'pointer',outline:'none'}}>
         <Bell size={17} color="hsl(215 25% 52%)"/>
         {unread > 0 && (
-          <div style={{position:'absolute',top:7,right:7,width:8,height:8,borderRadius:'50%',
-            background:'hsl(0 60% 56%)',border:'2px solid hsl(225 30% 3%)',
-            boxShadow:'0 0 6px hsl(0 60% 56%/0.5)'}}>
-            {unread > 9 && (
-              <span style={{position:'absolute',top:-14,right:-6,fontSize:9,fontWeight:700,
-                color:'white',background:'hsl(0 60% 50%)',borderRadius:6,padding:'1px 4px'}}>
-                {unread}
+          // FIX BUG-14: Proper badge that shows count up to 99+, no overflow
+          <div style={{
+            position:'absolute', top:4, right:4,
+            minWidth: unread > 9 ? 16 : 14,
+            height: unread > 9 ? 16 : 14,
+            borderRadius: unread > 9 ? 8 : '50%',
+            background:'hsl(0 60% 56%)',
+            border:'1.5px solid hsl(225 30% 3%)',
+            boxShadow:'0 0 8px hsl(0 60% 56%/0.6)',
+            display:'flex',alignItems:'center',justifyContent:'center',
+            padding: unread > 9 ? '0 3px' : 0,
+          }}>
+            {unread > 0 && (
+              <span style={{fontSize:8,fontWeight:800,color:'white',lineHeight:1}}>
+                {unread > 99 ? '99+' : unread > 9 ? unread : ''}
               </span>
             )}
           </div>
