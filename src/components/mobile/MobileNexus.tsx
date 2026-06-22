@@ -63,6 +63,7 @@ export default function MobileNexus() {
   const balance    = points?.total_points ?? 0;
   const nexusAddr  = profile?.nexus_address;
 
+  // FIX BUG-20: loading state now shows skeletons (not empty list)
   const fetchTx = async () => {
     if (!user) return;
     setLoading(true);
@@ -174,10 +175,14 @@ export default function MobileNexus() {
                 </div>
               </div>
               <button onClick={copyAddr}
-                style={{display:'flex',alignItems:'center',gap:6,padding:'8px 14px',borderRadius:14,flexShrink:0,marginLeft:12,
-                  background:'rgba(139,174,214,.1)',border:'1px solid rgba(139,174,214,.2)',
-                  color:'#8BAED6',fontSize:11,fontWeight:700,cursor:'pointer',outline:'none'}}>
-                {copied ? <><Check size={12}/>Copied</> : <><Copy size={12}/>Copy</>}
+                style={{display:'flex',alignItems:'center',gap:6,padding:'10px 18px',borderRadius:14,flexShrink:0,marginLeft:12,
+                  background: copied ? 'rgba(93,176,138,0.15)' : 'rgba(139,174,214,.12)',
+                  border: copied ? '1px solid rgba(93,176,138,0.3)' : '1px solid rgba(139,174,214,.25)',
+                  color: copied ? '#5DB08A' : '#8BAED6',fontSize:12,fontWeight:700,cursor:'pointer',outline:'none',
+                  transition:'all 0.2s',boxShadow: copied ? 'none' : '0 2px 8px rgba(139,174,214,0.1)'}}>
+                {copied
+                  ? <><Check size={13}/> Copied!</>
+                  : <><Copy size={13}/> Copy UID</>}
               </button>
             </div>
             <div style={{borderTop:'1px solid rgba(139,174,214,.08)',paddingTop:12,display:'flex',alignItems:'baseline',gap:6}}>
