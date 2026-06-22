@@ -6,9 +6,6 @@
  import { useAuth } from "@/contexts/AuthContext";
  import { format } from "date-fns";
  import { useMemo } from "react";
- import ResendBackground from "@/components/effects/ResendBackground";
- import ScrollReveal from "@/components/effects/ScrollReveal";
- import GlowCard from "@/components/effects/GlowCard";
  import { Button } from "@/components/ui/button";
 
  const Referrals = () => {
@@ -56,25 +53,25 @@
    };
  
    return (
-     <div className="min-h-screen bg-background relative overflow-hidden">
-       <ResendBackground variant="subtle" />
-       
-       {/* Header */}
-       <header className="relative z-20 flex items-center justify-between px-4 py-4 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-         <motion.button 
-           onClick={() => navigate('/')} 
-           className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
-           whileHover={{ x: -3 }}
-         >
-           <ArrowLeft className="w-6 h-6" />
+     <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
+       fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
+
+       {/* FIX BUG-12: Mobile inline-style header, no Tailwind web classes */}
+       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+         padding:'52px 20px 0',marginBottom:4}}>
+         <motion.button onClick={() => navigate('/')} whileTap={{scale:0.92}}
+           style={{width:40,height:40,borderRadius:14,background:'hsl(215 25% 11%)',
+             border:'1px solid hsl(215 22% 18%)',display:'flex',alignItems:'center',
+             justifyContent:'center',cursor:'pointer',outline:'none'}}>
+           <ArrowLeft style={{width:20,height:20,color:'hsl(215 25% 55%)'}} />
          </motion.button>
-         <h1 className="font-bold text-foreground text-lg">Referrals</h1>
-         <div className="w-10" />
-       </header>
+         <h1 style={{fontSize:18,fontWeight:700,color:'hsl(215 20% 93%)'}}>Referrals</h1>
+         <div style={{width:40}}/>
+       </div>
  
-       <main className="relative z-10 px-4 py-6 space-y-6 max-w-lg mx-auto">
+       <div style={{padding:"0 20px",marginTop:16}}>
          {/* Hero */}
-         <ScrollReveal>
+         <div>
            <div className="text-center mb-4">
              <motion.div
                className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-4"
@@ -87,7 +84,7 @@
              <h2 className="text-2xl font-bold text-foreground mb-2">Invite Friends & Earn</h2>
              <p className="text-muted-foreground text-sm">Share your code and earn when friends join</p>
            </div>
-         </ScrollReveal>
+         </div>
  
          {/* Referral Code Card */}
          {user && (
@@ -124,7 +121,7 @@
                  </Button>
                </div>
              </GlowCard>
-           </ScrollReveal>
+           </div>
          )}
  
          {/* Stats */}
@@ -151,7 +148,7 @@
                <p className="text-xs text-muted-foreground">ARX-P Earned</p>
              </GlowCard>
            </div>
-         </ScrollReveal>
+         </div>
  
          {/* Referrals List */}
          <ScrollReveal delay={0.2}>
@@ -237,8 +234,8 @@
                )}
              </div>
            )}
-         </ScrollReveal>
-       </main>
+         </div>
+       </div>
      </div>
    );
  };
