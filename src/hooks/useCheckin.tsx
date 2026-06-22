@@ -121,6 +121,8 @@ export const useCheckin = () => {
     todayCheckin,
     performCheckin,
     currentStreak: points?.daily_streak || 0,
-    streakBoost // +1% per day, max 30%
+    streakBoost, // numeric value e.g. 5 (= 5%)
+    // FIX BUG-32: Consistent display label always shows % sign
+    streakBoostLabel: streakBoost > 0 ? `+${streakBoost}%` : '+0%',
   };
 };
