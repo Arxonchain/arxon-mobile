@@ -10,6 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, ChevronRight, Zap } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { useRealtimePoints } from '@/hooks/useRealtimePoints';
 import { useArena } from '@/hooks/useArena';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
@@ -131,6 +132,8 @@ export default function MobileDashboard() {
   const { isMining, refetch: refetchMining }     = useMiningStatus();
   const { earnedPoints, pointsPerHour }          = useMining();
   const { unread: notifUnread }                  = useInAppNotifications();
+  // ENH-16: Realtime points subscription
+  useRealtimePoints();
   const [todayPts,  setTodayPts]  = useState(0);
   const [weekPts,   setWeekPts]   = useState(0);
   const [liveEarn,  setLiveEarn]  = useState(0);
@@ -265,6 +268,15 @@ export default function MobileDashboard() {
     { id:'referrals',label:'Referrals', path:'/referrals',icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
     { id:'wallet',   label:'Wallet',    path:'/wallet',   icon:<><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 11h20"/><circle cx="17" cy="15.5" r="1.5" fill="currentColor"/></> },
   ];
+
+  // ENH-18: Pause mining animations when app is in background to save battery
+  const [isVisible, setIsVisible] = useState(true);
+  useEffect(() => {
+    const onVis = () => setIsVisible(document.visibilityState === 'visible');
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
+
 
   return (
     <div
