@@ -120,7 +120,7 @@ function ClaimModal({ onClose, campaign }: {
             <Gift size={34} color={B.soft} strokeWidth={1.8} />
           </IconBox>
           <h2 style={{ fontSize: 24, fontWeight: 900, color: 'hsl(215 18% 96%)', margin: '0 0 8px' }}>
-            Arxon Mobile User Reward
+            New User Reward
           </h2>
           <p style={{ fontSize: 13, color: 'hsl(215 16% 46%)', lineHeight: 1.55, marginBottom: 22 }}>
             Welcome to Arxon! Claim your free daily ARX-P for 7 days.
@@ -313,6 +313,26 @@ export default function CampaignBanner() {
   const campaign = useNewUserCampaign();
   const [showModal, setShowModal] = useState(false);
 
+  // FIX ENH-13: Auto-hide banner 24h after campaign ends
+  const HIDE_KEY = 'arxon_campaign_banner_hidden';
+  const [hidden, setHidden] = useState(() => {
+    try {
+      const val = localStorage.getItem(HIDE_KEY);
+      if (!val) return false;
+      return Date.now() - parseInt(val) < 24 * 60 * 60 * 1000;
+    } catch { return false; }
+  });
+
+  useEffect(() => {
+    if (campaign.campaignEnded && !hidden) {
+      try {
+        localStorage.setItem(HIDE_KEY, Date.now().toString());
+      } catch {}
+    }
+  }, [campaign.campaignEnded, hidden]);
+
+  if (hidden && campaign.campaignEnded) return null;
+
   if (campaign.loading) return (
     <div style={{
       height: 76, borderRadius: 20, marginBottom: 14,
@@ -360,12 +380,12 @@ export default function CampaignBanner() {
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 13, fontWeight: 800, marginBottom: 3,
             color: ended ? 'hsl(215 16% 36%)' : 'hsl(215 18% 94%)' }}>
-            {ended ? '🏁 New User Campaign Ended' : '✦ Arxon Mobile User Reward: Free 1,000 ARX-P/Day!'}
+            {ended ? '🏁 New User Campaign Ended' : '✦ New User Reward — Free 1,000 ARX-P/Day!'}
           </p>
           <p style={{ fontSize: 11, color: ended ? 'hsl(215 12% 27%)' : 'hsl(215 13% 44%)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {ended
-              ? 'The 7-day Mobile user campaign has ended for you.'
+              ? 'The 7-day new user campaign has ended for you.'
               : native
                 ? campaign.canClaimToday
                   ? "Tap to claim today's 1,000 ARX-P reward!"
