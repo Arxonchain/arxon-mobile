@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { BRAND, TechLines } from './brand/BrandFX';
 
 // FIX BUG-02 + ENH-01: Added Mining tab, replaced Leaderboard in main nav
 // Mining is the core feature and needs direct access.
@@ -8,10 +9,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 const HomeIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <rect x="3" y="3" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.25)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
-    <rect x="14" y="3" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.15)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
-    <rect x="3" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.15)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
-    <rect x="14" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.35)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <rect x="3" y="3" width="7" height="7" rx="2" fill={a?'hsl(218 38% 76%/0.25)':'none'} stroke={a?'hsl(218 38% 76%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <rect x="14" y="3" width="7" height="7" rx="2" fill={a?'hsl(218 38% 76%/0.15)':'none'} stroke={a?'hsl(218 38% 76%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <rect x="3" y="14" width="7" height="7" rx="2" fill={a?'hsl(218 38% 76%/0.15)':'none'} stroke={a?'hsl(218 38% 76%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <rect x="14" y="14" width="7" height="7" rx="2" fill={a?'hsl(218 38% 76%/0.35)':'none'} stroke={a?'hsl(218 38% 76%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
   </svg>
 );
 
@@ -54,17 +55,17 @@ const LeaderboardIcon = (a: boolean) => (
 
 const ProfileIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="8" r="4" fill={a?'hsl(215 35% 62%/0.2)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
-    <path d="M4 21c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
+    <circle cx="12" cy="8" r="4" fill={a?'hsl(218 38% 76%/0.2)':'none'} stroke={a?'hsl(218 38% 76%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <path d="M4 21c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke={a?'hsl(218 38% 76%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
   </svg>
 );
 
 const TABS = [
-  { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
+  { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:BRAND.accent, dot:BRAND.accent },
   { to:'/mining',     id:'mining',      label:'Mining',      icon:MiningIcon,      col:'hsl(155 45% 50%)', dot:'hsl(155 55% 55%)' },
   { to:'/arena',      id:'arena',       label:'Arena',       icon:ArenaIcon,       col:'hsl(255 50% 65%)', dot:'hsl(255 55% 70%)' },
   { to:'/leaderboard',id:'leaderboard', label:'Leaderboard', icon:LeaderboardIcon, col:'hsl(38 55% 52%)',  dot:'hsl(38 60% 58%)'  },
-  { to:'/profile',    id:'profile',     label:'Profile',     icon:ProfileIcon,     col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
+  { to:'/profile',    id:'profile',     label:'Profile',     icon:ProfileIcon,     col:BRAND.accent, dot:BRAND.accent },
 ];
 
 export default function MobileBottomNav() {
@@ -88,11 +89,12 @@ export default function MobileBottomNav() {
     <div style={{position:'fixed',bottom:0,left:0,right:0,zIndex:200,
       background:'linear-gradient(to top,hsl(225 30% 3%) 60%,transparent)',
       paddingBottom:'env(safe-area-inset-bottom,0px)'}}>
-      <div style={{margin:'0 10px 10px',
+      <div style={{margin:'0 10px 10px',position:'relative',overflow:'hidden',
         background:'linear-gradient(180deg,hsl(225 26% 9%/0.97),hsl(225 30% 5%/0.99))',
         backdropFilter:'blur(44px) saturate(1.4)',WebkitBackdropFilter:'blur(44px) saturate(1.4)',
-        borderRadius:24,border:'1px solid hsl(215 25% 17%/0.55)',padding:'8px 2px',display:'flex',
-        boxShadow:'0 -4px 32px hsl(225 35% 3%/0.6),inset 0 1px 0 hsl(215 35% 62%/0.05)'}}>
+        borderRadius:24,border:`1px solid ${BRAND.accentBorder}`,padding:'8px 2px',display:'flex',
+        boxShadow:'0 -4px 32px hsl(225 35% 3%/0.6),inset 0 1px 0 hsl(218 38% 76%/0.05)'}}>
+        <TechLines opacity={0.35} />
         {TABS.map(({ to, id, label, icon, col, dot }) => {
           const isActive = id === activeId;
           return (
