@@ -12,6 +12,8 @@ import { toast } from '@/hooks/use-toast';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useAuth } from '@/contexts/AuthContext';
 import { format } from 'date-fns';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import PullToRefreshIndicator from '@/components/mobile/PullToRefreshIndicator';
 
 const CSS = `
   @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
@@ -21,7 +23,10 @@ const CSS = `
 const Referrals = () => {
   const navigate    = useNavigate();
   const { user }    = useAuth();
-  const { referralCode, referrals, stats, loading, getReferralLink } = useReferrals(user);
+  const { referralCode, referrals, stats, loading, getReferralLink, refreshReferrals } = useReferrals(user);
+
+  // ENH-03: Pull-to-refresh
+  const ptr = usePullToRefresh(async () => { await refreshReferrals(); });
 
   const { activeReferrals, inactiveReferrals } = useMemo(() => ({
     activeReferrals:   referrals.filter(r => r.is_active === true),
@@ -68,9 +73,17 @@ const Referrals = () => {
   ];
 
   return (
-    <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
+    <div
+      ref={ptr.scrollRef}
+      onTouchStart={ptr.onTouchStart}
+      onTouchMove={ptr.onTouchMove}
+      onTouchEnd={ptr.onTouchEnd}
+      style={{minHeight:'100vh',overflowY:'auto',position:'relative',background:'hsl(225 30% 3%)',paddingBottom:100,
       fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
       <style>{CSS}</style>
+      <PullToRefreshIndicator pullDistance={ptr.pullDistance} isRefreshing={ptr.isRefreshing} />
+      <div style={{transform:`translateY(${ptr.isRefreshing ? 60 : ptr.pullDistance * 0.7}px)`,
+        transition: ptr.pullDistance === 0 && !ptr.isRefreshing ? 'transform 0.2s ease' : 'none'}}>
 
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
@@ -299,6 +312,8 @@ const Referrals = () => {
             )}
           </div>
         )}
+      </div>
+
       </div>
     </div>
   );
