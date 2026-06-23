@@ -435,7 +435,7 @@ export default function MobileDashboard() {
                   {[
                     {l:'Today',    v:`+${Math.round(todayPts).toLocaleString()}`, c:'hsl(215 20% 90%)'},
                     {l:'This Week',v:`+${Math.round(weekPts).toLocaleString()}`,  c:'hsl(215 32% 72%)'},
-                    {l:'Streak',   v:`🔥 ${streak}d`,                             c:'hsl(38 55% 52%)'},
+                    {l:'Streak',   v:` ${streak}d`,                             c:'hsl(38 55% 52%)'},
                   ].map((s,i)=>(
                     <div key={i} style={{paddingLeft:i>0?12:0,borderLeft:i>0?'1px solid hsl(215 25% 18%)':'none'}}>
                       <p style={{fontSize:7,textTransform:'uppercase',letterSpacing:'0.1em',color:'hsl(215 14% 32%)',fontWeight:600,marginBottom:4}}>{s.l}</p>
