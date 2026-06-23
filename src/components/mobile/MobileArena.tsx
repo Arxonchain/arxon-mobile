@@ -370,21 +370,45 @@ function BattleDetail({
         )}
 
         {/* Staked confirmation */}
-        {existingVote && isActive && (
-          <div style={{marginBottom:14,padding:'14px 16px',background:'hsl(155 45% 43%/0.07)',
-            border:'1px solid hsl(155 45% 43%/0.22)',borderRadius:18,display:'flex',alignItems:'center',gap:12}}>
-            <div style={{width:36,height:36,borderRadius:12,background:'hsl(155 45% 43%/0.12)',
-              display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>✓</div>
-            <div>
-              <p style={{fontSize:13,fontWeight:700,color:'hsl(155 45% 55%)'}}>
-                Staked {battleUserVote?.power_spent?.toLocaleString()} ARX-P
-              </p>
-              <p style={{fontSize:11,color:'hsl(155 45% 43%/0.6)',marginTop:2}}>
-                On {existingVote==='a'?battle.side_a_name:battle.side_b_name} · Awaiting results
+        {existingVote && isActive && (() => {
+          const myStake = Number(battleUserVote?.power_spent || 0);
+          const mySidePool = existingVote === 'a' ? battle.side_a_power : battle.side_b_power;
+          const opposingPool = existingVote === 'a' ? battle.side_b_power : battle.side_a_power;
+          const myShare = mySidePool > 0 ? (myStake / mySidePool) * 100 : 0;
+          const estPayout = mySidePool > 0 ? myStake + (myStake / mySidePool) * opposingPool : myStake;
+          return (
+            <div style={{marginBottom:14,padding:'14px 16px',background:'hsl(155 45% 43%/0.07)',
+              border:'1px solid hsl(155 45% 43%/0.22)',borderRadius:18}}>
+              <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:12}}>
+                <div style={{width:36,height:36,borderRadius:12,background:'hsl(155 45% 43%/0.12)',
+                  display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>✓</div>
+                <div>
+                  <p style={{fontSize:13,fontWeight:700,color:'hsl(155 45% 55%)'}}>
+                    Staked {myStake.toLocaleString()} ARX-P
+                  </p>
+                  <p style={{fontSize:11,color:'hsl(155 45% 43%/0.6)',marginTop:2}}>
+                    On {existingVote==='a'?battle.side_a_name:battle.side_b_name} · Awaiting results
+                  </p>
+                </div>
+              </div>
+              {/* ENH-06: Stake breakdown — your share of the pool + estimated payout if your side wins */}
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8,paddingTop:12,
+                borderTop:'1px solid hsl(155 45% 43%/0.15)'}}>
+                <div>
+                  <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'0.08em',color:'hsl(155 45% 43%/0.55)',fontWeight:600,marginBottom:3}}>Your Pool Share</p>
+                  <p style={{fontSize:14,fontWeight:800,color:'hsl(155 45% 60%)'}}>{myShare.toFixed(1)}%</p>
+                </div>
+                <div>
+                  <p style={{fontSize:9,textTransform:'uppercase',letterSpacing:'0.08em',color:'hsl(155 45% 43%/0.55)',fontWeight:600,marginBottom:3}}>Est. Payout If Win</p>
+                  <p style={{fontSize:14,fontWeight:800,color:'hsl(38 55% 58%)'}}>{Math.round(estPayout).toLocaleString()} ARX-P</p>
+                </div>
+              </div>
+              <p style={{fontSize:9,color:'hsl(155 45% 43%/0.45)',marginTop:8}}>
+                Estimate based on current pool sizes — actual payout depends on final totals when the battle ends.
               </p>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Live participants */}
         {battleParticipants.length > 0 && (
@@ -425,6 +449,12 @@ function LeaderboardTab({ leaderboard, loading, currentUserId }: {
   currentUserId?: string;
 }) {
   const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
+  const [visibleCount, setVisibleCount] = useState(20);
+  const PAGE_SIZE = 20;
+
+  // Reset pagination whenever the visible team/list changes so we don't
+  // start on team Omega already showing 80 rows from a previous view.
+  useEffect(() => { setVisibleCount(PAGE_SIZE); }, [activeTeam]);
 
   const fmt = (n: number) => {
     if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -473,9 +503,24 @@ function LeaderboardTab({ leaderboard, loading, currentUserId }: {
             <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 40%)' }}>No rankings yet</p>
             <p style={{ fontSize: 12, color: 'hsl(215 14% 30%)', marginTop: 4 }}>Participate in battles to appear here</p>
           </div>
-        ) : allPlayers.map((e, i) => (
-          <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
-        ))}
+        ) : (
+          <>
+            {allPlayers.slice(0, visibleCount).map((e, i) => (
+              <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
+            ))}
+            {visibleCount < allPlayers.length && (
+              <button
+                onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+                style={{
+                  width: '100%', marginTop: 8, padding: '12px', borderRadius: 14, border: '1px solid hsl(215 20% 16%)',
+                  background: 'hsl(215 22% 9%)', color: 'hsl(215 35% 65%)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Show More ({allPlayers.length - visibleCount} left)
+              </button>
+            )}
+          </>
+        )}
       </div>
     );
   }
@@ -508,13 +553,28 @@ function LeaderboardTab({ leaderboard, loading, currentUserId }: {
           <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 18% 38%)' }}>No {activeTeam} members yet</p>
           <p style={{ fontSize: 12, color: 'hsl(215 14% 28%)', marginTop: 4 }}>Join {activeTeam} team in Arena to appear here</p>
         </div>
-      ) : (activeTeam === 'alpha' ? alphaTeam : omegaTeam).map((e, i) => (
-        <PlayerRow
-          key={e.user_id} entry={e} rank={i + 1}
-          color={activeTeam === 'alpha' ? ALPHA : OMEGA}
-          isMe={e.user_id === currentUserId} fmt={fmt}
-        />
-      ))}
+      ) : (
+        <>
+          {(activeTeam === 'alpha' ? alphaTeam : omegaTeam).slice(0, visibleCount).map((e, i) => (
+            <PlayerRow
+              key={e.user_id} entry={e} rank={i + 1}
+              color={activeTeam === 'alpha' ? ALPHA : OMEGA}
+              isMe={e.user_id === currentUserId} fmt={fmt}
+            />
+          ))}
+          {visibleCount < (activeTeam === 'alpha' ? alphaTeam : omegaTeam).length && (
+            <button
+              onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+              style={{
+                width: '100%', marginTop: 8, padding: '12px', borderRadius: 14, border: '1px solid hsl(215 20% 16%)',
+                background: 'hsl(215 22% 9%)', color: 'hsl(215 35% 65%)', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              }}
+            >
+              Show More ({(activeTeam === 'alpha' ? alphaTeam : omegaTeam).length - visibleCount} left)
+            </button>
+          )}
+        </>
+      )}
     </div>
   );
 }
