@@ -8,10 +8,11 @@ import { useMining } from '@/hooks/useMining';
 import { useMiningStatus } from '@/hooks/useMiningStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Bell, ChevronRight, Zap } from 'lucide-react';
+import { Bell, ChevronRight, Zap, Share2 } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { useRealtimePoints } from '@/hooks/useRealtimePoints';
 import { useArena } from '@/hooks/useArena';
+import { toast } from '@/hooks/use-toast';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
 
@@ -138,6 +139,28 @@ export default function MobileDashboard() {
   const [weekPts,   setWeekPts]   = useState(0);
   const [liveEarn,  setLiveEarn]  = useState(0);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  // ENH-02: Pending tasks badge on the Tasks quick-access button
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ data: activeTasks }, { data: completed }] = await Promise.all([
+          supabase.from('tasks').select('id').eq('is_active', true),
+          supabase.from('user_tasks').select('task_id').eq('user_id', user.id).eq('status', 'completed'),
+        ]);
+        if (cancelled) return;
+        const completedIds = new Set((completed || []).map((t: any) => t.task_id));
+        const pending = (activeTasks || []).filter((t: any) => !completedIds.has(t.id)).length;
+        setPendingTasksCount(pending);
+      } catch (err) {
+        console.error('Error fetching pending tasks count:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Pull-to-refresh state
   const [pullDistance, setPullDistance]   = useState(0);
@@ -161,6 +184,32 @@ export default function MobileDashboard() {
   const streak   = points?.daily_streak ?? 0;
   const username = profile?.username || user?.email?.split('@')[0] || 'Miner';
   const avatarUrl = profile?.avatar_url;
+
+  // ENH-05: Quick share button — let users invite friends directly from the
+  // dashboard without first navigating into the Referrals page.
+  const shareReferral = useCallback(async () => {
+    const code = profile?.referral_code;
+    const link = code ? `https://arxonchain.xyz/?ref=${code}` : 'https://arxonchain.xyz';
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Join ARXON',
+          text: code
+            ? `Join me on ARXON and start mining ARX-P! Use my referral code: ${code}`
+            : 'Join me on ARXON and start mining ARX-P!',
+          url: link,
+        });
+      } catch (err) {
+        if ((err as Error).name !== 'AbortError') {
+          navigator.clipboard.writeText(link);
+          toast({ title: '✓ Link Copied!', description: 'Referral link copied to clipboard' });
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(link);
+      toast({ title: '✓ Link Copied!', description: 'Referral link copied to clipboard' });
+    }
+  }, [profile?.referral_code]);
 
   const fetchActivityData = useCallback(async () => {
     if (!user) return;
@@ -313,6 +362,12 @@ export default function MobileDashboard() {
             </div>
           </div>
           <div style={{display:'flex',gap:8,alignItems:'center'}}>
+            <motion.button whileTap={{scale:0.88}} onClick={shareReferral}
+              className="glass-card press"
+              style={{width:40,height:40,borderRadius:14,display:'flex',alignItems:'center',
+                justifyContent:'center',cursor:'pointer'}}>
+              <Share2 size={16} color="hsl(215 25% 52%)"/>
+            </motion.button>
             <motion.button whileTap={{scale:0.88}} onClick={()=>navigate('/notifications')}
               className="glass-card press"
               style={{width:40,height:40,borderRadius:14,display:'flex',alignItems:'center',
@@ -478,16 +533,27 @@ export default function MobileDashboard() {
                 onClick={()=>navigate(item.path)}
                 className="press glass-elevated card-lift"
                 style={{borderRadius:18,padding:'14px 8px 12px',display:'flex',flexDirection:'column',
-                  alignItems:'center',gap:9,cursor:'pointer',
+                  alignItems:'center',gap:9,cursor:'pointer',position:'relative',
                   border:'1px solid hsl(215 28% 20%/0.4)'}}>
-                <div style={{width:42,height:42,borderRadius:13,
-                  background:'hsl(215 35% 62%/0.1)',
-                  border:'1px solid hsl(215 35% 62%/0.18)',
-                  display:'flex',alignItems:'center',justifyContent:'center',
-                  color:'hsl(215 35% 62%)'}}>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                    {item.icon}{item.icon2}
-                  </svg>
+                <div style={{position:'relative'}}>
+                  <div style={{width:42,height:42,borderRadius:13,
+                    background:'hsl(215 35% 62%/0.1)',
+                    border:'1px solid hsl(215 35% 62%/0.18)',
+                    display:'flex',alignItems:'center',justifyContent:'center',
+                    color:'hsl(215 35% 62%)'}}>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                      {item.icon}{item.icon2}
+                    </svg>
+                  </div>
+                  {item.id === 'tasks' && pendingTasksCount > 0 && (
+                    <span style={{position:'absolute',top:-4,right:-4,minWidth:18,height:18,borderRadius:9,
+                      background:'hsl(0 60% 56%)',border:'2px solid hsl(225 28% 8%)',
+                      display:'flex',alignItems:'center',justifyContent:'center',
+                      fontSize:9,fontWeight:800,color:'white',padding:'0 4px',
+                      boxShadow:'0 0 8px hsl(0 60% 56%/0.5)'}}>
+                      {pendingTasksCount > 9 ? '9+' : pendingTasksCount}
+                    </span>
+                  )}
                 </div>
                 <span style={{fontSize:11,fontWeight:600,color:'hsl(215 25% 62%)',textAlign:'center',
                   fontFamily:"'Creato Display',-apple-system,sans-serif"}}>
