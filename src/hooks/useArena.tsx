@@ -145,7 +145,7 @@ export const useArena = () => {
       console.error('Error fetching user vote:', error);
       return null;
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchParticipants = useCallback(async (battleId: string) => {
     try {
@@ -189,7 +189,7 @@ export const useArena = () => {
       console.error('Error fetching badges:', error);
       return [];
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchArenaBoosts = useCallback(async () => {
     if (!user) return [];
@@ -208,7 +208,7 @@ export const useArena = () => {
       console.error('Error fetching arena boosts:', error);
       return [];
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchLeaderboard = useCallback(async () => {
     try {
@@ -308,7 +308,7 @@ export const useArena = () => {
       console.error('Error fetching battle history:', error);
       return [];
     }
-  }, [user]);
+  }, [user?.id]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -386,7 +386,7 @@ export const useArena = () => {
       console.error('Error fetching analytics:', error);
       return null;
     }
-  }, [user]);
+  }, [user?.id]);
 
   const castVote = async (battleId: string, side: 'a' | 'b', powerAmount: number) => {
     if (!user) {
@@ -475,7 +475,7 @@ export const useArena = () => {
     };
 
     init();
-  }, [user, fetchActiveBattle, fetchUserVote, fetchParticipants, fetchUserBadges, fetchArenaBoosts, fetchLeaderboard, fetchBattleHistory, fetchAnalytics]);
+  }, [user?.id, fetchActiveBattle, fetchUserVote, fetchParticipants, fetchUserBadges, fetchArenaBoosts, fetchLeaderboard, fetchBattleHistory, fetchAnalytics]);
 
   // Real-time subscription for battle updates
   useEffect(() => {
