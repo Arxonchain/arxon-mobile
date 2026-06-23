@@ -60,7 +60,7 @@ export default function MobileWallet() {
         {/* Features */}
         {[
           {icon:'🔐', label:'Secure On-Chain Transfers',   sub:'Your keys, your coins. Always.'},
-          {icon:'⚡', label:'Instant ARX-P Withdrawals',   sub:'Bridge directly to mainnet'},
+          {icon:'⚡', label:'Instant ARX Withdrawals',   sub:'Bridge directly to mainnet'},
           {icon:'🎁', label:'Exclusive Holder Rewards',    sub:'NFT & token airdrops for holders'},
         ].map((f,i)=>(
           <motion.div key={i} variants={fadeUp}
@@ -87,14 +87,14 @@ export default function MobileWallet() {
               <span style={{fontSize:14,fontWeight:700,color:'hsl(38 55% 58%)'}}>Coming Soon</span>
             </div>
             <p style={{fontSize:12,color:'hsl(215 14% 40%)',lineHeight:1.6,marginBottom:14}}>
-              Polkadot & EVM wallet support is in development.{' '}
-              On-chain ARX-P transfers and token bridging will be available soon.
+              Arxon Wallet is in development.{' '}
+              On-chain ARX transfers and token bridging will be available soon.
             </p>
             <a href="https://x.com/arxonchain" target="_blank" rel="noopener noreferrer"
               style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 20px',borderRadius:14,
                 background:'hsl(38 55% 52%/0.1)',border:'1px solid hsl(38 55% 52%/0.3)',
                 color:'hsl(38 55% 58%)',fontSize:12,fontWeight:700,textDecoration:'none',cursor:'pointer'}}>
-              🐦 Follow @arxonchain for launch updates
+              🐦 Follow @arxoninfra for launch updates
             </a>
           </div>
         </motion.div>
