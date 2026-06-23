@@ -138,7 +138,6 @@ export default function MobileProfile() {
       toast({ title: 'File too large', description: 'Please select an image smaller than 5MB', variant: 'destructive' });
       return;
     }
-    const file = e.target.files?.[0];
     if (!file || !user) return;
     if (!file.type.startsWith('image/')) {
       toast({ title:'Invalid file', description:'Please select an image', variant:'destructive' });
