@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { cacheGet, cacheSet } from '@/lib/localCache';
@@ -282,11 +282,15 @@ export const useReferrals = (user: User | null) => {
   }, [user, fetchReferralCode, fetchReferrals]);
 
   // Real-time subscription for referrals and mining sessions (for active miners count)
+  // Use a ref for referredIds so new referral data doesn't tear down and
+  // recreate the realtime channel on every single fetch (channel churn).
+  const referredIdsRef = useRef<string[]>([]);
+  useEffect(() => {
+    referredIdsRef.current = referrals.map(r => r.referred_id).filter(Boolean);
+  }, [referrals]);
+
   useEffect(() => {
     if (!user) return;
-
-    // Get the referred user IDs to filter mining session updates
-    const referredIds = referrals.map(r => r.referred_id).filter(Boolean);
 
     const channel = supabase
       .channel('referrals-and-mining-changes')
@@ -312,6 +316,7 @@ export const useReferrals = (user: User | null) => {
         (payload) => {
           // Only refresh if this mining session belongs to one of our referrals
           const sessionUserId = (payload.new as any)?.user_id || (payload.old as any)?.user_id;
+          const referredIds = referredIdsRef.current;
           if (referredIds.length === 0 || referredIds.includes(sessionUserId)) {
             void fetchReferrals();
           }
@@ -322,7 +327,7 @@ export const useReferrals = (user: User | null) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, fetchReferrals, referrals]);
+  }, [user, fetchReferrals]);
 
   const getReferralLink = () => {
     if (!referralCode) return '';
