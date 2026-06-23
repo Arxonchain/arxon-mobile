@@ -4,7 +4,8 @@ import { usePoints } from '@/hooks/usePoints';
 import { useAuth } from '@/hooks/useAuth';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { ChevronLeft, Crown, Trophy, AlertCircle } from 'lucide-react';
+import { ChevronLeft, Crown, Trophy, AlertCircle, Lock, Medal } from 'lucide-react';
+import { BRAND, TechLines, GlowOrb } from './brand/BrandFX';
 
 interface Entry {
   user_id: string;
@@ -19,7 +20,7 @@ const TIERS = [
   { col: 'hsl(22 50% 48%)',  bg: 'hsl(22 50% 48%/0.12)',  bd: 'hsl(22 50% 48%/0.26)',  glow: 'hsl(22 50% 48%/0.22)' },
 ];
 
-function Avatar({ url, name, size = 36, col = 'hsl(215 35% 62%)' }: {
+function Avatar({ url, name, size = 36, col = 'hsl(218 38% 76%)' }: {
   url: string | null; name: string | null; size?: number; col?: string;
 }) {
   const [err, setErr] = useState(false);
@@ -128,7 +129,12 @@ export default function MobileLeaderboard() {
     <div style={{
       minHeight: '100vh', background: 'hsl(225 30% 3%)', paddingBottom: 100,
       fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif",
+      position: 'relative', overflow: 'hidden',
     }}>
+      <TechLines opacity={0.4} style={{ height: 480 }} />
+      <GlowOrb size={260} top={-60} right={-80} opacity={0.14} />
+      <GlowOrb size={200} top={220} left={-90} opacity={0.1} />
+
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '52px 20px 0' }}>
         <button onClick={() => navigate(-1)}
@@ -163,7 +169,7 @@ export default function MobileLeaderboard() {
             <div style={{ background: 'hsl(215 25% 18%)', height: 40 }} />
             <div style={{ textAlign: 'center' }}>
               <p style={{ fontSize: 8, textTransform: 'uppercase', letterSpacing: '0.14em', color: 'hsl(215 14% 35%)', fontWeight: 600, marginBottom: 8 }}>ARX-P</p>
-              <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 35% 62%)' }}>{totalPts.toLocaleString()}</p>
+              <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(218 38% 76%)' }}>{totalPts.toLocaleString()}</p>
             </div>
             <div style={{ background: 'hsl(215 25% 18%)', height: 40 }} />
             <div style={{ textAlign: 'center' }}>
@@ -270,7 +276,7 @@ TO public USING (true);`}
           ))
         ) : rlsBlocked ? (
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
-            <div style={{ fontSize: 40, marginBottom: 12 }}>🔒</div>
+            <Lock size={36} color={BRAND.textMuted} style={{ marginBottom: 12 }} />
             <p style={{ fontSize: 14, fontWeight: 700, color: 'hsl(215 14% 40%)', marginBottom: 6 }}>
               Leaderboard needs setup
             </p>
@@ -280,7 +286,7 @@ TO public USING (true);`}
           </div>
         ) : leaders.length === 0 ? (
           <div style={{ textAlign: 'center', padding: '48px 0' }}>
-            <p style={{ fontSize: 38, marginBottom: 12 }}>🏆</p>
+            <Trophy size={34} color={BRAND.textMuted} style={{ marginBottom: 12 }} />
             <p style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 14% 38%)' }}>No miners yet</p>
             <p style={{ fontSize: 12, color: 'hsl(215 14% 28%)', marginTop: 4 }}>Start mining to appear here</p>
           </div>
@@ -297,8 +303,8 @@ TO public USING (true);`}
                   display: 'flex', alignItems: 'center', gap: 12,
                   padding: '12px 16px', borderRadius: 16, marginBottom: 8,
                   background: isMe ? 'hsl(215 30% 12%)' : isTop3 ? t!.bg : 'hsl(225 22% 7%)',
-                  border: `1px solid ${isMe ? 'hsl(215 35% 62%/0.28)' : isTop3 ? t!.bd : 'hsl(215 20% 12%)'}`,
-                  boxShadow: isMe ? '0 0 0 1px hsl(215 35% 62%/0.1)' : 'none',
+                  border: `1px solid ${isMe ? 'hsl(218 38% 76%/0.28)' : isTop3 ? t!.bd : 'hsl(215 20% 12%)'}`,
+                  boxShadow: isMe ? '0 0 0 1px hsl(218 38% 76%/0.1)' : 'none',
                   cursor: 'pointer',
                 }}
                 onClick={() => !isMe && navigate(`/profile/${entry.user_id}`)}>
@@ -308,20 +314,20 @@ TO public USING (true);`}
                   background: isTop3 ? t!.bg : 'hsl(215 20% 11%)',
                   border: `1px solid ${isTop3 ? t!.bd : 'hsl(215 20% 16%)'}`,
                 }}>
-                  <span style={{ fontSize: 11, fontWeight: 800, color: isTop3 ? t!.col : 'hsl(215 14% 38%)' }}>
-                    {isTop3 ? ['🥇', '🥈', '🥉'][idx] : idx + 1}
-                  </span>
+                  {isTop3 ? <Medal size={14} color={t!.col} /> : (
+                    <span style={{ fontSize: 11, fontWeight: 800, color: 'hsl(215 14% 38%)' }}>{idx + 1}</span>
+                  )}
                 </div>
                 <Avatar url={entry.avatar_url} name={entry.username}
-                  col={isTop3 ? t!.col : isMe ? 'hsl(215 35% 62%)' : 'hsl(215 18% 52%)'} size={36} />
+                  col={isTop3 ? t!.col : isMe ? 'hsl(218 38% 76%)' : 'hsl(215 18% 52%)'} size={36} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ fontSize: 13, fontWeight: 600, color: 'hsl(215 18% 88%)',
                     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {entry.username || 'Miner'}
                     {isMe && (
                       <span style={{ marginLeft: 6, fontSize: 9,
-                        background: 'hsl(215 35% 62%/0.12)', border: '1px solid hsl(215 35% 62%/0.22)',
-                        borderRadius: 8, padding: '1px 6px', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>
+                        background: 'hsl(218 38% 76%/0.12)', border: '1px solid hsl(218 38% 76%/0.22)',
+                        borderRadius: 8, padding: '1px 6px', color: 'hsl(218 38% 76%)', fontWeight: 700 }}>
                         YOU
                       </span>
                     )}
@@ -329,7 +335,7 @@ TO public USING (true);`}
                 </div>
                 <div style={{ textAlign: 'right', flexShrink: 0 }}>
                   <p style={{ fontSize: 13, fontWeight: 700,
-                    color: isTop3 ? t!.col : isMe ? 'hsl(215 35% 62%)' : 'hsl(215 18% 62%)' }}>
+                    color: isTop3 ? t!.col : isMe ? 'hsl(218 38% 76%)' : 'hsl(215 18% 62%)' }}>
                     {entry.total_points.toLocaleString()}
                   </p>
                   <p style={{ fontSize: 9, color: 'hsl(215 14% 30%)', marginTop: 1 }}>ARX-P</p>
