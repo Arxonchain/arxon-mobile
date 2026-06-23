@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, X, Smartphone, Download, CheckCircle, Clock } from 'lucide-react';
 import { useNewUserCampaign } from '@/hooks/useNewUserCampaign';
