@@ -248,7 +248,7 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'rec
                   <Pickaxe className="w-5 h-5 text-primary" />
                 </motion.div>
                 <div className="text-left">
-                  <p className="text-sm font-bold text-foreground">⛏️ Start Mining Now</p>
+                  <p className="text-sm font-bold text-foreground"> Start Mining Now</p>
                   <p className="text-xs text-primary/80">Tap to earn 10 ARX-P/hour • Free</p>
                 </div>
               </div>
