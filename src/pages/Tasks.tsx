@@ -11,7 +11,7 @@
  * FIX BUG-16: External URL tasks now show a "I've Completed This" confirmation button
  *             AFTER opening the link, before awarding points. Prevents instant farming.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, Clock, ExternalLink, Gift, Target, Star, Zap, Flame, ChevronLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -21,6 +21,8 @@ import { useCheckin } from '@/hooks/useCheckin';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import AuthDialog from '@/components/auth/AuthDialog';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
+import PullToRefreshIndicator from '@/components/mobile/PullToRefreshIndicator';
 
 interface Task {
   id: string;
@@ -80,41 +82,43 @@ export default function Tasks() {
   // FIX BUG-16: Track which tasks are in "confirm" state (link opened, awaiting user confirm)
   const [pendingConfirm, setPendingConfirm] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchTasks = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('tasks')
-          .select('*')
-          .eq('is_active', true)
-          .order('points_reward', { ascending: false });
-        if (!error && data) setTasks(data);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchTasks();
+  const fetchTasks = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('is_active', true)
+        .order('points_reward', { ascending: false });
+      if (!error && data) setTasks(data);
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  useEffect(() => {
+  const fetchUserTasks = useCallback(async () => {
     if (!user) return;
-    const fetchUserTasks = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('user_tasks').select('*').eq('user_id', user.id);
-        if (!error && data) {
-          const map = new Map<string, UserTask>();
-          data.forEach((ut) => map.set(ut.task_id, ut));
-          setUserTasks(map);
-        }
-      } catch (err) {
-        console.error('Error fetching user tasks:', err);
+    try {
+      const { data, error } = await supabase
+        .from('user_tasks').select('*').eq('user_id', user.id);
+      if (!error && data) {
+        const map = new Map<string, UserTask>();
+        data.forEach((ut) => map.set(ut.task_id, ut));
+        setUserTasks(map);
       }
-    };
-    fetchUserTasks();
+    } catch (err) {
+      console.error('Error fetching user tasks:', err);
+    }
   }, [user]);
+
+  useEffect(() => { fetchTasks(); }, [fetchTasks]);
+  useEffect(() => { fetchUserTasks(); }, [fetchUserTasks]);
+
+  // ENH-03: Pull-to-refresh — re-fetches tasks + completion status + points
+  const ptr = usePullToRefresh(async () => {
+    await Promise.all([fetchTasks(), fetchUserTasks(), refreshPoints()]);
+  });
 
   // Step 1: Open external link and enter "confirm" state
   const initiateTask = (task: Task) => {
@@ -193,9 +197,17 @@ export default function Tasks() {
   const availableRewards = tasks.reduce((s, t) => s + t.points_reward, 0);
 
   return (
-    <div style={{minHeight:'100vh',background:'hsl(225 30% 3%)',paddingBottom:100,
+    <div
+      ref={ptr.scrollRef}
+      onTouchStart={ptr.onTouchStart}
+      onTouchMove={ptr.onTouchMove}
+      onTouchEnd={ptr.onTouchEnd}
+      style={{minHeight:'100vh',overflowY:'auto',position:'relative',background:'hsl(225 30% 3%)',paddingBottom:100,
       fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
       <style>{CSS}</style>
+      <PullToRefreshIndicator pullDistance={ptr.pullDistance} isRefreshing={ptr.isRefreshing} />
+      <div style={{transform:`translateY(${ptr.isRefreshing ? 60 : ptr.pullDistance * 0.7}px)`,
+        transition: ptr.pullDistance === 0 && !ptr.isRefreshing ? 'transform 0.2s ease' : 'none'}}>
 
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
@@ -423,6 +435,8 @@ export default function Tasks() {
             })}
           </AnimatePresence>
         )}
+      </div>
+
       </div>
 
       <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
