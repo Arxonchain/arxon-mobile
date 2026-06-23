@@ -59,7 +59,25 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
 });
 
-const isNative = Capacitor.isNativePlatform();
+// PREVIEW ONLY: lets us see the mobile (Capacitor) UI from a regular browser
+// without building/installing a native APK or IPA every time. Visit the site
+// once with ?mobilepreview=1 and it's remembered for the session; ?mobilepreview=0
+// turns it back off. Real native app builds are unaffected — Capacitor.isNativePlatform()
+// always wins when it's actually true.
+function resolveIsNative(): boolean {
+  if (Capacitor.isNativePlatform()) return true;
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const flag = params.get('mobilepreview');
+    if (flag === '1') { localStorage.setItem('arxon_force_mobile_preview', '1'); return true; }
+    if (flag === '0') { localStorage.removeItem('arxon_force_mobile_preview'); return false; }
+    return localStorage.getItem('arxon_force_mobile_preview') === '1';
+  } catch {
+    return false;
+  }
+}
+
+const isNative = resolveIsNative();
 
 const Spinner = () => (
   <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
