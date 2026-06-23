@@ -150,16 +150,16 @@ export default function AdminTasks() {
   const typeInfo = (type: string) => TASK_TYPES.find(t => t.value === type) || TASK_TYPES[4];
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Task Manager</h1>
           <p className="text-sm text-muted-foreground mt-1">
             Add X/Twitter & YouTube tasks. Users see them instantly — no app update needed.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Button variant="outline" onClick={notifyAll} disabled={notifying} className="gap-2">
             <Bell className="h-4 w-4" />
             {notifying ? "Sending…" : "Notify All Users"}
@@ -266,7 +266,7 @@ export default function AdminTasks() {
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-3 sm:gap-4">
         {[
           { label: "Total Tasks",  value: tasks.length,                           color: "text-foreground" },
           { label: "Active",       value: tasks.filter(t => t.is_active).length,  color: "text-green-400"  },
@@ -296,8 +296,9 @@ export default function AdminTasks() {
             const info = typeInfo(t.task_type);
             return (
               <div key={t.id}
-                className={`bg-card border rounded-xl p-4 flex items-center gap-4 transition-all
+                className={`bg-card border rounded-xl p-4 flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 transition-all
                   ${t.is_active ? "border-border" : "border-border/40 opacity-60"}`}>
+                <div className="flex items-center gap-3 flex-1 min-w-0 basis-full sm:basis-0">
                 <div className="text-2xl flex-shrink-0">{info.icon}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -328,7 +329,8 @@ export default function AdminTasks() {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0 ml-auto sm:ml-0">
                   <button onClick={() => toggle(t)} title={t.is_active ? "Deactivate" : "Activate"}
                     className={`relative w-10 h-5 rounded-full transition-colors ${t.is_active ? "bg-green-500" : "bg-muted"}`}>
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${t.is_active ? "left-5" : "left-0.5"}`} />
