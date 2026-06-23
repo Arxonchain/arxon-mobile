@@ -1,6 +1,7 @@
 import { Outlet, Navigate } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
 import { useAdmin } from "@/hooks/useAdmin";
+import ErrorBoundary from "@/components/system/ErrorBoundary";
 
 const AdminLayout = () => {
   const { user, isAdmin, loading } = useAdmin();
@@ -35,7 +36,9 @@ const AdminLayout = () => {
     <div className="min-h-screen bg-background flex flex-col md:flex-row w-full">
       <AdminSidebar />
       <main className="flex-1 p-4 md:p-6 overflow-auto">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </main>
     </div>
   );
