@@ -308,7 +308,7 @@ export default function MobileDashboard() {
     const ratePerSecond = BASE_RATE_PER_HOUR / 3600;
     const t = setInterval(()=>setLiveEarn(p => p + ratePerSecond), 1000);
     return ()=>clearInterval(t);
-  },[isMining, pointsPerHour]);
+  },[isMining]);
 
   const quickItems = [
     { id:'arena',    label:'Arena',     path:'/arena',    icon:<path d="M14.5 17.5L3 6V3h3l11.5 11.5"/>, icon2:<><circle cx="19" cy="19" r="2"/><circle cx="5" cy="5" r="2"/></> },
