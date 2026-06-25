@@ -4,7 +4,7 @@
  * FIX BUG-34: Referral link always uses arxonchain.xyz
  * FIX ENH-04: Proper empty state with Share CTA
  */
-import { useMemo } from 'react';
+import { useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Copy, Share2, Users, Activity, UserX, Gift, Zap } from 'lucide-react';
