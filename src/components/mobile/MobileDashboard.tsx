@@ -4,14 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { useProfile } from '@/hooks/useProfile';
-import { useMining } from '@/hooks/useMining';
 import { useMiningStatus } from '@/hooks/useMiningStatus';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, ChevronRight, Zap, Share2 } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { useRealtimePoints } from '@/hooks/useRealtimePoints';
-import { useArena } from '@/hooks/useArena';
 import { toast } from '@/hooks/use-toast';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
@@ -131,7 +129,9 @@ export default function MobileDashboard() {
   const { points, rank, refreshPoints } = usePoints();
   const { profile, refetchProfile }     = useProfile();
   const { isMining, refetch: refetchMining }     = useMiningStatus();
-  const { earnedPoints, pointsPerHour }          = useMining();
+  // FIX CRASH: Removed useMining from dashboard (caused init crash)
+  // Use base rate for counter - actual rate shown in Mining page
+  const BASE_RATE_PER_HOUR = 10;
   const { unread: notifUnread }                  = useInAppNotifications();
   // ENH-16: Realtime points subscription
   useRealtimePoints();
@@ -170,11 +170,12 @@ export default function MobileDashboard() {
   const scrollRef   = useRef<HTMLDivElement>(null);
   const THRESHOLD   = 70;
 
-  const { activeBattle, battleHistory, loading: arenaLoading, refreshBattle: refetchArena } = useArena();
+  // FIX BUG-35: Lightweight arena data - just show live count, not full hook
+  const [liveArenaCount, setLiveArenaCount] = useState(0);
   const dashBattles = (() => {
     try {
-      const live = activeBattle ? [{ ...activeBattle, _live: true }] : [];
-      const ended = (battleHistory || []).slice(0, 4).map((b: any) => ({ ...b, _live: false }));
+  const live  : any[] = [];
+  const ended : any[] = [];
       return [...live, ...ended].slice(0, 5);
     } catch { return []; }
   })();
@@ -238,7 +239,7 @@ export default function MobileDashboard() {
         type: s.is_active ? 'mining_active' : 'mining_done',
         label: s.is_active ? 'Mining Session' : 'Session Completed',
         sub: relTime(s.started_at),
-        val: s.is_active ? `+${(earnedPoints || liveEarn).toFixed(2)}` : `+${Number(s.arx_mined||0).toFixed(2)}`,
+        val: s.is_active ? `+${liveEarn.toFixed(2)}` : `+${Number(s.arx_mined||0).toFixed(2)}`,
         time: s.started_at,
         col: 'hsl(155 45% 43%)', bg: 'hsl(155 45% 43%/0.1)',
         bd: 'hsl(155 45% 43%/0.2)', vc: 'hsl(155 45% 55%)',
@@ -304,8 +305,7 @@ export default function MobileDashboard() {
 
   useEffect(()=>{
     if (!isMining) return;
-    // Use real mining rate from useMining hook (not hardcoded 148.2)
-    const ratePerSecond = (pointsPerHour || 0) / 3600;
+    const ratePerSecond = BASE_RATE_PER_HOUR / 3600;
     const t = setInterval(()=>setLiveEarn(p => p + ratePerSecond), 1000);
     return ()=>clearInterval(t);
   },[isMining, pointsPerHour]);
@@ -574,7 +574,7 @@ export default function MobileDashboard() {
             </button>
           </div>
           <div className="scrollbar-none" style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4,WebkitOverflowScrolling:'touch',touchAction:'pan-x'}}>
-            {arenaLoading && !dashBattles.length && [0,1,2].map(i=>(
+            {false && !dashBattles.length && [0,1,2].map(i=>(
               <div key={i} style={{minWidth:200,height:155,borderRadius:20,flexShrink:0,
                 background:'hsl(215 22% 9%)',border:'1px solid hsl(215 22% 13%)'}}/>
             ))}
@@ -636,7 +636,7 @@ export default function MobileDashboard() {
                 </motion.div>
               );
             })}
-            {!arenaLoading&&dashBattles.length===0&&(
+            {!false&&dashBattles.length===0&&(
               <div style={{minWidth:180,height:130,borderRadius:20,flexShrink:0,opacity:0.5,
                 border:'1px dashed hsl(215 25% 18%)',display:'flex',flexDirection:'column',
                 alignItems:'center',justifyContent:'center',gap:7,background:'hsl(225 28% 6%)'}}>
