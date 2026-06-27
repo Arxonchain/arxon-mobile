@@ -342,7 +342,11 @@ export default function MobileDashboard() {
       <motion.div variants={stagger} initial="hidden" animate="show"
         style={{
           minHeight:'100vh', background:'hsl(225 30% 3%)', paddingBottom:100,
-          transform: `translateY(${isRefreshing ? 60 : pullDistance * 0.7}px)`,
+          // FIX: any transform value other than 'none' (even translateY(0px)) creates a
+          // new containing block for position:fixed descendants — which broke the
+          // CampaignBanner claim modal's full-screen overlay. Only transform while
+          // actually pulling/refreshing; 'none' otherwise restores normal fixed behavior.
+          transform: (isRefreshing || pullDistance > 0) ? `translateY(${isRefreshing ? 60 : pullDistance * 0.7}px)` : 'none',
           transition: isPulling.current ? 'none' : 'transform 0.3s ease',
         }}>
 
