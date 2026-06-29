@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, Settings2, LogOut,
   ChevronLeft, ChevronRight, User, Menu,
   CalendarDays, Scale, Trophy, FileDown,
-  Upload, History, Globe, Presentation, ListChecks,
+  Upload, History, Globe, Presentation, ListChecks, Link2,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -27,6 +27,7 @@ const navItems: NavItem[] = [
   { icon: Trophy,          label: "Arena Markets",   path: "/admin/arena" },
   { icon: History,         label: "Battle History",  path: "/admin/battle-history" },
   { icon: ListChecks,      label: "Task Manager",    path: "/admin/tasks" },   // ← NEW
+  { icon: Link2,           label: "Referral Manager", path: "/admin/referrals" }, // ← NEW
   { icon: Scale,           label: "Reconciliation",  path: "/admin/reconciliation" },
   { icon: FileDown,        label: "Export Filter",   path: "/admin/export-filter" },
   { icon: Upload,          label: "Import Users",    path: "/admin/import-users" },
