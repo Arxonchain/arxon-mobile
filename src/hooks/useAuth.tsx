@@ -145,8 +145,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     })();
   }, [session?.user?.id]);
 
-  const signUp = async (email: string, password: string) => {
-    return signUpWithFallback(supabase, email, password);
+  const signUp = async (email: string, password: string, referralCode?: string) => {
+    return signUpWithFallback(supabase, email, password, referralCode);
   };
 
   const signIn = async (email: string, password: string) => {
