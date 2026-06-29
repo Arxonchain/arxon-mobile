@@ -62,7 +62,8 @@ function looksLikeExistingUser(msg: string) {
 export async function signUpWithFallback(
   supabase: SupabaseClient,
   email: string,
-  password: string
+  password: string,
+  referralCode?: string  // FIX: pass referral code so it's stored in auth metadata
 ): Promise<SignUpResult> {
   const normalizedEmail = email.trim().toLowerCase();
 
@@ -106,6 +107,10 @@ export async function signUpWithFallback(
     password,
     options: {
       emailRedirectTo: getEmailConfirmRedirectUrl(),
+      // FIX: Store referral code in auth metadata
+      // This persists PERMANENTLY in auth.users.raw_user_meta_data
+      // Our DB trigger reads it to create the referral row automatically
+      data: referralCode ? { referral_code: referralCode.trim().toUpperCase() } : undefined,
     },
   });
 
