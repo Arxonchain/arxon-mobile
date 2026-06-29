@@ -86,7 +86,7 @@ export default function AuthPage() {
           } catch {}
         }
 
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, ref || undefined);
         if (error) throw error;
 
         // If session exists immediately (auto-confirm on), apply referral now
