@@ -39,10 +39,10 @@ import AdminExportFilter from "@/pages/admin/AdminExportFilter";
 import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
-import AdminTasks from "@/pages/admin/AdminTasks";   // ← NEW
+import AdminTasks from "@/pages/admin/AdminTasks";
+import AdminReferrals from "@/pages/admin/AdminReferrals";   // ← NEW
 
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import ErrorBoundary from "@/components/system/ErrorBoundary";
 
 // Mobile
 import MobileDashboard from "@/components/mobile/MobileDashboard";
@@ -156,18 +156,18 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            <Route path="/"             element={<ErrorBoundary>{user ? <MobileDashboard /> : <Navigate to="/auth" replace />}</ErrorBoundary>} />
-            <Route path="/mining"       element={<ProtectedRoute><ErrorBoundary><MobileMining /></ErrorBoundary></ProtectedRoute>} />
-            <Route path="/arena"        element={<ErrorBoundary><MobileArena /></ErrorBoundary>} />
-            <Route path="/leaderboard"  element={<ErrorBoundary><MobileLeaderboard /></ErrorBoundary>} />
-            <Route path="/nexus"        element={<ProtectedRoute><ErrorBoundary><MobileNexus /></ErrorBoundary></ProtectedRoute>} />
-            <Route path="/profile"      element={<ProtectedRoute><ErrorBoundary><MobileProfile /></ErrorBoundary></ProtectedRoute>} />
-            <Route path="/wallet"       element={<ErrorBoundary><MobileWallet /></ErrorBoundary>} />
-            <Route path="/profile/:userId" element={<ErrorBoundary><PublicProfile /></ErrorBoundary>} />
-            <Route path="/tasks"        element={<ProtectedRoute><MobilePage><ErrorBoundary><Tasks /></ErrorBoundary></MobilePage></ProtectedRoute>} />
-            <Route path="/referrals"    element={<ProtectedRoute><MobilePage><ErrorBoundary><Referrals /></ErrorBoundary></MobilePage></ProtectedRoute>} />
-            <Route path="/settings"     element={<ProtectedRoute><MobilePage><ErrorBoundary><Settings /></ErrorBoundary></MobilePage></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><MobilePage><ErrorBoundary><Notifications /></ErrorBoundary></MobilePage></ProtectedRoute>} />
+            <Route path="/"             element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
+            <Route path="/mining"       element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
+            <Route path="/arena"        element={<MobileArena />} />
+            <Route path="/leaderboard"  element={<MobileLeaderboard />} />
+            <Route path="/nexus"        element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
+            <Route path="/profile"      element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
+            <Route path="/wallet"       element={<MobileWallet />} />
+            <Route path="/profile/:userId" element={<PublicProfile />} />
+            <Route path="/tasks"        element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
+            <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
+            <Route path="/settings"     element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><MobilePage><Notifications /></MobilePage></ProtectedRoute>} />
           </>
         ) : (
           <>
