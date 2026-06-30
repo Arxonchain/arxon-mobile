@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { icon: History,         label: "Battle History",  path: "/admin/battle-history" },
   { icon: ListChecks,      label: "Task Manager",    path: "/admin/tasks" },   // ← NEW
   { icon: Link2,           label: "Referral Manager", path: "/admin/referrals" }, // ← NEW
+  { icon: History,         label: "Referral Recovery", path: "/admin/referral-recovery" }, // ← NEW
   { icon: Scale,           label: "Reconciliation",  path: "/admin/reconciliation" },
   { icon: FileDown,        label: "Export Filter",   path: "/admin/export-filter" },
   { icon: Upload,          label: "Import Users",    path: "/admin/import-users" },
