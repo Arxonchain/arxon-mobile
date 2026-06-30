@@ -148,6 +148,8 @@ function AppRoutes() {
           <Route path="arena"           element={<AdminArena />} />
           <Route path="battle-history"  element={<AdminBattleHistory />} />
           <Route path="tasks"           element={<AdminTasks />} />     {/* ← NEW */}
+          <Route path="referrals"       element={<AdminReferrals />} />
+          <Route path="referral-recovery" element={<AdminReferralRecovery />} />
           <Route path="reconciliation"  element={<AdminReconciliation />} />
           <Route path="export-filter"   element={<AdminExportFilter />} />
           <Route path="import-users"    element={<AdminImportUsers />} />
