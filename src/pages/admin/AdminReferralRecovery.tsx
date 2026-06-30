@@ -1,9 +1,6 @@
 /**
- * AdminReferralRecovery.tsx
- *
- * Bulk recovery tool for historical referrals lost before the permanent fix.
- * Uses signup-timing proximity to SUGGEST candidates — admin reviews and
- * approves per referral code before crediting. Every action is logged.
+ * AdminReferralRecovery.tsx — Mobile-responsive bulk recovery tool.
+ * Card-based candidate list instead of table, stacked layout, touch targets ≥40px.
  */
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -20,12 +17,12 @@ interface Candidate {
 
 export default function AdminReferralRecovery() {
   const { toast } = useToast();
-  const [code,       setCode]       = useState('');
+  const [code,         setCode]         = useState('');
   const [referrerInfo, setReferrerInfo] = useState<{ user_id: string; username: string } | null>(null);
-  const [candidates, setCandidates] = useState<Candidate[]>([]);
-  const [selected,   setSelected]   = useState<Set<string>>(new Set());
-  const [loading,    setLoading]    = useState(false);
-  const [crediting,  setCrediting]  = useState(false);
+  const [candidates,   setCandidates]   = useState<Candidate[]>([]);
+  const [selected,     setSelected]     = useState<Set<string>>(new Set());
+  const [loading,      setLoading]      = useState(false);
+  const [crediting,    setCrediting]    = useState(false);
 
   const search = async () => {
     if (!code.trim()) return;
@@ -36,13 +33,8 @@ export default function AdminReferralRecovery() {
 
     try {
       const cleanCode = code.trim().toUpperCase();
-
-      // Get referrer info
       const { data: referrer } = await supabase
-        .from('profiles')
-        .select('user_id, username')
-        .eq('referral_code', cleanCode)
-        .maybeSingle();
+        .from('profiles').select('user_id, username').eq('referral_code', cleanCode).maybeSingle();
 
       if (!referrer) {
         toast({ title: 'Referral code not found', variant: 'destructive' });
@@ -51,14 +43,9 @@ export default function AdminReferralRecovery() {
       }
       setReferrerInfo(referrer);
 
-      // Get candidates via RPC
-      const { data, error } = await supabase.rpc('get_referral_candidates' as any, {
-        p_referral_code: cleanCode,
-      });
-
+      const { data, error } = await supabase.rpc('get_referral_candidates' as any, { p_referral_code: cleanCode });
       if (error) throw error;
       setCandidates(data || []);
-      // Pre-select all by default — admin can deselect suspicious ones
       setSelected(new Set((data || []).map((c: Candidate) => c.referred_user_id)));
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
@@ -81,12 +68,10 @@ export default function AdminReferralRecovery() {
 
   const handleCredit = async () => {
     if (selected.size === 0) {
-      toast({ title: 'Select at least one user to credit', variant: 'destructive' });
+      toast({ title: 'Select at least one user', variant: 'destructive' });
       return;
     }
-    if (!confirm(`Credit ${referrerInfo?.username} with ${selected.size} referrals? This awards ${selected.size * 100} ARX-P and cannot be easily undone.`)) {
-      return;
-    }
+    if (!confirm(`Credit ${referrerInfo?.username} with ${selected.size} referrals (+${selected.size * 100} ARX-P)?`)) return;
 
     setCrediting(true);
     try {
@@ -94,7 +79,6 @@ export default function AdminReferralRecovery() {
         p_referral_code: code.trim().toUpperCase(),
         p_user_ids: Array.from(selected),
       });
-
       if (error) throw error;
       const result = data as any;
 
@@ -103,49 +87,44 @@ export default function AdminReferralRecovery() {
         description: `${referrerInfo?.username} earned ${result.credited_count * 100} ARX-P`,
       });
 
-      setCandidates([]);
-      setSelected(new Set());
-      setCode('');
-      setReferrerInfo(null);
+      setCandidates([]); setSelected(new Set()); setCode(''); setReferrerInfo(null);
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     }
     setCrediting(false);
   };
 
-  // Flag suspicious clusters: many signups within seconds of each other
   const suspiciousGaps = candidates.filter((c, i) => {
     if (i === 0) return false;
     const prevTime = new Date(candidates[i-1].signup_time).getTime();
-    const curTime = new Date(c.signup_time).getTime();
-    return (curTime - prevTime) < 5000; // less than 5 seconds apart
+    const curTime  = new Date(c.signup_time).getTime();
+    return (curTime - prevTime) < 5000;
   });
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="max-w-3xl mx-auto px-3 sm:px-6 py-4 space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">Referral Recovery Tool</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Search a referral code to find likely referred users based on signup timing.
-          Review and select who to credit — every action is logged for audit.
+        <h1 className="text-xl sm:text-2xl font-bold">Referral Recovery</h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+          Search a code, review timing-matched candidates, select who to credit.
         </p>
       </div>
 
-      {/* Search */}
-      <div className="bg-card border border-border rounded-xl p-6">
-        <div className="flex gap-3">
+      {/* Search — stacked on mobile */}
+      <div className="bg-card border border-border rounded-xl p-4">
+        <div className="flex flex-col sm:flex-row gap-2">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/>
             <input
               value={code}
               onChange={e => setCode(e.target.value.toUpperCase())}
               onKeyDown={e => e.key === 'Enter' && search()}
-              placeholder="Enter referral code (e.g. ARX-UW943F)"
-              className="w-full pl-9 pr-3 py-3 bg-background border border-border rounded-lg outline-none focus:border-primary font-mono"
+              placeholder="ARX-XXXXXX"
+              className="w-full pl-9 pr-3 py-2.5 bg-background border border-border rounded-lg outline-none focus:border-primary font-mono text-sm"
             />
           </div>
           <button onClick={search} disabled={loading}
-            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium disabled:opacity-50">
+            className="px-5 py-2.5 bg-primary text-primary-foreground rounded-lg font-medium text-sm disabled:opacity-50 w-full sm:w-auto">
             {loading ? 'Searching...' : 'Search'}
           </button>
         </div>
@@ -153,70 +132,66 @@ export default function AdminReferralRecovery() {
 
       {/* Referrer found */}
       {referrerInfo && (
-        <div className="bg-card border border-border rounded-xl p-4 flex items-center justify-between">
-          <div>
-            <p className="text-sm text-muted-foreground">Referrer</p>
-            <p className="font-bold text-lg">{referrerInfo.username}</p>
+        <div className="bg-card border border-border rounded-xl p-3.5 flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] text-muted-foreground">Referrer</p>
+            <p className="font-bold text-base truncate">{referrerInfo.username}</p>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-muted-foreground">Candidates found</p>
-            <p className="font-bold text-lg text-primary">{candidates.length}</p>
+          <div className="text-right flex-shrink-0 ml-3">
+            <p className="text-[11px] text-muted-foreground">Candidates</p>
+            <p className="font-bold text-base text-primary">{candidates.length}</p>
           </div>
         </div>
       )}
 
       {/* Suspicious warning */}
       {suspiciousGaps.length > 2 && (
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertTriangle size={18} className="text-yellow-500 mt-0.5 flex-shrink-0"/>
-          <div>
-            <p className="font-medium text-yellow-200">Possible bot cluster detected</p>
-            <p className="text-sm text-yellow-200/70 mt-1">
-              {suspiciousGaps.length} of these signups happened within 5 seconds of each other.
-              Review carefully before crediting — this pattern can indicate automated account creation
-              rather than genuine referrals.
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3.5 flex items-start gap-2.5">
+          <AlertTriangle size={16} className="text-yellow-500 mt-0.5 flex-shrink-0"/>
+          <div className="min-w-0">
+            <p className="font-medium text-yellow-200 text-sm">Possible bot cluster</p>
+            <p className="text-xs text-yellow-200/70 mt-1 leading-relaxed">
+              {suspiciousGaps.length} signups within 5 seconds of each other. Review before crediting.
             </p>
           </div>
         </div>
       )}
 
-      {/* Candidates list */}
+      {/* Candidates — card list, sticky action bar */}
       {candidates.length > 0 && (
         <div className="bg-card border border-border rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-border flex items-center justify-between">
-            <button onClick={toggleAll} className="flex items-center gap-2 text-sm font-medium">
+          <div className="p-3 border-b border-border flex items-center justify-between gap-2 sticky top-0 bg-card z-10">
+            <button onClick={toggleAll} className="flex items-center gap-1.5 text-xs font-medium flex-shrink-0">
               {selected.size === candidates.length
-                ? <CheckSquare size={16} className="text-primary"/>
-                : <Square size={16} className="text-muted-foreground"/>}
-              {selected.size} / {candidates.length} selected
+                ? <CheckSquare size={15} className="text-primary"/>
+                : <Square size={15} className="text-muted-foreground"/>}
+              {selected.size}/{candidates.length}
             </button>
             <button onClick={handleCredit} disabled={crediting || selected.size === 0}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium disabled:opacity-50">
-              <Gift size={14}/> {crediting ? 'Crediting...' : `Credit ${selected.size} Referrals (+${selected.size * 100} ARX-P)`}
+              className="flex items-center gap-1.5 px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-medium disabled:opacity-50 flex-1 justify-center sm:flex-none">
+              <Gift size={13}/> {crediting ? 'Crediting...' : `Credit (+${selected.size * 100} ARX-P)`}
             </button>
           </div>
 
-          <div className="divide-y divide-border max-h-[500px] overflow-y-auto">
+          <div className="divide-y divide-border max-h-[55vh] overflow-y-auto">
             {candidates.map((c, i) => {
               const isFast = i > 0 &&
                 (new Date(c.signup_time).getTime() - new Date(candidates[i-1].signup_time).getTime()) < 5000;
               return (
                 <button key={c.referred_user_id} onClick={() => toggle(c.referred_user_id)}
-                  className={`w-full flex items-center gap-3 p-3 text-left hover:bg-muted/30 ${isFast ? 'bg-yellow-500/5' : ''}`}>
+                  className={`w-full flex items-center gap-2.5 p-3 text-left active:bg-muted/30 ${isFast ? 'bg-yellow-500/5' : ''}`}>
                   {selected.has(c.referred_user_id)
                     ? <CheckSquare size={16} className="text-primary flex-shrink-0"/>
                     : <Square size={16} className="text-muted-foreground flex-shrink-0"/>}
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{c.username || 'No username'}</p>
-                    <p className="text-xs text-muted-foreground truncate">{c.email}</p>
+                    <p className="font-medium text-sm truncate">{c.username || 'No username'}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{c.email}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock size={10}/> {c.minutes_after_referrer.toFixed(2)}m after
+                    <p className="text-[10px] text-muted-foreground flex items-center gap-1 whitespace-nowrap">
+                      <Clock size={9}/> {c.minutes_after_referrer.toFixed(1)}m
                     </p>
-                    {isFast && (
-                      <p className="text-xs text-yellow-500 mt-0.5">⚠ fast signup</p>
-                    )}
+                    {isFast && <p className="text-[10px] text-yellow-500 mt-0.5">⚠ fast</p>}
                   </div>
                 </button>
               );
@@ -226,7 +201,7 @@ export default function AdminReferralRecovery() {
       )}
 
       {!loading && code && candidates.length === 0 && referrerInfo && (
-        <div className="text-center py-12 text-muted-foreground">
+        <div className="text-center py-12 text-sm text-muted-foreground px-4">
           No unlinked candidates found near this referrer's signup time.
         </div>
       )}
