@@ -40,7 +40,8 @@ import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 import AdminTasks from "@/pages/admin/AdminTasks";
-import AdminReferrals from "@/pages/admin/AdminReferrals";   // ← NEW
+import AdminReferrals from "@/pages/admin/AdminReferrals";
+import AdminReferralRecovery from "@/pages/admin/AdminReferralRecovery";   // ← NEW
 
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
