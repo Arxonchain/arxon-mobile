@@ -6,7 +6,7 @@ import {
   Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
-import { useBiometric } from '@/hooks/useBiometric';
+import { useBiometric } from '@/contexts/BiometricContext';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
@@ -198,8 +198,12 @@ function NotificationsPanel() {
 }
 
 function SecurityPanel() {
-  const { supported, enabled, checking, enableBiometric, disableBiometric } = useBiometric();
+  const { supported, enabled, checking, enableBiometric, disableBiometric, probeSupport } = useBiometric();
   const isNative = Capacitor.isNativePlatform();
+
+  useEffect(() => {
+    if (isNative) void probeSupport();
+  }, [isNative, probeSupport]);
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' });

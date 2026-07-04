@@ -14,7 +14,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
-import { useBiometric } from '@/hooks/useBiometric';
+import { useBiometric } from '@/contexts/BiometricContext';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.05,delayChildren:0.08}} };

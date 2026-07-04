@@ -62,6 +62,7 @@ import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
+import { BiometricProvider } from "@/contexts/BiometricContext";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -224,9 +225,11 @@ function App() {
               <NetworkOfflineBanner />
               <RouterShell>
                 <MobileNavProvider>
-                  <BiometricGate>
-                    <AppRoutes />
-                  </BiometricGate>
+                  <BiometricProvider>
+                    <BiometricGate>
+                      <AppRoutes />
+                    </BiometricGate>
+                  </BiometricProvider>
                 </MobileNavProvider>
               </RouterShell>
             </TooltipProvider>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Capacitor } from '@capacitor/core';
 import { Fingerprint, AlertCircle } from 'lucide-react';
-import { useBiometric } from '@/hooks/useBiometric';
+import { useBiometric } from '@/contexts/BiometricContext';
 import arxonLogo from '@/assets/arxon-icon.svg';
 
 function LockOverlay() {
@@ -82,8 +82,8 @@ function LockOverlay() {
 
 /** Shows lock overlay on native when biometric lock is enabled and app was backgrounded. */
 export default function BiometricGate({ children }: { children: React.ReactNode }) {
-  const { enabled, locked, supported } = useBiometric();
-  if (Capacitor.isNativePlatform() && supported && enabled && locked) {
+  const { enabled, locked } = useBiometric();
+  if (Capacitor.isNativePlatform() && enabled && locked) {
     return <LockOverlay />;
   }
   return <>{children}</>;
