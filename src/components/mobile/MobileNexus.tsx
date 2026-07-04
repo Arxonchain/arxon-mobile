@@ -67,16 +67,27 @@ export default function MobileNexus() {
   const fetchTx = async () => {
     if (!user) return;
     setLoading(true);
-    const { data } = await supabase.from('nexus_transactions').select('*')
-      .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-      .order('created_at',{ ascending:false }).limit(20);
-    setTxList(data||[]);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase.from('nexus_transactions').select('*')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at',{ ascending:false }).limit(20);
+      if (error) throw error;
+      setTxList(data || []);
+    } catch (e: any) {
+      toast({ title: 'Could not load transactions', description: e?.message || 'Try again', variant: 'destructive' });
+    } finally {
+      setLoading(false);
+    }
   };
   const fetchAllTx = async () => {
-    const { data } = await supabase.from('nexus_transactions').select('*')
-      .eq('private_mode',false).order('created_at',{ ascending:false }).limit(30);
-    setAllTx(data||[]);
+    try {
+      const { data, error } = await supabase.from('nexus_transactions').select('*')
+        .eq('private_mode', false).order('created_at',{ ascending:false }).limit(30);
+      if (error) throw error;
+      setAllTx(data || []);
+    } catch (e: any) {
+      toast({ title: 'Could not load explorer', description: e?.message || 'Try again', variant: 'destructive' });
+    }
   };
 
   useEffect(() => { if (user) { fetchTx(); fetchAllTx(); } }, [user]);
@@ -225,12 +236,15 @@ export default function MobileNexus() {
 
           {/* Numpad */}
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10,padding:'14px 24px 0'}}>
-            {['1','2','3','4','5','6','7','8','9','.','0','del'].map(k=>(
-              <motion.button key={k} whileTap={{scale:.9}}
+            {['1','2','3','4','5','6','7','8','9','','0','del'].map(k=>(
+              <motion.button key={k || 'sp'} whileTap={{scale:.9}}
+                disabled={!k}
                 onClick={()=>{
-                  if(k==='del') setAmount(a=>a.slice(0,-1));
-                  else if(k==='.'&&amount.includes('.')) return;
-                  else if(amount.length<2) setAmount(a=>a+k);
+                  if (!k) return;
+                  if (k === 'del') { setAmount(a => a.slice(0, -1)); return; }
+                  const next = amount + k;
+                  const num = parseInt(next, 10);
+                  if (!isNaN(num) && num >= 1 && num <= 10) setAmount(next);
                 }}
                 style={{background:'rgba(139,174,214,.06)',border:'1px solid rgba(139,174,214,.09)',borderRadius:18,
                   padding:'17px 0',fontSize:24,fontWeight:700,color:'#EEF2F7',cursor:'pointer',outline:'none',

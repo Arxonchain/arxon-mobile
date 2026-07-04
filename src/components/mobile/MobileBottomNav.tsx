@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
+import { useMobileNav } from '@/contexts/MobileNavContext';
 
 // FIX BUG-02 + ENH-01: Added Mining tab, replaced Leaderboard in main nav
 // Mining is the core feature and needs direct access.
@@ -70,7 +71,8 @@ const TABS = [
 export default function MobileBottomNav() {
   const location = useLocation();
   const { user } = useAuth();
-  if (!user) return null;
+  const { hideNav } = useMobileNav();
+  if (!user || hideNav) return null;
   if (['/auth','/admin','/landing'].some(p => location.pathname.startsWith(p))) return null;
   // FIX BUG-17: Hide bottom nav when arena battle detail is open
   // MobileArena sets selectedBattle which renders a fixed overlay — bottom nav should be hidden

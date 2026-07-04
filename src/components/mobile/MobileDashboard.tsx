@@ -129,9 +129,7 @@ export default function MobileDashboard() {
   const { points, rank, refreshPoints } = usePoints();
   const { profile, refetchProfile }     = useProfile();
   const { isMining, refetch: refetchMining }     = useMiningStatus();
-  // FIX CRASH: Removed useMining from dashboard (caused init crash)
-  // Use base rate for counter - actual rate shown in Mining page
-  const BASE_RATE_PER_HOUR = 10;
+  const MAX_MINING_SECONDS = 8 * 3600;
   const { unread: notifUnread }                  = useInAppNotifications();
   // ENH-16: Realtime points subscription
   useRealtimePoints();
@@ -333,12 +331,38 @@ export default function MobileDashboard() {
   useEffect(() => { fetchActivityData(); }, [fetchActivityData]);
   useEffect(() => { fetchDashBattles(); }, [fetchDashBattles]);
 
-  useEffect(()=>{
-    if (!isMining) return;
-    const ratePerSecond = BASE_RATE_PER_HOUR / 3600;
-    const t = setInterval(()=>setLiveEarn(p => p + ratePerSecond), 1000);
-    return ()=>clearInterval(t);
-  },[isMining]);
+  // Sync live earn from active mining session (DB-backed, not a hardcoded rate ticker)
+  useEffect(() => {
+    if (!user || !isMining) {
+      setLiveEarn(0);
+      return;
+    }
+    let cancelled = false;
+    const syncSession = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('mining_sessions')
+          .select('started_at, arx_mined')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled || error || !data) return;
+        const elapsed = Math.min(
+          Math.floor((Date.now() - new Date(data.started_at).getTime()) / 1000),
+          MAX_MINING_SECONDS,
+        );
+        const calculated = Math.min(480, (elapsed / 3600) * 10);
+        setLiveEarn(Math.max(Number(data.arx_mined || 0), calculated));
+      } catch {
+        /* ignore transient fetch errors */
+      }
+    };
+    syncSession();
+    const t = setInterval(syncSession, 5000);
+    return () => { cancelled = true; clearInterval(t); };
+  }, [user, isMining]);
 
   const quickItems = [
     { id:'arena',    label:'Arena',     path:'/arena',    icon:<path d="M14.5 17.5L3 6V3h3l11.5 11.5"/>, icon2:<><circle cx="19" cy="19" r="2"/><circle cx="5" cy="5" r="2"/></> },
