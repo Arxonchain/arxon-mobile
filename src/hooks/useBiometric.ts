@@ -1,15 +1,28 @@
 /**
  * Native biometric app lock via @capgo/capacitor-native-biometric.
- * Web browsers: feature disabled (native-only).
+ * Gracefully disabled when the store APK has not been rebuilt with the plugin yet.
  */
 import { useState, useCallback, useEffect } from 'react';
 import { Capacitor } from '@capacitor/core';
 
 const LOCK_KEY   = 'arxon_biometric_enabled';
 const LOCKED_KEY = 'arxon_app_locked';
+const PLUGIN_ID  = 'NativeBiometric';
+
+function pluginMissing(): boolean {
+  return Capacitor.isNativePlatform() && !Capacitor.isPluginAvailable(PLUGIN_ID);
+}
+
+function clearLockState() {
+  try {
+    localStorage.removeItem(LOCK_KEY);
+    sessionStorage.removeItem(LOCKED_KEY);
+  } catch { /* ignore */ }
+}
 
 async function getNativeBiometric() {
   if (!Capacitor.isNativePlatform()) return null;
+  if (!Capacitor.isPluginAvailable(PLUGIN_ID)) return null;
   try {
     const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
     return NativeBiometric;
@@ -30,26 +43,57 @@ export function useBiometric() {
         setSupported(false);
         return;
       }
+
+      // OTA JS may load before a Play Store rebuild ships the native plugin.
+      if (pluginMissing()) {
+        setSupported(false);
+        setEnabled(false);
+        setLocked(false);
+        clearLockState();
+        return;
+      }
+
       const NB = await getNativeBiometric();
       if (!NB) {
         setSupported(false);
+        setEnabled(false);
+        setLocked(false);
+        clearLockState();
         return;
       }
+
       try {
         const result = await NB.isAvailable({ useFallback: true });
-        setSupported(!!result.isAvailable);
-      } catch {
+        const available = !!result.isAvailable;
+        setSupported(available);
+        if (!available) {
+          setEnabled(false);
+          setLocked(false);
+          clearLockState();
+          return;
+        }
+        if (localStorage.getItem(LOCK_KEY) === 'true') setEnabled(true);
+        if (sessionStorage.getItem(LOCKED_KEY) === 'true') setLocked(true);
+      } catch (e) {
+        console.warn('[biometric] isAvailable failed:', e);
         setSupported(false);
+        setEnabled(false);
+        setLocked(false);
+        clearLockState();
       }
     };
 
-    void check();
-    if (localStorage.getItem(LOCK_KEY) === 'true') setEnabled(true);
-    if (sessionStorage.getItem(LOCKED_KEY) === 'true') setLocked(true);
+    void check().catch((e) => {
+      console.warn('[biometric] init failed:', e);
+      setSupported(false);
+      setEnabled(false);
+      setLocked(false);
+      clearLockState();
+    });
   }, []);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !supported) return;
     const onVisible = () => {
       if (document.visibilityState === 'hidden') {
         sessionStorage.setItem(LOCKED_KEY, 'true');
@@ -59,10 +103,10 @@ export function useBiometric() {
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [enabled]);
+  }, [enabled, supported]);
 
   const authenticate = useCallback(async (): Promise<boolean> => {
-    if (!Capacitor.isNativePlatform()) return true;
+    if (!Capacitor.isNativePlatform() || pluginMissing()) return true;
     setChecking(true);
     try {
       const NB = await getNativeBiometric();
@@ -84,7 +128,7 @@ export function useBiometric() {
   }, []);
 
   const enableBiometric = useCallback(async (): Promise<boolean> => {
-    if (!Capacitor.isNativePlatform()) return false;
+    if (!Capacitor.isNativePlatform() || pluginMissing()) return false;
     try {
       const NB = await getNativeBiometric();
       if (!NB) return false;
@@ -103,8 +147,7 @@ export function useBiometric() {
   }, []);
 
   const disableBiometric = useCallback(() => {
-    localStorage.removeItem(LOCK_KEY);
-    sessionStorage.removeItem(LOCKED_KEY);
+    clearLockState();
     setEnabled(false);
     setLocked(false);
   }, []);

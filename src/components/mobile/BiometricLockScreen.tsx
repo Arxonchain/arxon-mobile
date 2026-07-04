@@ -82,8 +82,8 @@ function LockOverlay() {
 
 /** Shows lock overlay on native when biometric lock is enabled and app was backgrounded. */
 export default function BiometricGate({ children }: { children: React.ReactNode }) {
-  const { enabled, locked } = useBiometric();
-  if (Capacitor.isNativePlatform() && enabled && locked) {
+  const { enabled, locked, supported } = useBiometric();
+  if (Capacitor.isNativePlatform() && supported && enabled && locked) {
     return <LockOverlay />;
   }
   return <>{children}</>;
