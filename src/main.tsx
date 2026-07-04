@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { Capacitor } from "@capacitor/core";
+import { ensureArxonNotificationChannel } from "@/lib/nativeNotifications";
 
 function showFatal(message: string, details?: unknown) {
   const el = document.createElement("div");
@@ -37,15 +38,7 @@ void (async () => {
       }
 
       try {
-        const { LocalNotifications } = await import('@capacitor/local-notifications');
-        await LocalNotifications.createChannel({
-          id: 'arxon-default',
-          name: 'Arxon Notifications',
-          description: 'Mining, arena, and reward alerts',
-          importance: 4,
-          visibility: 1,
-          vibration: true,
-        });
+        await ensureArxonNotificationChannel();
       } catch (e) {
         console.warn('LocalNotifications channel setup failed:', e);
       }
