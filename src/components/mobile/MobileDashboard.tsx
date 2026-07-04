@@ -138,7 +138,7 @@ export default function MobileDashboard() {
   const [weekPts,   setWeekPts]   = useState(0);
   const [liveEarn,  setLiveEarn]  = useState(0);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
-  // ENH-02: Pending tasks badge on the Tasks quick-access button
+  const [pendingTasksCount, setPendingTasksCount] = useState(0);
   const [weekChart, setWeekChart] = useState<number[]>([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]);
 
   useEffect(() => {
