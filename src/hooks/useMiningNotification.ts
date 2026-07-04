@@ -28,46 +28,45 @@ async function getLocalNotifications() {
   }
 }
 
+export async function scheduleMiningEndNotification() {
+  if (!isNative()) return;
+  const LN = await getLocalNotifications();
+  if (!LN) return;
+
+  try {
+    const perm = await LN.requestPermissions();
+    if (perm.display !== 'granted') return;
+
+    await LN.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
+
+    const fireAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
+
+    await LN.schedule({
+      notifications: [{
+        id:    NOTIFICATION_ID,
+        title: '⛏️ Mining Complete!',
+        body:  'Your 8-hour mining session is done. Open Arxon to claim your ARX-P!',
+        schedule: { at: fireAt },
+        sound: 'default',
+        smallIcon: 'ic_stat_icon_config_sample',
+      }],
+    });
+  } catch (e) {
+    console.warn('[miningNotif] Failed to schedule:', e);
+  }
+}
+
+export async function cancelMiningNotification() {
+  if (!isNative()) return;
+  const LN = await getLocalNotifications();
+  if (!LN) return;
+  try {
+    await LN.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
+  } catch {}
+}
+
 export function useMiningNotification() {
-  const scheduleMiningEndNotification = useCallback(async () => {
-    if (!isNative()) return;
-    const LN = await getLocalNotifications();
-    if (!LN) return;
-
-    try {
-      // Request permission first
-      const perm = await LN.requestPermissions();
-      if (perm.display !== 'granted') return;
-
-      // Cancel any existing mining notification
-      await LN.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
-
-      // Schedule for 8 hours from now
-      const fireAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
-
-      await LN.schedule({
-        notifications: [{
-          id:    NOTIFICATION_ID,
-          title: '⛏️ Mining Complete!',
-          body:  'Your 8-hour mining session is done. Open Arxon to claim your ARX-P!',
-          schedule: { at: fireAt },
-          sound: 'default',
-          smallIcon: 'ic_stat_icon_config_sample',
-        }],
-      });
-    } catch (e) {
-      console.warn('[miningNotif] Failed to schedule:', e);
-    }
-  }, []);
-
-  const cancelMiningNotification = useCallback(async () => {
-    if (!isNative()) return;
-    const LN = await getLocalNotifications();
-    if (!LN) return;
-    try {
-      await LN.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
-    } catch {}
-  }, []);
-
-  return { scheduleMiningEndNotification, cancelMiningNotification };
+  const schedule = useCallback(() => scheduleMiningEndNotification(), []);
+  const cancel = useCallback(() => cancelMiningNotification(), []);
+  return { scheduleMiningEndNotification: schedule, cancelMiningNotification: cancel };
 }

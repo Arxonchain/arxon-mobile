@@ -1,10 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Fingerprint, Eye, AlertCircle } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
+import { Fingerprint, AlertCircle } from 'lucide-react';
 import { useBiometric } from '@/hooks/useBiometric';
 import arxonLogo from '@/assets/arxon-icon.svg';
 
-export default function BiometricLockScreen() {
+function LockOverlay() {
   const { authenticate, checking } = useBiometric();
   const [failed, setFailed] = useState(false);
 
@@ -20,7 +21,6 @@ export default function BiometricLockScreen() {
       alignItems:'center',justifyContent:'center',
       fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
 
-      {/* Logo */}
       <motion.div initial={{scale:0.8,opacity:0}} animate={{scale:1,opacity:1}}
         transition={{delay:0.1,type:'spring',stiffness:200}}>
         <div style={{width:80,height:80,borderRadius:24,overflow:'hidden',
@@ -39,7 +39,6 @@ export default function BiometricLockScreen() {
         App is locked
       </motion.p>
 
-      {/* Fingerprint button */}
       <motion.button
         whileTap={{scale:0.92}}
         onClick={unlock}
@@ -79,4 +78,13 @@ export default function BiometricLockScreen() {
       <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
     </div>
   );
+}
+
+/** Shows lock overlay on native when biometric lock is enabled and app was backgrounded. */
+export default function BiometricGate({ children }: { children: React.ReactNode }) {
+  const { enabled, locked } = useBiometric();
+  if (Capacitor.isNativePlatform() && enabled && locked) {
+    return <LockOverlay />;
+  }
+  return <>{children}</>;
 }
