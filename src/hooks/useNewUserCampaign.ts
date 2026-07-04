@@ -39,6 +39,19 @@ function getAccountAgeDays(createdAt: string | undefined): number {
   return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000);
 }
 
+async function resolveAccountCreatedAt(
+  userId: string,
+  authCreatedAt?: string,
+): Promise<string | undefined> {
+  if (authCreatedAt) return authCreatedAt;
+  const { data } = await supabase
+    .from('profiles')
+    .select('created_at')
+    .eq('id', userId)
+    .maybeSingle();
+  return data?.created_at ?? undefined;
+}
+
 interface CampaignRecord {
   days_claimed: number;
   last_claim_at: string | null;
@@ -60,19 +73,44 @@ export interface CampaignState {
   claim: () => Promise<{ success: boolean; pointsAwarded?: number; error?: string }>;
 }
 
+async function fetchCampaignRecord(userId: string): Promise<CampaignRecord | null> {
+  const { data } = await supabase
+    .from('new_user_campaign')
+    .select('days_claimed, last_claim_at, is_eligible, first_open_at')
+    .eq('user_id', userId)
+    .maybeSingle();
+  return (data as CampaignRecord | null) ?? null;
+}
+
 export function useNewUserCampaign(): CampaignState {
   const { user } = useAuth();
-  const [native,   setNative]   = useState(false);
-  const [deviceId, setDeviceId] = useState('');
-  const [record,   setRecord]   = useState<CampaignRecord | null>(null);
-  const [loading,  setLoading]  = useState(true);
-  const [claiming, setClaiming] = useState(false);
+  const [native,        setNative]        = useState(false);
+  const [deviceId,      setDeviceId]      = useState('');
+  const [record,        setRecord]        = useState<CampaignRecord | null>(null);
+  const [accountCreated,setAccountCreated] = useState<string | undefined>();
+  const [loading,       setLoading]       = useState(true);
+  const [claiming,      setClaiming]      = useState(false);
 
   const accountAgeDays = useMemo(
-    () => getAccountAgeDays(user?.created_at),
-    [user?.created_at],
+    () => getAccountAgeDays(accountCreated),
+    [accountCreated],
   );
   const isNewAccount = accountAgeDays < CAMPAIGN_DAYS;
+
+  const ensureRegistered = useCallback(async (id: string, userId: string) => {
+    const { data, error } = await supabase.rpc('ensure_new_user_campaign' as any, {
+      p_device_id: id,
+    });
+    if (error) {
+      console.warn('[campaign] ensure failed:', error.message);
+      return fetchCampaignRecord(userId);
+    }
+    const result = data as { registered?: boolean; eligible?: boolean; error?: string };
+    if (!result?.registered) {
+      console.warn('[campaign] not registered:', result?.error);
+    }
+    return fetchCampaignRecord(userId);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -92,38 +130,30 @@ export function useNewUserCampaign(): CampaignState {
         return;
       }
 
-      if (isNative && isNewAccount) {
-        const { data: existing } = await supabase
-          .from('new_user_campaign')
-          .select('id')
-          .eq('user_id', user.id)
-          .maybeSingle();
+      const createdAt = await resolveAccountCreatedAt(user.id, user.created_at);
+      if (cancelled) return;
+      setAccountCreated(createdAt);
 
-        if (!existing) {
-          await supabase.from('new_user_campaign').insert({
-            user_id: user.id,
-            device_id: id,
-            first_open_at: new Date().toISOString(),
-            is_eligible: true,
-          });
-        }
+      const ageDays = getAccountAgeDays(createdAt);
+      const isNew = ageDays < CAMPAIGN_DAYS;
+
+      let campaignRecord: CampaignRecord | null = null;
+
+      if (isNative && isNew) {
+        campaignRecord = await ensureRegistered(id, user.id);
+      } else {
+        campaignRecord = await fetchCampaignRecord(user.id);
       }
 
-      const { data } = await supabase
-        .from('new_user_campaign')
-        .select('days_claimed, last_claim_at, is_eligible, first_open_at')
-        .eq('user_id', user.id)
-        .maybeSingle();
-
       if (!cancelled) {
-        setRecord(data as CampaignRecord | null);
+        setRecord(campaignRecord);
         setLoading(false);
       }
     };
 
     init();
     return () => { cancelled = true; };
-  }, [user, isNewAccount]);
+  }, [user, ensureRegistered]);
 
   const claim = useCallback(async () => {
     if (!user || !deviceId) return { success: false, error: 'Not ready' };
@@ -132,6 +162,11 @@ export function useNewUserCampaign(): CampaignState {
 
     setClaiming(true);
     try {
+      if (!record) {
+        const refreshed = await ensureRegistered(deviceId, user.id);
+        setRecord(refreshed);
+      }
+
       const { data, error } = await supabase.rpc('claim_new_user_reward' as any, {
         p_device_id: deviceId,
       });
@@ -139,12 +174,8 @@ export function useNewUserCampaign(): CampaignState {
 
       const result = data as any;
       if (result?.success) {
-        const { data: updated } = await supabase
-          .from('new_user_campaign')
-          .select('days_claimed, last_claim_at, is_eligible, first_open_at')
-          .eq('user_id', user.id)
-          .maybeSingle();
-        setRecord(updated as CampaignRecord | null);
+        const updated = await fetchCampaignRecord(user.id);
+        setRecord(updated);
         return { success: true, pointsAwarded: result.points_awarded };
       }
       return { success: false, error: result?.error || 'Claim failed' };
@@ -153,7 +184,7 @@ export function useNewUserCampaign(): CampaignState {
     } finally {
       setClaiming(false);
     }
-  }, [user, deviceId, native, isNewAccount]);
+  }, [user, deviceId, native, isNewAccount, record, ensureRegistered]);
 
   const now = new Date();
   const daysClaimed = record?.days_claimed ?? 0;
@@ -163,16 +194,17 @@ export function useNewUserCampaign(): CampaignState {
   const campaignEnded =
     !isNewAccount ||
     daysClaimed >= CAMPAIGN_DAYS ||
-    record?.is_eligible === false;
+    (record != null && record.is_eligible === false);
 
   const daysRemaining = Math.max(0, CAMPAIGN_DAYS - daysClaimed);
 
+  // New account on mobile can claim even before record loads — claim RPC auto-registers
   const canClaimToday =
     native &&
     isNewAccount &&
-    !!record &&
     !campaignEnded &&
-    !claimedToday;
+    !claimedToday &&
+    (record == null || record.is_eligible !== false);
 
   const showBanner = useMemo(() => {
     if (!user) return false;
@@ -186,7 +218,7 @@ export function useNewUserCampaign(): CampaignState {
     isNewAccount,
     isNative: native,
     showBanner,
-    isEligible: isNewAccount && !!record && !campaignEnded,
+    isEligible: isNewAccount && !campaignEnded,
     daysRemaining,
     daysClaimed,
     canClaimToday,
