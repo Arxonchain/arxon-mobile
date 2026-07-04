@@ -55,6 +55,8 @@ function looksLikeExistingUser(msg: string) {
   );
 }
 
+let signupGeneration = 0;
+
 /**
  * Simple, direct signup with extended timeout.
  * This is the most reliable approach when backend is under load.
@@ -66,12 +68,17 @@ export async function signUpWithFallback(
   referralCode?: string  // FIX: pass referral code so it's stored in auth metadata
 ): Promise<SignUpResult> {
   const normalizedEmail = email.trim().toLowerCase();
+  const generation = ++signupGeneration;
 
   const invokeAuthSignup = async (): Promise<SignUpResult> => {
     try {
       // Edge function returns: { success: boolean, session?: { access_token, refresh_token, user? }, error?: string }
       const { data, error } = await supabase.functions.invoke("auth-signup", {
-        body: { email: normalizedEmail, password },
+        body: {
+          email: normalizedEmail,
+          password,
+          referralCode: referralCode?.trim().toUpperCase() || undefined,
+        },
       });
 
       if (error) return { error: toError(error, "Sign up failed"), user: null };
@@ -125,6 +132,10 @@ export async function signUpWithFallback(
       }),
     ]);
 
+    if (generation !== signupGeneration) {
+      return { error: new Error("Sign up superseded by a newer attempt."), user: null };
+    }
+
     if (result.error) {
       const err = toError(result.error, "Sign up failed");
       
@@ -157,6 +168,9 @@ export async function signUpWithFallback(
 
     return { error: null, user: result.data?.user ?? null };
   } catch (e) {
+    if (generation !== signupGeneration) {
+      return { error: new Error("Sign up superseded by a newer attempt."), user: null };
+    }
     const err = toError(e, "Sign up failed");
     const msg = err.message.toLowerCase();
     
