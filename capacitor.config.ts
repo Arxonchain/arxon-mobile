@@ -38,7 +38,7 @@ const config: CapacitorConfig = {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
     LocalNotifications: {
-      smallIcon: 'ic_stat_icon_config_sample',
+      smallIcon: 'ic_stat_arxon',
       iconColor: '#6B9FD4',
     },
   },

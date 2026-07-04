@@ -1,55 +1,36 @@
 /**
- * useMiningNotification.ts — ENH-08
- *
- * Schedules a local push notification when a mining session starts,
- * to fire 8 hours later reminding the user to claim their ARX-P.
- *
- * Usage: Call scheduleMiningEndNotification() when mining starts.
- *        Call cancelMiningNotification() when mining stops/claims.
- *
- * Requires @capacitor/local-notifications (already likely installed via push-notifications)
+ * Schedules a local notification when mining starts (8-hour claim reminder).
  */
 import { useCallback } from 'react';
+import {
+  ARXON_NOTIF_CHANNEL,
+  ARXON_NOTIF_SMALL_ICON,
+  isLocalNotificationsAvailable,
+} from '@/lib/nativeNotifications';
 
-const NOTIFICATION_ID = 1001; // Fixed ID so we can cancel it
-
-function isNative(): boolean {
-  try {
-    return !!(window as any).Capacitor?.isNativePlatform?.();
-  } catch { return false; }
-}
-
-async function getLocalNotifications() {
-  try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-    return LocalNotifications;
-  } catch {
-    return null;
-  }
-}
+const NOTIFICATION_ID = 1001;
 
 export async function scheduleMiningEndNotification() {
-  if (!isNative()) return;
-  const LN = await getLocalNotifications();
-  if (!LN) return;
+  if (!isLocalNotificationsAvailable()) return;
 
   try {
-    const perm = await LN.requestPermissions();
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const perm = await LocalNotifications.requestPermissions();
     if (perm.display !== 'granted') return;
 
-    await LN.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
+    await LocalNotifications.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
 
     const fireAt = new Date(Date.now() + 8 * 60 * 60 * 1000);
 
-    await LN.schedule({
+    await LocalNotifications.schedule({
       notifications: [{
         id:    NOTIFICATION_ID,
         title: '⛏️ Mining Complete!',
         body:  'Your 8-hour mining session is done. Open Arxon to claim your ARX-P!',
         schedule: { at: fireAt },
         sound: 'default',
-        smallIcon: 'ic_stat_icon_config_sample',
-        channelId: 'arxon-default',
+        smallIcon: ARXON_NOTIF_SMALL_ICON,
+        channelId: ARXON_NOTIF_CHANNEL,
       }],
     });
   } catch (e) {
@@ -58,12 +39,11 @@ export async function scheduleMiningEndNotification() {
 }
 
 export async function cancelMiningNotification() {
-  if (!isNative()) return;
-  const LN = await getLocalNotifications();
-  if (!LN) return;
+  if (!isLocalNotificationsAvailable()) return;
   try {
-    await LN.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
-  } catch {}
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    await LocalNotifications.cancel({ notifications: [{ id: NOTIFICATION_ID }] });
+  } catch { /* ignore */ }
 }
 
 export function useMiningNotification() {

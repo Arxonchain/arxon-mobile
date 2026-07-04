@@ -4,6 +4,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { dispatchAppNavigate } from '@/lib/nativeNavigation';
+import {
+  ARXON_NOTIF_CHANNEL,
+  ARXON_NOTIF_SMALL_ICON,
+  isLocalNotificationsAvailable,
+} from '@/lib/nativeNotifications';
 
 const NOTIFICATION_PREFS_KEY = 'arxon_notification_preferences';
 const VAPID_PUBLIC_KEY = 'BH83wzlnSpDzR3jxVWOmlPVnSWMxzKy6XABCoR5BThesZTX3Lkt_cJZmze_gDsReh5_IeBXIjb-ijbluwf0I2_w';
@@ -47,7 +52,7 @@ function navigateFromPush(url: string) {
 }
 
 async function showNativeLocalNotification(title: string, body: string) {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!isLocalNotificationsAvailable()) return;
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
     const id = (Date.now() % 2147483647) || 1;
@@ -58,8 +63,8 @@ async function showNativeLocalNotification(title: string, body: string) {
         body,
         schedule: { at: new Date(Date.now() + 300) },
         sound: 'default',
-        smallIcon: 'ic_stat_icon_config_sample',
-        channelId: 'arxon-default',
+        smallIcon: ARXON_NOTIF_SMALL_ICON,
+        channelId: ARXON_NOTIF_CHANNEL,
       }],
     });
   } catch (e) {

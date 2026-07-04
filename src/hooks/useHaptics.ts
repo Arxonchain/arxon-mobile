@@ -1,26 +1,14 @@
 /**
- * useHaptics.ts — ENH-07
- *
- * Provides haptic feedback for button taps on native Android/iOS.
- * Safe to call on web — does nothing if not native or if plugin unavailable.
- *
- * Usage:
- *   const { impact, success, error } = useHaptics();
- *   <button onClick={() => { impact(); handleClaim(); }}>Claim</button>
- *
- * To enable: Install @capacitor/haptics
- *   npm install @capacitor/haptics
- *   npx cap sync android
+ * Haptic feedback on native — requires @capacitor/haptics in the store APK.
  */
+import { Capacitor } from '@capacitor/core';
 
-function isNative(): boolean {
-  try {
-    return !!(window as any).Capacitor?.isNativePlatform?.();
-  } catch { return false; }
+function hapticsAvailable(): boolean {
+  return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('Haptics');
 }
 
 async function triggerHaptic(style: 'light' | 'medium' | 'heavy' | 'success' | 'error') {
-  if (!isNative()) return;
+  if (!hapticsAvailable()) return;
   try {
     const { Haptics, ImpactStyle, NotificationType } = await import('@capacitor/haptics');
     if (style === 'success') {
@@ -32,8 +20,7 @@ async function triggerHaptic(style: 'light' | 'medium' | 'heavy' | 'success' | '
       await Haptics.impact({ style: map[style] });
     }
   } catch {
-    // @capacitor/haptics not installed — silent fallback
-    // To enable: npm install @capacitor/haptics && npx cap sync android
+    // Plugin missing or call failed — silent fallback
   }
 }
 
