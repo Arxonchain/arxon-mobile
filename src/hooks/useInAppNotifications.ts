@@ -10,7 +10,31 @@ export interface AppNotification {
   amount?: number;
   read: boolean;
   created_at: string;
-  data?: any;
+  data?: unknown;
+}
+
+type DbNotification = {
+  id: string;
+  notification_type: string;
+  title: string;
+  message: string;
+  amount?: number | null;
+  read: boolean;
+  created_at: string;
+  data?: unknown;
+};
+
+function mapRow(row: DbNotification): AppNotification {
+  return {
+    id: row.id,
+    type: row.notification_type,
+    title: row.title,
+    message: row.message,
+    amount: row.amount ?? undefined,
+    read: row.read,
+    created_at: row.created_at,
+    data: row.data,
+  };
 }
 
 export function useInAppNotifications() {
@@ -29,7 +53,7 @@ export function useInAppNotifications() {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(50);
-    const list = (data || []) as AppNotification[];
+    const list = (data || []).map(row => mapRow(row as DbNotification));
     setNotifications(list);
     setUnread(list.filter(n => !n.read).length);
     setLoading(false);
@@ -37,7 +61,6 @@ export function useInAppNotifications() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Real-time subscription for new notifications
   useEffect(() => {
     if (!user) return;
     if (subRef.current) { supabase.removeChannel(subRef.current); subRef.current = null; }
@@ -47,13 +70,9 @@ export function useInAppNotifications() {
         event: 'INSERT', schema: 'public', table: 'user_notifications',
         filter: `user_id=eq.${user.id}`,
       }, (payload) => {
-        const n = payload.new as AppNotification;
+        const n = mapRow(payload.new as DbNotification);
         setNotifications(prev => [n, ...prev]);
         setUnread(u => u + 1);
-        // Show native notification if permitted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification(n.title, { body: n.message, icon: '/favicon.jpg', tag: n.id });
-        }
       }).subscribe();
 
     subRef.current = sub;
@@ -68,7 +87,6 @@ export function useInAppNotifications() {
       setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
       setUnread(u => Math.max(0, u - 1));
     } else {
-      // Mark all read
       await supabase.from('user_notifications')
         .update({ read: true }).eq('user_id', user.id).eq('read', false);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
@@ -76,7 +94,6 @@ export function useInAppNotifications() {
     }
   }, [user]);
 
-  // Helper: create a notification for this user (used locally for immediate feedback)
   const notify = useCallback(async (type: string, title: string, message: string, amount = 0) => {
     if (!user) return;
     await supabase.from('user_notifications').insert({
