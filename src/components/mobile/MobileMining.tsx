@@ -232,7 +232,7 @@ const MIN_CLAIM_ARX = 10;
         <motion.button whileTap={{scale:0.97}} onClick={handleMineToggle}
           disabled={isStarting||isStopping}
           style={{width:'100%',padding:'17px',borderRadius:20,marginBottom:10,cursor:'pointer',fontWeight:700,
-            fontSize:15,border:'none',outline:'none',transition:'all 0.25s',
+            fontSize:15,outline:'none',transition:'all 0.25s',
             fontFamily:"'Creato Display',-apple-system,sans-serif",
             background:isMining?'hsl(0 60% 56%/0.12)':'linear-gradient(135deg,hsl(215 35% 55%),hsl(215 40% 45%))',
             color:isMining?'hsl(0 60% 65%)':'white',
