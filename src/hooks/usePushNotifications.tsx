@@ -59,6 +59,7 @@ async function showNativeLocalNotification(title: string, body: string) {
         schedule: { at: new Date(Date.now() + 300) },
         sound: 'default',
         smallIcon: 'ic_stat_icon_config_sample',
+        channelId: 'arxon-default',
       }],
     });
   } catch (e) {

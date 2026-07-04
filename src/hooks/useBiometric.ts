@@ -1,32 +1,21 @@
 /**
- * useBiometric.ts — FIXED VERSION
- *
- * FIX BUG-27: The original implementation used WebAuthn (navigator.credentials)
- * which requires a registered passkey and doesn't work in Android WebView.
- *
- * NEW APPROACH: We use a simple PIN/pattern fallback using the device's
- * built-in screen lock via the `@capacitor/biometric-auth` approach.
- *
- * Since @capgo/capacitor-native-biometric is not yet installed, we fall back
- * to a lock-screen pattern that:
- * 1. Detects if the device has biometric hardware via PublicKeyCredential
- * 2. On native Android WebView, shows a "confirm with device credentials" prompt
- * 3. On web, disables the feature gracefully
- *
- * TO FULLY ENABLE NATIVE BIOMETRIC: Install @capgo/capacitor-native-biometric
- * and replace the authenticate() body with NativeBiometric.verifyIdentity()
+ * Native biometric app lock via @capgo/capacitor-native-biometric.
+ * Web browsers: feature disabled (native-only).
  */
 import { useState, useCallback, useEffect } from 'react';
+import { Capacitor } from '@capacitor/core';
 
 const LOCK_KEY   = 'arxon_biometric_enabled';
 const LOCKED_KEY = 'arxon_app_locked';
 
-// Safe native check
-function isNative(): boolean {
+async function getNativeBiometric() {
+  if (!Capacitor.isNativePlatform()) return null;
   try {
-    const cap = (window as any).Capacitor;
-    return !!(cap && cap.isNativePlatform?.());
-  } catch { return false; }
+    const { NativeBiometric } = await import('@capgo/capacitor-native-biometric');
+    return NativeBiometric;
+  } catch {
+    return null;
+  }
 }
 
 export function useBiometric() {
@@ -37,36 +26,26 @@ export function useBiometric() {
 
   useEffect(() => {
     const check = async () => {
-      // FIX BUG-27: Only report as supported on native Android/iOS
-      // WebAuthn in WebView doesn't work without registered credentials
-      if (isNative()) {
-        // On native, we can support biometric via device screen lock
-        // Check if PublicKeyCredential is available (Android 9+, iOS 14+)
-        const hasWebAuthn = typeof window !== 'undefined' && 'PublicKeyCredential' in window;
-        if (hasWebAuthn) {
-          try {
-            const available = await (window.PublicKeyCredential as any)
-              .isUserVerifyingPlatformAuthenticatorAvailable?.();
-            setSupported(!!available);
-          } catch {
-            // Still show as supported on native — we'll handle errors in authenticate()
-            setSupported(true);
-          }
-        } else {
-          setSupported(false);
-        }
-      } else {
-        // FIX BUG-27: On web browser, biometric is NOT supported
-        // (WebAuthn requires registered credentials and HTTPS with proper RP ID)
+      if (!Capacitor.isNativePlatform()) {
+        setSupported(false);
+        return;
+      }
+      const NB = await getNativeBiometric();
+      if (!NB) {
+        setSupported(false);
+        return;
+      }
+      try {
+        const result = await NB.isAvailable({ useFallback: true });
+        setSupported(!!result.isAvailable);
+      } catch {
         setSupported(false);
       }
     };
 
-    check();
-    const saved = localStorage.getItem(LOCK_KEY);
-    if (saved === 'true') setEnabled(true);
-    const wasLocked = sessionStorage.getItem(LOCKED_KEY);
-    if (wasLocked === 'true') setLocked(true);
+    void check();
+    if (localStorage.getItem(LOCK_KEY) === 'true') setEnabled(true);
+    if (sessionStorage.getItem(LOCKED_KEY) === 'true') setLocked(true);
   }, []);
 
   useEffect(() => {
@@ -83,30 +62,21 @@ export function useBiometric() {
   }, [enabled]);
 
   const authenticate = useCallback(async (): Promise<boolean> => {
-    if (!isNative()) return true; // Not locked on web
+    if (!Capacitor.isNativePlatform()) return true;
     setChecking(true);
     try {
-      // Try WebAuthn with stored credential
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-
-      const credential = await navigator.credentials.get({
-        publicKey: {
-          challenge,
-          timeout: 60000,
-          userVerification: 'required',
-          rpId: window.location.hostname,
-        },
-      } as any);
-
-      if (credential) {
-        setLocked(false);
-        sessionStorage.removeItem(LOCKED_KEY);
-        return true;
-      }
-      return false;
-    } catch (e: any) {
-      console.warn('[biometric] WebAuthn failed:', e.message);
+      const NB = await getNativeBiometric();
+      if (!NB) return false;
+      await NB.verifyIdentity({
+        reason: 'Unlock the Arxon app',
+        title: 'App Locked',
+        subtitle: 'Use fingerprint or face ID',
+      });
+      setLocked(false);
+      sessionStorage.removeItem(LOCKED_KEY);
+      return true;
+    } catch (e) {
+      console.warn('[biometric] verify failed:', e);
       return false;
     } finally {
       setChecking(false);
@@ -114,34 +84,20 @@ export function useBiometric() {
   }, []);
 
   const enableBiometric = useCallback(async (): Promise<boolean> => {
-    if (!isNative()) {
-      return false;
-    }
+    if (!Capacitor.isNativePlatform()) return false;
     try {
-      const challenge = new Uint8Array(32);
-      window.crypto.getRandomValues(challenge);
-      const userId = new Uint8Array(16);
-      window.crypto.getRandomValues(userId);
-
-      await navigator.credentials.create({
-        publicKey: {
-          challenge,
-          rp: { name: 'Arxon', id: window.location.hostname },
-          user: { id: userId, name: 'arxon-user', displayName: 'Arxon User' },
-          pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
-          authenticatorSelection: {
-            authenticatorAttachment: 'platform',
-            userVerification: 'required',
-          },
-          timeout: 60000,
-        },
-      } as any);
-
+      const NB = await getNativeBiometric();
+      if (!NB) return false;
+      await NB.verifyIdentity({
+        reason: 'Enable biometric lock for Arxon',
+        title: 'Enable Biometric Lock',
+        subtitle: 'Confirm your identity',
+      });
       localStorage.setItem(LOCK_KEY, 'true');
       setEnabled(true);
       return true;
-    } catch (e: any) {
-      console.warn('[biometric] Enable failed:', e.message);
+    } catch (e) {
+      console.warn('[biometric] enable failed:', e);
       return false;
     }
   }, []);

@@ -60,6 +60,7 @@ import BiometricGate from "@/components/mobile/BiometricLockScreen";
 import MobileSplash from "@/components/mobile/MobileSplash";
 import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
+import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 
 const queryClient = new QueryClient({
@@ -220,6 +221,7 @@ function App() {
           <PointsProvider>
             <TooltipProvider>
               <Toaster />
+              <NetworkOfflineBanner />
               <RouterShell>
                 <MobileNavProvider>
                   <BiometricGate>
