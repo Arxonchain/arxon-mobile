@@ -54,6 +54,7 @@ import MobileArena from "@/components/mobile/MobileArena";
 import MobileNexus from "@/components/mobile/MobileNexus";
 import MobileProfile from "@/components/mobile/MobileProfile";
 import MobileWallet from "@/components/mobile/MobileWallet";
+import MobileSettings from "@/components/mobile/MobileSettings";
 import PublicProfile from "@/pages/PublicProfile";
 import BiometricGate from "@/components/mobile/BiometricLockScreen";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
@@ -171,7 +172,7 @@ function AppRoutes() {
             <Route path="/profile/:userId" element={<PublicProfile />} />
             <Route path="/tasks"        element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
             <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
-            <Route path="/settings"     element={<ProtectedRoute><MobilePage><Settings /></MobilePage></ProtectedRoute>} />
+            <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><MobilePage><Notifications /></MobilePage></ProtectedRoute>} />
           </>
         ) : (

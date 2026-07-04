@@ -125,19 +125,11 @@ export default function MobileProfile() {
       toast({ title: 'Invalid file', description: 'Please select an image file (JPG, PNG, etc.)', variant: 'destructive' });
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Please select an image smaller than 5MB', variant: 'destructive' });
-      return;
-    }
-    if (!file || !user) return;
-    if (!file.type.startsWith('image/')) {
-      toast({ title:'Invalid file', description:'Please select an image', variant:'destructive' });
-      return;
-    }
     if (file.size > 2 * 1024 * 1024) {
-      toast({ title:'Too large', description:'Max 2MB', variant:'destructive' });
+      toast({ title: 'File too large', description: 'Please select an image smaller than 2MB', variant: 'destructive' });
       return;
     }
+    if (!user) return;
     setUploading(true);
     try {
       const ext      = file.name.split('.').pop();

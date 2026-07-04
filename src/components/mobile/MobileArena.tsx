@@ -19,6 +19,33 @@ const CSS = `
 @keyframes shimmer{0%{left:-100%}100%{left:200%}}
 `;
 
+type ArenaSide = 'a' | 'b' | 'c';
+
+function getPoolStats(battle: { side_a_power?: number; side_b_power?: number; side_c_power?: number | null; side_c_name?: string | null }) {
+  const hasSideC = !!battle.side_c_name;
+  const powC = hasSideC ? Number(battle.side_c_power ?? 0) : 0;
+  const powA = Number(battle.side_a_power ?? 0);
+  const powB = Number(battle.side_b_power ?? 0);
+  const total = powA + powB + powC;
+  if (total <= 0) {
+    return { total: 0, pctA: hasSideC ? 33 : 50, pctB: hasSideC ? 33 : 50, pctC: hasSideC ? 34 : 0, hasSideC, powC };
+  }
+  return {
+    total,
+    pctA: Math.round((powA / total) * 100),
+    pctB: Math.round((powB / total) * 100),
+    pctC: hasSideC ? Math.round((powC / total) * 100) : 0,
+    hasSideC,
+    powC,
+  };
+}
+
+function sideName(battle: { side_a_name: string; side_b_name: string; side_c_name?: string | null }, side: ArenaSide) {
+  if (side === 'a') return battle.side_a_name;
+  if (side === 'c') return battle.side_c_name || 'Draw';
+  return battle.side_b_name;
+}
+
 type Tab = 'battles' | 'leaderboard' | 'my-stakes';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -76,9 +103,7 @@ function BattleCard({
   onClick: () => void;
 }) {
   const timer = useTimer(battle.ends_at, !!isActive);
-  const totalPow = (battle.side_a_power??0) + (battle.side_b_power??0);
-  const pctA = totalPow > 0 ? Math.round((battle.side_a_power/totalPow)*100) : 50;
-  const pctB = 100 - pctA;
+  const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle);
   const concluded = (isEnded || !isActive) && battle.winner_side;
   const totalVoters = (battle as any).total_participants ?? 0;
 
@@ -145,7 +170,7 @@ function BattleCard({
           </div>
         </div>
 
-        <div style={{display:'grid',gridTemplateColumns:'1fr 32px 1fr',gap:8,alignItems:'stretch',marginBottom:10}}>
+        <div style={{display:'grid',gridTemplateColumns: hasSideC ? '1fr 1fr 1fr' : '1fr 32px 1fr',gap:8,alignItems:'stretch',marginBottom:10}}>
           <div style={{
             padding:'10px 12px',borderRadius:14,
             background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
@@ -157,12 +182,24 @@ function BattleCard({
             {battle.winner_side==='a' && <span style={{fontSize:9,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</span>}
           </div>
 
-          <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-            <div style={{width:28,height:28,borderRadius:9,background:'hsl(215 26% 12%)',
-              border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <span style={{fontSize:8,fontWeight:900,color:'hsl(215 22% 42%)'}}>VS</span>
+          {hasSideC ? (
+            <div style={{
+              padding:'10px 8px',borderRadius:14,
+              background:battle.winner_side==='c'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 11%)',
+              border:`1.5px solid ${battle.winner_side==='c'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 17%)'}`,
+              display:'flex',flexDirection:'column',gap:3,alignItems:'center',
+            }}>
+              <p style={{fontSize:10,fontWeight:700,color:'hsl(215 18% 84%)',textAlign:'center',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:'100%'}}>{battle.side_c_name}</p>
+              <p style={{fontSize:14,fontWeight:900,color:battle.winner_side==='c'?'hsl(38 55% 58%)':'hsl(215 35% 72%)',lineHeight:1}}>{pctC}%</p>
             </div>
-          </div>
+          ) : (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <div style={{width:28,height:28,borderRadius:9,background:'hsl(215 26% 12%)',
+                border:'1px solid hsl(215 22% 20%)',display:'flex',alignItems:'center',justifyContent:'center'}}>
+                <span style={{fontSize:8,fontWeight:900,color:'hsl(215 22% 42%)'}}>VS</span>
+              </div>
+            </div>
+          )}
 
           <div style={{
             padding:'10px 12px',borderRadius:14,
@@ -206,18 +243,15 @@ function BattleDetail({
   battleUserVote: any;           // the vote for THIS specific battle (or null)
   battleParticipants: any[];     // participants for THIS specific battle
   voting: boolean;
-  castVote: (id:string, side:'a'|'b', amt:number) => Promise<boolean>;
+  castVote: (id:string, side:ArenaSide, amt:number) => Promise<boolean>;
   available: number;
   onClose: () => void;
 }) {
   const timer = useTimer(battle.ends_at, !!isActive);
-  const totalPow = (battle.side_a_power??0) + (battle.side_b_power??0);
-  const pctA = totalPow > 0 ? Math.round((battle.side_a_power/totalPow)*100) : 50;
-  const pctB = 100 - pctA;
+  const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle as any);
   const existingVote = battleUserVote?.side ?? null;
 
-  // FIX: localSide is reset to null via key prop on parent — each battle gets a fresh state
-  const [localSide, setLocalSide] = useState<'a'|'b'|null>(null);
+  const [localSide, setLocalSide] = useState<ArenaSide|null>(null);
   const [stakeAmt, setStakeAmt] = useState('');
   const activeSide = existingVote ?? localSide;
   const concluded = !isActive && battle.winner_side;
@@ -313,6 +347,26 @@ function BattleDetail({
             </motion.div>
           </div>
 
+          {hasSideC && (
+            <motion.div whileTap={{scale:0.97}}
+              onClick={()=>isActive&&!existingVote&&setLocalSide('c')}
+              style={{borderRadius:16,padding:'14px 16px',marginBottom:14,display:'flex',alignItems:'center',justifyContent:'space-between',
+                cursor:isActive&&!existingVote?'pointer':'default',
+                background:activeSide==='c'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
+                border:`2px solid ${activeSide==='c'?'hsl(215 35% 62%/0.45)':battle.winner_side==='c'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
+              }}>
+              <div>
+                <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)'}}>{battle.side_c_name}</p>
+                <p style={{fontSize:10,color:'hsl(215 14% 40%)',marginTop:2}}>{powC.toLocaleString()} ARX-P</p>
+              </div>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:22,fontWeight:800,color:battle.winner_side==='c'?'hsl(38 55% 58%)':activeSide==='c'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctC}%</div>
+                {battle.winner_side==='c' && <div style={{fontSize:10,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</div>}
+                {activeSide==='c'&&isActive && <div style={{fontSize:10,fontWeight:700,color:'hsl(155 45% 55%)'}}>✓ Your pick</div>}
+              </div>
+            </motion.div>
+          )}
+
           {/* Progress */}
           <div style={{height:5,borderRadius:3,background:'hsl(215 26% 12%)',overflow:'hidden',marginBottom:8}}>
             <motion.div initial={{width:0}} animate={{width:`${pctA}%`}} transition={{duration:0.8,ease:'easeOut'}}
@@ -343,7 +397,7 @@ function BattleDetail({
         {isActive && !existingVote && (
           <div className="glass-elevated" style={{borderRadius:20,padding:'16px',marginBottom:14,border:'1px solid hsl(215 28% 20%)'}}>
             <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.12em',color:'hsl(215 14% 35%)',fontWeight:700,marginBottom:10}}>
-              Stake ARX-P · {activeSide?`backing ${activeSide==='a'?battle.side_a_name:battle.side_b_name}`:'select a side above'}
+              Stake ARX-P · {activeSide ? `backing ${sideName(battle as any, activeSide)}` : 'select a side above'}
             </p>
             <div style={{display:'flex',alignItems:'center',gap:10,background:'hsl(215 26% 10%)',
               border:'1px solid hsl(215 26% 17%)',borderRadius:14,padding:'14px 16px',marginBottom:10}}>
@@ -369,7 +423,7 @@ function BattleDetail({
                 color:activeSide&&stakeAmt?'white':'hsl(215 18% 35%)',
                 border:`1.5px solid ${activeSide&&stakeAmt?'hsl(215 35% 62%/0.4)':'hsl(215 25% 18%)'}`,
                 boxShadow:activeSide&&stakeAmt?'0 4px 16px hsl(215 55% 62%/0.2)':'none'}}>
-              {voting?'Staking…':activeSide?`Stake on ${activeSide==='a'?battle.side_a_name:battle.side_b_name}`:'← Select a side above first'}
+              {voting?'Staking…':activeSide?`Stake on ${sideName(battle as any, activeSide)}`:'← Select a side above first'}
             </button>
             <p style={{fontSize:9,color:'hsl(215 14% 32%)',marginTop:8,textAlign:'center'}}>
               Min 1,000 · Max 100,000 ARX-P · Winners earn from the losing pool
@@ -388,7 +442,7 @@ function BattleDetail({
                 Staked {battleUserVote?.power_spent?.toLocaleString()} ARX-P
               </p>
               <p style={{fontSize:11,color:'hsl(155 45% 43%/0.6)',marginTop:2}}>
-                On {existingVote==='a'?battle.side_a_name:battle.side_b_name} · Awaiting results
+                On {sideName(battle as any, existingVote as ArenaSide)} · Awaiting results
               </p>
             </div>
           </div>
@@ -648,7 +702,7 @@ export default function MobileArena() {
 
   // FIX: castVoteForBattle routes to placeVote (useArenaMarkets) which handles
   // ALL battles correctly via userPositions Map. It will never misfire to another battle.
-  const castVoteForBattle = useCallback(async (battleId: string, side: 'a'|'b', amount: number): Promise<boolean> => {
+  const castVoteForBattle = useCallback(async (battleId: string, side: ArenaSide, amount: number): Promise<boolean> => {
     const ok = await placeVote(battleId, side, amount);
     if (ok) {
       // Refresh participants for the currently open battle

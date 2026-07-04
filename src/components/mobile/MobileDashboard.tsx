@@ -603,6 +603,13 @@ export default function MobileDashboard() {
                       {item.icon}{item.icon2}
                     </svg>
                   </div>
+                  {item.id === 'wallet' && (
+                    <span style={{position:'absolute',top:-4,right:-4,padding:'2px 6px',borderRadius:8,
+                      background:'hsl(215 25% 18%)',border:'1px solid hsl(215 22% 24%)',
+                      fontSize:8,fontWeight:800,color:'hsl(215 14% 50%)'}}>
+                      Soon
+                    </span>
+                  )}
                   {item.id === 'tasks' && pendingTasksCount > 0 && (
                     <span style={{position:'absolute',top:-4,right:-4,minWidth:18,height:18,borderRadius:9,
                       background:'hsl(0 60% 56%)',border:'2px solid hsl(225 28% 8%)',

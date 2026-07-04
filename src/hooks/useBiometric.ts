@@ -106,13 +106,8 @@ export function useBiometric() {
       }
       return false;
     } catch (e: any) {
-      // FIX BUG-27: If no credential registered, auto-unlock
-      // (biometric was enabled before proper credential registration)
-      // In production, install @capgo/capacitor-native-biometric instead
-      console.warn('[biometric] WebAuthn failed, falling back to unlock:', e.message);
-      setLocked(false);
-      sessionStorage.removeItem(LOCKED_KEY);
-      return true;
+      console.warn('[biometric] WebAuthn failed:', e.message);
+      return false;
     } finally {
       setChecking(false);
     }
