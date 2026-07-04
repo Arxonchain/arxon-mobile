@@ -9,6 +9,8 @@ import { ChevronLeft, ChevronRight, Trophy, Zap, Users, Clock } from 'lucide-rea
 import AuthDialog from '@/components/auth/AuthDialog';
 import ArenaOnboarding from '@/components/arena/ArenaOnboarding';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from '@/hooks/use-toast';
+import { useMobileNav } from '@/contexts/MobileNavContext';
 
 const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
@@ -223,8 +225,14 @@ function BattleDetail({
   const handleVote = async () => {
     if (!activeSide) return;
     const amt = parseInt(stakeAmt);
-    if (isNaN(amt)||amt<1000) { alert('Minimum 1,000 ARX-P'); return; }
-    if (amt>available) { alert('Insufficient ARX-P'); return; }
+    if (isNaN(amt)||amt<1000) {
+      toast({ title: 'Minimum stake', description: 'Minimum 1,000 ARX-P required', variant: 'destructive' });
+      return;
+    }
+    if (amt>available) {
+      toast({ title: 'Insufficient balance', description: 'Not enough ARX-P to stake', variant: 'destructive' });
+      return;
+    }
     const ok = await castVote(battle.id, activeSide, amt);
     if (ok) { setStakeAmt(''); setLocalSide(null); }
   };
@@ -604,6 +612,12 @@ export default function MobileArena() {
   const [selectedBattle,    setSelectedBattle]    = useState<(ArenaBattle|BattleHistoryEntry)|null>(null);
   const [endedVisible,      setEndedVisible]      = useState(10); // ENH-14: paginate ended battles
   const [isBattleActive,    setIsBattleActive]    = useState(false);
+  const { setHideNav } = useMobileNav();
+
+  useEffect(() => {
+    setHideNav(!!selectedBattle);
+    return () => setHideNav(false);
+  }, [selectedBattle, setHideNav]);
   const [battleParticipants, setBattleParticipants] = useState<any[]>([]);
   const [loadingParticipants, setLoadingParticipants] = useState(false);
 
@@ -688,8 +702,6 @@ export default function MobileArena() {
     </div>
   );
 
-  const myStakes = (battleHistory as BattleHistoryEntry[]).filter(b=>b.user_participated);
-
   const seenIds = new Set((battleHistory as BattleHistoryEntry[]).map(b => b.id));
   const allHistory: any[] = [
     ...(battleHistory as BattleHistoryEntry[]),
@@ -709,6 +721,17 @@ export default function MobileArena() {
   const liveCt     = liveList.length;
   const upcomingCt = upcomingList.length;
   const endedCt    = endedList.length;
+
+  const myStakes = (() => {
+    const byId = new Map<string, BattleHistoryEntry | ArenaBattle>();
+    for (const b of battleHistory as BattleHistoryEntry[]) {
+      if (b.user_participated) byId.set(b.id, b);
+    }
+    for (const b of allHistory) {
+      if (userPositions.has(b.id)) byId.set(b.id, b);
+    }
+    return Array.from(byId.values());
+  })();
 
   type BF = 'live'|'upcoming'|'ended';
   const pills: {id:BF; label:string; count:number; dot?:boolean}[] = [
@@ -893,6 +916,15 @@ export default function MobileArena() {
                       userWon={userPositions.get(b.id)?.side === b.winner_side}
                       onClick={()=>openBattle(b, false)}/>
                   ))
+                )}
+                {endedCt > endedVisible && (
+                  <button onClick={() => setEndedVisible(v => v + 10)}
+                    style={{width:'100%',marginTop:10,padding:'14px',borderRadius:16,cursor:'pointer',
+                      background:'hsl(215 25% 11%)',border:'1px solid hsl(215 22% 18%)',
+                      color:'hsl(215 35% 62%)',fontSize:13,fontWeight:700,
+                      fontFamily:"'Creato Display',-apple-system,sans-serif"}}>
+                    Load more ({endedCt - endedVisible} remaining)
+                  </button>
                 )}
               </>
             )}

@@ -56,6 +56,7 @@ import MobileProfile from "@/components/mobile/MobileProfile";
 import MobileWallet from "@/components/mobile/MobileWallet";
 import PublicProfile from "@/pages/PublicProfile";
 import BiometricGate from "@/components/mobile/BiometricLockScreen";
+import { MobileNavProvider } from "@/contexts/MobileNavContext";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -209,9 +210,11 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <RouterShell>
-                <BiometricGate>
-                  <AppRoutes />
-                </BiometricGate>
+                <MobileNavProvider>
+                  <BiometricGate>
+                    <AppRoutes />
+                  </BiometricGate>
+                </MobileNavProvider>
               </RouterShell>
             </TooltipProvider>
           </PointsProvider>
