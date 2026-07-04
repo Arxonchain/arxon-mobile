@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import CampaignBanner from '@/components/CampaignBanner';
+import MobileRewardAlerts from '@/components/mobile/MobileRewardAlerts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
@@ -138,7 +139,7 @@ export default function MobileDashboard() {
   const [liveEarn,  setLiveEarn]  = useState(0);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
   // ENH-02: Pending tasks badge on the Tasks quick-access button
-  const [pendingTasksCount, setPendingTasksCount] = useState(0);
+  const [weekChart, setWeekChart] = useState<number[]>([0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]);
 
   useEffect(() => {
     if (!user) return;
@@ -238,12 +239,24 @@ export default function MobileDashboard() {
     const today = now.toISOString().split('T')[0];
     const week  = new Date(now.getTime()-7*86400000).toISOString().split('T')[0];
     const [{ data:td }, { data:wk }] = await Promise.all([
-      supabase.from('mining_sessions').select('arx_mined').eq('user_id',user.id).gte('started_at',today),
-      supabase.from('mining_sessions').select('arx_mined').eq('user_id',user.id).gte('started_at',week),
+      supabase.from('mining_sessions').select('arx_mined, started_at').eq('user_id',user.id).gte('started_at',today),
+      supabase.from('mining_sessions').select('arx_mined, started_at').eq('user_id',user.id).gte('started_at',week),
     ]);
     const t = td?.reduce((s,r)=>s+Number(r.arx_mined||0),0)??0;
     const w = wk?.reduce((s,r)=>s+Number(r.arx_mined||0),0)??0;
-    setTodayPts(t); setWeekPts(w); setLiveEarn(t);
+    setTodayPts(t); setWeekPts(w);
+
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (6 - i));
+      return d.toISOString().split('T')[0];
+    });
+    const dayTotals = weekDays.map(day =>
+      (wk || []).filter(s => String(s.started_at).startsWith(day))
+        .reduce((sum, r) => sum + Number(r.arx_mined || 0), 0),
+    );
+    const maxDay = Math.max(...dayTotals, 1);
+    setWeekChart(dayTotals.map(v => Math.max(0.08, v / maxDay)));
 
     const [{ data: sessions }, { data: nexusTx }] = await Promise.all([
       supabase.from('mining_sessions').select('id,arx_mined,started_at,ended_at,is_active')
@@ -259,7 +272,7 @@ export default function MobileDashboard() {
         type: s.is_active ? 'mining_active' : 'mining_done',
         label: s.is_active ? 'Mining Session' : 'Session Completed',
         sub: relTime(s.started_at),
-        val: s.is_active ? `+${liveEarn.toFixed(2)}` : `+${Number(s.arx_mined||0).toFixed(2)}`,
+        val: s.is_active ? null : `+${Number(s.arx_mined||0).toFixed(2)}`,
         time: s.started_at,
         col: 'hsl(155 45% 43%)', bg: 'hsl(155 45% 43%/0.1)',
         bd: 'hsl(155 45% 43%/0.2)', vc: 'hsl(155 45% 55%)',
@@ -457,6 +470,8 @@ export default function MobileDashboard() {
           <CampaignBanner />
         </div>
 
+        <MobileRewardAlerts />
+
         {/* ── Hero Balance Card ── */}
         <motion.div variants={scaleIn} style={{margin:'18px 20px 0'}} className="shine">
           <div className="glass-hero" style={{borderRadius:28,overflow:'hidden',position:'relative',
@@ -502,7 +517,7 @@ export default function MobileDashboard() {
                   ))}
                 </div>
                 <div style={{display:'flex',alignItems:'flex-end',gap:3,height:26}}>
-                  {[0.38,0.50,0.28,0.65,0.42,0.58,0.88].map((h,i)=>(
+                  {weekChart.map((h,i)=>(
                     <div key={i} style={{flex:1,borderRadius:'3px 3px 0 0',height:`${h*100}%`,
                       background:i===6
                         ?'linear-gradient(to top,hsl(215 35% 62%/0.5),hsl(215 38% 75%/0.7))'
@@ -511,7 +526,7 @@ export default function MobileDashboard() {
                 </div>
               </div>
               <div style={{width:110,flexShrink:0,display:'flex',alignItems:'center',justifyContent:'center'}}>
-                <ArxonCoin active={isMining}/>
+                <ArxonCoin active={isMining && isVisible}/>
               </div>
             </div>
           </div>
