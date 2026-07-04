@@ -25,7 +25,15 @@ window.addEventListener("error", (e) => {
 });
 
 window.addEventListener("unhandledrejection", (e) => {
-  showFatal("unhandled promise rejection", (e as PromiseRejectionEvent).reason);
+  const reason = (e as PromiseRejectionEvent).reason;
+  const msg = String((reason as Error)?.message || reason || "");
+  // Capacitor plugin missing in APK — log only, don't kill the app
+  if (/not implemented|nativebiometric|localnotifications|haptics/i.test(msg)) {
+    console.warn("[startup] ignored plugin rejection:", reason);
+    e.preventDefault();
+    return;
+  }
+  showFatal("unhandled promise rejection", reason);
 });
 
 void (async () => {

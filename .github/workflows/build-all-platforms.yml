@@ -24,6 +24,11 @@ jobs:
       - run: npm install @capacitor/cli
       - run: npx cap add android || true
       - run: npx cap sync android
+      - name: Verify native plugins synced
+        run: |
+          grep -q 'capgo-capacitor-native-biometric' android/app/capacitor.build.gradle
+          grep -q 'capacitor-local-notifications' android/app/capacitor.build.gradle
+          echo "Native plugins OK"
       - name: Build APK
         run: |
           cd android
