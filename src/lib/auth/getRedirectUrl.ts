@@ -1,9 +1,16 @@
 /**
  * Returns the appropriate redirect URL for auth callbacks.
- * Uses window.location.origin to work with any domain (custom or Lovable).
+ * On native Capacitor, always use the production Pages URL so email links
+ * match Supabase allowlist (not capacitor:// or transient WebView origins).
  */
+import { Capacitor } from '@capacitor/core';
+
+const PRODUCTION_APP_ORIGIN = 'https://arxon-mobile.pages.dev';
+
 export function getAuthRedirectUrl(path = "/"): string {
-  const origin = window.location.origin;
+  const origin = Capacitor.isNativePlatform()
+    ? PRODUCTION_APP_ORIGIN
+    : window.location.origin;
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${normalizedPath}`;
 }

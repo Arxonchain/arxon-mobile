@@ -637,7 +637,7 @@ export default function MobileArena() {
   const { points }  = usePoints();
 
   // useArena: single activeBattle + legacy data
-  const { activeBattle, leaderboard, battleHistory, loading, voting: arenaVoting, castVote } = useArena();
+  const { leaderboard, battleHistory, loading } = useArena();
 
   // useArenaMarkets: ALL battles + per-battle vote map (userPositions keyed by battle_id)
   // FIX: Use userPositions from useArenaMarkets for per-battle vote tracking.

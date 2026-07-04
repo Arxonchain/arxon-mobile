@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
+import { dispatchAppNavigate } from '@/lib/nativeNavigation';
 
 const NOTIFICATION_PREFS_KEY = 'arxon_notification_preferences';
 const VAPID_PUBLIC_KEY = 'BH83wzlnSpDzR3jxVWOmlPVnSWMxzKy6XABCoR5BThesZTX3Lkt_cJZmze_gDsReh5_IeBXIjb-ijbluwf0I2_w';
@@ -39,10 +40,9 @@ function normalizePrefs(raw: Record<string, unknown>): NotificationPreferences {
 
 function navigateFromPush(url: string) {
   const path = url.startsWith('/') ? url : `/${url}`;
+  dispatchAppNavigate(path);
   if (Capacitor.isNativePlatform()) {
-    window.location.hash = path.startsWith('#') ? path : `#${path}`;
-  } else {
-    window.location.assign(path);
+    window.location.hash = `#${path}`;
   }
 }
 

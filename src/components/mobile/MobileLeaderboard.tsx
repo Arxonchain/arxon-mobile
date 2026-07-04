@@ -2,6 +2,8 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { usePoints } from '@/hooks/usePoints';
 import { useAuth } from '@/hooks/useAuth';
+import { useAdmin } from '@/hooks/useAdmin';
+import { useAdmin } from '@/hooks/useAdmin';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, Crown, Trophy, AlertCircle } from 'lucide-react';
@@ -44,6 +46,7 @@ function Avatar({ url, name, size = 36, col = 'hsl(215 35% 62%)' }: {
 export default function MobileLeaderboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isAdmin } = useAdmin();
   const { points, rank } = usePoints();
   const [leaders, setLeaders] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -183,11 +186,14 @@ export default function MobileLeaderboard() {
             <AlertCircle size={16} color="hsl(38 55% 52%)" style={{ flexShrink: 0, marginTop: 1 }} />
             <div>
               <p style={{ fontSize: 12, fontWeight: 700, color: 'hsl(38 55% 58%)', marginBottom: 4 }}>
-                Leaderboard needs a Supabase policy fix
+                Leaderboard temporarily unavailable
               </p>
               <p style={{ fontSize: 11, color: 'hsl(38 55% 52%/0.7)', lineHeight: 1.5 }}>
-                Run this in Supabase SQL Editor to enable public leaderboard:
+                {isAdmin
+                  ? 'Run this policy in Supabase SQL Editor to enable public leaderboard reads:'
+                  : 'Rankings are being updated. Please check back soon.'}
               </p>
+              {isAdmin && (
               <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8,
                 background: 'hsl(225 30% 5%)', border: '1px solid hsl(215 22% 16%)' }}>
                 <code style={{ fontSize: 10, color: 'hsl(155 45% 55%)', lineHeight: 1.6, display: 'block',
@@ -197,6 +203,7 @@ ON user_points FOR SELECT
 TO public USING (true);`}
                 </code>
               </div>
+              )}
             </div>
           </div>
         </motion.div>

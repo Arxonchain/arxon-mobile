@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -57,6 +57,9 @@ import MobileWallet from "@/components/mobile/MobileWallet";
 import MobileSettings from "@/components/mobile/MobileSettings";
 import PublicProfile from "@/pages/PublicProfile";
 import BiometricGate from "@/components/mobile/BiometricLockScreen";
+import MobileSplash from "@/components/mobile/MobileSplash";
+import SessionRecovery from "@/components/system/SessionRecovery";
+import PushNavListener from "@/components/system/PushNavListener";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 
 const queryClient = new QueryClient({
@@ -131,10 +134,17 @@ function MobilePage({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
+  const [splashDone, setSplashDone] = useState(!isNative);
+
+  if (isNative && !splashDone) {
+    return <MobileSplash isAppReady={!loading} onFinish={() => setSplashDone(true)} />;
+  }
   if (loading) return <Spinner />;
 
   return (
     <>
+      <PushNavListener />
+      <SessionRecovery />
       <PushNotificationInit />
       <Routes>
         <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
@@ -173,7 +183,7 @@ function AppRoutes() {
             <Route path="/tasks"        element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
             <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
             <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><MobilePage><Notifications /></MobilePage></ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
           </>
         ) : (
           <>
