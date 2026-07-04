@@ -1,16 +1,28 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
+const REMOTE_URL = 'https://arxon-mobile.pages.dev';
+
+/**
+ * Default: load UI from Cloudflare (instant OTA on git push).
+ * Store builds with offline support: set CAPACITOR_BUNDLE_LOCAL=true before cap sync
+ * so the app ships bundled dist/ and works without network.
+ */
+const bundleLocal = process.env.CAPACITOR_BUNDLE_LOCAL === 'true';
+
 const config: CapacitorConfig = {
   appId: 'xyz.arxonchain.app',
   appName: 'Arxon',
   webDir: 'dist',
-  server: {
-    androidScheme: 'https',
-    // Live updates — app loads UI from Cloudflare Pages on every open.
-    // Every GitHub push rebuilds Cloudflare and all users get updates instantly.
-    url: 'https://arxon-mobile.pages.dev',
-    cleartext: false,
-  },
+  server: bundleLocal
+    ? {
+        androidScheme: 'https',
+        cleartext: false,
+      }
+    : {
+        androidScheme: 'https',
+        url: REMOTE_URL,
+        cleartext: false,
+      },
   plugins: {
     SplashScreen: {
       launchShowDuration: 2500,
@@ -24,6 +36,10 @@ const config: CapacitorConfig = {
     },
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
+    },
+    LocalNotifications: {
+      smallIcon: 'ic_stat_icon_config_sample',
+      iconColor: '#6B9FD4',
     },
   },
 };

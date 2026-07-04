@@ -49,6 +49,7 @@ export async function scheduleMiningEndNotification() {
         schedule: { at: fireAt },
         sound: 'default',
         smallIcon: 'ic_stat_icon_config_sample',
+        channelId: 'arxon-default',
       }],
     });
   } catch (e) {

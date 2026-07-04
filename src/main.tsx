@@ -35,6 +35,20 @@ void (async () => {
       } catch (e) {
         console.warn("CapacitorUpdater.notifyAppReady failed:", e);
       }
+
+      try {
+        const { LocalNotifications } = await import('@capacitor/local-notifications');
+        await LocalNotifications.createChannel({
+          id: 'arxon-default',
+          name: 'Arxon Notifications',
+          description: 'Mining, arena, and reward alerts',
+          importance: 4,
+          visibility: 1,
+          vibration: true,
+        });
+      } catch (e) {
+        console.warn('LocalNotifications channel setup failed:', e);
+      }
     }
 
     const { default: App } = await import("./App.tsx");
