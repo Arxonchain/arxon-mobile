@@ -1,20 +1,23 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 
-// ── Native detection ───────────────────────────────────────────────────────
-// Called lazily inside useEffect so Capacitor bridge is ready
+const CAMPAIGN_DAYS = 7;
+
 function isNativePlatform(): boolean {
   try {
     const cap = (window as any).Capacitor;
     if (cap && typeof cap.isNativePlatform === 'function') {
       return cap.isNativePlatform();
     }
-  } catch {}
+  } catch { /* ignore */ }
   try {
-    // Android WebView UA always has "; wv)" marker
+    const { Capacitor } = require('@capacitor/core');
+    if (Capacitor?.isNativePlatform?.()) return true;
+  } catch { /* ignore */ }
+  try {
     if (/; wv\)/i.test(navigator.userAgent)) return true;
-  } catch {}
+  } catch { /* ignore */ }
   return false;
 }
 
@@ -31,8 +34,22 @@ function getDeviceId(): string {
   }
 }
 
+function getAccountAgeDays(createdAt: string | undefined): number {
+  if (!createdAt) return 9999;
+  return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86_400_000);
+}
+
+interface CampaignRecord {
+  days_claimed: number;
+  last_claim_at: string | null;
+  is_eligible: boolean;
+  first_open_at: string;
+}
+
 export interface CampaignState {
+  isNewAccount: boolean;
   isNative: boolean;
+  showBanner: boolean;
   isEligible: boolean;
   daysRemaining: number;
   daysClaimed: number;
@@ -45,17 +62,22 @@ export interface CampaignState {
 
 export function useNewUserCampaign(): CampaignState {
   const { user } = useAuth();
-  const [native,    setNative]    = useState(false);
-  const [deviceId,  setDeviceId]  = useState('');
-  const [record,    setRecord]    = useState<any>(null);
-  const [loading,   setLoading]   = useState(true);
-  const [claiming,  setClaiming]  = useState(false);
+  const [native,   setNative]   = useState(false);
+  const [deviceId, setDeviceId] = useState('');
+  const [record,   setRecord]   = useState<CampaignRecord | null>(null);
+  const [loading,  setLoading]  = useState(true);
+  const [claiming, setClaiming] = useState(false);
+
+  const accountAgeDays = useMemo(
+    () => getAccountAgeDays(user?.created_at),
+    [user?.created_at],
+  );
+  const isNewAccount = accountAgeDays < CAMPAIGN_DAYS;
 
   useEffect(() => {
     let cancelled = false;
 
     const init = async () => {
-      // Wait 300ms for Capacitor bridge to inject window.Capacitor
       await new Promise(r => setTimeout(r, 300));
 
       const isNative = isNativePlatform();
@@ -65,16 +87,12 @@ export function useNewUserCampaign(): CampaignState {
       setNative(isNative);
       setDeviceId(id);
 
-      if (!user) { setLoading(false); return; }
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-      // FIX: For native users, ALWAYS try to register them in the campaign.
-      // If they already have a record (UNIQUE conflict), that's fine — ignore it.
-      // This handles:
-      // - Brand new installs (no record yet → creates one)
-      // - Reinstalls (device_id conflict → ignored, user already used this device)
-      // - Existing users who just got the update (no record → creates one)
-      if (isNative) {
-        // Check if record already exists first
+      if (isNative && isNewAccount) {
         const { data: existing } = await supabase
           .from('new_user_campaign')
           .select('id')
@@ -82,51 +100,51 @@ export function useNewUserCampaign(): CampaignState {
           .maybeSingle();
 
         if (!existing) {
-          // No record yet — this is their first time. Register them.
-          // first_open_at = now, so their 7-day window starts today
           await supabase.from('new_user_campaign').insert({
             user_id: user.id,
             device_id: id,
             first_open_at: new Date().toISOString(),
             is_eligible: true,
-          }).then(() => {});
+          });
         }
       }
 
-      // Fetch the campaign record
       const { data } = await supabase
         .from('new_user_campaign')
-        .select('*')
+        .select('days_claimed, last_claim_at, is_eligible, first_open_at')
         .eq('user_id', user.id)
         .maybeSingle();
 
       if (!cancelled) {
-        setRecord(data);
+        setRecord(data as CampaignRecord | null);
         setLoading(false);
       }
     };
 
     init();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [user, isNewAccount]);
 
   const claim = useCallback(async () => {
     if (!user || !deviceId) return { success: false, error: 'Not ready' };
+    if (!native) return { success: false, error: 'Claims are mobile-app only' };
+    if (!isNewAccount) return { success: false, error: 'Campaign ended for your account' };
+
     setClaiming(true);
     try {
       const { data, error } = await supabase.rpc('claim_new_user_reward' as any, {
         p_device_id: deviceId,
       });
       if (error) return { success: false, error: error.message };
+
       const result = data as any;
       if (result?.success) {
-        // Refresh record to show updated progress
         const { data: updated } = await supabase
           .from('new_user_campaign')
-          .select('*')
+          .select('days_claimed, last_claim_at, is_eligible, first_open_at')
           .eq('user_id', user.id)
           .maybeSingle();
-        setRecord(updated);
+        setRecord(updated as CampaignRecord | null);
         return { success: true, pointsAwarded: result.points_awarded };
       }
       return { success: false, error: result?.error || 'Claim failed' };
@@ -135,26 +153,40 @@ export function useNewUserCampaign(): CampaignState {
     } finally {
       setClaiming(false);
     }
-  }, [user, deviceId]);
+  }, [user, deviceId, native, isNewAccount]);
 
-  // Derive state from record
-  const now         = new Date();
-  const firstOpen   = record?.first_open_at ? new Date(record.first_open_at) : now;
-  const daysSince   = Math.floor((now.getTime() - firstOpen.getTime()) / 86_400_000);
+  const now = new Date();
   const daysClaimed = record?.days_claimed ?? 0;
-  const campaignEnded = daysSince >= 7 || daysClaimed >= 7 || record?.is_eligible === false;
-  const daysRemaining = Math.max(0, 7 - daysClaimed);
-  const lastClaim   = record?.last_claim_at ? new Date(record.last_claim_at) : null;
-  const claimedToday = lastClaim
-    ? lastClaim.toDateString() === now.toDateString()
-    : false;
+  const lastClaim = record?.last_claim_at ? new Date(record.last_claim_at) : null;
+  const claimedToday = lastClaim ? lastClaim.toDateString() === now.toDateString() : false;
 
-  // canClaimToday: must have a DB record + be on native + campaign not ended + not claimed today
-  const canClaimToday = !!record && native && !campaignEnded && !claimedToday;
+  const campaignEnded =
+    !isNewAccount ||
+    daysClaimed >= CAMPAIGN_DAYS ||
+    record?.is_eligible === false;
+
+  const daysRemaining = Math.max(0, CAMPAIGN_DAYS - daysClaimed);
+
+  const canClaimToday =
+    native &&
+    isNewAccount &&
+    !!record &&
+    !campaignEnded &&
+    !claimedToday;
+
+  const showBanner = useMemo(() => {
+    if (!user) return false;
+    if (!native) return true;
+    if (isNewAccount) return true;
+    if (daysClaimed > 0) return true;
+    return false;
+  }, [user, native, isNewAccount, daysClaimed]);
 
   return {
+    isNewAccount,
     isNative: native,
-    isEligible: !!record && !campaignEnded,
+    showBanner,
+    isEligible: isNewAccount && !!record && !campaignEnded,
     daysRemaining,
     daysClaimed,
     canClaimToday,
