@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
 import { useBiometric } from '@/hooks/useBiometric';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.05,delayChildren:0.08}} };
 const fadeUp  = { hidden:{opacity:0,y:20}, show:{opacity:1,y:0,transition:{duration:0.42,ease:[0.25,0.46,0.45,0.94]}} };
@@ -36,10 +37,9 @@ function Toggle({ on, onToggle }: { on:boolean; onToggle:()=>void }) {
 const MENU = [
   {Icon:Users,   label:'Referrals',    sub:'Earn 100 ARX-P per friend', path:'/referrals', col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'},
   {Icon:Wallet,  label:'Wallet',       sub:'Connect your Web3 wallet',  path:'/wallet',    col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
-  {Icon:Shield,  label:'Security',     sub:'Password & 2FA settings',   path:'/settings',  col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
+  {Icon:Shield,  label:'Security',     sub:'Password & biometric lock', path:'/settings?tab=security', col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
   {Icon:BookOpen,label:'Litepaper',    sub:'Guides & documentation',    path:'/litepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
-  {Icon:Settings,label:'App Settings', sub:'Preferences & display',     path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
-  {Icon:Shield,  label:'Security',    sub:'Biometric & password',        path:'/settings?tab=security', col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
+  {Icon:Settings,label:'App Settings', sub:'Notifications & display',   path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
 ];
 
 const ADMIN_MENU = [
@@ -55,11 +55,6 @@ const ADMIN_MENU = [
   { Icon:Globe,           label:'Global Map',      sub:'Worldwide miner activity',    path:'/admin/global-map',     col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'  },
 ];
 
-// Admin email — only this account sees the admin panel
-// FIX BUG-15: Use useAdmin hook instead of hardcoded email for security
-// The admin email is no longer exposed in the client bundle
-const ADMIN_EMAIL = 'gabemetax@gmail.com'; // kept for backwards compat, useAdmin() is primary check
-
 export default function MobileProfile() {
   const navigate                    = useNavigate();
   const { user, signOut }           = useAuth();
@@ -68,10 +63,9 @@ export default function MobileProfile() {
   const { isAdmin }                 = useAdmin();
   const { supported: bioSupported, enabled: bioEnabled,
           enableBiometric, disableBiometric } = useBiometric();
+  const { preferences: pushPrefs, updatePreferences: updatePushPrefs, requestPermission } = usePushNotifications();
 
   const [copied,      setCopied]      = useState(false);
-  const [notif,       setNotif]       = useState(true);
-  const [mineN,       setMineN]       = useState(true);
   const [uploading,   setUploading]   = useState(false);
   const [isAdminUser, setIsAdminUser] = useState(false);
   const [xHandle,     setXHandle]     = useState('');
@@ -84,11 +78,9 @@ export default function MobileProfile() {
   const streak    = points?.daily_streak ?? 0;
   const avatarUrl = profile?.avatar_url;
 
-  // Check admin by email match OR by role in DB
   useEffect(() => {
-    const emailMatch = user?.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase();
-    setIsAdminUser(emailMatch || isAdmin);
-  }, [user, isAdmin]);
+    setIsAdminUser(isAdmin);
+  }, [isAdmin]);
 
   // Load x_handle from profile
   useEffect(() => {
@@ -97,7 +89,7 @@ export default function MobileProfile() {
 
   const saveXHandle = async () => {
     // FIX ENH-09: Validate X handle format before saving
-    const handleToSave = xHandleInput.replace('@', '').trim();
+    const handleToSave = xHandle.replace('@', '').trim();
     if (handleToSave && !/^[A-Za-z0-9_]{1,15}$/.test(handleToSave)) {
       toast({ title: 'Invalid X handle', description: 'Handle must be 1-15 characters: letters, numbers, underscores only.', variant: 'destructive' });
       return;
@@ -105,14 +97,13 @@ export default function MobileProfile() {
     if (!user) return;
     setSavingX(true);
     try {
-      const handle = xHandle.replace('@','').trim();
       const { error } = await supabase.from('profiles')
-        .update({ x_handle: handle || null } as any)
+        .update({ x_handle: handleToSave || null } as any)
         .eq('user_id', user.id);
       if (error) throw error;
       await refetchProfile();
       setEditingX(false);
-      toast({ title: 'Saved!', description: handle ? `@${handle} linked` : 'X handle removed' });
+      toast({ title: 'Saved!', description: handleToSave ? `@${handleToSave} linked` : 'X handle removed' });
     } catch (e: any) {
       toast({ title: 'Error', description: e.message, variant: 'destructive' });
     } finally { setSavingX(false); }
@@ -399,8 +390,42 @@ export default function MobileProfile() {
         <p style={{fontSize:10, textTransform:'uppercase', letterSpacing:'0.15em',
           color:'hsl(215 14% 30%)', fontWeight:700, marginBottom:12}}>Notifications</p>
         {[
-          {label:'All Notifications', sub:'Push alerts',     on:notif, toggle:() => setNotif(n => !n)},
-          {label:'Mining Alerts',     sub:'Session updates', on:mineN, toggle:() => setMineN(n => !n)},
+          {
+            label: 'Push Notifications',
+            sub: 'Arena, rewards & announcements',
+            on: pushPrefs.arenaLive || pushPrefs.arenaResults || pushPrefs.adminAnnouncements,
+            toggle: async () => {
+              const enabling = !(pushPrefs.arenaLive || pushPrefs.arenaResults || pushPrefs.adminAnnouncements);
+              if (enabling) {
+                const ok = await requestPermission();
+                if (!ok) {
+                  toast({ title: 'Notifications blocked', description: 'Enable in Settings → Apps → Arxon → Notifications', variant: 'destructive' });
+                  return;
+                }
+              }
+              const next = enabling;
+              updatePushPrefs({
+                ...pushPrefs,
+                arenaLive: next,
+                arenaResults: next,
+                rewardUpdates: next,
+                adminAnnouncements: next,
+              });
+            },
+          },
+          {
+            label: 'Mining Alerts',
+            sub: 'Session ending & claim reminders',
+            on: pushPrefs.miningAlerts && pushPrefs.claimNotifications,
+            toggle: () => {
+              const next = !(pushPrefs.miningAlerts && pushPrefs.claimNotifications);
+              updatePushPrefs({
+                ...pushPrefs,
+                miningAlerts: next,
+                claimNotifications: next,
+              });
+            },
+          },
         ].map((item, i) => (
           <div key={i} className="glass-card press"
             style={{display:'flex', alignItems:'center', justifyContent:'space-between',

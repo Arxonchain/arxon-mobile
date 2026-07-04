@@ -1,3 +1,10 @@
+/**
+ * CampaignBanner — web + mobile dashboards.
+ * Mobile (new accounts): claim modal
+ * Mobile (old accounts, never claimed): hidden
+ * Mobile (old accounts, partial claims): ended/progress state
+ * Web: download app modal
+ */
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, X, Smartphone, Download, CheckCircle, Clock } from 'lucide-react';
@@ -43,7 +50,7 @@ function IconBox({ size = 80, children }: { size?: number; children: React.React
     <div style={{
       width: size, height: size, borderRadius: size * 0.28,
       margin: '0 auto 16px',
-      background: `linear-gradient(145deg, hsl(207 80% 26%), hsl(215 55% 14%))`,
+      background: 'linear-gradient(145deg, hsl(207 80% 26%), hsl(215 55% 14%))',
       border: `1.5px solid ${B.border}`,
       boxShadow: `0 8px 32px ${B.glow}, 0 2px 8px rgba(0,0,0,0.5), inset 0 1px 1px hsl(207 100% 75%/0.2)`,
       display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -59,7 +66,6 @@ function IconBox({ size = 80, children }: { size?: number; children: React.React
   );
 }
 
-// ── Claim Modal ────────────────────────────────────────────────────────────
 function ClaimModal({ onClose, campaign }: {
   onClose: () => void;
   campaign: ReturnType<typeof useNewUserCampaign>;
@@ -71,17 +77,20 @@ function ClaimModal({ onClose, campaign }: {
     const res = await campaign.claim();
     if (res.success) {
       setClaimed(res.pointsAwarded ?? 1000);
-      toast({ title: `+${(res.pointsAwarded ?? 1000).toLocaleString()} ARX-P claimed! 🎉` });
+      toast({
+        title: `+${(res.pointsAwarded ?? 1000).toLocaleString()} ARX-P claimed! 🎉`,
+        description: `Day ${campaign.daysClaimed + 1} of 7 complete.`,
+      });
     } else {
       toast({ title: 'Claim failed', description: res.error, variant: 'destructive' });
     }
   };
 
-  const daysClaimed = campaign.daysClaimed;
-  const daysRemaining = campaign.daysRemaining;
-  const ended = campaign.campaignEnded;
-  const canClaim = campaign.canClaimToday && claimed === null;
-  const alreadyToday = !campaign.canClaimToday && !ended && daysClaimed > 0;
+  const { daysClaimed, daysRemaining, campaignEnded, canClaimToday } = campaign;
+  const alreadyToday = !canClaimToday && !campaignEnded && daysClaimed > 0;
+  // Allow claim tap for new accounts even if DB record is still registering
+  const canClaim = !campaignEnded && !alreadyToday && claimed === null
+    && (canClaimToday || (campaign.isNewAccount && daysClaimed === 0));
 
   return (
     <div style={{
@@ -114,7 +123,6 @@ function ClaimModal({ onClose, campaign }: {
           <X size={16} color="hsl(215 18% 52%)" />
         </button>
 
-        {/* Header */}
         <div style={{ textAlign: 'center' }}>
           <IconBox size={78}>
             <Gift size={34} color={B.soft} strokeWidth={1.8} />
@@ -123,20 +131,18 @@ function ClaimModal({ onClose, campaign }: {
             New User Reward
           </h2>
           <p style={{ fontSize: 13, color: 'hsl(215 16% 46%)', lineHeight: 1.55, marginBottom: 22 }}>
-            Welcome to Arxon! Claim your free daily ARX-P for 7 days.
+            {campaign.isNewAccount
+              ? 'Welcome to Arxon! Claim your free daily ARX-P for 7 days.'
+              : 'This reward is only available for accounts created within the last 7 days.'}
           </p>
         </div>
 
-        {/* Points card */}
         <div style={{
-          background: `linear-gradient(135deg, hsl(215 42% 11%), hsl(207 55% 13%))`,
+          background: 'linear-gradient(135deg, hsl(215 42% 11%), hsl(207 55% 13%))',
           border: `1.5px solid ${B.border}`,
           borderRadius: 22, padding: '20px', marginBottom: 14, textAlign: 'center',
           boxShadow: `0 4px 24px ${B.glow}, inset 0 1px 0 hsl(207 100% 75%/0.07)`,
-          position: 'relative', overflow: 'hidden',
         }}>
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1,
-            background: `linear-gradient(90deg,transparent,${B.soft},transparent)` }} />
           <p style={{ fontSize: 11, color: B.soft, letterSpacing: '0.14em', fontWeight: 700, marginBottom: 8, textTransform: 'uppercase' }}>
             Daily Reward
           </p>
@@ -150,7 +156,6 @@ function ClaimModal({ onClose, campaign }: {
           <p style={{ fontSize: 13, color: B.soft, fontWeight: 600 }}>ARX-P per day</p>
         </div>
 
-        {/* Progress */}
         <div style={{
           background: 'hsl(215 35% 10%)', border: `1px solid ${B.darkBorder}`,
           borderRadius: 18, padding: '15px 17px', marginBottom: 18,
@@ -162,14 +167,13 @@ function ClaimModal({ onClose, campaign }: {
             </span>
           </div>
           <DayDots claimed={daysClaimed} />
-          {!ended && (
+          {!campaignEnded && (
             <p style={{ fontSize: 11, color: 'hsl(215 14% 34%)', marginTop: 9 }}>
-              {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining in campaign
+              {daysRemaining} day{daysRemaining !== 1 ? 's' : ''} remaining
             </p>
           )}
         </div>
 
-        {/* Success */}
         {claimed !== null && (
           <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             style={{
@@ -184,15 +188,20 @@ function ClaimModal({ onClose, campaign }: {
           </motion.div>
         )}
 
-        {/* CTA */}
-        {ended ? (
+        {campaignEnded ? (
           <div style={{
             padding: '18px', borderRadius: 20, textAlign: 'center',
             background: 'hsl(215 25% 9%)', border: '1px solid hsl(215 22% 15%)',
           }}>
-            <p style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 16% 40%)' }}>🏁 Campaign Ended</p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: 'hsl(215 16% 40%)' }}>
+              🏁 Campaign {daysClaimed >= 7 ? 'Complete' : 'Ended'}
+            </p>
             <p style={{ fontSize: 12, color: 'hsl(215 12% 28%)', marginTop: 5 }}>
-              You've completed the 7-day new user reward campaign.
+              {daysClaimed >= 7
+                ? 'You claimed all 7 daily rewards. Well done!'
+                : campaign.isNewAccount
+                  ? 'You missed the daily claim window.'
+                  : 'This reward is only for accounts created within the last 7 days.'}
             </p>
           </div>
         ) : alreadyToday ? (
@@ -203,9 +212,7 @@ function ClaimModal({ onClose, campaign }: {
           }}>
             <Clock size={20} color={B.primary} />
             <div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: B.soft }}>
-                Already claimed today!
-              </p>
+              <p style={{ fontSize: 14, fontWeight: 700, color: B.soft }}>Already claimed today!</p>
               <p style={{ fontSize: 11, color: 'hsl(215 14% 36%)', marginTop: 3 }}>
                 Come back tomorrow for Day {daysClaimed + 1}
               </p>
@@ -222,13 +229,10 @@ function ClaimModal({ onClose, campaign }: {
               fontFamily: "'Creato Display',-apple-system,sans-serif",
               fontSize: 17, fontWeight: 900,
               background: canClaim
-                ? `linear-gradient(135deg, hsl(207 90% 58%), hsl(207 80% 40%))`
+                ? 'linear-gradient(135deg, hsl(207 90% 58%), hsl(207 80% 40%))'
                 : 'hsl(215 26% 12%)',
               color: canClaim ? 'white' : 'hsl(215 16% 38%)',
-              boxShadow: canClaim
-                ? `0 8px 32px ${B.glow}, inset 0 1px 1px hsl(207 100% 82%/0.2)`
-                : 'none',
-              transition: 'all 0.2s',
+              boxShadow: canClaim ? `0 8px 32px ${B.glow}, inset 0 1px 1px hsl(207 100% 82%/0.2)` : 'none',
             }}>
             {campaign.claiming
               ? 'Claiming…'
@@ -236,7 +240,9 @@ function ClaimModal({ onClose, campaign }: {
                 ? '✓ Claimed! Come back tomorrow'
                 : canClaim
                   ? '🎁 Claim 1,000 ARX-P Now'
-                  : 'Loading…'}
+                  : campaign.isNewAccount
+                    ? '🎁 Claim 1,000 ARX-P Now'
+                    : 'Not eligible for this campaign'}
           </motion.button>
         )}
       </motion.div>
@@ -244,7 +250,6 @@ function ClaimModal({ onClose, campaign }: {
   );
 }
 
-// ── Download Modal (web) ───────────────────────────────────────────────────
 function DownloadModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{
@@ -288,7 +293,12 @@ function DownloadModal({ onClose }: { onClose: () => void }) {
           background: 'hsl(215 32% 10%)', border: `1px solid ${B.darkBorder}`,
           borderRadius: 18, padding: '14px 18px', marginBottom: 24, textAlign: 'left',
         }}>
-          {['1,000 free ARX-P every day','7 days after install','New installs only','Points added instantly'].map(item => (
+          {[
+            '1,000 free ARX-P every day',
+            '7 days for new accounts',
+            'Mobile app only',
+            'Points added instantly',
+          ].map(item => (
             <p key={item} style={{ fontSize: 13, color: 'hsl(215 16% 60%)', marginBottom: 7, display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ color: B.primary, fontWeight: 800 }}>✦</span> {item}
             </p>
@@ -297,7 +307,7 @@ function DownloadModal({ onClose }: { onClose: () => void }) {
         <a href={APP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer" style={{
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
           width: '100%', padding: '18px', borderRadius: 20,
-          background: `linear-gradient(135deg, hsl(207 90% 58%), hsl(207 80% 40%))`,
+          background: 'linear-gradient(135deg, hsl(207 90% 58%), hsl(207 80% 40%))',
           color: 'white', fontWeight: 900, fontSize: 16, textDecoration: 'none',
           boxShadow: `0 8px 32px ${B.glow}`,
         }}>
@@ -308,109 +318,123 @@ function DownloadModal({ onClose }: { onClose: () => void }) {
   );
 }
 
-// ── Main Banner ────────────────────────────────────────────────────────────
 export default function CampaignBanner() {
   const campaign = useNewUserCampaign();
   const [showModal, setShowModal] = useState(false);
 
-  // FIX ENH-13: Auto-hide banner 24h after campaign ends
   const HIDE_KEY = 'arxon_campaign_banner_hidden';
   const [hidden, setHidden] = useState(() => {
     try {
       const val = localStorage.getItem(HIDE_KEY);
       if (!val) return false;
-      return Date.now() - parseInt(val) < 24 * 60 * 60 * 1000;
+      return Date.now() - parseInt(val, 10) < 24 * 60 * 60 * 1000;
     } catch { return false; }
   });
 
   useEffect(() => {
     if (campaign.campaignEnded && !hidden) {
-      try {
-        localStorage.setItem(HIDE_KEY, Date.now().toString());
-      } catch {}
+      try { localStorage.setItem(HIDE_KEY, Date.now().toString()); } catch { /* ignore */ }
     }
   }, [campaign.campaignEnded, hidden]);
 
+  if (!campaign.showBanner) return null;
   if (hidden && campaign.campaignEnded) return null;
 
-  if (campaign.loading) return (
-    <div style={{
-      height: 76, borderRadius: 20, marginBottom: 14,
-      background: 'hsl(215 28% 9%)', border: `1px solid ${B.darkBorder}`,
-    }} />
-  );
+  if (campaign.loading) {
+    return (
+      <div style={{
+        height: 76, borderRadius: 20, marginBottom: 14,
+        background: 'hsl(215 28% 9%)', border: `1px solid ${B.darkBorder}`,
+      }} />
+    );
+  }
 
-  const ended  = campaign.campaignEnded;
-  const native = campaign.isNative;
+  const { campaignEnded, isNative, isNewAccount, canClaimToday, daysClaimed, daysRemaining } = campaign;
+
+  const subtitle = campaignEnded
+    ? isNewAccount
+      ? 'The 7-day new user campaign has ended for you.'
+      : `Campaign complete — ${daysClaimed}/7 days claimed.`
+    : isNative
+      ? canClaimToday
+        ? "Tap to claim today's 1,000 ARX-P reward!"
+        : daysClaimed > 0
+          ? `Day ${daysClaimed}/7 claimed · Come back tomorrow!`
+          : 'Tap to claim your first daily reward!'
+      : 'Download the mobile app to claim free daily ARX-P for 7 days!';
+
+  const claimedTodayBadge = !canClaimToday && !campaignEnded && daysClaimed > 0;
+  const badgeLabel = isNative
+    ? (campaignEnded ? 'DONE' : claimedTodayBadge ? 'CLAIMED' : 'CLAIM')
+    : 'DOWNLOAD';
 
   return (
     <>
       <motion.div whileTap={{ scale: 0.975 }} onClick={() => setShowModal(true)}
         style={{
           borderRadius: 20, padding: '15px 18px', marginBottom: 14, cursor: 'pointer',
-          background: ended ? 'hsl(215 25% 8%)' : `linear-gradient(135deg,${B.bg},hsl(215 34% 9%))`,
-          border: `1.5px solid ${ended ? 'hsl(215 20% 13%)' : B.border}`,
+          background: campaignEnded ? 'hsl(215 25% 8%)' : `linear-gradient(135deg,${B.bg},hsl(215 34% 9%))`,
+          border: `1.5px solid ${campaignEnded ? 'hsl(215 20% 13%)' : B.border}`,
           display: 'flex', alignItems: 'center', gap: 14,
-          boxShadow: ended ? 'none' : `0 4px 24px ${B.glow}`,
+          boxShadow: campaignEnded ? 'none' : `0 4px 24px ${B.glow}`,
           position: 'relative', overflow: 'hidden',
         }}>
-        {!ended && (
+        {!campaignEnded && (
           <>
-            <div style={{ position:'absolute',top:0,left:0,right:0,height:1,
-              background:`linear-gradient(90deg,transparent,${B.soft},transparent)` }}/>
-            <div style={{ position:'absolute',top:0,left:'-100%',width:'55%',height:'100%',
-              background:`linear-gradient(90deg,transparent,hsl(207 90% 60%/0.06),transparent)`,
-              animation:'shimmer 3.5s ease-in-out infinite' }}/>
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1,
+              background: `linear-gradient(90deg,transparent,${B.soft},transparent)` }} />
+            <div style={{ position: 'absolute', top: 0, left: '-100%', width: '55%', height: '100%',
+              background: 'linear-gradient(90deg,transparent,hsl(207 90% 60%/0.06),transparent)',
+              animation: 'shimmer 3.5s ease-in-out infinite' }} />
           </>
         )}
         <style>{`@keyframes shimmer{0%{left:-100%}100%{left:210%}}`}</style>
 
         <div style={{
           width: 48, height: 48, borderRadius: 15, flexShrink: 0,
-          background: ended ? 'hsl(215 26% 11%)' : `linear-gradient(145deg,hsl(207 80%26%),hsl(215 52%13%))`,
-          border: `1.5px solid ${ended ? 'hsl(215 20% 17%)' : B.border}`,
+          background: campaignEnded ? 'hsl(215 26% 11%)' : 'linear-gradient(145deg,hsl(207 80% 26%),hsl(215 52% 13%))',
+          border: `1.5px solid ${campaignEnded ? 'hsl(215 20% 17%)' : B.border}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          boxShadow: ended ? 'none' : `0 4px 16px ${B.glow}, inset 0 1px 1px hsl(207 100%75%/0.12)`,
+          boxShadow: campaignEnded ? 'none' : `0 4px 16px ${B.glow}, inset 0 1px 1px hsl(207 100% 75%/0.12)`,
         }}>
-          {ended
+          {campaignEnded
             ? <Clock size={22} color="hsl(215 16% 34%)" />
             : <Gift size={22} color={B.primary} strokeWidth={2} />}
         </div>
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{ fontSize: 13, fontWeight: 800, marginBottom: 3,
-            color: ended ? 'hsl(215 16% 36%)' : 'hsl(215 18% 94%)' }}>
-            {ended ? '🏁 New User Campaign Ended' : '✦ New User Reward — Free 1,000 ARX-P/Day!'}
+            color: campaignEnded ? 'hsl(215 16% 36%)' : 'hsl(215 18% 94%)' }}>
+            {campaignEnded
+              ? (daysClaimed >= 7 ? '🏁 Campaign Complete' : '🏁 New User Campaign Ended')
+              : '✦ New User Reward — Free 1,000 ARX-P/Day!'}
           </p>
-          <p style={{ fontSize: 11, color: ended ? 'hsl(215 12% 27%)' : 'hsl(215 13% 44%)',
+          <p style={{ fontSize: 11, color: campaignEnded ? 'hsl(215 12% 27%)' : 'hsl(215 13% 44%)',
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {ended
-              ? 'The 7-day new user campaign has ended for you.'
-              : native
-                ? campaign.canClaimToday
-                  ? "Tap to claim today's 1,000 ARX-P reward!"
-                  : campaign.daysClaimed > 0
-                    ? `Day ${campaign.daysClaimed}/7 claimed · Come back tomorrow!`
-                    : 'Tap to claim your first daily reward!'
-                : 'Download the mobile app to claim free daily ARX-P for 7 days!'}
+            {subtitle}
           </p>
-          {!ended && native && campaign.daysClaimed > 0 && (
+          {!campaignEnded && isNative && daysClaimed > 0 && (
             <div style={{ marginTop: 8 }}>
-              <DayDots claimed={campaign.daysClaimed} />
+              <DayDots claimed={daysClaimed} />
+            </div>
+          )}
+          {campaignEnded && daysClaimed > 0 && (
+            <div style={{ marginTop: 8 }}>
+              <DayDots claimed={daysClaimed} />
             </div>
           )}
         </div>
 
-        {!ended && (
+        {!campaignEnded && (
           <div style={{
             flexShrink: 0, padding: '5px 11px', borderRadius: 20,
-            background: native && campaign.canClaimToday ? B.bg : 'hsl(215 24% 11%)',
-            border: `1px solid ${native && campaign.canClaimToday ? B.border : 'hsl(215 20% 17%)'}`,
-            boxShadow: native && campaign.canClaimToday ? `0 2px 8px ${B.glow}` : 'none',
+            background: isNative && canClaimToday ? B.bg : 'hsl(215 24% 11%)',
+            border: `1px solid ${isNative && canClaimToday ? B.border : 'hsl(215 20% 17%)'}`,
+            boxShadow: isNative && canClaimToday ? `0 2px 8px ${B.glow}` : 'none',
           }}>
             <p style={{ fontSize: 10, fontWeight: 800,
-              color: native && campaign.canClaimToday ? B.primary : 'hsl(215 16% 36%)' }}>
-              {native ? (campaign.canClaimToday ? 'CLAIM' : 'CLAIMED') : 'DOWNLOAD'}
+              color: isNative && canClaimToday ? B.primary : 'hsl(215 16% 36%)' }}>
+              {badgeLabel}
             </p>
           </div>
         )}
@@ -418,7 +442,7 @@ export default function CampaignBanner() {
 
       <AnimatePresence>
         {showModal && (
-          native
+          isNative
             ? <ClaimModal key="claim" onClose={() => setShowModal(false)} campaign={campaign} />
             : <DownloadModal key="dl" onClose={() => setShowModal(false)} />
         )}

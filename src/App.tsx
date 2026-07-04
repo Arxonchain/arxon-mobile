@@ -10,7 +10,7 @@ import { Capacitor } from "@capacitor/core";
 // Web pages
 import Landing from "@/pages/Landing";
 import AuthPage from "@/pages/AuthPage";
-import AuthCallback from "@/pages/AuthCallback";
+import AuthConfirm from "@/pages/AuthConfirm";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import Dashboard from "@/pages/Dashboard";
 import DashboardLayout from "@/components/layout/DashboardLayout";
@@ -88,7 +88,7 @@ class AppErrorBoundary extends React.Component<
           <p style={{ fontSize: 12, color: 'hsl(215 14% 40%)', marginBottom: 24, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
             {this.state.error?.message || 'Unexpected runtime error'}
           </p>
-          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.href = '/'; }}
+          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.hash = '#/'; window.location.reload(); }}
             style={{ padding: '12px 28px', borderRadius: 14, background: 'hsl(215 35% 62%/0.15)', border: '1px solid hsl(215 35% 62%/0.35)', color: 'hsl(215 35% 72%)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Reload App
           </button>
@@ -135,7 +135,7 @@ function AppRoutes() {
       <PushNotificationInit />
       <Routes>
         <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
-        <Route path="/auth/confirm"   element={<AuthCallback />} />
+        <Route path="/auth/confirm"   element={<AuthConfirm />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/litepaper"      element={<Litepaper />} />
         <Route path="/admin/login"    element={<AdminLogin />} />

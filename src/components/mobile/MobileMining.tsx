@@ -66,10 +66,18 @@ export default function MobileMining() {
     else await startMining();
   };
 
+const MIN_CLAIM_ARX = 10;
+
   const handleClaim = async () => {
     if (!user) { setShowAuth(true); return; }
-    if (earnedPoints >= 1) await claimPoints();
+    if (earnedPoints >= MIN_CLAIM_ARX) await claimPoints();
   };
+
+  const claimable = Math.floor(earnedPoints);
+  const canClaim = isMining && claimable >= MIN_CLAIM_ARX;
+  const claimProgress = isMining && claimable < MIN_CLAIM_ARX
+    ? `${MIN_CLAIM_ARX - claimable} more ARX-P to claim`
+    : null;
 
   const copyRef = async () => {
     if (!referralCode) return;
@@ -233,16 +241,24 @@ export default function MobileMining() {
           {isStarting?'Starting...' : isStopping?'Stopping...' : isMining?'■  Stop & Collect' : '▶  Start Mining'}
         </motion.button>
 
-        {earnedPoints >= 1 && (
-          <motion.button whileTap={{scale:0.97}} onClick={handleClaim}
-            disabled={isClaiming}
-            style={{width:'100%',padding:'17px',borderRadius:20,cursor:'pointer',fontWeight:700,
-              fontSize:15,border:'1.5px solid hsl(155 45% 43%/0.35)',outline:'none',
-              background:'linear-gradient(135deg,hsl(155 45% 43%/0.12),hsl(155 45% 43%/0.06))',
-              color:'hsl(155 45% 58%)',fontFamily:"'Creato Display',-apple-system,sans-serif"}}>
-            <Zap size={16} style={{display:'inline',marginRight:8,verticalAlign:'middle'}}/>
-            {isClaiming?'Claiming...':`Claim ${Math.floor(earnedPoints)} ARX-P now`}
-          </motion.button>
+        {isMining && (
+          <>
+            {canClaim ? (
+              <motion.button whileTap={{ scale: 0.97 }} onClick={handleClaim}
+                disabled={isClaiming}
+                style={{ width: '100%', padding: '17px', borderRadius: 20, cursor: 'pointer', fontWeight: 700,
+                  fontSize: 15, border: '1.5px solid hsl(155 45% 43%/0.35)', outline: 'none',
+                  background: 'linear-gradient(135deg,hsl(155 45% 43%/0.12),hsl(155 45% 43%/0.06))',
+                  color: 'hsl(155 45% 58%)', fontFamily: "'Creato Display',-apple-system,sans-serif" }}>
+                <Zap size={16} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />
+                {isClaiming ? 'Claiming...' : `Claim ${claimable} ARX-P now`}
+              </motion.button>
+            ) : claimProgress ? (
+              <p style={{ textAlign: 'center', fontSize: 12, color: 'hsl(215 14% 42%)', marginTop: 4 }}>
+                {claimProgress} (minimum {MIN_CLAIM_ARX} ARX-P)
+              </p>
+            ) : null}
+          </>
         )}
       </div>
 
