@@ -87,8 +87,10 @@ function ClaimModal({ onClose, campaign }: {
   };
 
   const { daysClaimed, daysRemaining, campaignEnded, canClaimToday } = campaign;
-  const canClaim = canClaimToday && claimed === null;
   const alreadyToday = !canClaimToday && !campaignEnded && daysClaimed > 0;
+  // Allow claim tap for new accounts even if DB record is still registering
+  const canClaim = !campaignEnded && !alreadyToday && claimed === null
+    && (canClaimToday || (campaign.isNewAccount && daysClaimed === 0));
 
   return (
     <div style={{
@@ -238,7 +240,9 @@ function ClaimModal({ onClose, campaign }: {
                 ? '✓ Claimed! Come back tomorrow'
                 : canClaim
                   ? '🎁 Claim 1,000 ARX-P Now'
-                  : 'Not eligible on this device'}
+                  : campaign.isNewAccount
+                    ? '🎁 Claim 1,000 ARX-P Now'
+                    : 'Not eligible for this campaign'}
           </motion.button>
         )}
       </motion.div>
@@ -359,8 +363,9 @@ export default function CampaignBanner() {
           : 'Tap to claim your first daily reward!'
       : 'Download the mobile app to claim free daily ARX-P for 7 days!';
 
+  const claimedTodayBadge = !canClaimToday && !campaignEnded && daysClaimed > 0;
   const badgeLabel = isNative
-    ? (canClaimToday ? 'CLAIM' : campaignEnded ? 'DONE' : 'CLAIMED')
+    ? (campaignEnded ? 'DONE' : claimedTodayBadge ? 'CLAIMED' : 'CLAIM')
     : 'DOWNLOAD';
 
   return (
