@@ -238,7 +238,7 @@ const MIN_CLAIM_ARX = 10;
             color:isMining?'hsl(0 60% 65%)':'white',
             boxShadow:isMining?'none':'0 4px 20px hsl(215 55% 62%/0.25)',
             border:isMining?'1.5px solid hsl(0 60% 56%/0.3)':'1.5px solid hsl(215 35% 62%/0.4)'}}>
-          {isStarting?'Starting...' : isStopping?'Stopping...' : isMining?'■  Stop & Collect' : '▶  Start Mining'}
+          {isStarting?'Starting...' : isStopping?'Stopping...' : isMining?'■  Stop Mining' : '▶  Start Mining'}
         </motion.button>
 
         {isMining && (
@@ -246,18 +246,22 @@ const MIN_CLAIM_ARX = 10;
             {canClaim ? (
               <motion.button whileTap={{ scale: 0.97 }} onClick={handleClaim}
                 disabled={isClaiming}
-                style={{ width: '100%', padding: '17px', borderRadius: 20, cursor: 'pointer', fontWeight: 700,
+                style={{ width: '100%', padding: '17px', borderRadius: 20, marginTop: 10, cursor: 'pointer', fontWeight: 700,
                   fontSize: 15, border: '1.5px solid hsl(155 45% 43%/0.35)', outline: 'none',
                   background: 'linear-gradient(135deg,hsl(155 45% 43%/0.12),hsl(155 45% 43%/0.06))',
                   color: 'hsl(155 45% 58%)', fontFamily: "'Creato Display',-apple-system,sans-serif" }}>
                 <Zap size={16} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} />
-                {isClaiming ? 'Claiming...' : `Claim ${claimable} ARX-P now`}
+                {isClaiming ? 'Claiming...' : `Claim ${claimable} ARX-P (keep mining)`}
               </motion.button>
             ) : claimProgress ? (
-              <p style={{ textAlign: 'center', fontSize: 12, color: 'hsl(215 14% 42%)', marginTop: 4 }}>
+              <p style={{ textAlign: 'center', fontSize: 12, color: 'hsl(215 14% 42%)', marginTop: 10 }}>
                 {claimProgress} (minimum {MIN_CLAIM_ARX} ARX-P)
               </p>
-            ) : null}
+            ) : (
+              <p style={{ textAlign: 'center', fontSize: 11, color: 'hsl(215 14% 38%)', marginTop: 8 }}>
+                Stop ends your session and credits ARX-P · Claim mid-session without stopping
+              </p>
+            )}
           </>
         )}
       </div>
