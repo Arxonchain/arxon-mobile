@@ -757,10 +757,17 @@ export default function MobileArena() {
           </p>
         </div>
         <div style={{display:'flex',alignItems:'center',gap:5,
-          background:'hsl(0 60% 56%/0.1)',border:'1px solid hsl(0 60% 56%/0.22)',
-          borderRadius:20,padding:'6px 12px'}}>
-          <div className="pulse" style={{width:6,height:6,borderRadius:'50%',background:'hsl(0 60% 56%)'}}/>
-          <span style={{fontSize:10,fontWeight:700,color:'hsl(0 60% 65%)'}}>LIVE</span>
+          background: liveCt > 0 ? 'hsl(0 60% 56%/0.1)' : 'hsl(215 25% 11%)',
+          border: liveCt > 0 ? '1px solid hsl(0 60% 56%/0.22)' : '1px solid hsl(215 22% 18%)',
+          borderRadius:20,padding:'6px 12px',minWidth:40,justifyContent:'center'}}>
+          {liveCt > 0 ? (
+            <>
+              <div className="pulse" style={{width:6,height:6,borderRadius:'50%',background:'hsl(0 60% 56%)'}}/>
+              <span style={{fontSize:10,fontWeight:700,color:'hsl(0 60% 65%)'}}>LIVE</span>
+            </>
+          ) : (
+            <span style={{fontSize:10,fontWeight:600,color:'hsl(215 14% 40%)'}}>{upcomingCt > 0 ? `${upcomingCt} soon` : '—'}</span>
+          )}
         </div>
       </div>
 

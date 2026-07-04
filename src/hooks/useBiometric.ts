@@ -74,6 +74,8 @@ export function useBiometric() {
     const onVisible = () => {
       if (document.visibilityState === 'hidden') {
         sessionStorage.setItem(LOCKED_KEY, 'true');
+      } else if (sessionStorage.getItem(LOCKED_KEY) === 'true') {
+        setLocked(true);
       }
     };
     document.addEventListener('visibilitychange', onVisible);

@@ -5,6 +5,7 @@ import { BackendUnavailableError } from '@/lib/backendHealth';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from '@/hooks/use-toast';
+import { scheduleMiningEndNotification, cancelMiningNotification } from '@/hooks/useMiningNotification';
 
 const MAX_MINING_HOURS = 8;
 const BASE_POINTS_PER_HOUR = 10;
@@ -313,6 +314,7 @@ export const useMining = (options?: UseMiningOptions) => {
         lastDbWriteAtRef.current = 0;
         sessionStartTimeRef.current = null;
         endingRef.current = false;
+        cancelMiningNotification();
 
         if (credited && creditedPoints > 0) {
           toast({
@@ -593,6 +595,7 @@ export const useMining = (options?: UseMiningOptions) => {
         description: "You're now earning ARX-P points",
       });
       triggerConfetti();
+      scheduleMiningEndNotification();
     } catch (error) {
       console.error('Error starting mining:', error);
 
@@ -856,6 +859,7 @@ export const useMining = (options?: UseMiningOptions) => {
         arx_mined: 0,
         is_active: true,
       });
+      scheduleMiningEndNotification();
 
     } catch (error) {
       console.error('Error claiming points:', error);

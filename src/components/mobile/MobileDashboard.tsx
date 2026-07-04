@@ -170,15 +170,37 @@ export default function MobileDashboard() {
   const scrollRef   = useRef<HTMLDivElement>(null);
   const THRESHOLD   = 70;
 
-  // FIX BUG-35: Lightweight arena data - just show live count, not full hook
+  // FIX BUG-35: Lightweight arena data for dashboard carousel
   const [liveArenaCount, setLiveArenaCount] = useState(0);
-  const dashBattles = (() => {
+  const [dashBattles, setDashBattles] = useState<any[]>([]);
+
+  const fetchDashBattles = useCallback(async () => {
     try {
-  const live  : any[] = [];
-  const ended : any[] = [];
-      return [...live, ...ended].slice(0, 5);
-    } catch { return []; }
-  })();
+      const now = Date.now();
+      const { data, error } = await supabase
+        .from('arena_battles')
+        .select('id, title, banner_image, side_a_name, side_b_name, side_a_power, side_b_power, starts_at, ends_at, is_active, winner_side')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (error) throw error;
+
+      const rows = data || [];
+      const live = rows.filter(b => {
+        const s = new Date(b.starts_at).getTime();
+        const e = new Date(b.ends_at).getTime();
+        return s <= now && e > now && (b.is_active ?? true) && !b.winner_side;
+      }).map(b => ({ ...b, _live: true }));
+
+      const ended = rows.filter(b =>
+        b.winner_side || new Date(b.ends_at).getTime() <= now
+      ).slice(0, 3);
+
+      setLiveArenaCount(live.length);
+      setDashBattles([...live, ...ended].slice(0, 5));
+    } catch (err) {
+      console.error('Error fetching dashboard battles:', err);
+    }
+  }, []);
 
   const totalPts = Math.round(points?.total_points ?? 0);
   const userRank = rank ?? null;
@@ -263,15 +285,22 @@ export default function MobileDashboard() {
     setRecentActivity(activities.slice(0, 4));
   }, [user]);
 
-  // Full refresh — refetches everything
+  // Refetch dashboard data without reloading the page
   const doRefresh = useCallback(async () => {
     setIsRefreshing(true);
-    // Short delay so the user sees the spinner, then force a full reload
-    // This pulls the latest JS bundle from Cloudflare AND refreshes all data
-    setTimeout(() => {
-      window.location.reload();
-    }, 700);
-  }, []);
+    try {
+      await Promise.all([
+        refreshPoints(),
+        refetchProfile(),
+        refetchMining(),
+        fetchActivityData(),
+        fetchDashBattles(),
+      ]);
+    } finally {
+      setIsRefreshing(false);
+      setPullDistance(0);
+    }
+  }, [refreshPoints, refetchProfile, refetchMining, fetchActivityData, fetchDashBattles]);
 
   // Touch handlers for pull-to-refresh
   const onTouchStart = useCallback((e: React.TouchEvent) => {
@@ -302,6 +331,7 @@ export default function MobileDashboard() {
   }, [pullDistance, doRefresh]);
 
   useEffect(() => { fetchActivityData(); }, [fetchActivityData]);
+  useEffect(() => { fetchDashBattles(); }, [fetchDashBattles]);
 
   useEffect(()=>{
     if (!isMining) return;
@@ -571,7 +601,16 @@ export default function MobileDashboard() {
         {/* ── Live Battles ── */}
         <motion.div variants={fadeUp} style={{padding:'24px 20px 0'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-            <p style={{fontSize:15,fontWeight:700,color:'hsl(215 20% 93%)'}}>Live Battles</p>
+            <div style={{display:'flex',alignItems:'center',gap:8}}>
+              <p style={{fontSize:15,fontWeight:700,color:'hsl(215 20% 93%)'}}>Live Battles</p>
+              {liveArenaCount > 0 && (
+                <span style={{fontSize:9,fontWeight:700,color:'hsl(155 45% 55%)',
+                  background:'hsl(155 45% 43%/0.12)',border:'1px solid hsl(155 45% 43%/0.25)',
+                  borderRadius:10,padding:'2px 8px'}}>
+                  {liveArenaCount} live
+                </span>
+              )}
+            </div>
             <button onPointerDown={()=>navigate('/arena')}
               style={{display:'flex',alignItems:'center',gap:3,fontSize:11,color:'hsl(215 35% 62%)',fontWeight:600,background:'none',border:'none',cursor:'pointer'}}>
               View all <ChevronRight size={13}/>
