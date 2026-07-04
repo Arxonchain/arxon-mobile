@@ -775,6 +775,9 @@ export default function MobileDashboard() {
               : it.type==='nexus_send'
                 ? <><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>
                 : <><polyline points="23 7 13.5 15.5 8.5 10.5 1 17"/><polyline points="17 7 23 7 23 13"/></>;
+            const displayVal = it.type === 'mining_active'
+              ? `+${liveEarn.toFixed(2)}`
+              : (it.val ?? '—');
             return (
               <motion.div key={it.time+i} initial={{opacity:0,y:10}} animate={{opacity:1,y:0}}
                 transition={{delay:0.6+i*0.07}} whileTap={{scale:0.98}}
@@ -789,12 +792,45 @@ export default function MobileDashboard() {
                   <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>{it.sub}</p>
                 </div>
                 <div style={{textAlign:'right'}}>
-                  <p style={{fontSize:14,fontWeight:700,color:it.vc}}>{it.val}</p>
-                  <p style={{fontSize:9,color:'hsl(215 14% 30%)',marginTop:1}}>ARX-P</p>
+                  <p style={{fontSize:14,fontWeight:700,color:it.vc}}>{displayVal}</p>
+                  <p style={{fontSize:9,color:'hsl(215 14% 30%)',marginTop:1}}>
+                    {it.type === 'mining_active' ? 'mining…' : 'ARX-P'}
+                  </p>
                 </div>
               </motion.div>
             );
           })}
+        </motion.div>
+
+        {/* ── Community ── */}
+        <motion.div variants={fadeUp} style={{padding:'24px 20px 0'}}>
+          <div className="glass-card" style={{
+            borderRadius:20, padding:'18px 16px', textAlign:'center',
+            border:'1px solid hsl(215 28% 20%/0.4)',
+          }}>
+            <p style={{fontSize:11,color:'hsl(215 25% 48%)',marginBottom:14}}>Join our community</p>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12}}>
+              {[
+                { label:'Telegram', href:'https://t.me/Arxonofficial', icon:<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/> },
+                { label:'X', href:'https://x.com/arxonarx', icon:<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.733-8.835L1.254 2.25H8.08l4.253 5.622z"/> },
+                { label:'Discord', href:'https://discord.gg/7FXxFDTqwj', icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
+              ].map(s => (
+                <motion.a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
+                  whileTap={{scale:0.92}}
+                  aria-label={s.label}
+                  style={{
+                    width:44, height:44, borderRadius:14, display:'flex', alignItems:'center', justifyContent:'center',
+                    background:'hsl(215 35% 62%/0.08)', border:'1px solid hsl(215 35% 62%/0.22)',
+                    color:'hsl(215 35% 62%)', textDecoration:'none',
+                  }}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                    strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                    {s.icon}
+                  </svg>
+                </motion.a>
+              ))}
+            </div>
+          </div>
         </motion.div>
       </motion.div>
     </div>

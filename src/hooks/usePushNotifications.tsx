@@ -46,6 +46,26 @@ function navigateFromPush(url: string) {
   }
 }
 
+async function showNativeLocalNotification(title: string, body: string) {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const { LocalNotifications } = await import('@capacitor/local-notifications');
+    const id = (Date.now() % 2147483647) || 1;
+    await LocalNotifications.schedule({
+      notifications: [{
+        id,
+        title,
+        body,
+        schedule: { at: new Date(Date.now() + 300) },
+        sound: 'default',
+        smallIcon: 'ic_stat_icon_config_sample',
+      }],
+    });
+  } catch (e) {
+    console.warn('[Push] Local notification failed:', e);
+  }
+}
+
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
@@ -117,62 +137,32 @@ export const usePushNotifications = () => {
       .catch(err => console.error('[Push] SW registration failed:', err));
   }, [isNative]);
 
+  // Re-register FCM token when already granted — never auto-prompt (user opts in via Settings/Profile)
   useEffect(() => {
     if (!isNative || !user) return;
-    const autoRegister = async () => {
+    const syncRegistration = async () => {
       try {
         const { receive } = await PushNotifications.checkPermissions();
         if (receive === 'granted') {
           await PushNotifications.register();
           setPermission('granted');
-        } else if (receive === 'prompt' || receive === 'prompt-with-rationale') {
-          const { receive: result } = await PushNotifications.requestPermissions();
-          if (result === 'granted') {
-            await PushNotifications.register();
-            setPermission('granted');
-          } else {
-            setPermission('denied');
-          }
-        } else {
+        } else if (receive === 'denied') {
           setPermission('denied');
+        } else {
+          setPermission('default');
         }
       } catch (e) {
-        console.error('[Push] Auto-register error:', e);
+        console.error('[Push] Registration sync error:', e);
       }
     };
-    const t = setTimeout(autoRegister, 1500);
+    const t = setTimeout(syncRegistration, 1500);
     return () => clearTimeout(t);
   }, [user?.id, isNative]);
 
   useEffect(() => {
     if (isNative || !user) return;
     if (!('Notification' in window)) return;
-    if (Notification.permission !== 'default') {
-      setPermission(Notification.permission as 'granted' | 'denied');
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const result = await Notification.requestPermission();
-        setPermission(result as 'granted' | 'denied');
-        if (result === 'granted' && serviceWorkerRef.current) {
-          const sub = await (serviceWorkerRef.current as any).pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
-          });
-          const subJson = sub.toJSON();
-          await supabase.from('push_subscriptions').upsert({
-            user_id: user.id,
-            endpoint: subJson.endpoint,
-            p256dh: subJson.keys?.p256dh || '',
-            auth: subJson.keys?.auth || '',
-          }, { onConflict: 'endpoint' });
-        }
-      } catch (e) {
-        console.error('[Push] Web permission error:', e);
-      }
-    }, 3000);
-    return () => clearTimeout(timer);
+    setPermission(Notification.permission as 'default' | 'granted' | 'denied');
   }, [user, isNative]);
 
   const requestPermission = useCallback(async () => {
@@ -191,11 +181,28 @@ export const usePushNotifications = () => {
       }
       const result = await Notification.requestPermission();
       setPermission(result as 'granted' | 'denied');
+      if (result === 'granted' && user && serviceWorkerRef.current) {
+        try {
+          const sub = await serviceWorkerRef.current.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+          });
+          const subJson = sub.toJSON();
+          await supabase.from('push_subscriptions').upsert({
+            user_id: user.id,
+            endpoint: subJson.endpoint!,
+            p256dh: subJson.keys?.p256dh || '',
+            auth: subJson.keys?.auth || '',
+          }, { onConflict: 'endpoint' });
+        } catch (e) {
+          console.error('[Push] Web subscribe error:', e);
+        }
+      }
       return result === 'granted';
     } catch {
       return false;
     }
-  }, [isNative]);
+  }, [isNative, user]);
 
   const reRegisterToken = useCallback(async () => {
     if (!isNative) return;
@@ -244,10 +251,14 @@ export const usePushNotifications = () => {
           tag: options?.tag || 'arxon',
         },
       });
+      // Foreground banner on native — FCM often silent while app is open
+      if (isNative && document.visibilityState === 'visible') {
+        await showNativeLocalNotification(title, body);
+      }
     } catch (e) {
       console.error('[Push] sendServerPush error:', e);
     }
-  }, [user]);
+  }, [user, isNative]);
 
   useEffect(() => {
     if (!user || !preferences.arenaLive) return;
