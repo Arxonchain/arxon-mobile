@@ -1,8 +1,8 @@
 import type { CharacterConfig } from './types';
 
-import explorerSprite from '@/assets/depth-watch/characters/player_explorer_RAW.png';
-import skaterSprite from '@/assets/depth-watch/characters/player_skater_RAW.jpg';
-import scoutSprite from '@/assets/depth-watch/characters/player_scout_RAW.jpg';
+import explorerSprite from '@/assets/depth-watch/characters/player_explorer.png';
+import skaterSprite from '@/assets/depth-watch/characters/player_skater.png';
+import scoutSprite from '@/assets/depth-watch/characters/player_scout.png';
 
 /** Add a character: drop sprite + one entry here — no other code changes. */
 export const DEPTH_WATCH_CHARACTERS: CharacterConfig[] = [
