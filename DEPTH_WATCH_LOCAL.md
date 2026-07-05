@@ -15,7 +15,20 @@ npm run dev:depth-watch
 
 Open the app, log in, tap **Depth Watch** on the dashboard (BETA badge).
 
-## 3. Test on Android (local bundle — no OTA)
+## 3. Test on Android via GitHub (no Android Studio)
+
+Push stays on branch **`feat/depth-watch-private`** — never merge to `main` until you approve.
+
+1. Push the branch (already set up): triggers **Build Depth Watch Test APK (Private)** in GitHub Actions.
+2. Open GitHub → **Actions** → that workflow → latest run → **Artifacts** → download the APK.
+3. Install on your phone (enable “Install unknown apps” for your browser/files app).
+4. Log in and tap **Depth Watch** on the dashboard.
+
+This APK **bundles the UI locally** — it does **not** load from Cloudflare OTA, so production users are unaffected.
+
+Re-run manually anytime: Actions → **Build Depth Watch Test APK (Private)** → **Run workflow**.
+
+## 4. Test on Android (local machine, optional)
 
 ```powershell
 npm run build:depth-watch
@@ -25,9 +38,7 @@ npx cap sync android
 
 Open `android/` in Android Studio → Run on your device.
 
-This bundles `dist/` into the APK. The app will **not** load from arxon-mobile.pages.dev until you rebuild without `CAPACITOR_BUNDLE_LOCAL`.
-
-## 4. Before going public
+## 5. Before going public
 
 - [ ] Playtest sectors 1–10 on a real phone
 - [ ] Prep sprites (remove white backgrounds, 512×512 PNG) — see `02-ASSET-MAP.md`
