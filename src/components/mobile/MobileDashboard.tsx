@@ -14,6 +14,8 @@ import { useRealtimePoints } from '@/hooks/useRealtimePoints';
 import { toast } from '@/hooks/use-toast';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
+import { COMMUNITY_LINKS, DISCORD_ICON_PATH } from '@/lib/communityLinks';
+import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -37,6 +39,7 @@ function ArxonCoin({ active }: { active: boolean }) {
         @keyframes orbitRing{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         @keyframes orbitRingRev{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
         @keyframes spinRefresh{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes rippleRing{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.35);opacity:0}}
       `}</style>
       <svg width="96" height="96" viewBox="0 0 96 96">
         <defs>
@@ -178,7 +181,7 @@ export default function MobileDashboard() {
       const now = Date.now();
       const { data, error } = await supabase
         .from('arena_battles')
-        .select('id, title, banner_image, side_a_name, side_b_name, side_a_power, side_b_power, starts_at, ends_at, is_active, winner_side')
+        .select('id, title, banner_image, side_a_name, side_b_name, side_c_name, side_a_power, side_b_power, side_c_power, starts_at, ends_at, is_active, winner_side')
         .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
@@ -668,9 +671,7 @@ export default function MobileDashboard() {
                 background:'hsl(215 22% 9%)',border:'1px solid hsl(215 22% 13%)'}}/>
             ))}
             {dashBattles.map((battle:any)=>{
-              const total=(battle.side_a_power||0)+(battle.side_b_power||0);
-              const pctA=total>0?Math.round((battle.side_a_power||0)/total*100):50;
-              const pctB=100-pctA;
+              const { pctA, pctB, pctC, hasSideC } = getArenaPoolStats(battle);
               const isLive=battle._live||battle.status==='active';
               return (
                 <motion.div key={battle.id} whileTap={{scale:0.97}}
@@ -704,16 +705,25 @@ export default function MobileDashboard() {
                       overflow:'hidden',display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical'}}>
                       {battle.title||'Arena Battle'}
                     </p>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 20px 1fr',gap:5,alignItems:'stretch'}}>
+                    <div style={{display:'grid',gridTemplateColumns: hasSideC ? '1fr 1fr 1fr' : '1fr 20px 1fr',gap:5,alignItems:'stretch'}}>
                       <div style={{padding:'6px 8px',borderRadius:10,
                         background:battle.winner_side==='a'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 12%)',
                         border:`1px solid ${battle.winner_side==='a'?'hsl(38 55% 52%/0.35)':'hsl(215 22% 18%)'}`}}>
                         <p style={{fontSize:9,fontWeight:600,color:'hsl(215 18% 72%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_a_name}</p>
                         <p style={{fontSize:13,fontWeight:900,color:battle.winner_side==='a'?'hsl(38 55% 58%)':'hsl(215 35% 68%)'}}>{pctA}%</p>
                       </div>
-                      <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <span style={{fontSize:7,fontWeight:900,color:'hsl(215 22% 34%)'}}>VS</span>
-                      </div>
+                      {hasSideC ? (
+                        <div style={{padding:'6px 8px',borderRadius:10,
+                          background:battle.winner_side==='c'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 12%)',
+                          border:`1px solid ${battle.winner_side==='c'?'hsl(38 55% 52%/0.35)':'hsl(215 22% 18%)'}`}}>
+                          <p style={{fontSize:9,fontWeight:600,color:'hsl(215 18% 72%)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.side_c_name}</p>
+                          <p style={{fontSize:13,fontWeight:900,color:battle.winner_side==='c'?'hsl(38 55% 58%)':'hsl(215 35% 68%)'}}>{pctC}%</p>
+                        </div>
+                      ) : (
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
+                          <span style={{fontSize:7,fontWeight:900,color:'hsl(215 22% 34%)'}}>VS</span>
+                        </div>
+                      )}
                       <div style={{padding:'6px 8px',borderRadius:10,
                         background:battle.winner_side==='b'?'hsl(38 55% 52%/0.1)':'hsl(215 26% 12%)',
                         border:`1px solid ${battle.winner_side==='b'?'hsl(38 55% 52%/0.35)':'hsl(215 22% 18%)'}`}}>
@@ -811,9 +821,9 @@ export default function MobileDashboard() {
             <p style={{fontSize:11,color:'hsl(215 25% 48%)',marginBottom:14}}>Join our community</p>
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',gap:12}}>
               {[
-                { label:'Telegram', href:'https://t.me/Arxonofficial', icon:<path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/> },
-                { label:'X', href:'https://x.com/arxonarx', icon:<path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.733-8.835L1.254 2.25H8.08l4.253 5.622z"/> },
-                { label:'Discord', href:'https://discord.gg/7FXxFDTqwj', icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
+                { label: COMMUNITY_LINKS.telegram.label, href: COMMUNITY_LINKS.telegram.href, kind: 'telegram' as const },
+                { label: COMMUNITY_LINKS.x.label, href: COMMUNITY_LINKS.x.href, kind: 'x' as const },
+                { label: COMMUNITY_LINKS.discord.label, href: COMMUNITY_LINKS.discord.href, kind: 'discord' as const },
               ].map(s => (
                 <motion.a key={s.label} href={s.href} target="_blank" rel="noopener noreferrer"
                   whileTap={{scale:0.92}}
@@ -823,10 +833,18 @@ export default function MobileDashboard() {
                     background:'hsl(215 35% 62%/0.08)', border:'1px solid hsl(215 35% 62%/0.22)',
                     color:'hsl(215 35% 62%)', textDecoration:'none',
                   }}>
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                    {s.icon}
-                  </svg>
+                  {s.kind === 'discord' ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <path d={DISCORD_ICON_PATH} />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                      strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
+                      {s.kind === 'telegram'
+                        ? <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                        : <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.733-8.835L1.254 2.25H8.08l4.253 5.622z"/>}
+                    </svg>
+                  )}
                 </motion.a>
               ))}
             </div>

@@ -72,7 +72,7 @@ export default function Tasks() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { refreshPoints, triggerConfetti, addPoints } = usePoints();
-  const { canCheckin, loading: checkinLoading, performCheckin, currentStreak, streakBoost } = useCheckin();
+  const { canCheckin, loading: checkinLoading, performCheckin, currentStreak, streakBoost, refreshCheckin } = useCheckin();
   const [showAuth,       setShowAuth]       = useState(false);
   const [tasks,          setTasks]          = useState<Task[]>([]);
   const [userTasks,      setUserTasks]      = useState<Map<string, UserTask>>(new Map());
@@ -114,6 +114,14 @@ export default function Tasks() {
 
   useEffect(() => { fetchTasks(); }, [fetchTasks]);
   useEffect(() => { fetchUserTasks(); }, [fetchUserTasks]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void refreshCheckin();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refreshCheckin]);
 
   // ENH-03: Pull-to-refresh — re-fetches tasks + completion status + points
   const ptr = usePullToRefresh(async () => {

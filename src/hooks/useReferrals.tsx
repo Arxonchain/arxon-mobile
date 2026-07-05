@@ -261,20 +261,23 @@ export const useReferrals = (user: User | null) => {
       return;
     }
 
-    // FIX: Bust the referrals cache on every mount so stale "empty" state
-    // (from before RLS was fixed) never blocks real data from showing.
-    // The referral CODE cache is safe to keep (it's per-user and stable).
+    // Hydrate from cache when fresh; bust only when stale (5 min TTL)
+    const REFERRALS_CACHE_TTL = 5 * 60_000;
+    let hydratedFromCache = false;
     try {
-      localStorage.removeItem(referralsCacheKey(user.id));
-      localStorage.removeItem(referralStatsCacheKey(user.id));
-    } catch {}
+      const cachedRefs = cacheGet<any[]>(referralsCacheKey(user.id), { maxAgeMs: REFERRALS_CACHE_TTL });
+      const cachedStats = cacheGet<any>(referralStatsCacheKey(user.id), { maxAgeMs: REFERRALS_CACHE_TTL });
+      if (cachedRefs?.data) setReferrals(cachedRefs.data);
+      if (cachedStats?.data) setStats(cachedStats.data);
+      hydratedFromCache = !!(cachedRefs?.data || cachedStats?.data);
+      if (hydratedFromCache) setLoading(false);
 
-    // Hydrate referral CODE from long-lived cache only
-    const cachedCode = cacheGet<string>(referralCodeCacheKey(user.id), { maxAgeMs: 24 * 60 * 60_000 });
-    if (cachedCode?.data) {
-      setReferralCode(cachedCode.data);
-      setLoading(false);
-    }
+      const cachedCode = cacheGet<string>(referralCodeCacheKey(user.id), { maxAgeMs: 24 * 60 * 60_000 });
+      if (cachedCode?.data) {
+        setReferralCode(cachedCode.data);
+        if (!hydratedFromCache) setLoading(false);
+      }
+    } catch {}
 
     // Always fetch fresh data from server
     void fetchReferralCode(true);

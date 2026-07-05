@@ -120,6 +120,7 @@ export const useCheckin = () => {
     loading,
     todayCheckin,
     performCheckin,
+    refreshCheckin: checkTodayCheckin,
     currentStreak: points?.daily_streak || 0,
     streakBoost, // numeric value e.g. 5 (= 5%)
     // FIX BUG-32: Consistent display label always shows % sign
