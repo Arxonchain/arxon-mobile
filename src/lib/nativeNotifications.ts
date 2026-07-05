@@ -6,6 +6,9 @@ export const ARXON_NOTIF_CHANNEL = 'arxon_default';
 /** res/drawable/ic_stat_arxon.xml — white silhouette for status bar */
 export const ARXON_NOTIF_SMALL_ICON = 'ic_stat_arxon';
 
+/** res/drawable/ic_notif_arxon.xml — colored logo for expanded notification */
+export const ARXON_NOTIF_LARGE_ICON = 'ic_notif_arxon';
+
 export function isLocalNotificationsAvailable(): boolean {
   return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('LocalNotifications');
 }
