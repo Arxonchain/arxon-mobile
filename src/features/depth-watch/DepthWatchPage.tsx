@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useMobileNav } from '@/contexts/MobileNavContext';
 import CharacterSelect from './CharacterSelect';
 import GameScreen from './GameScreen';
 
