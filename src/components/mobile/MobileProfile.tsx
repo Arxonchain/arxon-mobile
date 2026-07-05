@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
 import { useBiometric } from '@/contexts/BiometricContext';
+import { Capacitor } from '@capacitor/core';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.05,delayChildren:0.08}} };
@@ -62,7 +63,7 @@ export default function MobileProfile() {
   const { profile, refetchProfile } = useProfile();
   const { isAdmin }                 = useAdmin();
   const { supported: bioSupported, enabled: bioEnabled,
-          enableBiometric, disableBiometric } = useBiometric();
+          enableBiometric, disableBiometric, probeSupport } = useBiometric();
   const { preferences: pushPrefs, updatePreferences: updatePushPrefs, requestPermission } = usePushNotifications();
 
   const [copied,      setCopied]      = useState(false);
@@ -81,6 +82,10 @@ export default function MobileProfile() {
   useEffect(() => {
     setIsAdminUser(isAdmin);
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) void probeSupport();
+  }, [probeSupport]);
 
   // Load x_handle from profile
   useEffect(() => {
