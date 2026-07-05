@@ -61,6 +61,7 @@ import MobileSplash from "@/components/mobile/MobileSplash";
 import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
+import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 import { BiometricProvider } from "@/contexts/BiometricContext";
 
@@ -223,6 +224,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <NetworkOfflineBanner />
+              <AppUpdateOverlay />
               <RouterShell>
                 <MobileNavProvider>
                   <BiometricProvider>
