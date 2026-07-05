@@ -38,11 +38,9 @@ const MiningIcon = (a: boolean) => (
 const ArenaIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M14.5 17.5L3 6V3h3l11.5 11.5"
-      fill={a?'hsl(255 50% 65%/0.15)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
-    <circle cx="19" cy="19" r="2.2"
-      fill={a?'hsl(255 50% 65%/0.2)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
-    <circle cx="5" cy="5" r="2.2"
-      fill={a?'hsl(255 50% 65%/0.2)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+      fill={a?'hsl(255 50% 65%/0.12)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M9.5 17.5L21 6V3h-3L9.5 14.5"
+      fill={a?'hsl(255 50% 65%/0.12)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
 
@@ -74,11 +72,6 @@ export default function MobileBottomNav() {
   const { hideNav } = useMobileNav();
   if (!user || hideNav) return null;
   if (['/auth','/admin','/landing'].some(p => location.pathname.startsWith(p))) return null;
-  // FIX BUG-17: Hide bottom nav when arena battle detail is open
-  // MobileArena sets selectedBattle which renders a fixed overlay — bottom nav should be hidden
-  // The arena page itself hides it via CSS when the detail is open
-  const hidePaths = ['/auth', '/admin', '/landing'];
-  if (hidePaths.some(p => location.pathname.startsWith(p))) return null;
 
   const activeId = (() => {
     if (location.pathname === '/') return 'home';
