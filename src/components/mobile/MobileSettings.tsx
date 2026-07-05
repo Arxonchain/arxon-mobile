@@ -6,10 +6,8 @@ import {
   Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
-import { useBiometric } from '@/contexts/BiometricContext';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Capacitor } from '@capacitor/core';
 
 type Tab = 'notifications' | 'security';
 
@@ -198,12 +196,6 @@ function NotificationsPanel() {
 }
 
 function SecurityPanel() {
-  const { supported, enabled, checking, enableBiometric, disableBiometric, probeSupport } = useBiometric();
-  const isNative = Capacitor.isNativePlatform();
-
-  useEffect(() => {
-    if (isNative) void probeSupport();
-  }, [isNative, probeSupport]);
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' });
@@ -231,39 +223,8 @@ function SecurityPanel() {
     }
   };
 
-  const toggleBiometric = async () => {
-    if (enabled) {
-      disableBiometric();
-      toast({ title: 'Biometric lock disabled' });
-      return;
-    }
-    const ok = await enableBiometric();
-    toast(ok
-      ? { title: 'Biometric lock enabled', description: 'App locks when you switch away.' }
-      : { title: 'Could not enable', description: 'Biometric setup failed on this device.', variant: 'destructive' });
-  };
-
   return (
     <div>
-      {isNative && (
-        <div className="glass-card" style={{ padding: '16px', borderRadius: 18, marginBottom: 14 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-            <div>
-              <p style={{ fontSize: 13, fontWeight: 700, color: 'hsl(215 20% 90%)' }}>Biometric Lock</p>
-              <p style={{ fontSize: 10, color: 'hsl(215 14% 40%)', marginTop: 4 }}>
-                {supported ? 'Require unlock when returning to the app' : 'Not available on this device'}
-              </p>
-            </div>
-            <button onClick={toggleBiometric} disabled={!supported || checking}
-              style={{ width: 48, height: 28, borderRadius: 14, flexShrink: 0, cursor: supported ? 'pointer' : 'default',
-                border: 'none', background: enabled ? 'hsl(155 45% 43%)' : 'hsl(215 22% 18%)', position: 'relative' }}>
-              <span style={{ position: 'absolute', top: 3, left: enabled ? 23 : 3, width: 22, height: 22,
-                borderRadius: '50%', background: 'white', transition: 'left 0.2s' }} />
-            </button>
-          </div>
-        </div>
-      )}
-
       <div className="glass-card" style={{ padding: '16px', borderRadius: 18 }}>
         <p style={{ fontSize: 13, fontWeight: 700, color: 'hsl(215 20% 90%)', marginBottom: 14 }}>Change Password</p>
 

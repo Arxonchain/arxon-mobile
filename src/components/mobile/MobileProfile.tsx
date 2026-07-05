@@ -9,13 +9,11 @@ import {
   Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks,
   ChevronRight, ChevronLeft, Users, Wallet, Camera,
   LayoutDashboard, Trophy, History, Scale, User2,
-  CalendarDays, FileDown, Globe, Zap, Fingerprint,
+  CalendarDays, FileDown, Globe, Zap,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
-import { useBiometric } from '@/contexts/BiometricContext';
-import { Capacitor } from '@capacitor/core';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.05,delayChildren:0.08}} };
@@ -38,7 +36,7 @@ function Toggle({ on, onToggle }: { on:boolean; onToggle:()=>void }) {
 const MENU = [
   {Icon:Users,   label:'Referrals',    sub:'Earn 100 ARX-P per friend', path:'/referrals', col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'},
   {Icon:Wallet,  label:'Wallet',       sub:'Connect your Web3 wallet',  path:'/wallet',    col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
-  {Icon:Shield,  label:'Security',     sub:'Password & biometric lock', path:'/settings?tab=security', col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
+  {Icon:Shield,  label:'Security',     sub:'Password & account security', path:'/settings?tab=security', col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
   {Icon:BookOpen,label:'Litepaper',    sub:'Guides & documentation',    path:'/litepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
   {Icon:Settings,label:'App Settings', sub:'Notifications & display',   path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
 ];
@@ -62,8 +60,6 @@ export default function MobileProfile() {
   const { points, rank }            = usePoints();
   const { profile, refetchProfile } = useProfile();
   const { isAdmin }                 = useAdmin();
-  const { supported: bioSupported, enabled: bioEnabled,
-          enableBiometric, disableBiometric, probeSupport } = useBiometric();
   const { preferences: pushPrefs, updatePreferences: updatePushPrefs, requestPermission } = usePushNotifications();
 
   const [copied,      setCopied]      = useState(false);
@@ -82,10 +78,6 @@ export default function MobileProfile() {
   useEffect(() => {
     setIsAdminUser(isAdmin);
   }, [isAdmin]);
-
-  useEffect(() => {
-    if (Capacitor.isNativePlatform()) void probeSupport();
-  }, [probeSupport]);
 
   // Load x_handle from profile
   useEffect(() => {
@@ -441,44 +433,6 @@ export default function MobileProfile() {
             <Toggle on={item.on} onToggle={item.toggle}/>
           </div>
         ))}
-
-        {/* Biometric Security */}
-        {bioSupported && (
-          <>
-            <p style={{fontSize:10, textTransform:'uppercase', letterSpacing:'0.15em',
-              color:'hsl(215 14% 30%)', fontWeight:700, marginBottom:12, marginTop:20}}>Security</p>
-            <div className="glass-card press"
-              style={{display:'flex', alignItems:'center', justifyContent:'space-between',
-                padding:'14px 16px', borderRadius:18, marginBottom:8}}>
-              <div style={{display:'flex', alignItems:'center', gap:12}}>
-                <div style={{width:38, height:38, borderRadius:13,
-                  background: bioEnabled ? 'hsl(155 45% 43%/0.12)' : 'hsl(215 25% 12%)',
-                  border:`1px solid ${bioEnabled ? 'hsl(155 45% 43%/0.3)' : 'hsl(215 22% 18%)'}`,
-                  display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                  <Fingerprint size={18} color={bioEnabled ? 'hsl(155 45% 50%)' : 'hsl(215 25% 48%)'}/>
-                </div>
-                <div>
-                  <p style={{fontSize:13, fontWeight:600, color:'hsl(215 18% 88%)'}}>
-                    Biometric Lock
-                  </p>
-                  <p style={{fontSize:10, color:'hsl(215 14% 38%)', marginTop:2}}>
-                    {bioEnabled ? 'App locked with fingerprint/face' : 'Lock app with fingerprint or face ID'}
-                  </p>
-                </div>
-              </div>
-              <Toggle on={bioEnabled} onToggle={async () => {
-                if (bioEnabled) {
-                  disableBiometric();
-                  toast({ title:'Biometric disabled', description:'App lock removed' });
-                } else {
-                  const ok = await enableBiometric();
-                  if (ok) toast({ title:'Biometric enabled! 🔐', description:'App will lock when you leave' });
-                  else    toast({ title:'Setup failed', description:'Biometric not available on this device', variant:'destructive' });
-                }
-              }}/>
-            </div>
-          </>
-        )}
 
         {/* Account */}
         <p style={{fontSize:10, textTransform:'uppercase', letterSpacing:'0.15em',
