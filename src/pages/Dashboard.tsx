@@ -10,7 +10,8 @@
   Pickaxe, Sparkles, Coins, Activity, TrendingDown
  } from 'lucide-react';
  import XIcon from '@/components/icons/XIcon';
-import { Users } from 'lucide-react';
+import DiscordIcon from '@/components/icons/DiscordIcon';
+import { COMMUNITY_LINKS } from '@/lib/communityLinks';
 import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect } from 'react';
 import ArenaBattleBanner from '@/components/arena/ArenaBattleBanner';
@@ -419,9 +420,9 @@ import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from 'rec
           <p className="text-xs text-muted-foreground text-center mb-3">Join our community</p>
           <div className="flex items-center justify-center gap-3">
             {[
-              { icon: Send, href: 'https://t.me/Arxonofficial', label: 'Telegram' },
-              { icon: XIcon, href: 'https://x.com/arxonarx', label: 'X' },
-              { icon: Users, href: 'https://discord.gg/7FXxFDTqwj', label: 'Discord' },
+              { icon: Send, href: COMMUNITY_LINKS.telegram.href, label: COMMUNITY_LINKS.telegram.label },
+              { icon: XIcon, href: COMMUNITY_LINKS.x.href, label: COMMUNITY_LINKS.x.label },
+              { icon: DiscordIcon, href: COMMUNITY_LINKS.discord.href, label: COMMUNITY_LINKS.discord.label },
             ].map((social) => (
               <motion.a
                 key={social.label}

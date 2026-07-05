@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import { COMMUNITY_LINKS } from '@/lib/communityLinks';
 
 const fadeUp = { hidden:{opacity:0,y:22}, show:{opacity:1,y:0,transition:{duration:0.48,ease:[0.25,0.46,0.45,0.94]}} };
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.07,delayChildren:0.15}} };
@@ -90,11 +91,11 @@ export default function MobileWallet() {
               Arxon Wallet is in development.{' '}
               On-chain ARX transfers and token bridging will be available soon.
             </p>
-            <a href="https://x.com/arxonchain" target="_blank" rel="noopener noreferrer"
+            <a href={COMMUNITY_LINKS.x.href} target="_blank" rel="noopener noreferrer"
               style={{display:'inline-flex',alignItems:'center',gap:6,padding:'10px 20px',borderRadius:14,
                 background:'hsl(38 55% 52%/0.1)',border:'1px solid hsl(38 55% 52%/0.3)',
                 color:'hsl(38 55% 58%)',fontSize:12,fontWeight:700,textDecoration:'none',cursor:'pointer'}}>
-              🐦 Follow @arxoninfra for launch updates
+              🐦 Follow {COMMUNITY_LINKS.x.handle} for launch updates
             </a>
           </div>
         </motion.div>

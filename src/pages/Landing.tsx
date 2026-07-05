@@ -16,6 +16,8 @@ import {
   TrendingUp,
 } from "lucide-react";
 import XIcon from "@/components/icons/XIcon";
+import DiscordIcon from "@/components/icons/DiscordIcon";
+import { COMMUNITY_LINKS } from "@/lib/communityLinks";
  import arxonLogo from "@/assets/arxon-logo-wide.svg";
 import { useState, useEffect, memo, useRef } from "react";
 
@@ -141,7 +143,7 @@ export default function Landing() {
   const features = [
     { icon: Zap, title: "Browser Mining", description: "Start mining with one click. No hardware needed — earn ARX-P directly from your browser, 24/7." },
     { icon: Gift, title: "Referral Rewards", description: "Earn 100 ARX-P per referral plus 5% lifetime boost on all their mining earnings." },
-    { icon: Target, title: "Daily Tasks", description: "Complete simple tasks like following @arxonarx on X and joining Discord for bonus ARX-P." },
+    { icon: Target, title: "Daily Tasks", description: "Complete simple tasks like following @arxoninfra on X and joining Discord for bonus ARX-P." },
     { icon: Trophy, title: "Arena Battles", description: "Stake your points in prediction markets. Win big from the pool when your side wins." },
     { icon: Send, title: "Nexus Transfers", description: "Send ARX-P to other users and earn 2.5 ARX-P boost to your mining rate per transaction." },
     { icon: TrendingUp, title: "Leaderboard", description: "Compete with thousands of miners. Top 100 get exclusive rewards and recognition." },
@@ -323,9 +325,9 @@ export default function Landing() {
               <span className="text-sm text-muted-foreground">© 2025 Arxon. All rights reserved.</span>
             </div>
             <div className="flex items-center gap-6">
-              <a href="https://t.me/Arxonofficial" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><Send className="h-5 w-5" /></a>
-              <a href="https://x.com/arxonarx" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><XIcon className="h-5 w-5" /></a>
-              <a href="https://discord.gg/7FXxFDTqwj" target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><Users className="h-5 w-5" /></a>
+              <a href={COMMUNITY_LINKS.telegram.href} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><Send className="h-5 w-5" /></a>
+              <a href={COMMUNITY_LINKS.x.href} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><XIcon className="h-5 w-5" /></a>
+              <a href={COMMUNITY_LINKS.discord.href} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><DiscordIcon className="h-5 w-5" /></a>
             </div>
             <div className="flex items-center gap-6 text-sm">
               <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Privacy</a>

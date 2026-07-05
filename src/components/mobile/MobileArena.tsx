@@ -11,9 +11,12 @@ import ArenaOnboarding from '@/components/arena/ArenaOnboarding';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
 import { useMobileNav } from '@/contexts/MobileNavContext';
+import { getArenaPoolStats } from '@/lib/arenaPoolStats';
+import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
 
 const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
+.pulse{animation:pulse 1.2s ease-in-out infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shimmer{0%{left:-100%}100%{left:200%}}
@@ -21,23 +24,8 @@ const CSS = `
 
 type ArenaSide = 'a' | 'b' | 'c';
 
-function getPoolStats(battle: { side_a_power?: number; side_b_power?: number; side_c_power?: number | null; side_c_name?: string | null }) {
-  const hasSideC = !!battle.side_c_name;
-  const powC = hasSideC ? Number(battle.side_c_power ?? 0) : 0;
-  const powA = Number(battle.side_a_power ?? 0);
-  const powB = Number(battle.side_b_power ?? 0);
-  const total = powA + powB + powC;
-  if (total <= 0) {
-    return { total: 0, pctA: hasSideC ? 33 : 50, pctB: hasSideC ? 33 : 50, pctC: hasSideC ? 34 : 0, hasSideC, powC };
-  }
-  return {
-    total,
-    pctA: Math.round((powA / total) * 100),
-    pctB: Math.round((powB / total) * 100),
-    pctC: hasSideC ? Math.round((powC / total) * 100) : 0,
-    hasSideC,
-    powC,
-  };
+function getPoolStats(battle: Parameters<typeof getArenaPoolStats>[0]) {
+  return getArenaPoolStats(battle);
 }
 
 function sideName(battle: { side_a_name: string; side_b_name: string; side_c_name?: string | null }, side: ArenaSide) {
@@ -136,6 +124,13 @@ function BattleCard({
                 {battle.description}
               </p>
             )}
+            <MobileAIPredictionBadge
+              sideAProbability={(battle as any).ai_side_a_probability}
+              sideBProbability={(battle as any).ai_side_b_probability}
+              sideAName={battle.side_a_name}
+              sideBName={battle.side_b_name}
+              confidence={(battle as any).ai_confidence}
+            />
           </div>
           <div style={{display:'flex',alignItems:'center',flexShrink:0}}>
             {isActive && (
@@ -236,12 +231,13 @@ function BattleCard({
 // plus castVote is the correct per-battle function from useArenaMarkets.
 // This prevents vote state from one battle leaking into other battles.
 function BattleDetail({
-  battle, isActive, battleUserVote, battleParticipants, voting, castVote, available, onClose
+  battle, isActive, battleUserVote, battleParticipants, loadingParticipants, voting, castVote, available, onClose
 }: {
   battle: ArenaBattle | BattleHistoryEntry;
   isActive?: boolean;
-  battleUserVote: any;           // the vote for THIS specific battle (or null)
-  battleParticipants: any[];     // participants for THIS specific battle
+  battleUserVote: any;
+  battleParticipants: any[];
+  loadingParticipants?: boolean;
   voting: boolean;
   castVote: (id:string, side:ArenaSide, amt:number) => Promise<boolean>;
   available: number;
@@ -309,6 +305,16 @@ function BattleDetail({
           {battle.description && (
             <p style={{fontSize:12,color:'hsl(215 18% 55%)',marginBottom:14,textAlign:'center'}}>{battle.description}</p>
           )}
+
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
+            <MobileAIPredictionBadge
+              sideAProbability={(battle as any).ai_side_a_probability}
+              sideBProbability={(battle as any).ai_side_b_probability}
+              sideAName={battle.side_a_name}
+              sideBName={battle.side_b_name}
+              confidence={(battle as any).ai_confidence}
+            />
+          </div>
 
           <div style={{display:'grid',gridTemplateColumns:'1fr 40px 1fr',gap:10,alignItems:'stretch',marginBottom:14}}>
             {/* Side A */}
@@ -449,7 +455,17 @@ function BattleDetail({
         )}
 
         {/* Live participants */}
-        {battleParticipants.length > 0 && (
+        {loadingParticipants && (
+          <>
+            <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.12em',color:'hsl(215 14% 30%)',fontWeight:700,marginBottom:10}}>
+              Live Stakers
+            </p>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ height: 52, borderRadius: 14, marginBottom: 7, background: 'hsl(215 22% 10%)', opacity: 1 - i * 0.2 }} />
+            ))}
+          </>
+        )}
+        {!loadingParticipants && battleParticipants.length > 0 && (
           <>
             <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.12em',color:'hsl(215 14% 30%)',fontWeight:700,marginBottom:10}}>
               Live Stakers ({battleParticipants.length})
@@ -811,6 +827,7 @@ export default function MobileArena() {
             isActive={isBattleActive}
             battleUserVote={userPositions.get(selectedBattle.id) ?? null}
             battleParticipants={battleParticipants}
+            loadingParticipants={loadingParticipants}
             voting={marketsVoting}
             castVote={castVoteForBattle}
             available={available}
