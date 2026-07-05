@@ -3,10 +3,9 @@ import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { ENVIRONMENT_TIERS } from './engine/environments';
 import { loadDepthWatchAssets } from './engine/assetLoader';
-import { generateLevel } from './engine/levelGenerator';
+import { generateLevel } from './engine/segmentGenerator';
 import {
-  activateCloak, createCloak, createParticles, createPlayer,
-  renderGame, updateGame, type GameSnapshot,
+  activateCloak, initSnapshot, renderGame, updateGame, type GameSnapshot,
 } from './engine/gameEngine';
 import { LEVEL_TRANSITION_MS, EXPOSURE_MAX } from './engine/constants';
 import { saveDepthWatchRun, unlockCharacter } from './data/supabaseScores';
@@ -65,26 +64,16 @@ export default function GameScreen({ characterId, onExit }: GameScreenProps) {
   const initLevel = useCallback((level: number, keepElapsed = false) => {
     const { w, h } = sizeRef.current;
     const layout = generateLevel(w, h, level);
-    const env = layout.tierId;
-    const tier = ENVIRONMENT_TIERS[env];
-    snapRef.current = {
-      level,
-      elapsed: keepElapsed ? (snapRef.current?.elapsed ?? 0) : 0,
-      exposure: 0,
-      cloak: createCloak(level),
-      player: createPlayer(characterId, layout.playerStart),
-      layout,
-      particles: createParticles(tier.particleKind),
-      phase: 'playing',
-      transitionTimer: 0,
-    };
-    setHud((h) => ({
-      ...h,
+    const snap = initSnapshot(level, layout, characterId, h);
+    if (keepElapsed && snapRef.current) snap.elapsed = snapRef.current.elapsed;
+    snapRef.current = snap;
+    setHud((prev) => ({
+      ...prev,
       level,
       exposure: 0,
       cloakCd: 0,
       cloakActive: false,
-      elapsed: keepElapsed ? h.elapsed : 0,
+      elapsed: keepElapsed ? prev.elapsed : 0,
     }));
   }, [characterId]);
 

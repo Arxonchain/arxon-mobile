@@ -58,3 +58,8 @@ export function coneAngleForLevel(level: number): number {
 export function cloakCooldownForLevel(level: number): number {
   return Math.max(CLOAK_COOLDOWN_MIN, CLOAK_COOLDOWN_BASE - level * 0.25);
 }
+
+export const WALK_SPEED = 130;
+export const RUN_SPEED = 225;
+export const RUN_THRESHOLD = 0.72;
+export const RUN_EXPOSURE_MUL = 1.18;
