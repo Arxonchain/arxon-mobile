@@ -4,19 +4,13 @@ import { BackendUnavailableError } from '@/lib/backendHealth';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from '@/hooks/use-toast';
+import { COMMUNITY_LINKS, SOCIAL_POST_REQUIRED_TERMS } from '@/lib/communityLinks';
 
 const SOCIAL_POST_POINTS = 50; // Points per quality post
 const SOCIAL_MINING_BOOST = 5; // +5 ARX-P/HR per quality post
 const MAX_QUALITY_POSTS = 2; // Maximum quality posts allowed per day
 
-// Required hashtags/mentions for a qualified post
-const REQUIRED_TERMS = [
-  '@arxonarx',
-  '#arxon',
-  '#arxonmining',
-  '#arxonchain',
-  'arxon'
-];
+const REQUIRED_TERMS = [...SOCIAL_POST_REQUIRED_TERMS];
 
 interface SocialSubmission {
   id: string;
@@ -198,7 +192,7 @@ export const useSocialSubmissions = () => {
         
         toast({
           title: "Post Not Qualified",
-          description: validationResult?.reason || "Post must mention @arxonarx, #arxon, #arxonmining, or #arxonchain to qualify",
+          description: validationResult?.reason || `Post must mention ${COMMUNITY_LINKS.x.handle}, #arxon, #arxonmining, or #arxonchain to qualify`,
           variant: "destructive"
         });
         return false;
