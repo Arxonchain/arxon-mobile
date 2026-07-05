@@ -10,14 +10,14 @@ export default function Joystick({ onMove, disabled }: JoystickProps) {
   const stickRef = useRef<HTMLDivElement>(null);
   const centerRef = useRef({ x: 0, y: 0 });
   const activeRef = useRef(false);
-  const maxR = 38;
+  const maxR = 42;
 
   const reset = useCallback(() => {
     activeRef.current = false;
     onMove(0, 0);
     if (stickRef.current) {
-      stickRef.current.style.left = '31px';
-      stickRef.current.style.top = '31px';
+      stickRef.current.style.left = '34px';
+      stickRef.current.style.top = '34px';
     }
   }, [onMove]);
 
@@ -31,8 +31,8 @@ export default function Joystick({ onMove, disabled }: JoystickProps) {
       dy = (dy / dist) * maxR;
     }
     if (stickRef.current) {
-      stickRef.current.style.left = `${31 + dx}px`;
-      stickRef.current.style.top = `${31 + dy}px`;
+      stickRef.current.style.left = `${34 + dx}px`;
+      stickRef.current.style.top = `${34 + dy}px`;
     }
     onMove(dx / maxR, dy / maxR);
   }, [disabled, onMove]);
@@ -50,9 +50,12 @@ export default function Joystick({ onMove, disabled }: JoystickProps) {
     <div
       ref={baseRef}
       style={{
-        position: 'absolute', bottom: 36, left: 28, width: 110, height: 110,
-        borderRadius: '50%', background: 'rgba(244,228,193,0.08)',
-        border: '2px solid rgba(244,228,193,0.25)', zIndex: 15, touchAction: 'none',
+        position: 'absolute', bottom: 32, left: 22, width: 120, height: 120,
+        borderRadius: '50%',
+        background: 'linear-gradient(180deg,rgba(255,255,255,0.18),rgba(0,0,0,0.35))',
+        border: '4px solid #fff',
+        boxShadow: '0 6px 0 rgba(0,0,0,0.35), inset 0 2px 8px rgba(255,255,255,0.15)',
+        zIndex: 15, touchAction: 'none',
         opacity: disabled ? 0.35 : 1,
       }}
       onTouchStart={(e) => { e.preventDefault(); onStart(e.touches[0].clientX, e.touches[0].clientY); }}
@@ -66,9 +69,11 @@ export default function Joystick({ onMove, disabled }: JoystickProps) {
       <div
         ref={stickRef}
         style={{
-          position: 'absolute', width: 48, height: 48, borderRadius: '50%',
-          background: 'rgba(127,231,196,0.5)', border: '2px solid #7FE7C4',
-          top: 31, left: 31, pointerEvents: 'none',
+          position: 'absolute', width: 52, height: 52, borderRadius: '50%',
+          background: 'linear-gradient(180deg,#7FE7C4,#4FD8EB)',
+          border: '3px solid #fff',
+          boxShadow: '0 4px 0 #2a9d8f',
+          top: 34, left: 34, pointerEvents: 'none',
         }}
       />
     </div>
