@@ -7,6 +7,7 @@ import { dispatchAppNavigate } from '@/lib/nativeNavigation';
 import {
   ARXON_NOTIF_CHANNEL,
   ARXON_NOTIF_SMALL_ICON,
+  ARXON_NOTIF_LARGE_ICON,
   isLocalNotificationsAvailable,
 } from '@/lib/nativeNotifications';
 
@@ -64,6 +65,7 @@ async function showNativeLocalNotification(title: string, body: string) {
         schedule: { at: new Date(Date.now() + 300) },
         sound: 'default',
         smallIcon: ARXON_NOTIF_SMALL_ICON,
+        largeIcon: ARXON_NOTIF_LARGE_ICON,
         channelId: ARXON_NOTIF_CHANNEL,
       }],
     });
