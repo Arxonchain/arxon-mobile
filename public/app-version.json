@@ -1,0 +1,7 @@
+{
+  "androidMinBuild": 10,
+  "iosMinBuild": 10,
+  "message": "A new version of Arxon is available. Please update to continue.",
+  "androidStoreUrl": "https://play.google.com/store/apps/details?id=xyz.arxonchain.app",
+  "iosStoreUrl": "https://apps.apple.com/app/id0000000000"
+}
