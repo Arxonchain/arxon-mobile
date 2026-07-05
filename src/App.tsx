@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -62,6 +62,11 @@ import PushNavListener from "@/components/system/PushNavListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
+import { DEPTH_WATCH_ENABLED } from "@/lib/depthWatchFeature";
+
+const DepthWatchPage = DEPTH_WATCH_ENABLED
+  ? lazy(() => import("@/features/depth-watch/DepthWatchPage"))
+  : null;
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -185,6 +190,15 @@ function AppRoutes() {
             <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
             <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            {DEPTH_WATCH_ENABLED && DepthWatchPage && (
+              <Route path="/depth-watch" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<Spinner />}>
+                    <DepthWatchPage />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+            )}
           </>
         ) : (
           <>

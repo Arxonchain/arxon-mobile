@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:dev": "vite build --mode development",
+    "build:depth-watch": "vite build --mode depth-watch",
+    "dev:depth-watch": "vite --mode depth-watch",
     "cap:sync": "npx cap sync android",
     "lint": "eslint .",
     "preview": "vite preview"
