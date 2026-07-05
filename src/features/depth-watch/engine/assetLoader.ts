@@ -1,8 +1,8 @@
-import patrolSprite from '@/assets/depth-watch/agents/agent_patrol_flashlight_RAW.png';
-import alertSprite from '@/assets/depth-watch/agents/agent_alert_cutlass_RAW.png';
+import patrolSprite from '@/assets/depth-watch/agents/agent_patrol_flashlight.png';
+import alertSprite from '@/assets/depth-watch/agents/agent_alert_cutlass.png';
 import chaseSprite from '@/assets/depth-watch/agents/agent_chase_headlamp_RAW.png';
 import towerSprite from '@/assets/depth-watch/agents/agent_tower_security_RAW.png';
-import droneSprite from '@/assets/depth-watch/agents/agent_drone_RAW.png';
+import droneSprite from '@/assets/depth-watch/agents/agent_drone.png';
 
 import { DEPTH_WATCH_CHARACTERS } from '../data/characters';
 import { loadProcessedSprite } from './spriteProcessing';
