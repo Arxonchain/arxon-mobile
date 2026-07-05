@@ -35,6 +35,12 @@
 
         </activity>
 
+        <!-- Native biometric prompt activity (@capgo/capacitor-native-biometric) -->
+        <activity
+            android:name="ee.forgr.biometric.AuthActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme.Transparent" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"

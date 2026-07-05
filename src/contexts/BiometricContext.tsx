@@ -4,6 +4,11 @@
  */
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
+import {
+  BiometryType,
+  type AvailableResult,
+  type BiometricOptions,
+} from '@capgo/capacitor-native-biometric';
 
 const LOCK_KEY   = 'arxon_biometric_enabled';
 const LOCKED_KEY = 'arxon_app_locked';
@@ -21,6 +26,32 @@ type BiometricContextValue = {
 
 const BiometricContext = createContext<BiometricContextValue | null>(null);
 
+const VERIFY_OPTIONS: BiometricOptions = {
+  title: 'App Locked',
+  subtitle: 'Use fingerprint or face ID',
+  description: 'Confirm your identity to unlock Arxon',
+  negativeButtonText: 'Cancel',
+  maxAttempts: 3,
+  allowedBiometryTypes: [
+    BiometryType.FINGERPRINT,
+    BiometryType.FACE_AUTHENTICATION,
+    BiometryType.IRIS_AUTHENTICATION,
+  ],
+};
+
+const ENABLE_OPTIONS: BiometricOptions = {
+  title: 'Enable Biometric Lock',
+  subtitle: 'Confirm your identity',
+  description: 'Use fingerprint or face ID to lock the app when you switch away',
+  negativeButtonText: 'Cancel',
+  maxAttempts: 3,
+  allowedBiometryTypes: [
+    BiometryType.FINGERPRINT,
+    BiometryType.FACE_AUTHENTICATION,
+    BiometryType.IRIS_AUTHENTICATION,
+  ],
+};
+
 function clearLockState() {
   try {
     localStorage.removeItem(LOCK_KEY);
@@ -31,6 +62,17 @@ function clearLockState() {
 function isPluginError(e: unknown): boolean {
   const msg = String((e as Error)?.message || e || '').toLowerCase();
   return msg.includes('not implemented') || msg.includes('nativebiometric');
+}
+
+/** Android: isAvailable(useFallback:true) can be true for PIN-only — verifyIdentity still needs biometrics. */
+function hasEnrolledBiometric(result: AvailableResult): boolean {
+  if (!result.isAvailable) return false;
+  if (result.strongBiometryIsAvailable) return true;
+  const t = result.biometryType;
+  return t === BiometryType.FINGERPRINT
+    || t === BiometryType.FACE_AUTHENTICATION
+    || t === BiometryType.IRIS_AUTHENTICATION
+    || t === BiometryType.MULTIPLE;
 }
 
 async function callNative<T>(fn: (NB: typeof import('@capgo/capacitor-native-biometric').NativeBiometric) => Promise<T>): Promise<T | null> {
@@ -60,12 +102,12 @@ function BiometricProviderInner({ children }: { children: ReactNode }) {
       setSupported(false);
       return false;
     }
-    const result = await callNative(NB => NB.isAvailable({ useFallback: true }));
+    const result = await callNative(NB => NB.isAvailable({ useFallback: false }));
     if (!result) {
       setSupported(false);
       return false;
     }
-    const ok = !!result.isAvailable;
+    const ok = hasEnrolledBiometric(result);
     setSupported(ok);
     if (!ok) {
       clearLockState();
@@ -95,22 +137,14 @@ function BiometricProviderInner({ children }: { children: ReactNode }) {
     setChecking(true);
     try {
       const ok = await callNative(NB =>
-        NB.verifyIdentity({
-          reason: 'Unlock the Arxon app',
-          title: 'App Locked',
-          subtitle: 'Use fingerprint or face ID',
-        }).then(() => true),
+        NB.verifyIdentity(VERIFY_OPTIONS).then(() => true),
       );
       if (ok) {
         setLocked(false);
         sessionStorage.removeItem(LOCKED_KEY);
         return true;
       }
-      // Plugin missing or verify failed — don't brick the app
-      clearLockState();
-      setEnabled(false);
-      setLocked(false);
-      return true;
+      return false;
     } finally {
       setChecking(false);
     }
@@ -122,11 +156,7 @@ function BiometricProviderInner({ children }: { children: ReactNode }) {
     if (!available) return false;
 
     const ok = await callNative(NB =>
-      NB.verifyIdentity({
-        reason: 'Enable biometric lock for Arxon',
-        title: 'Enable Biometric Lock',
-        subtitle: 'Confirm your identity',
-      }).then(() => true),
+      NB.verifyIdentity(ENABLE_OPTIONS).then(() => true),
     );
     if (!ok) return false;
 
