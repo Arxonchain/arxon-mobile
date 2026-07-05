@@ -4,14 +4,13 @@
  * FIX BUG-34: Referral link always uses arxonchain.xyz
  * FIX ENH-04: Proper empty state with Share CTA
  */
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Copy, Share2, Users, Activity, UserX, Gift, Zap } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
 const CSS = `
@@ -60,20 +59,6 @@ const Referrals = () => {
       toast({ title: '✓ Link Copied!', description: 'Referral link copied to clipboard' });
     }
   };
-
-  // ENH-10: Realtime subscription so new referrals appear instantly
-  useEffect(() => {
-    if (!user) return;
-    const channel = (supabase as any)
-      .channel('referrals-realtime')
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public', table: 'referrals',
-        filter: `referrer_id=eq.${user.id}`,
-      }, () => { /* useReferrals hook refreshes automatically */ })
-      .subscribe();
-    return () => { (supabase as any).removeChannel(channel); };
-  }, [user]);
-
   const statCards = [
     { icon: <Users   size={18}/>, label: 'Total Referrals', value: stats.totalReferrals, col: 'hsl(215 35% 62%)' },
     { icon: <Activity size={18}/>, label: 'Active Miners',  value: stats.activeMiners,   col: 'hsl(155 45% 50%)' },

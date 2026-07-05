@@ -56,14 +56,12 @@ import MobileProfile from "@/components/mobile/MobileProfile";
 import MobileWallet from "@/components/mobile/MobileWallet";
 import MobileSettings from "@/components/mobile/MobileSettings";
 import PublicProfile from "@/pages/PublicProfile";
-import BiometricGate from "@/components/mobile/BiometricLockScreen";
 import MobileSplash from "@/components/mobile/MobileSplash";
 import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
-import { BiometricProvider } from "@/contexts/BiometricContext";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -97,7 +95,7 @@ class AppErrorBoundary extends React.Component<
           <p style={{ fontSize: 12, color: 'hsl(215 14% 40%)', marginBottom: 24, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
             {this.state.error?.message || 'Unexpected runtime error'}
           </p>
-          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.hash = '#/'; window.location.reload(); }}
+          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.hash = '#/'; }}
             style={{ padding: '12px 28px', borderRadius: 14, background: 'hsl(215 35% 62%/0.15)', border: '1px solid hsl(215 35% 62%/0.35)', color: 'hsl(215 35% 72%)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
             Reload App
           </button>
@@ -181,7 +179,7 @@ function AppRoutes() {
             <Route path="/leaderboard"  element={<MobileLeaderboard />} />
             <Route path="/nexus"        element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
             <Route path="/profile"      element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
-            <Route path="/wallet"       element={<MobileWallet />} />
+            <Route path="/wallet"       element={<ProtectedRoute><MobileWallet /></ProtectedRoute>} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
             <Route path="/tasks"        element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
             <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
@@ -227,11 +225,7 @@ function App() {
               <AppUpdateOverlay />
               <RouterShell>
                 <MobileNavProvider>
-                  <BiometricProvider>
-                    <BiometricGate>
-                      <AppRoutes />
-                    </BiometricGate>
-                  </BiometricProvider>
+                  <AppRoutes />
                 </MobileNavProvider>
               </RouterShell>
             </TooltipProvider>

@@ -381,11 +381,21 @@ export default function MobileDashboard() {
   }, [user, isMining]);
 
   const quickItems = [
-    { id:'arena',    label:'Arena',     path:'/arena',    icon:<path d="M14.5 17.5L3 6V3h3l11.5 11.5"/>, icon2:<><circle cx="19" cy="19" r="2"/><circle cx="5" cy="5" r="2"/></> },
-    { id:'nexus',    label:'Nexus',     path:'/nexus',    icon:<><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></> },
-    { id:'tasks',    label:'Tasks',     path:'/tasks',    icon:<><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></> },
-    { id:'referrals',label:'Referrals', path:'/referrals',icon:<><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></> },
-    { id:'wallet',   label:'Wallet',    path:'/wallet',   icon:<><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 11h20"/><circle cx="17" cy="15.5" r="1.5" fill="currentColor"/></> },
+    { id:'arena', label:'Arena', path:'/arena',
+      col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.12)', bd:'hsl(255 50% 65%/0.22)',
+      icon:<><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M9.5 17.5L21 6V3h-3L9.5 14.5"/></> },
+    { id:'nexus', label:'Nexus', path:'/nexus',
+      col:'hsl(215 55% 62%)', bg:'hsl(215 55% 62%/0.12)', bd:'hsl(215 55% 62%/0.22)',
+      icon:<><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></> },
+    { id:'tasks', label:'Tasks', path:'/tasks',
+      col:'hsl(155 45% 50%)', bg:'hsl(155 45% 43%/0.12)', bd:'hsl(155 45% 43%/0.22)',
+      icon:<><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></> },
+    { id:'referrals', label:'Referrals', path:'/referrals',
+      col:'hsl(38 55% 52%)', bg:'hsl(38 55% 52%/0.12)', bd:'hsl(38 55% 52%/0.22)',
+      icon:<><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></> },
+    { id:'wallet', label:'Wallet', path:'/wallet',
+      col:'hsl(215 14% 50%)', bg:'hsl(215 14% 50%/0.08)', bd:'hsl(215 14% 50%/0.18)',
+      icon:<><rect x="2" y="6" width="20" height="14" rx="3"/><path d="M2 11h20"/><circle cx="17" cy="15.5" r="1.5" fill="currentColor"/></> },
   ];
 
   // ENH-18: Pause mining animations when app is in background to save battery
@@ -613,12 +623,12 @@ export default function MobileDashboard() {
                   border:'1px solid hsl(215 28% 20%/0.4)'}}>
                 <div style={{position:'relative'}}>
                   <div style={{width:42,height:42,borderRadius:13,
-                    background:'hsl(215 35% 62%/0.1)',
-                    border:'1px solid hsl(215 35% 62%/0.18)',
+                    background:item.bg,
+                    border:`1px solid ${item.bd}`,
                     display:'flex',alignItems:'center',justifyContent:'center',
-                    color:'hsl(215 35% 62%)'}}>
+                    color:item.col}}>
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">
-                      {item.icon}{item.icon2}
+                      {item.icon}
                     </svg>
                   </div>
                   {item.id === 'wallet' && (
@@ -666,10 +676,6 @@ export default function MobileDashboard() {
             </button>
           </div>
           <div className="scrollbar-none" style={{display:'flex',gap:12,overflowX:'auto',paddingBottom:4,WebkitOverflowScrolling:'touch',touchAction:'pan-x'}}>
-            {false && !dashBattles.length && [0,1,2].map(i=>(
-              <div key={i} style={{minWidth:200,height:155,borderRadius:20,flexShrink:0,
-                background:'hsl(215 22% 9%)',border:'1px solid hsl(215 22% 13%)'}}/>
-            ))}
             {dashBattles.map((battle:any)=>{
               const { pctA, pctB, pctC, hasSideC } = getArenaPoolStats(battle);
               const isLive=battle._live||battle.status==='active';
@@ -735,7 +741,7 @@ export default function MobileDashboard() {
                 </motion.div>
               );
             })}
-            {!false&&dashBattles.length===0&&(
+            {dashBattles.length===0&&(
               <div style={{minWidth:180,height:130,borderRadius:20,flexShrink:0,opacity:0.5,
                 border:'1px dashed hsl(215 25% 18%)',display:'flex',flexDirection:'column',
                 alignItems:'center',justifyContent:'center',gap:7,background:'hsl(225 28% 6%)'}}>

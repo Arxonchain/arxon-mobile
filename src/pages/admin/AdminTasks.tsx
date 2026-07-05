@@ -220,7 +220,7 @@ export default function AdminTasks() {
               <Input id="url" value={form.external_url}
                 onChange={e => setForm(f => ({ ...f, external_url: e.target.value }))}
                 placeholder={form.task_type === "social"
-                  ? "https://x.com/arxonchain/status/..." : "https://youtube.com/watch?v=..."}
+                  ? "https://x.com/arxoninfra/status/..." : "https://youtube.com/watch?v=..."}
                 className="pr-10" />
               <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
                 {form.task_type === "social" ? <Twitter className="h-4 w-4" /> : <Youtube className="h-4 w-4" />}
