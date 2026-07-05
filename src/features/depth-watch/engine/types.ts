@@ -15,6 +15,23 @@ export interface Obstacle {
   h: number;
 }
 
+export interface CoverObstacle extends Obstacle {
+  isCover?: boolean;
+  coverNorth?: boolean;
+  coverSouth?: boolean;
+  coverEast?: boolean;
+  coverWest?: boolean;
+}
+
+export interface LevelSegment {
+  id: string;
+  kind: 'straight' | 'turn_left' | 'turn_right' | 'junction' | 'open' | 'room' | 'alcove';
+  worldY: number;
+  height: number;
+  pathCenterX: number;
+  pathWidth: number;
+}
+
 export interface Portal {
   x: number;
   y: number;
@@ -25,8 +42,15 @@ export interface PlayerEntity {
   x: number;
   y: number;
   r: number;
-  speed: number;
-  angle: number;
+  walkSpeed: number;
+  runSpeed: number;
+  facingRight: boolean;
+  moving: boolean;
+  running: boolean;
+  hiding: boolean;
+  hideSide: 'north' | 'south' | 'east' | 'west' | null;
+  coverRef: CoverObstacle | null;
+  moveMag: number;
   characterId: string;
 }
 
@@ -54,6 +78,7 @@ export interface BaseAgent {
   lastSeenX: number;
   lastSeenY: number;
   partialTimer: number;
+  facingRight: boolean;
 }
 
 export interface TowerEnemy {
@@ -88,13 +113,16 @@ export interface Particle {
 }
 
 export interface LevelLayout {
-  obstacles: Obstacle[];
+  obstacles: CoverObstacle[];
   enemies: EnemyEntity[];
   portal: Portal;
   playerStart: Vec2;
   tierId: EnvironmentTierId;
   level: number;
   flavorText: string;
+  worldWidth: number;
+  worldHeight: number;
+  segments: LevelSegment[];
 }
 
 export type EnvironmentTierId = 'tier1' | 'tier1b' | 'tier2' | 'tier2b';
