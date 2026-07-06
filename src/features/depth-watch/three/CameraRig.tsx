@@ -2,14 +2,26 @@ import { useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
-export function CameraRig({ target }: { target: THREE.Vector3 }) {
+/** CODM-style third-person follow — camera trails behind movement facing. */
+export function CameraRig({
+  target,
+  yawRef,
+}: {
+  target: THREE.Vector3;
+  yawRef: React.MutableRefObject<number>;
+}) {
   const { camera } = useThree();
   const look = useRef(new THREE.Vector3());
+  const dist = 7.5;
+  const height = 3.2;
 
   useFrame(() => {
-    const ideal = new THREE.Vector3(target.x * 0.25, 6.2, target.z + 9.5);
-    camera.position.lerp(ideal, 0.08);
-    look.current.set(target.x * 0.15, 1.4, target.z - 14);
+    const yaw = yawRef.current;
+    const idealX = target.x - Math.sin(yaw) * dist;
+    const idealZ = target.z - Math.cos(yaw) * dist;
+    const ideal = new THREE.Vector3(idealX, target.y + height, idealZ);
+    camera.position.lerp(ideal, 0.09);
+    look.current.set(target.x, target.y + 0.4, target.z + Math.cos(yaw) * 4);
     camera.lookAt(look.current);
   });
 

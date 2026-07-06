@@ -2,10 +2,12 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { ArrowLeft } from 'lucide-react';
 import { DepthWatchScene, type HudSnapshot } from './three/DepthWatchScene';
-import { activateCloak3D, createGameState, type GameState3D, type Input3D } from './three/gameState';
+import { activateShield, createGameState, type GameState3D, type Input3D } from './three/gameState';
+import { preloadDepthWatchModels } from './three/models/modelRegistry';
 import SubwayHUD from './ui/SubwayHUD';
 import Joystick from './ui/Joystick';
-import CloakButton from './ui/CloakButton';
+import JumpButton from './ui/JumpButton';
+import ShieldButton from './ui/ShieldButton';
 import { saveDepthWatchRun, unlockCharacter } from './data/supabaseScores';
 import { DEPTH_WATCH_CHARACTERS } from './data/characters';
 import { useAuth } from '@/contexts/AuthContext';
@@ -17,18 +19,27 @@ interface GameScreen3DProps {
 
 type Phase = 'menu' | 'playing' | 'caught' | 'won';
 
+const defaultInput = (): Input3D => ({
+  x: 0, y: 0, jump: false, crouch: false, cameraYaw: Math.PI, jumpPressed: false,
+});
+
 export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps) {
   const { user } = useAuth();
   const gameRef = useRef<GameState3D>(createGameState(1, characterId));
-  const inputRef = useRef<Input3D>({ x: 0, y: 0 });
+  const inputRef = useRef<Input3D>(defaultInput());
   const [phase, setPhase] = useState<Phase>('menu');
   const [hud, setHud] = useState<HudSnapshot>({
-    level: 1, elapsed: 0, exposure: 0, cloakActive: false, cloakCooldown: 0, hiding: false, running: false,
+    level: 1, elapsed: 0, exposure: 0, shieldActive: false, shieldCharges: 0,
+    coins: 0, coinsRequired: 5, hiding: false, running: false, climbing: false,
   });
+
+  useEffect(() => {
+    preloadDepthWatchModels();
+  }, []);
 
   const startRun = useCallback(() => {
     gameRef.current = createGameState(1, characterId);
-    inputRef.current = { x: 0, y: 0 };
+    inputRef.current = defaultInput();
     setPhase('playing');
   }, [characterId]);
 
@@ -55,6 +66,7 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
       } else {
         gameRef.current = createGameState(next, characterId);
         gameRef.current.elapsed = s.elapsed;
+        inputRef.current = defaultInput();
         setPhase('playing');
       }
     }
@@ -72,7 +84,7 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
       fontFamily: "'Creato Display',system-ui,sans-serif", touchAction: 'none',
     }}>
       {playing && (
-        <Canvas shadows camera={{ position: [0, 8, 12], fov: 52, near: 0.1, far: 150 }} style={{ touchAction: 'none' }}>
+        <Canvas shadows camera={{ position: [0, 8, 12], fov: 55, near: 0.1, far: 200 }} style={{ touchAction: 'none' }}>
           <Suspense fallback={null}>
             <DepthWatchScene
               gameRef={gameRef}
@@ -90,30 +102,60 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
             level={hud.level}
             elapsed={hud.elapsed}
             exposure={hud.exposure}
+            coins={hud.coins}
+            coinsRequired={hud.coinsRequired}
             hiding={hud.hiding}
             running={hud.running}
+            climbing={hud.climbing}
             onBack={onExit}
           />
           <Joystick
             disabled={false}
-            onMove={(x, y) => { inputRef.current = { x, y }; }}
+            onMove={(x, y) => {
+              inputRef.current.x = x;
+              inputRef.current.y = y;
+              inputRef.current.crouch = y < -0.4;
+            }}
           />
-          <CloakButton
-            active={hud.cloakActive}
-            cooldown={hud.cloakCooldown}
-            onActivate={() => activateCloak3D(gameRef.current)}
+          <JumpButton
+            onDown={() => { inputRef.current.jump = true; }}
+            onUp={() => { inputRef.current.jump = false; }}
+          />
+          <ShieldButton
+            active={hud.shieldActive}
+            charges={hud.shieldCharges}
+            onActivate={() => activateShield(gameRef.current)}
           />
         </>
       )}
 
       {phase === 'menu' && (
-        <Overlay title="DEPTH WATCH" subtitle="Auto-run stealth — swipe lanes, duck behind cover, reach the portal." action="START RUN" onAction={startRun} onBack={onExit} />
+        <Overlay
+          title="DEPTH WATCH"
+          subtitle="Infiltrate the compound — collect gold, dodge drones & spotlights, climb cover, reach the vault."
+          action="START HEIST"
+          onAction={startRun}
+          onBack={onExit}
+        />
       )}
       {phase === 'caught' && (
-        <Overlay title="EXPOSED!" subtitle={`Sector ${hud.level} — the Ledger got you.`} action="TRY AGAIN" onAction={startRun} onBack={onExit} danger />
+        <Overlay
+          title="EXPOSED!"
+          subtitle={`Sector ${hud.level} — surveillance caught you.`}
+          action="TRY AGAIN"
+          onAction={startRun}
+          onBack={onExit}
+          danger
+        />
       )}
       {phase === 'won' && (
-        <Overlay title="EXTRACTED!" subtitle="Clean run. More sectors coming soon." action="PLAY AGAIN" onAction={startRun} onBack={onExit} />
+        <Overlay
+          title="VAULT BREACHED!"
+          subtitle={`${hud.coins} gold secured. Deeper sectors await.`}
+          action="NEXT SECTOR"
+          onAction={startRun}
+          onBack={onExit}
+        />
       )}
     </div>
   );
@@ -138,7 +180,7 @@ function Overlay({ title, subtitle, action, onAction, onBack, danger }: {
         color: danger ? '#ff6b4a' : '#7FE7C4',
         textShadow: '0 3px 0 rgba(0,0,0,0.4)',
       }}>{title}</h1>
-      <p style={{ color: '#e2e8f0', textAlign: 'center', lineHeight: 1.5, marginBottom: 28 }}>{subtitle}</p>
+      <p style={{ color: '#e2e8f0', textAlign: 'center', lineHeight: 1.5, marginBottom: 28, maxWidth: 320 }}>{subtitle}</p>
       <button type="button" onClick={onAction} style={{
         padding: '16px 40px', borderRadius: 28, border: '3px solid #fff',
         background: 'linear-gradient(180deg,#ff6b35,#e8542a)', boxShadow: '0 6px 0 #b8381a',
