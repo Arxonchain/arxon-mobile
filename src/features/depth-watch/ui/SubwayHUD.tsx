@@ -5,8 +5,11 @@ interface SubwayHUDProps {
   level: number;
   elapsed: number;
   exposure: number;
+  coins: number;
+  coinsRequired: number;
   hiding: boolean;
   running: boolean;
+  climbing: boolean;
   onBack: () => void;
 }
 
@@ -16,7 +19,9 @@ function formatTime(t: number): string {
   return `${m}:${s}`;
 }
 
-export default function SubwayHUD({ level, elapsed, exposure, hiding, running, onBack }: SubwayHUDProps) {
+export default function SubwayHUD({
+  level, elapsed, exposure, coins, coinsRequired, hiding, running, climbing, onBack,
+}: SubwayHUDProps) {
   const pct = Math.min(100, (exposure / EXPOSURE_MAX) * 100);
   const hot = pct > 60;
 
@@ -55,6 +60,29 @@ export default function SubwayHUD({ level, elapsed, exposure, hiding, running, o
       </div>
 
       <div style={{
+        display: 'flex', gap: 8, marginBottom: 8,
+      }}>
+        <div style={{
+          flex: 1, background: 'rgba(0,0,0,0.45)', borderRadius: 14, padding: '6px 12px',
+          border: '2px solid rgba(255,215,0,0.35)', display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 18 }}>🪙</span>
+          <span style={{ fontSize: 14, fontWeight: 900, color: '#ffd93d' }}>
+            {coins} / {coinsRequired}
+          </span>
+        </div>
+        {(hiding || climbing) && (
+          <div style={{
+            padding: '6px 12px', borderRadius: 14, background: 'rgba(127,231,196,0.15)',
+            border: '2px solid #7FE7C4', fontSize: 10, fontWeight: 800, color: '#7FE7C4',
+            display: 'flex', alignItems: 'center',
+          }}>
+            {climbing ? 'CLIMBING' : 'HIDDEN'}
+          </div>
+        )}
+      </div>
+
+      <div style={{
         background: 'rgba(0,0,0,0.45)', borderRadius: 16, padding: '8px 12px',
         border: '2px solid rgba(255,255,255,0.25)',
       }}>
@@ -62,9 +90,6 @@ export default function SubwayHUD({ level, elapsed, exposure, hiding, running, o
           <span style={{ fontSize: 10, fontWeight: 800, color: hot ? '#ff6b4a' : '#7FE7C4', letterSpacing: 1.2 }}>
             SIGNAL EXPOSURE
           </span>
-          {hiding && (
-            <span style={{ fontSize: 10, fontWeight: 800, color: '#7FE7C4' }}>IN COVER</span>
-          )}
           {running && !hiding && (
             <span style={{ fontSize: 10, fontWeight: 800, color: '#ffd93d' }}>SPRINT</span>
           )}

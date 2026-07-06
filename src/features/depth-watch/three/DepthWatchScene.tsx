@@ -2,12 +2,13 @@ import { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { Sky } from '@react-three/drei';
-import { World, ExtractionPortal } from './World';
+import { ArenaWorld } from './arena/ArenaWorld';
 import { RainFX } from './RainFX';
-import { PlayerAvatar } from './PlayerAvatar';
-import { Agent3D } from './Agent3D';
+import { AgentGlb } from './entities/AgentGlb';
+import { Drone3D } from './entities/Drone3D';
+import { Pickups3D, VaultGoal } from './entities/Pickups3D';
+import { PlayerGlb } from './entities/PlayerGlb';
 import { CameraRig } from './CameraRig';
-import { paletteForTier } from './worldLayout';
 import { stepGame, type GameState3D, type Input3D } from './gameState';
 
 interface DepthWatchSceneProps {
@@ -21,26 +22,38 @@ export interface HudSnapshot {
   level: number;
   elapsed: number;
   exposure: number;
-  cloakActive: boolean;
-  cloakCooldown: number;
+  shieldActive: boolean;
+  shieldCharges: number;
+  coins: number;
+  coinsRequired: number;
   hiding: boolean;
   running: boolean;
+  climbing: boolean;
 }
 
+const SKY = {
+  day: { bg: '#87CEEB', fog: '#b8d4e8' },
+  dusk: { bg: '#e8956d', fog: '#c97b5a' },
+  night: { bg: '#0f1419', fog: '#1a2332' },
+};
+
 export function DepthWatchScene({ gameRef, inputRef, onHud, onEnd }: DepthWatchSceneProps) {
-  const playerGroup = useRef<THREE.Group>(null);
+  const playerRoot = useRef<THREE.Group>(null);
   const target = useMemo(() => new THREE.Vector3(), []);
+  const cameraYaw = useRef(Math.PI);
   const hudTick = useRef(0);
 
   useFrame((_, dt) => {
     const state = gameRef.current;
-    const result = stepGame(state, inputRef.current, Math.min(dt, 0.05));
+    const input = { ...inputRef.current, cameraYaw: cameraYaw.current };
+    const result = stepGame(state, input, Math.min(dt, 0.05));
+    const p = state.player;
 
-    if (playerGroup.current) {
-      playerGroup.current.position.set(state.px, 0, state.pz);
-      playerGroup.current.rotation.y = state.facingRight ? 0 : Math.PI;
+    if (playerRoot.current) {
+      playerRoot.current.position.set(p.px, p.py, p.pz);
     }
-    target.set(state.px, 0, state.pz);
+    target.set(p.px, p.py + 1.2, p.pz);
+    cameraYaw.current = p.facing;
 
     hudTick.current += dt;
     if (hudTick.current > 0.08) {
@@ -49,10 +62,13 @@ export function DepthWatchScene({ gameRef, inputRef, onHud, onEnd }: DepthWatchS
         level: state.level,
         elapsed: state.elapsed,
         exposure: state.exposure,
-        cloakActive: state.cloakActive,
-        cloakCooldown: state.cloakCooldown,
-        hiding: state.hiding,
-        running: state.running,
+        shieldActive: state.shieldActive,
+        shieldCharges: state.shieldCharges,
+        coins: state.coins,
+        coinsRequired: state.layout.coinsRequired,
+        hiding: p.hiding,
+        running: p.running,
+        climbing: p.climbing,
       });
     }
 
@@ -60,46 +76,51 @@ export function DepthWatchScene({ gameRef, inputRef, onHud, onEnd }: DepthWatchS
   });
 
   const layout = gameRef.current.layout;
-  const pal = paletteForTier(layout.tier);
-  const rain = layout.tier === 'night' || layout.tier === 'dusk';
+  const sky = SKY[layout.tier];
+  const rain = layout.tier !== 'day';
 
   return (
     <>
-      <color attach="background" args={[pal.sky]} />
-      <fog attach="fog" args={[pal.fog, 20, rain ? 70 : 85]} />
+      <color attach="background" args={[sky.bg]} />
+      <fog attach="fog" args={[sky.fog, 28, 95]} />
       <Sky
         distance={450000}
-        sunPosition={layout.tier === 'night' ? [0.2, 0.05, -0.3] : [0.5, 0.35, -0.5]}
-        inclination={layout.tier === 'night' ? 0.35 : 0.52}
-        azimuth={0.25}
+        sunPosition={layout.tier === 'night' ? [0.15, 0.04, -0.2] : [0.5, 0.4, -0.4]}
+        inclination={layout.tier === 'night' ? 0.3 : 0.52}
+        azimuth={0.22}
       />
-      <ambientLight intensity={layout.tier === 'night' ? 0.18 : layout.tier === 'dusk' ? 0.35 : 0.55} />
+      <ambientLight intensity={layout.tier === 'night' ? 0.22 : layout.tier === 'dusk' ? 0.38 : 0.55} />
       <directionalLight
         castShadow
-        position={[12, 22, 8]}
-        intensity={layout.tier === 'night' ? 0.25 : layout.tier === 'dusk' ? 0.65 : 1.1}
+        position={[18, 28, 12]}
+        intensity={layout.tier === 'night' ? 0.3 : 0.95}
         shadow-mapSize={[1024, 1024]}
+        shadow-camera-far={80}
+        shadow-camera-left={-40}
+        shadow-camera-right={40}
+        shadow-camera-top={40}
+        shadow-camera-bottom={-40}
       />
-      <hemisphereLight
-        args={[layout.tier === 'night' ? '#1a2332' : pal.sky, pal.grass, layout.tier === 'night' ? 0.2 : 0.35]}
-      />
+      <hemisphereLight args={[sky.bg, '#2d4a32', layout.tier === 'night' ? 0.25 : 0.4]} />
 
-      <RainFX active={rain} length={layout.length} />
+      <RainFX active={rain} length={layout.half * 2} />
 
-      <World layout={layout} />
-      <ExtractionPortal z={layout.portalZ} />
+      <ArenaWorld layout={layout} />
+      <Pickups3D pickups={layout.pickups} />
+      <VaultGoal x={layout.vault.x} z={layout.vault.z} />
 
       {layout.agents.map((a) => (
-        <Agent3D key={a.id} agent={a} />
+        <AgentGlb key={a.id} agent={a} />
+      ))}
+      {layout.drones.map((d) => (
+        <Drone3D key={d.id} drone={d} />
       ))}
 
-      <PlayerAvatar
-        groupRef={playerGroup}
-        gameRef={gameRef}
-        characterId={gameRef.current.characterId}
-      />
+      <group ref={playerRoot}>
+        <PlayerGlb gameRef={gameRef} />
+      </group>
 
-      <CameraRig target={target} />
+      <CameraRig target={target} yawRef={cameraYaw} />
     </>
   );
 }
