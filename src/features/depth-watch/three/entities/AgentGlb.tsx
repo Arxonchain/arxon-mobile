@@ -2,8 +2,8 @@ import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { ArenaAgent } from '../arena/arenaLayout';
-import { agentModelKey } from '../models/modelRegistry';
-import { GlbCharacter, type AnimState } from './GlbCharacter';
+import { AGENT_CLIPS } from '../models/modelRegistry';
+import { AnimatedCharacter } from './AnimatedCharacter';
 
 function SpotCone({ danger }: { danger: boolean }) {
   return (
@@ -22,15 +22,16 @@ function SpotCone({ danger }: { danger: boolean }) {
 
 export function AgentGlb({ agent }: { agent: ArenaAgent }) {
   const group = useRef<THREE.Group>(null);
-  const danger = agent.state === 'chase';
-  const modelKey = agentModelKey(agent.modelIndex);
-  const anim: AnimState = danger ? 'run' : 'walk';
+  const agentRef = useRef(agent);
+  agentRef.current = agent;
 
   useFrame(() => {
     if (group.current) {
       group.current.position.set(agent.x, 0, agent.z);
     }
   });
+
+  const danger = agent.state === 'chase';
 
   return (
     <group ref={group}>
@@ -47,7 +48,13 @@ export function AgentGlb({ agent }: { agent: ArenaAgent }) {
           rotation={[-Math.PI / 2, 0, 0]}
         />
       </group>
-      <GlbCharacter modelKey={modelKey} anim={anim} facing={agent.angle} scale={0.95} />
+      <AnimatedCharacter
+        clips={AGENT_CLIPS}
+        scale={0.95}
+        facingOffset={Math.PI}
+        resolveAnim={() => (agentRef.current.state === 'chase' ? 'run' : 'walk')}
+        resolveFacing={() => agentRef.current.angle}
+      />
     </group>
   );
 }
