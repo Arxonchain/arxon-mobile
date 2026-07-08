@@ -1,27 +1,33 @@
 import { useGLTF } from '@react-three/drei';
 
-import adventurerGlb from '@/assets/depth-watch/models/adventurer.glb?url';
-import agentPirateGlb from '@/assets/depth-watch/models/agent-pirate.glb?url';
-import agentMinifigGlb from '@/assets/depth-watch/models/agent-minifig.glb?url';
+import playerWalkGlb from '@/assets/depth-watch/models/player-walk.glb?url';
+import playerRunGlb from '@/assets/depth-watch/models/player-run.glb?url';
+import agentIdleGlb from '@/assets/depth-watch/models/agent-idle.glb?url';
+import agentTorchWalkGlb from '@/assets/depth-watch/models/agent-torch-walk.glb?url';
+import agentTorchRunGlb from '@/assets/depth-watch/models/agent-torch-run.glb?url';
 
-export const MODEL_URLS = {
-  adventurer: adventurerGlb,
-  agentPirate: agentPirateGlb,
-  agentMinifig: agentMinifigGlb,
-} as const;
-
-export type ModelKey = keyof typeof MODEL_URLS;
-
-export function playerModelKey(characterId: string): ModelKey {
-  return 'adventurer';
+export interface CharacterClipSet {
+  idle: string;
+  walk: string;
+  run: string;
 }
 
-export function agentModelKey(index: number): ModelKey {
-  return index % 2 === 0 ? 'agentPirate' : 'agentMinifig';
-}
+export const PLAYER_CLIPS: CharacterClipSet = {
+  idle: playerWalkGlb,
+  walk: playerWalkGlb,
+  run: playerRunGlb,
+};
+
+export const AGENT_CLIPS: CharacterClipSet = {
+  idle: agentIdleGlb,
+  walk: agentTorchWalkGlb,
+  run: agentTorchRunGlb,
+};
 
 export function preloadDepthWatchModels(): void {
-  useGLTF.preload(MODEL_URLS.adventurer);
-  useGLTF.preload(MODEL_URLS.agentPirate);
-  useGLTF.preload(MODEL_URLS.agentMinifig);
+  useGLTF.preload(PLAYER_CLIPS.walk);
+  useGLTF.preload(PLAYER_CLIPS.run);
+  useGLTF.preload(AGENT_CLIPS.idle);
+  useGLTF.preload(AGENT_CLIPS.walk);
+  useGLTF.preload(AGENT_CLIPS.run);
 }
