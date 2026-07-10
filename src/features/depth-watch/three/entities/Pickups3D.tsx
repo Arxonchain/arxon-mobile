@@ -8,16 +8,16 @@ function Coin({ pickup }: { pickup: Pickup }) {
   useFrame(({ clock }) => {
     if (ref.current) {
       ref.current.rotation.y = clock.elapsedTime * 2.5;
-      ref.current.position.y = pickup.y + 0.35 + Math.sin(clock.elapsedTime * 3 + pickup.x) * 0.12;
+      ref.current.position.y = pickup.y + 0.45 + Math.sin(clock.elapsedTime * 3 + pickup.x) * 0.14;
     }
   });
   return (
     <group ref={ref} position={[pickup.x, pickup.y, pickup.z]}>
       <mesh castShadow>
-        <cylinderGeometry args={[0.28, 0.28, 0.08, 16]} />
-        <meshStandardMaterial color="#ffd93d" emissive="#ffb800" emissiveIntensity={0.55} metalness={0.7} roughness={0.25} />
+        <cylinderGeometry args={[0.38, 0.38, 0.1, 20]} />
+        <meshStandardMaterial color="#ffe566" emissive="#ffc400" emissiveIntensity={0.85} metalness={0.75} roughness={0.2} />
       </mesh>
-      <pointLight color="#ffd93d" intensity={0.35} distance={3} />
+      <pointLight color="#ffd93d" intensity={0.55} distance={4.5} />
     </group>
   );
 }
