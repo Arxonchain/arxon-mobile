@@ -13,16 +13,38 @@ interface SciFiPieceProps {
   receiveShadow?: boolean;
 }
 
+function brightenMaterials(root: THREE.Object3D) {
+  root.traverse((child) => {
+    const mesh = child as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.material) return;
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    const cloned = mats.map((mat) => {
+      const m = mat.clone();
+      if (m instanceof THREE.MeshStandardMaterial) {
+        m.metalness = Math.min(m.metalness, 0.45);
+        m.roughness = Math.max(m.roughness, 0.35);
+        m.envMapIntensity = 1.2;
+        if (m.color) {
+          m.color.multiplyScalar(1.35);
+        }
+      }
+      return m;
+    });
+    mesh.material = cloned.length === 1 ? cloned[0] : cloned;
+  });
+}
+
 function fitClone(
   clone: THREE.Object3D,
   asset: SciFiAssetId,
   size: [number, number, number],
 ) {
   const native = SCIFI_NATIVE[asset];
+  const h = Math.max(native.height, 0.2);
   clone.scale.set(
-    size[0] / native.width,
-    size[1] / native.height,
-    size[2] / native.depth,
+    size[0] / Math.max(native.width, 0.1),
+    size[1] / h,
+    size[2] / Math.max(native.depth, 0.1),
   );
   const box = new THREE.Box3().setFromObject(clone);
   clone.position.y -= box.min.y;
@@ -40,13 +62,14 @@ export function SciFiPiece({
   const fitted = useRef(false);
   const targetSize = size ?? [
     SCIFI_NATIVE[asset].width,
-    SCIFI_NATIVE[asset].height,
+    Math.max(SCIFI_NATIVE[asset].height, 0.2),
     SCIFI_NATIVE[asset].depth,
   ];
 
   const clone = useMemo(() => {
     fitted.current = false;
     const c = scene.clone(true);
+    brightenMaterials(c);
     c.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = castShadow;

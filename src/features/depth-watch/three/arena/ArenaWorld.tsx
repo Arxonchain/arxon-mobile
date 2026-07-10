@@ -8,15 +8,50 @@ const PERIMETER_IDS = new Set(['w-n', 'w-s', 'w-w', 'w-e']);
 const WALL_H = 4;
 const WALL_THICK = 1.2;
 const TILE = SCIFI_NATIVE.WallAstra_Straight.depth;
+const GROUND_SIZE = ARENA_HALF * 2 + 8;
 
-function tileCount(span: number) {
-  return Math.max(1, Math.ceil(span / TILE));
+function tileCount(span: number, segment = TILE) {
+  return Math.max(1, Math.ceil(span / segment));
+}
+
+/** Lightweight ground — one plane instead of hundreds of GLB tiles. */
+function SciFiGround() {
+  return (
+    <group>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} receiveShadow>
+        <planeGeometry args={[GROUND_SIZE, GROUND_SIZE]} />
+        <meshStandardMaterial color="#4a5568" roughness={0.82} metalness={0.2} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
+        <planeGeometry args={[GROUND_SIZE - 6, GROUND_SIZE - 6]} />
+        <meshStandardMaterial color="#2d3748" roughness={0.88} metalness={0.15} />
+      </mesh>
+      <SciFiPiece
+        asset="Platform_Metal"
+        position={[0, 0.02, 0]}
+        size={[24, 0.25, 24]}
+        castShadow={false}
+      />
+      {[-8, 0, 8].map((x) =>
+        [-8, 0, 8].map((z) => (
+          <SciFiPiece
+            key={`mark-${x}-${z}`}
+            asset="Platform_3Plates"
+            position={[x, 0.03, z]}
+            size={[1.8, 0.12, 1.8]}
+            castShadow={false}
+          />
+        )),
+      )}
+    </group>
+  );
 }
 
 function PerimeterWalls() {
   const span = ARENA_HALF * 2;
-  const count = tileCount(span);
-  const start = -ARENA_HALF + TILE / 2;
+  const segment = TILE * 2;
+  const count = tileCount(span, segment);
+  const start = -ARENA_HALF + segment / 2;
   const pieces: {
     key: string;
     pos: [number, number, number];
@@ -26,19 +61,19 @@ function PerimeterWalls() {
   }[] = [];
 
   for (let i = 0; i < count; i++) {
-    const x = start + i * TILE;
+    const x = start + i * segment;
     const asset = i % 3 === 1 ? 'WallAstra_Straight_Window' : 'WallAstra_Straight';
     pieces.push(
-      { key: `pn-${i}`, pos: [x, 0, -ARENA_HALF], rot: Math.PI / 2, size: [WALL_THICK, WALL_H, TILE], asset },
-      { key: `ps-${i}`, pos: [x, 0, ARENA_HALF], rot: -Math.PI / 2, size: [WALL_THICK, WALL_H, TILE], asset },
+      { key: `pn-${i}`, pos: [x, 0, -ARENA_HALF], rot: Math.PI / 2, size: [WALL_THICK, WALL_H, segment], asset },
+      { key: `ps-${i}`, pos: [x, 0, ARENA_HALF], rot: -Math.PI / 2, size: [WALL_THICK, WALL_H, segment], asset },
     );
   }
   for (let i = 0; i < count; i++) {
-    const z = start + i * TILE;
+    const z = start + i * segment;
     const asset = i % 3 === 2 ? 'WallAstra_Straight_Window' : 'WallAstra_Straight';
     pieces.push(
-      { key: `pw-${i}`, pos: [-ARENA_HALF, 0, z], rot: 0, size: [WALL_THICK, WALL_H, TILE], asset },
-      { key: `pe-${i}`, pos: [ARENA_HALF, 0, z], rot: Math.PI, size: [WALL_THICK, WALL_H, TILE], asset },
+      { key: `pw-${i}`, pos: [-ARENA_HALF, 0, z], rot: 0, size: [WALL_THICK, WALL_H, segment], asset },
+      { key: `pe-${i}`, pos: [ARENA_HALF, 0, z], rot: Math.PI, size: [WALL_THICK, WALL_H, segment], asset },
     );
   }
 
@@ -51,46 +86,9 @@ function PerimeterWalls() {
           position={p.pos}
           rotation={[0, p.rot, 0]}
           size={p.size}
+          castShadow={false}
         />
       ))}
-    </group>
-  );
-}
-
-function SciFiGround() {
-  const span = ARENA_HALF * 2 + 8;
-  const tile = SCIFI_NATIVE.Platform_Metal.width;
-  const count = Math.ceil(span / tile);
-  const start = -((count * tile) / 2) + tile / 2;
-  const tiles: { key: string; x: number; z: number }[] = [];
-
-  for (let ix = 0; ix < count; ix++) {
-    for (let iz = 0; iz < count; iz++) {
-      tiles.push({ key: `${ix}-${iz}`, x: start + ix * tile, z: start + iz * tile });
-    }
-  }
-
-  return (
-    <group>
-      {tiles.map((t) => (
-        <SciFiPiece
-          key={t.key}
-          asset="Platform_Metal"
-          position={[t.x, -0.02, t.z]}
-          size={[tile, SCIFI_NATIVE.Platform_Metal.height, tile]}
-        />
-      ))}
-      {/* Inner courtyard plates */}
-      {[-8, 0, 8].map((x) =>
-        [-8, 0, 8].map((z) => (
-          <SciFiPiece
-            key={`mark-${x}-${z}`}
-            asset="Platform_3Plates"
-            position={[x, 0.01, z]}
-            size={[1.8, 0.12, 1.8]}
-          />
-        )),
-      )}
     </group>
   );
 }
@@ -103,14 +101,15 @@ function BuildingShell({ s, night }: { s: Solid; night: boolean }) {
 
   return (
     <group position={[s.x, s.y - s.h / 2, s.z]}>
-      <SciFiPiece asset={wallAsset} position={[0, 0, halfD]} size={[WALL_THICK, s.h, s.w]} rotation={[0, Math.PI / 2, 0]} />
-      <SciFiPiece asset={wallAsset} position={[0, 0, -halfD]} size={[WALL_THICK, s.h, s.w]} rotation={[0, -Math.PI / 2, 0]} />
-      <SciFiPiece asset={wallAsset} position={[-halfW, 0, 0]} size={[WALL_THICK, s.h, s.d]} />
-      <SciFiPiece asset={wallAsset} position={[halfW, 0, 0]} size={[WALL_THICK, s.h, s.d]} rotation={[0, Math.PI, 0]} />
+      <SciFiPiece asset={wallAsset} position={[0, 0, halfD]} size={[WALL_THICK, s.h, s.w]} rotation={[0, Math.PI / 2, 0]} castShadow={false} />
+      <SciFiPiece asset={wallAsset} position={[0, 0, -halfD]} size={[WALL_THICK, s.h, s.w]} rotation={[0, -Math.PI / 2, 0]} castShadow={false} />
+      <SciFiPiece asset={wallAsset} position={[-halfW, 0, 0]} size={[WALL_THICK, s.h, s.d]} castShadow={false} />
+      <SciFiPiece asset={wallAsset} position={[halfW, 0, 0]} size={[WALL_THICK, s.h, s.d]} rotation={[0, Math.PI, 0]} castShadow={false} />
       <SciFiPiece
         asset="Platform_DarkPlates"
         position={[0, s.h, 0]}
         size={[s.w + 0.2, 0.25, s.d + 0.2]}
+        castShadow={false}
       />
       {night &&
         Array.from({ length: lightCount }).map((_, i) => (
@@ -119,12 +118,14 @@ function BuildingShell({ s, night }: { s: Solid; night: boolean }) {
             asset="Prop_Light_Floor"
             position={[-halfW + 1.2 + i * 2.8, s.h + 0.05, halfD + 0.35]}
             size={[0.7, 0.15, 0.7]}
+            castShadow={false}
           />
         ))}
       <SciFiPiece
         asset="Prop_Vent_Small"
         position={[halfW * 0.5, s.h + 0.1, -halfD - 0.2]}
         size={[1.1, 0.35, 1.1]}
+        castShadow={false}
       />
     </group>
   );
@@ -185,6 +186,7 @@ function SolidMesh({ s, night }: { s: Solid; night: boolean }) {
         asset="WallAstra_Straight"
         position={[s.x, s.y - s.h / 2, s.z]}
         size={[s.w, s.h, s.d]}
+        castShadow={false}
       />
     );
   }
@@ -194,6 +196,7 @@ function SolidMesh({ s, night }: { s: Solid; night: boolean }) {
       asset="Platform_DarkPlates"
       position={[s.x, s.y - s.h / 2, s.z]}
       size={[s.w, s.h, s.d]}
+      castShadow={false}
     />
   );
 }

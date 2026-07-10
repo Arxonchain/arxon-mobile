@@ -6,7 +6,6 @@ import type { GameState3D } from '../gameState';
 import { CHARACTER_HEIGHT } from '../constants';
 import type { CharacterClipSet } from '../models/modelRegistry';
 import { PLAYER_CLIPS } from '../models/modelRegistry';
-import { PLAYER_CLIPS } from '../models/modelRegistry';
 
 export type AnimState = 'idle' | 'walk' | 'run' | 'crouch' | 'climb' | 'jump';
 

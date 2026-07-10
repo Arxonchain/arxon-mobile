@@ -12,16 +12,16 @@ export function CameraRig({
 }) {
   const { camera } = useThree();
   const look = useRef(new THREE.Vector3());
-  const dist = 7.5;
-  const height = 3.2;
+  const dist = 8.5;
+  const height = 4.2;
 
   useFrame(() => {
     const yaw = yawRef.current;
     const idealX = target.x - Math.sin(yaw) * dist;
     const idealZ = target.z - Math.cos(yaw) * dist;
     const ideal = new THREE.Vector3(idealX, target.y + height, idealZ);
-    camera.position.lerp(ideal, 0.09);
-    look.current.set(target.x, target.y + 0.4, target.z + Math.cos(yaw) * 4);
+    camera.position.lerp(ideal, 0.12);
+    look.current.set(target.x, target.y + 1.1, target.z);
     camera.lookAt(look.current);
   });
 
