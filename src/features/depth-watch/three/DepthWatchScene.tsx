@@ -82,7 +82,7 @@ export function DepthWatchScene({ gameRef, inputRef, onHud, onEnd }: DepthWatchS
   return (
     <>
       <color attach="background" args={[sky.bg]} />
-      <fog attach="fog" args={[sky.fog, 28, 95]} />
+      <fog attach="fog" args={[sky.fog, 38, 110]} />
       <Sky
         distance={450000}
         sunPosition={layout.tier === 'night' ? [0.15, 0.04, -0.2] : [0.5, 0.4, -0.4]}

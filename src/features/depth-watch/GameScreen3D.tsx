@@ -4,6 +4,7 @@ import { ArrowLeft } from 'lucide-react';
 import { DepthWatchScene, type HudSnapshot } from './three/DepthWatchScene';
 import { activateShield, createGameState, type GameState3D, type Input3D } from './three/gameState';
 import { preloadDepthWatchModels } from './three/models/modelRegistry';
+import { preloadSciFiEnvironment } from './three/environment/SciFiPiece';
 import SubwayHUD from './ui/SubwayHUD';
 import Joystick from './ui/Joystick';
 import JumpButton from './ui/JumpButton';
@@ -35,6 +36,7 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
 
   useEffect(() => {
     preloadDepthWatchModels();
+    preloadSciFiEnvironment();
   }, []);
 
   const startRun = useCallback(() => {

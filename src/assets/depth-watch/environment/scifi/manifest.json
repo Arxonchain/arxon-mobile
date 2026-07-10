@@ -1,0 +1,125 @@
+{
+  "generatedAt": "2026-07-10T06:09:10.646Z",
+  "pieces": {
+    "WallAstra_Straight": {
+      "id": "WallAstra_Straight",
+      "file": "WallAstra_Straight.glb",
+      "bytes": 16423240,
+      "bbox": {
+        "width": 1.209268569946289,
+        "height": 3.0279611945152283,
+        "depth": 4.0000011920928955
+      }
+    },
+    "WallAstra_Straight_Window": {
+      "id": "WallAstra_Straight_Window",
+      "file": "WallAstra_Straight_Window.glb",
+      "bytes": 11377924,
+      "bbox": {
+        "width": 0.4974968433380127,
+        "height": 3.000000256487027,
+        "depth": 4.000000953674316
+      }
+    },
+    "WallAstra_Straight_Flat": {
+      "id": "WallAstra_Straight_Flat",
+      "file": "WallAstra_Straight_Flat.glb",
+      "bytes": 11359308,
+      "bbox": {
+        "width": 0.10000014305114746,
+        "height": 3.000000256487027,
+        "depth": 4.000000953674316
+      }
+    },
+    "Platform_Metal": {
+      "id": "Platform_Metal",
+      "file": "Platform_Metal.glb",
+      "bytes": 5903776,
+      "bbox": {
+        "width": 4,
+        "height": 0,
+        "depth": 4
+      }
+    },
+    "Platform_3Plates": {
+      "id": "Platform_3Plates",
+      "file": "Platform_3Plates.glb",
+      "bytes": 4892728,
+      "bbox": {
+        "width": 4.000002384185791,
+        "height": 0,
+        "depth": 4.000000953674316
+      }
+    },
+    "Platform_DarkPlates": {
+      "id": "Platform_DarkPlates",
+      "file": "Platform_DarkPlates.glb",
+      "bytes": 4892728,
+      "bbox": {
+        "width": 4.000002384185791,
+        "height": 0,
+        "depth": 4.000000953674316
+      }
+    },
+    "Door_Metal": {
+      "id": "Door_Metal",
+      "file": "Door_Metal.glb",
+      "bytes": 10795972,
+      "bbox": {
+        "width": 2.1057209968566895,
+        "height": 4.0489020347595215,
+        "depth": 0.10160236060619354
+      }
+    },
+    "Prop_Crate3": {
+      "id": "Prop_Crate3",
+      "file": "Prop_Crate3.glb",
+      "bytes": 5916208,
+      "bbox": {
+        "width": 1,
+        "height": 1,
+        "depth": 1
+      }
+    },
+    "Prop_Crate4": {
+      "id": "Prop_Crate4",
+      "file": "Prop_Crate4.glb",
+      "bytes": 5940300,
+      "bbox": {
+        "width": 1.1208693981170654,
+        "height": 1.1208693385124207,
+        "depth": 1.1208693385124207
+      }
+    },
+    "Prop_Barrel_Large": {
+      "id": "Prop_Barrel_Large",
+      "file": "Prop_Barrel_Large.glb",
+      "bytes": 10817508,
+      "bbox": {
+        "width": 0.5078441500663757,
+        "height": 1.1026048054918647,
+        "depth": 0.5319890975952148
+      }
+    },
+    "Prop_Light_Floor": {
+      "id": "Prop_Light_Floor",
+      "file": "Prop_Light_Floor.glb",
+      "bytes": 4898412,
+      "bbox": {
+        "width": 1.3331035375595093,
+        "height": 0.20898841507732868,
+        "depth": 0.5245764255523682
+      }
+    },
+    "Prop_Vent_Small": {
+      "id": "Prop_Vent_Small",
+      "file": "Prop_Vent_Small.glb",
+      "bytes": 10809800,
+      "bbox": {
+        "width": 2,
+        "height": 0.20000011660158634,
+        "depth": 1.2366009950637817
+      }
+    }
+  }
+}
