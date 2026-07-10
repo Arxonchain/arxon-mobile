@@ -9,14 +9,14 @@ export default function JumpButton({ onDown, onUp, disabled }: JumpButtonProps) 
     <button
       type="button"
       disabled={disabled}
-      onTouchStart={(e) => { e.preventDefault(); onDown(); }}
-      onTouchEnd={(e) => { e.preventDefault(); onUp(); }}
+      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); onDown(); }}
+      onTouchEnd={(e) => { e.preventDefault(); e.stopPropagation(); onUp(); }}
       onMouseDown={onDown}
       onMouseUp={onUp}
       onMouseLeave={onUp}
       style={{
-        position: 'absolute', bottom: 130, right: 22, width: 64, height: 64,
-        borderRadius: '50%', zIndex: 15, touchAction: 'none', cursor: 'pointer',
+        position: 'absolute', bottom: 130, right: 22, width: 72, height: 72,
+        borderRadius: '50%', zIndex: 30, touchAction: 'none', pointerEvents: 'auto', cursor: 'pointer',
         background: 'linear-gradient(180deg,#ffd93d,#ffb800)',
         border: '4px solid #fff',
         boxShadow: '0 5px 0 #c98a00',

@@ -78,6 +78,24 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
     gameRef.current.characterId = characterId;
   }, [characterId]);
 
+  const handleJoystick = useCallback((x: number, y: number) => {
+    inputRef.current.x = x;
+    inputRef.current.y = y;
+    inputRef.current.crouch = y < -0.4;
+  }, []);
+
+  const handleJumpDown = useCallback(() => {
+    inputRef.current.jump = true;
+  }, []);
+
+  const handleJumpUp = useCallback(() => {
+    inputRef.current.jump = false;
+  }, []);
+
+  const handleShield = useCallback(() => {
+    activateShield(gameRef.current);
+  }, []);
+
   const playing = phase === 'playing';
 
   return (
@@ -86,7 +104,12 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
       fontFamily: "'Creato Display',system-ui,sans-serif", touchAction: 'none',
     }}>
       {playing && (
-        <Canvas shadows camera={{ position: [0, 8, 12], fov: 55, near: 0.1, far: 200 }} style={{ touchAction: 'none' }}>
+        <Canvas
+          dpr={[1, 1.5]}
+          gl={{ antialias: false, powerPreference: 'high-performance', toneMappingExposure: 1.25 }}
+          camera={{ position: [0, 8, 12], fov: 55, near: 0.1, far: 200 }}
+          style={{ position: 'absolute', inset: 0, touchAction: 'none', pointerEvents: 'none' }}
+        >
           <Suspense fallback={null}>
             <DepthWatchScene
               gameRef={gameRef}
@@ -99,7 +122,7 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
       )}
 
       {playing && (
-        <>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 25, pointerEvents: 'none' }}>
           <SubwayHUD
             level={hud.level}
             elapsed={hud.elapsed}
@@ -111,24 +134,14 @@ export default function GameScreen3D({ characterId, onExit }: GameScreen3DProps)
             climbing={hud.climbing}
             onBack={onExit}
           />
-          <Joystick
-            disabled={false}
-            onMove={(x, y) => {
-              inputRef.current.x = x;
-              inputRef.current.y = y;
-              inputRef.current.crouch = y < -0.4;
-            }}
-          />
-          <JumpButton
-            onDown={() => { inputRef.current.jump = true; }}
-            onUp={() => { inputRef.current.jump = false; }}
-          />
+          <Joystick disabled={false} onMove={handleJoystick} />
+          <JumpButton onDown={handleJumpDown} onUp={handleJumpUp} />
           <ShieldButton
             active={hud.shieldActive}
             charges={hud.shieldCharges}
-            onActivate={() => activateShield(gameRef.current)}
+            onActivate={handleShield}
           />
-        </>
+        </div>
       )}
 
       {phase === 'menu' && (
