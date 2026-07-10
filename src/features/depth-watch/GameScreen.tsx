@@ -157,7 +157,10 @@ export default function GameScreen({ characterId, onExit }: GameScreenProps) {
       position: 'fixed', inset: 0, background: '#06262E', overflow: 'hidden',
       fontFamily: "'Creato Display',system-ui,sans-serif", touchAction: 'none',
     }}>
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%', touchAction: 'none' }} />
+      <canvas
+        ref={canvasRef}
+        style={{ display: 'block', width: '100%', height: '100%', touchAction: 'none', pointerEvents: 'none' }}
+      />
 
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0, padding: '14px 16px 10px',
@@ -201,7 +204,7 @@ export default function GameScreen({ characterId, onExit }: GameScreenProps) {
       )}
 
       {playing && (
-        <>
+        <div style={{ position: 'absolute', inset: 0, zIndex: 25, pointerEvents: 'none' }}>
           <Joystick
             disabled={screenPhase === 'transition'}
             onMove={(x, y) => { inputRef.current = { moveX: x, moveY: y }; }}
@@ -212,7 +215,7 @@ export default function GameScreen({ characterId, onExit }: GameScreenProps) {
             disabled={screenPhase === 'transition'}
             onActivate={() => { if (snapRef.current) activateCloak(snapRef.current); }}
           />
-        </>
+        </div>
       )}
     </div>
   );

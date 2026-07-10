@@ -13,11 +13,11 @@ export default function CloakButton({ active, cooldown, onActivate, disabled }: 
     <button
       type="button"
       disabled={disabled || (!ready && !active)}
-      onTouchStart={(e) => { e.preventDefault(); if (ready) onActivate(); }}
+      onTouchStart={(e) => { e.preventDefault(); e.stopPropagation(); if (ready) onActivate(); }}
       onClick={() => { if (ready) onActivate(); }}
       style={{
         position: 'absolute', bottom: 42, right: 22, width: 88, height: 88,
-        borderRadius: '50%', zIndex: 15, touchAction: 'none', cursor: 'pointer',
+        borderRadius: '50%', zIndex: 30, touchAction: 'none', pointerEvents: 'auto', cursor: 'pointer',
         background: active
           ? 'linear-gradient(180deg,#4FD8EB,#0891b2)'
           : ready
