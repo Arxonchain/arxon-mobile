@@ -11,13 +11,18 @@ function Coin({ pickup }: { pickup: Pickup }) {
       ref.current.position.y = pickup.y + 0.45 + Math.sin(clock.elapsedTime * 3 + pickup.x) * 0.14;
     }
   });
+  const pulse = 0.55 + Math.sin(pickup.x * 3) * 0.1;
   return (
     <group ref={ref} position={[pickup.x, pickup.y, pickup.z]}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+        <ringGeometry args={[0.55, 0.85, 24]} />
+        <meshBasicMaterial color="#ffd93d" transparent opacity={0.22} depthWrite={false} />
+      </mesh>
       <mesh castShadow>
         <cylinderGeometry args={[0.38, 0.38, 0.1, 20]} />
-        <meshStandardMaterial color="#ffe566" emissive="#ffc400" emissiveIntensity={0.85} metalness={0.75} roughness={0.2} />
+        <meshStandardMaterial color="#ffe566" emissive="#ffc400" emissiveIntensity={0.95} metalness={0.75} roughness={0.2} />
       </mesh>
-      <pointLight color="#ffd93d" intensity={0.55} distance={4.5} />
+      <pointLight color="#ffd93d" intensity={pulse} distance={5.5} />
     </group>
   );
 }

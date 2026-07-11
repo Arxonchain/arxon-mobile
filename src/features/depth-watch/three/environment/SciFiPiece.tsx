@@ -3,6 +3,8 @@ import { useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import { SCIFI_NATIVE, SCIFI_URLS, type SciFiAssetId } from './scifiAssets';
 
+const USE_DRACO = true;
+
 interface SciFiPieceProps {
   asset: SciFiAssetId;
   position?: [number, number, number];
@@ -58,7 +60,7 @@ export function SciFiPiece({
   castShadow = true,
   receiveShadow = true,
 }: SciFiPieceProps) {
-  const { scene } = useGLTF(SCIFI_URLS[asset]);
+  const { scene } = useGLTF(SCIFI_URLS[asset], USE_DRACO);
   const fitted = useRef(false);
   const targetSize = size ?? [
     SCIFI_NATIVE[asset].width,
@@ -94,6 +96,6 @@ export function SciFiPiece({
 
 export function preloadSciFiEnvironment(): void {
   for (const url of Object.values(SCIFI_URLS)) {
-    useGLTF.preload(url);
+    useGLTF.preload(url, USE_DRACO);
   }
 }

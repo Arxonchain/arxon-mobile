@@ -3,7 +3,7 @@ import {
   CLIMB_SPEED, CROUCH_SPEED_MULT, GRAVITY, JUMP_VELOCITY,
   PLAYER_CROUCH_HEIGHT, PLAYER_RADIUS, RUN_SPEED, RUN_THRESHOLD, WALK_SPEED,
 } from '../constants';
-import { findClimbTarget, isUnderCover, resolveHorizontal, solidAabb } from './collision';
+import { findClimbTarget, isUnderCover, resolveHorizontal, solidAabb, type ResolveOptions } from './collision';
 
 export type MoveMode = 'ground' | 'air' | 'climb';
 
@@ -30,14 +30,19 @@ export interface InputFrame {
   cameraYaw: number;
 }
 
+export interface StepPlayerOptions {
+  collision?: ResolveOptions;
+}
+
 export function stepPlayer(
   snap: PlayerSnapshot,
   input: InputFrame,
   solids: Solid[],
   dt: number,
   jumpPressed: boolean,
+  options?: StepPlayerOptions,
 ): PlayerSnapshot {
-  const crouching = input.crouch || input.y < -0.35;
+  const crouching = input.crouch;
   const height = crouching ? PLAYER_CROUCH_HEIGHT : 1.75;
   const mag = Math.min(1, Math.hypot(input.x, input.y));
   const running = !crouching && mag >= RUN_THRESHOLD;
@@ -51,7 +56,7 @@ export function stepPlayer(
   let { px, py, pz, vy, facing, mode } = snap;
   let climbing = false;
 
-  if (Math.abs(mx) > 0.08 || Math.abs(mz) > 0.08) {
+  if (Math.abs(mx) > 0.18 || Math.abs(mz) > 0.18) {
     facing = Math.atan2(mx, mz);
   }
 
@@ -85,7 +90,7 @@ export function stepPlayer(
     px += mx * speed * dt;
     pz += mz * speed * dt;
 
-    const resolved = resolveHorizontal(px, py, pz, height, solids);
+    const resolved = resolveHorizontal(px, py, pz, height, solids, options?.collision);
     px = resolved.px;
     pz = resolved.pz;
 

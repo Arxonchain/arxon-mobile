@@ -33,65 +33,55 @@ export function playerAabb(px: number, py: number, pz: number, height: number): 
   };
 }
 
-function overlap(a: Aabb, b: Aabb): boolean {
-  return a.minX < b.maxX && a.maxX > b.minX
-    && a.minY < b.maxY && a.maxY > b.minY
-    && a.minZ < b.maxZ && a.maxZ > b.minZ;
+export interface ResolveOptions {
+  floorY?: number;
+  half?: number;
+  passes?: number;
 }
 
+/** Circle-vs-AABB separation — stable, no snap-back oscillation. */
 export function resolveHorizontal(
   px: number,
   py: number,
   pz: number,
   height: number,
   solids: Solid[],
+  opts?: ResolveOptions,
 ): { px: number; pz: number; grounded: boolean; groundY: number } {
+  const floorY = opts?.floorY ?? 0;
+  const half = opts?.half ?? ARENA_HALF;
+  const passes = opts?.passes ?? 6;
+  const r = PLAYER_RADIUS;
+
   let nx = px;
   let nz = pz;
-  let grounded = false;
   let groundY = py;
 
-  for (const s of solids) {
-    const box = solidAabb(s);
-    const p = playerAabb(nx, py, nz, height);
-    if (!overlap(p, box)) continue;
+  for (let pass = 0; pass < passes; pass++) {
+    for (const s of solids) {
+      const box = solidAabb(s);
+      if (py + height < box.minY + 0.05 || py > box.maxY + 0.15) continue;
 
-    const overlapX = Math.min(p.maxX, box.maxX) - Math.max(p.minX, box.minX);
-    const overlapZ = Math.min(p.maxZ, box.maxZ) - Math.max(p.minZ, box.minZ);
+      const cx = Math.max(box.minX, Math.min(nx, box.maxX));
+      const cz = Math.max(box.minZ, Math.min(nz, box.maxZ));
+      const dx = nx - cx;
+      const dz = nz - cz;
+      const distSq = dx * dx + dz * dz;
+      if (distSq >= r * r) continue;
 
-    if (overlapX < overlapZ) {
-      nx += p.minX + p.maxX < box.minX + box.maxX
-        ? box.minX - p.maxX - 0.001
-        : box.maxX - p.minX + 0.001;
-    } else {
-      nz += p.minZ + p.maxZ < box.minZ + box.maxZ
-        ? box.minZ - p.maxZ - 0.001
-        : box.maxZ - p.minZ + 0.001;
+      const dist = Math.sqrt(distSq) || 0.0001;
+      const pen = r - dist + 0.004;
+      nx += (dx / dist) * pen;
+      nz += (dz / dist) * pen;
     }
   }
 
-  // Ground / standing on top
-  for (const s of solids) {
-    const box = solidAabb(s);
-    const foot = py;
-    const onTop =
-      nx + PLAYER_RADIUS > box.minX && nx - PLAYER_RADIUS < box.maxX &&
-      nz + PLAYER_RADIUS > box.minZ && nz - PLAYER_RADIUS < box.maxZ &&
-      foot >= box.maxY - 0.15 && foot <= box.maxY + 0.35;
-    if (onTop && box.maxY > groundY) {
-      grounded = true;
-      groundY = box.maxY;
-    }
-  }
+  let grounded = py <= floorY + 0.1;
+  if (grounded) groundY = floorY;
 
-  const floor = 0;
-  if (py <= floor + 0.05) {
-    grounded = true;
-    groundY = Math.max(groundY, floor);
-  }
-
-  nx = Math.max(-ARENA_HALF + 1.5, Math.min(ARENA_HALF - 1.5, nx));
-  nz = Math.max(-ARENA_HALF + 1.5, Math.min(ARENA_HALF - 1.5, nz));
+  const inset = 1.2;
+  nx = Math.max(-half + inset, Math.min(half - inset, nx));
+  nz = Math.max(-half + inset, Math.min(half - inset, nz));
 
   return { px: nx, pz: nz, grounded, groundY };
 }

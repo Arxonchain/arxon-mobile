@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useReducer, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { useAnimations, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
+import { SkeletonUtils } from 'three-stdlib';
 import type { GameState3D } from '../gameState';
 import { CHARACTER_HEIGHT } from '../constants';
 import type { CharacterClipSet } from '../models/modelRegistry';
@@ -46,7 +47,7 @@ function RiggedClip({
   const fitted = useRef(false);
   const { scene, animations } = useGLTF(url);
   const clone = useMemo(() => {
-    const c = scene.clone(true);
+    const c = SkeletonUtils.clone(scene) as THREE.Group;
     c.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true;

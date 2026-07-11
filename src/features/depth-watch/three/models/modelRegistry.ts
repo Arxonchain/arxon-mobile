@@ -1,5 +1,6 @@
 import { useGLTF } from '@react-three/drei';
 
+import playerIdleGlb from '@/assets/depth-watch/models/player-idle.glb?url';
 import playerWalkGlb from '@/assets/depth-watch/models/player-walk.glb?url';
 import playerRunGlb from '@/assets/depth-watch/models/player-run.glb?url';
 import agentIdleGlb from '@/assets/depth-watch/models/agent-idle.glb?url';
@@ -13,7 +14,7 @@ export interface CharacterClipSet {
 }
 
 export const PLAYER_CLIPS: CharacterClipSet = {
-  idle: playerWalkGlb,
+  idle: playerIdleGlb,
   walk: playerWalkGlb,
   run: playerRunGlb,
 };
@@ -25,6 +26,7 @@ export const AGENT_CLIPS: CharacterClipSet = {
 };
 
 export function preloadDepthWatchModels(): void {
+  useGLTF.preload(PLAYER_CLIPS.idle);
   useGLTF.preload(PLAYER_CLIPS.walk);
   useGLTF.preload(PLAYER_CLIPS.run);
   useGLTF.preload(AGENT_CLIPS.idle);
