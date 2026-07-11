@@ -16,7 +16,6 @@ import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
 import { COMMUNITY_LINKS, DISCORD_ICON_PATH } from '@/lib/communityLinks';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
-import { DEPTH_WATCH_ENABLED } from '@/lib/depthWatchFeature';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 
 function relTime(iso: string) {
@@ -388,12 +387,6 @@ export default function MobileDashboard() {
       col:'hsl(38 90% 55%)', bg:'hsl(38 90% 55%/0.12)', bd:'hsl(38 90% 55%/0.22)',
       badge: 'BETA' as const,
       icon:<><path d="M4 7h16M7 7v12a2 2 0 002 2h6a2 2 0 002-2V7"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,
-    }] : []),
-    ...(DEPTH_WATCH_ENABLED ? [{
-      id:'depth-watch', label:'Depth Watch', path:'/depth-watch',
-      col:'hsl(195 70% 55%)', bg:'hsl(195 70% 55%/0.12)', bd:'hsl(195 70% 55%/0.22)',
-      badge: 'BETA' as const,
-      icon:<><circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></>,
     }] : []),
     { id:'arena', label:'Arena', path:'/arena',
       col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.12)', bd:'hsl(255 50% 65%/0.22)',
