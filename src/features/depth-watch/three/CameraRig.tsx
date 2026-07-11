@@ -6,21 +6,26 @@ import * as THREE from 'three';
 export function CameraRig({
   target,
   yawRef,
+  smoothness = 0.1,
 }: {
   target: THREE.Vector3;
   yawRef: React.MutableRefObject<number>;
+  smoothness?: number;
 }) {
   const { camera } = useThree();
   const look = useRef(new THREE.Vector3());
+  const ideal = useRef(new THREE.Vector3());
   const dist = 8.5;
   const height = 4.2;
 
   useFrame(() => {
     const yaw = yawRef.current;
-    const idealX = target.x - Math.sin(yaw) * dist;
-    const idealZ = target.z - Math.cos(yaw) * dist;
-    const ideal = new THREE.Vector3(idealX, target.y + height, idealZ);
-    camera.position.lerp(ideal, 0.12);
+    ideal.current.set(
+      target.x - Math.sin(yaw) * dist,
+      target.y + height,
+      target.z - Math.cos(yaw) * dist,
+    );
+    camera.position.lerp(ideal.current, smoothness);
     look.current.set(target.x, target.y + 1.1, target.z);
     camera.lookAt(look.current);
   });

@@ -17,6 +17,7 @@ import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
 import { COMMUNITY_LINKS, DISCORD_ICON_PATH } from '@/lib/communityLinks';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 import { DEPTH_WATCH_ENABLED } from '@/lib/depthWatchFeature';
+import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -382,6 +383,12 @@ export default function MobileDashboard() {
   }, [user, isMining]);
 
   const quickItems = [
+    ...(WORD_FORGE_ENABLED ? [{
+      id:'word-forge', label:'Word Forge', path:'/word-forge',
+      col:'hsl(38 90% 55%)', bg:'hsl(38 90% 55%/0.12)', bd:'hsl(38 90% 55%/0.22)',
+      badge: 'BETA' as const,
+      icon:<><path d="M4 7h16M7 7v12a2 2 0 002 2h6a2 2 0 002-2V7"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,
+    }] : []),
     ...(DEPTH_WATCH_ENABLED ? [{
       id:'depth-watch', label:'Depth Watch', path:'/depth-watch',
       col:'hsl(195 70% 55%)', bg:'hsl(195 70% 55%/0.12)', bd:'hsl(195 70% 55%/0.22)',

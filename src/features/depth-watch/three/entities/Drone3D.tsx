@@ -26,22 +26,25 @@ function DroneMesh() {
 
 export function Drone3D({ drone }: { drone: ArenaDrone }) {
   const group = useRef<THREE.Group>(null);
-  const beam = useRef<THREE.Mesh>(null);
+  const beam = useRef<THREE.Group>(null);
+  const droneRef = useRef(drone);
+  droneRef.current = drone;
 
   useFrame(({ clock }) => {
+    const d = droneRef.current;
     if (!group.current) return;
-    group.current.position.set(drone.x, drone.y, drone.z);
-    group.current.rotation.y = drone.angle + Math.sin(clock.elapsedTime * 2 + drone.hover) * 0.08;
+    group.current.position.set(d.x, d.y, d.z);
+    group.current.rotation.y = d.angle + Math.sin(clock.elapsedTime * 2 + d.hover) * 0.08;
     if (beam.current) {
-      beam.current.rotation.x = Math.PI / 2;
+      beam.current.rotation.y = d.angle;
     }
   });
 
   return (
     <group ref={group}>
       <DroneMesh />
-      <group rotation={[0, drone.angle, 0]}>
-        <mesh ref={beam} position={[0, -4, 0]}>
+      <group ref={beam}>
+        <mesh position={[0, -4, 0]} rotation={[Math.PI / 2, 0, 0]}>
           <coneGeometry args={[3.2, 8, 16, 1, true]} />
           <meshBasicMaterial color="#ffd166" transparent opacity={0.14} side={THREE.DoubleSide} depthWrite={false} />
         </mesh>

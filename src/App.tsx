@@ -63,6 +63,14 @@ import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 import { DEPTH_WATCH_ENABLED } from "@/lib/depthWatchFeature";
+import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
+
+const DepthWatchPreviewPage = lazy(() => import("@/features/depth-watch/preview/DepthWatchPreviewPage"));
+const WordForgePreviewPage = lazy(() => import("@/features/word-forge/preview/WordForgePreviewPage"));
+
+const WordForgePage = WORD_FORGE_ENABLED
+  ? lazy(() => import("@/features/word-forge/WordForgePage"))
+  : null;
 
 const DepthWatchPage = DEPTH_WATCH_ENABLED
   ? lazy(() => import("@/features/depth-watch/DepthWatchPage"))
@@ -158,6 +166,16 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/litepaper"      element={<Litepaper />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
+        <Route path="/depth-watch-preview" element={
+          <Suspense fallback={<Spinner />}>
+            <DepthWatchPreviewPage />
+          </Suspense>
+        } />
+        <Route path="/word-forge-preview" element={
+          <Suspense fallback={<Spinner />}>
+            <WordForgePreviewPage />
+          </Suspense>
+        } />
 
         <Route path="/admin" element={<AdminLayout />}>
           <Route index                  element={<AdminDashboard />} />
@@ -190,6 +208,15 @@ function AppRoutes() {
             <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
             <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            {WORD_FORGE_ENABLED && WordForgePage && (
+              <Route path="/word-forge" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<Spinner />}>
+                    <WordForgePage />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+            )}
             {DEPTH_WATCH_ENABLED && DepthWatchPage && (
               <Route path="/depth-watch" element={
                 <ProtectedRoute>
