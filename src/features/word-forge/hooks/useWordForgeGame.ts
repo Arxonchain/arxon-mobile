@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { usePoints } from '@/hooks/usePoints';
 import {
   playBonus, playClear, playError, playLevelFail, playLevelWin,
   playSubmit, playTap, playTick,
@@ -8,8 +9,10 @@ import {
 import { bonusDefinition } from '../data/bonusWords';
 import { levelParams } from '../engine/difficultyCurve';
 import { payoutForWord } from '../engine/payoutCalculator';
-import { generateLevel, type LevelGeneration } from '../engine/poolGenerator';
+import { generateLevel, type LevelGeneration, type LetterTile } from '../engine/poolGenerator';
 import { validateWordLocal, validateWordServer } from '../engine/wordValidator';
+import { saveForgeProgress, loadForgeProgress } from './useForgeProgress';
+import { shuffle as shuffleArr } from '../engine/seedHash';
 
 export interface FoundWord {
   word: string;
@@ -46,11 +49,19 @@ async function haptic(style: ImpactStyle): Promise<void> {
   } catch { /* ignore */ }
 }
 
-export function useWordForgeGame() {
-  const [level, setLevel] = useState(1);
+interface UseWordForgeGameOptions {
+  preview?: boolean;
+}
+
+export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
+  const { preview = false } = options;
+  const { addPoints, triggerConfetti } = usePoints();
+
+  const saved = useMemo(() => loadForgeProgress(), []);
+  const [level, setLevel] = useState(saved.currentLevel);
   const [attemptId, setAttemptId] = useState(() => String(Date.now()));
   const [phase, setPhase] = useState<RoundPhase>('playing');
-  const [timeLeft, setTimeLeft] = useState(() => levelParams(1).timerSeconds);
+  const [timeLeft, setTimeLeft] = useState(() => levelParams(saved.currentLevel).timerSeconds);
   const [balance, setBalance] = useState(0);
   const [foundWords, setFoundWords] = useState<FoundWord[]>([]);
   const [selection, setSelection] = useState<number[]>([]);
@@ -59,6 +70,10 @@ export function useWordForgeGame() {
   const [coinFlies, setCoinFlies] = useState<CoinFlyEvent[]>([]);
   const [shakeWord, setShakeWord] = useState<string | null>(null);
   const [streak, setStreak] = useState(0);
+  const [hintsLeft, setHintsLeft] = useState(saved.hintsLeft);
+  const [shufflesLeft, setShufflesLeft] = useState(saved.shufflesLeft);
+  const [hintReveal, setHintReveal] = useState<string | null>(null);
+  const [liveTiles, setLiveTiles] = useState<LetterTile[] | null>(null);
 
   const claimedRef = useRef(new Set<string>());
   const pendingRef = useRef(new Map<string, number>());
@@ -66,6 +81,7 @@ export function useWordForgeGame() {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const balanceRef = useRef<HTMLDivElement | null>(null);
   const lastTickRef = useRef(-1);
+  const creditedRef = useRef(0);
 
   const uid = useMemo(() => userId(), []);
 
@@ -74,14 +90,21 @@ export function useWordForgeGame() {
     [level, uid, attemptId],
   );
 
+  const tiles = liveTiles ?? generation.tiles;
+
   const currentWord = useMemo(
-    () => selection.map((i) => generation.tiles[i]?.letter ?? '').join(''),
-    [selection, generation.tiles],
+    () => selection.map((i) => tiles[i]?.letter ?? '').join(''),
+    [selection, tiles],
   );
+
+  const persistMeta = useCallback((patch: Parameters<typeof saveForgeProgress>[0]) => {
+    saveForgeProgress(patch);
+  }, []);
 
   const resetRound = useCallback((nextLevel: number, newAttempt: boolean) => {
     const params = levelParams(nextLevel);
     setLevel(nextLevel);
+    persistMeta({ currentLevel: nextLevel });
     if (newAttempt) setAttemptId(String(Date.now()));
     setPhase('playing');
     setTimeLeft(params.timerSeconds);
@@ -91,15 +114,17 @@ export function useWordForgeGame() {
     setBonusPopup(null);
     setShakeWord(null);
     setStreak(0);
+    setHintReveal(null);
+    setLiveTiles(null);
+    creditedRef.current = 0;
     claimedRef.current = new Set();
     pendingRef.current = new Map();
     lastTickRef.current = -1;
-  }, []);
+  }, [persistMeta]);
 
   const spawnCoinFly = useCallback((amount: number) => {
     const board = boardRef.current?.getBoundingClientRect();
-    const bal = balanceRef.current?.getBoundingClientRect();
-    if (!board || !bal) return;
+    if (!board) return;
     const id = ++flyId.current;
     setCoinFlies((prev) => [
       ...prev,
@@ -115,10 +140,19 @@ export function useWordForgeGame() {
     }, 700);
   }, []);
 
+  const creditPoints = useCallback(async (amount: number) => {
+    if (preview || amount <= 0) return;
+    const result = await addPoints(amount, 'task');
+    if (result.success) {
+      creditedRef.current += amount;
+    }
+  }, [addPoints, preview]);
+
   const submitWord = useCallback(async () => {
     if (phase !== 'playing' || selection.length < 3) return;
     const word = currentWord.toUpperCase();
-    const local = validateWordLocal(word, generation.poolLetters, claimedRef.current);
+    const poolLetters = tiles.map((t) => t.letter);
+    const local = validateWordLocal(word, poolLetters, claimedRef.current);
     if (!local.ok) {
       setShakeWord(word);
       setStreak(0);
@@ -142,6 +176,7 @@ export function useWordForgeGame() {
     setFoundWords((prev) => [...prev, { word, payout, isBonus: !!local.isBonus, pending: true }]);
     setBalance((b) => b + payout);
     setStreak((s) => s + 1);
+    persistMeta({ totalWords: loadForgeProgress().totalWords + 1 });
     spawnCoinFly(payout);
     setSelection([]);
 
@@ -157,7 +192,7 @@ export function useWordForgeGame() {
       void haptic(ImpactStyle.Light);
     }
 
-    const server = await validateWordServer(word, generation.poolLetters, claimedRef.current);
+    const server = await validateWordServer(word, poolLetters, claimedRef.current);
     if (!server.ok) {
       const rev = pendingRef.current.get(word) ?? payout;
       pendingRef.current.delete(word);
@@ -178,7 +213,18 @@ export function useWordForgeGame() {
     setFoundWords((prev) => prev.map((w) => (
       w.word === word ? { ...w, pending: false } : w
     )));
-  }, [phase, selection.length, currentWord, generation.poolLetters, spawnCoinFly]);
+    void creditPoints(payout);
+  }, [phase, selection.length, currentWord, tiles, spawnCoinFly, creditPoints, persistMeta]);
+
+  const appendTile = useCallback((index: number) => {
+    if (phase !== 'playing') return;
+    setSelection((prev) => {
+      if (prev.includes(index)) return prev;
+      playTap();
+      void haptic(ImpactStyle.Light);
+      return [...prev, index];
+    });
+  }, [phase]);
 
   const toggleTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
@@ -191,21 +237,68 @@ export function useWordForgeGame() {
     });
   }, [phase]);
 
+  const undoLetter = useCallback(() => {
+    if (selection.length === 0) return;
+    playClear();
+    setSelection((prev) => prev.slice(0, -1));
+  }, [selection.length]);
+
   const clearSelection = useCallback(() => {
     playClear();
     setSelection([]);
   }, []);
 
+  const shuffleTiles = useCallback(() => {
+    if (phase !== 'playing' || shufflesLeft <= 0) return;
+    const base = [...tiles];
+    const letters = base.map((t) => t.letter);
+    const rng = () => Math.random();
+    const shuffled = shuffleArr(rng, letters);
+    const next = base.map((t, i) => ({ ...t, letter: shuffled[i] }));
+    setLiveTiles(next);
+    setSelection([]);
+    const left = shufflesLeft - 1;
+    setShufflesLeft(left);
+    persistMeta({ shufflesLeft: left });
+    setToast('Letters shuffled');
+    window.setTimeout(() => setToast(null), 1200);
+  }, [phase, shufflesLeft, tiles, persistMeta]);
+
+  const useHint = useCallback(() => {
+    if (phase !== 'playing' || hintsLeft <= 0) return;
+    const target = generation.hintBonus ?? generation.targetWords[0];
+    if (!target) return;
+    const left = hintsLeft - 1;
+    setHintsLeft(left);
+    persistMeta({ hintsLeft: left });
+    setHintReveal(`${target[0]}${'_'.repeat(target.length - 1)} (${target.length} letters)`);
+    setToast(`Hint: ${target[0]}…`);
+    window.setTimeout(() => setToast(null), 2000);
+  }, [phase, hintsLeft, generation, persistMeta]);
+
   const advanceOrRetry = useCallback(() => {
     const passed = foundWords.filter((w) => !w.rejected).length >= generation.params.minWordsRequired;
+    const prog = loadForgeProgress();
     if (passed) {
       playLevelWin();
-      resetRound(level + 1, true);
+      triggerConfetti();
+      const next = level + 1;
+      persistMeta({
+        bestLevel: Math.max(prog.bestLevel, next),
+        sessionHigh: Math.max(prog.sessionHigh, balance),
+        currentLevel: next,
+        hintsLeft: 3,
+        shufflesLeft: 2,
+      });
+      setHintsLeft(3);
+      setShufflesLeft(2);
+      resetRound(next, true);
     } else {
       playLevelFail();
+      persistMeta({ sessionHigh: Math.max(prog.sessionHigh, balance) });
       resetRound(level, true);
     }
-  }, [foundWords, generation.params.minWordsRequired, level, resetRound]);
+  }, [foundWords, generation.params.minWordsRequired, level, balance, resetRound, persistMeta, triggerConfetti]);
 
   useEffect(() => {
     if (phase !== 'playing') return;
@@ -218,17 +311,19 @@ export function useWordForgeGame() {
         if (s <= 1) {
           window.clearInterval(t);
           setPhase('ended');
+          persistMeta({ sessionHigh: Math.max(loadForgeProgress().sessionHigh, balance) });
           return 0;
         }
         return s - 1;
       });
     }, 1000);
     return () => window.clearInterval(t);
-  }, [phase, attemptId, level]);
+  }, [phase, attemptId, level, balance, persistMeta]);
 
   return {
     level,
     generation,
+    tiles,
     phase,
     timeLeft,
     balance,
@@ -240,11 +335,18 @@ export function useWordForgeGame() {
     coinFlies,
     shakeWord,
     streak,
+    hintsLeft,
+    shufflesLeft,
+    hintReveal,
     boardRef,
     balanceRef,
     toggleTile,
+    appendTile,
+    undoLetter,
     clearSelection,
     submitWord,
+    shuffleTiles,
+    useHint,
     advanceOrRetry,
     resetRound,
     validCount: foundWords.filter((w) => !w.rejected).length,
