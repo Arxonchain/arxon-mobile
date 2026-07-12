@@ -2,10 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileNav } from '@/contexts/MobileNavContext';
-
-// FIX BUG-02 + ENH-01: Added Mining tab, replaced Leaderboard in main nav
-// Mining is the core feature and needs direct access.
-// Leaderboard is now accessible via dashboard or a dedicated button.
+import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 
 const HomeIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -16,7 +13,6 @@ const HomeIcon = (a: boolean) => (
   </svg>
 );
 
-// NEW: Mining icon
 const MiningIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <circle cx="12" cy="12" r="4"
@@ -44,6 +40,15 @@ const ArenaIcon = (a: boolean) => (
   </svg>
 );
 
+const PlayIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <rect x="4" y="5" width="16" height="14" rx="2"
+      fill={a?'hsl(190 85% 55%/0.15)':'none'}
+      stroke={a?'hsl(190 85% 55%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <path d="M10 9l5 3-5 3V9z" fill={a?'hsl(190 85% 55%)':'hsl(215 14% 38%)'}/>
+  </svg>
+);
+
 const LeaderboardIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"
@@ -58,20 +63,39 @@ const ProfileIcon = (a: boolean) => (
   </svg>
 );
 
-const TABS = [
+const BASE_TABS = [
   { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
   { to:'/mining',     id:'mining',      label:'Mining',      icon:MiningIcon,      col:'hsl(155 45% 50%)', dot:'hsl(155 55% 55%)' },
   { to:'/arena',      id:'arena',       label:'Arena',       icon:ArenaIcon,       col:'hsl(255 50% 65%)', dot:'hsl(255 55% 70%)' },
-  { to:'/leaderboard',id:'leaderboard', label:'Leaderboard', icon:LeaderboardIcon, col:'hsl(38 55% 52%)',  dot:'hsl(38 60% 58%)'  },
+  { to:'/leaderboard',id:'leaderboard', label:'Ranks',       icon:LeaderboardIcon, col:'hsl(38 55% 52%)',  dot:'hsl(38 60% 58%)'  },
   { to:'/profile',    id:'profile',     label:'Profile',     icon:ProfileIcon,     col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
 ];
+
+const PLAY_TAB = {
+  to:'/games', id:'games', label:'Play', icon:PlayIcon,
+  col:'hsl(190 85% 55%)', dot:'hsl(190 90% 60%)',
+};
+
+function buildTabs() {
+  if (!WORD_FORGE_ENABLED) return BASE_TABS;
+  // Replace Ranks with Play — ranks still on dashboard
+  return [
+    BASE_TABS[0],
+    BASE_TABS[1],
+    BASE_TABS[2],
+    PLAY_TAB,
+    BASE_TABS[4],
+  ];
+}
 
 export default function MobileBottomNav() {
   const location = useLocation();
   const { user } = useAuth();
   const { hideNav } = useMobileNav();
+  const TABS = buildTabs();
+
   if (!user || hideNav) return null;
-  if (['/auth','/admin','/landing'].some(p => location.pathname.startsWith(p))) return null;
+  if (['/auth','/admin','/landing','/word-forge'].some(p => location.pathname.startsWith(p))) return null;
 
   const activeId = (() => {
     if (location.pathname === '/') return 'home';

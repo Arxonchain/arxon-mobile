@@ -47,7 +47,7 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 // Mobile
 import MobileDashboard from "@/components/mobile/MobileDashboard";
-import MobileHomePager from "@/components/mobile/MobileHomePager";
+import GamingHubPage from "@/components/mobile/GamingHubPage";
 import MobileMining from "@/components/mobile/MobileMining";
 import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -186,7 +186,10 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            <Route path="/"             element={user ? <MobileHomePager /> : <Navigate to="/auth" replace />} />
+            <Route path="/"             element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
+            {WORD_FORGE_ENABLED && (
+              <Route path="/games" element={<ProtectedRoute><GamingHubPage /></ProtectedRoute>} />
+            )}
             <Route path="/mining"       element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena"        element={<MobileArena />} />
             <Route path="/leaderboard"  element={<MobileLeaderboard />} />
