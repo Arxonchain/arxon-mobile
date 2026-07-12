@@ -1,15 +1,13 @@
 import { useCallback, useRef } from 'react';
-import { tileImageForBiome } from '../data/biomeTiles';
-import { TILE_SHAPES } from '../data/tileTextures';
+import { tileSkinForLevel, type LevelTileSkin } from '../data/uiAssets';
 import type { LetterTile } from '../engine/poolGenerator';
-import type { ThemeSkin } from '../data/themes';
 
-const TILE = 60;
+const TILE = 64;
 
 interface LetterBoardProps {
   tiles: LetterTile[];
   selection: number[];
-  theme: ThemeSkin;
+  level: number;
   onToggle: (index: number) => void;
   onAppend: (index: number) => void;
 }
@@ -18,12 +16,12 @@ function tileCenterPct(tile: LetterTile): { x: number; y: number } {
   return { x: 50 + tile.x * 40, y: 50 + tile.y * 40 };
 }
 
-export function LetterBoard({ tiles, selection, theme, onToggle, onAppend }: LetterBoardProps) {
+export function LetterBoard({ tiles, selection, level, onToggle, onAppend }: LetterBoardProps) {
+  const skin = tileSkinForLevel(level);
   const selectedSet = new Set(selection);
   const orderMap = new Map(selection.map((idx, i) => [idx, i + 1]));
   const boardRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef(false);
-  const tileImg = tileImageForBiome(theme.biome);
 
   const hitTest = useCallback((clientX: number, clientY: number): number | null => {
     const board = boardRef.current;
@@ -72,9 +70,8 @@ export function LetterBoard({ tiles, selection, theme, onToggle, onAppend }: Let
       onPointerLeave={onPointerUp}
       style={{
         position: 'relative',
-        width: 'min(92vw, 360px)',
-        height: 'min(78vw, 320px)',
-        margin: '0 auto',
+        width: '100%',
+        height: '100%',
         touchAction: 'none',
       }}
     >
@@ -82,127 +79,123 @@ export function LetterBoard({ tiles, selection, theme, onToggle, onAppend }: Let
         <svg
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
-          style={{
-            position: 'absolute', inset: 0, width: '100%', height: '100%',
-            pointerEvents: 'none', zIndex: 5,
-          }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 5 }}
         >
           <polyline
             points={linePoints}
             fill="none"
-            stroke={theme.accent}
-            strokeWidth="1.8"
+            stroke="rgba(79,216,235,0.9)"
+            strokeWidth="1.2"
             strokeLinecap="round"
             strokeLinejoin="round"
-            opacity="0.85"
-            vectorEffect="non-scaling-stroke"
+            filter="drop-shadow(0 0 4px rgba(79,216,235,0.8))"
           />
-          {selection.map((idx, i) => {
-            if (i === 0) return null;
-            const c = tileCenterPct(tiles[idx]);
-            const prev = tileCenterPct(tiles[selection[i - 1]]);
-            const mx = (c.x + prev.x) / 2;
-            const my = (c.y + prev.y) / 2;
-            return (
-              <polygon
-                key={`arr-${idx}-${i}`}
-                points={`${mx},${my - 1.2} ${mx + 1.4},${my} ${mx},${my + 1.2}`}
-                fill={theme.accent}
-                opacity="0.9"
-              />
-            );
-          })}
         </svg>
       )}
 
-      {tiles.map((tile, index) => {
-        const selected = selectedSet.has(index);
-        const order = orderMap.get(index);
-        const clipPath = TILE_SHAPES[tile.shapeId];
-        const isPoly = clipPath.includes('polygon');
-        const depth = selected ? 4 : 7;
-
-        return (
-          <button
-            key={tile.id}
-            type="button"
-            data-tile-index={index}
-            onPointerDown={(e) => onPointerDown(index, e)}
-            style={{
-              position: 'absolute',
-              left: `calc(50% + ${tile.x * 40}% - ${TILE / 2}px)`,
-              top: `calc(50% + ${tile.y * 40}% - ${TILE / 2}px)`,
-              width: TILE,
-              height: TILE,
-              border: 'none',
-              backgroundImage: `url(${tileImg})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center',
-              color: theme.tileText,
-              fontSize: 24,
-              fontWeight: 900,
-              fontFamily: theme.fontFamily,
-              textShadow: '0 1px 0 rgba(255,255,255,0.35), 0 2px 4px rgba(0,0,0,0.55)',
-              boxShadow: selected
-                ? `0 ${depth}px 0 rgba(0,0,0,0.35), inset 0 3px 0 rgba(255,255,255,0.55), inset 0 -4px 8px rgba(0,0,0,0.15), ${theme.tileGlow}`
-                : `0 ${depth}px 0 rgba(0,0,0,0.42), inset 0 3px 0 rgba(255,255,255,0.45), inset 0 -5px 10px rgba(0,0,0,0.22), 0 6px 16px rgba(0,0,0,0.35)`,
-              transform: selected ? 'translateY(-5px) scale(1.08)' : 'translateY(0) scale(1)',
-              transition: 'transform 0.14s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.12s ease',
-              cursor: 'pointer',
-              touchAction: 'none',
-              clipPath: isPoly ? clipPath : undefined,
-              borderRadius: isPoly ? undefined : '22%',
-              zIndex: selected ? 10 : 2,
-              outline: selected ? `2px solid ${theme.accent}` : '1.5px solid rgba(255,255,255,0.25)',
-              outlineOffset: -2,
-            }}
-          >
-            <span style={{
-              position: 'relative', zIndex: 2,
-              filter: selected ? `drop-shadow(0 0 6px ${theme.accent})` : undefined,
-            }}>
-              {tile.letter}
-            </span>
-            {order != null && (
-              <span style={{
-                position: 'absolute', top: 3, right: 5, zIndex: 3,
-                fontSize: 10, fontWeight: 900, color: theme.accent,
-                background: 'rgba(0,0,0,0.55)', borderRadius: 6,
-                width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
-                {order}
-              </span>
-            )}
-          </button>
-        );
-      })}
+      {tiles.map((tile, index) => (
+        <TileButton
+          key={tile.id}
+          tile={tile}
+          index={index}
+          selected={selectedSet.has(index)}
+          order={orderMap.get(index)}
+          skin={skin}
+          onPointerDown={onPointerDown}
+        />
+      ))}
     </div>
   );
 }
 
-/** SVG pattern defs for arena textures */
-export function TexturePatternDefs() {
-  const patterns: { id: string; stops: string[] }[] = [
-    { id: 'wood', stops: ['#6b4423', '#8b5a2b', '#5c3d1e'] },
-    { id: 'ice', stops: ['#e8f8ff', '#9dd4f0', '#5eb8e8'] },
-    { id: 'water', stops: ['#1e6fa8', '#2d8fc4', '#0e4d7a'] },
-    { id: 'stone', stops: ['#6a6a6a', '#4a4a4a', '#333'] },
-    { id: 'metal', stops: ['#d0d5db', '#8a939e', '#4a5259'] },
-    { id: 'lava', stops: ['#ff6b20', '#e83a10', '#8a1a00'] },
-    { id: 'crystal', stops: ['#e9d5ff', '#a855f7', '#6b21a8'] },
-    { id: 'moss', stops: ['#4a7c3f', '#2d5a28', '#1a3a18'] },
-    { id: 'sand', stops: ['#f5deb3', '#d4a76a', '#a67c3a'] },
-  ];
+function TileButton({
+  tile, index, selected, order, skin, onPointerDown,
+}: {
+  tile: LetterTile;
+  index: number;
+  selected: boolean;
+  order?: number;
+  skin: LevelTileSkin;
+  onPointerDown: (i: number, e: React.PointerEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onPointerDown={(e) => onPointerDown(index, e)}
+      style={{
+        position: 'absolute',
+        left: `calc(50% + ${tile.x * 40}% - ${TILE / 2}px)`,
+        top: `calc(50% + ${tile.y * 40}% - ${TILE / 2}px)`,
+        width: TILE,
+        height: TILE,
+        border: 'none',
+        background: 'transparent',
+        padding: 0,
+        cursor: 'pointer',
+        touchAction: 'none',
+        transform: selected ? 'translateY(-4px) scale(1.06)' : 'scale(1)',
+        transition: 'transform 0.12s cubic-bezier(0.34,1.4,0.64,1)',
+        zIndex: selected ? 10 : 2,
+        filter: selected ? `drop-shadow(0 0 12px ${skin.glow})` : undefined,
+      }}
+    >
+      <img
+        src={skin.image}
+        alt=""
+        draggable={false}
+        style={{
+          position: 'absolute', inset: 0, width: '100%', height: '100%',
+          objectFit: 'contain', pointerEvents: 'none',
+        }}
+      />
+      <span style={{
+        position: 'relative', zIndex: 2,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '100%', height: '100%',
+        fontSize: 26, fontWeight: 900,
+        color: skin.letterColor,
+        fontFamily: "'Creato Display', system-ui, sans-serif",
+        textShadow: '0 1px 0 rgba(255,255,255,0.35), 0 2px 6px rgba(0,0,0,0.45)',
+      }}>
+        {tile.letter}
+      </span>
+      {order != null && (
+        <span style={{
+          position: 'absolute', top: 4, right: 6, zIndex: 3,
+          fontSize: 9, fontWeight: 900, color: '#4FD8EB',
+          background: 'rgba(0,0,0,0.65)', borderRadius: 4,
+          width: 14, height: 14, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: '1px solid rgba(79,216,235,0.4)',
+        }}>
+          {order}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export function TimerRing({
+  timeLeft, total, urgent,
+}: {
+  timeLeft: number;
+  total: number;
+  urgent: boolean;
+}) {
+  const pct = total > 0 ? timeLeft / total : 0;
+  const r = 20;
+  const circ = 2 * Math.PI * r;
+  const offset = circ * (1 - pct);
+  const stroke = urgent ? '#ff6b4a' : '#4FD8EB';
 
   return (
-    <defs>
-      {patterns.map((p) => (
-        <pattern key={p.id} id={`wf-tex-${p.id}`} patternUnits="userSpaceOnUse" width="12" height="12">
-          <rect width="12" height="12" fill={p.stops[0]} />
-          <rect width="6" height="6" fill={p.stops[1]} opacity="0.6" />
-          <rect x="6" y="6" width="6" height="6" fill={p.stops[2]} opacity="0.5" />
-        </pattern>
-      ))}
-    </defs>
+    <svg width={48} height={48} style={{ display: 'block', margin: '0 auto' }}>
+      <circle cx={24} cy={24} r={r} fill="none" stroke="rgba(79,216,235,0.12)" strokeWidth={3} />
+      <circle
+        cx={24} cy={24} r={r} fill="none" stroke={stroke} strokeWidth={3}
+        strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="butt"
+        transform="rotate(-90 24 24)"
+        style={{ transition: 'stroke-dashoffset 0.9s linear', filter: `drop-shadow(0 0 6px ${stroke})` }}
+      />
+    </svg>
   );
 }
