@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ForgeSettings } from '../hooks/useForgeSettings';
 
 interface AudioSettingsProps {
@@ -9,9 +9,23 @@ interface AudioSettingsProps {
 
 export function AudioSettings({ settings, onChange, accent }: AudioSettingsProps) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent | TouchEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('touchstart', close);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('touchstart', close);
+    };
+  }, [open]);
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div ref={ref} style={{ position: 'relative' }}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

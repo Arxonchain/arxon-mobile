@@ -18,7 +18,7 @@ interface WordForgeGameProps {
 
 export function WordForgeGame({ preview = false }: WordForgeGameProps) {
   const navigate = useNavigate();
-  const game = useWordForgeGame();
+  const game = useWordForgeGame({ preview });
   const { generation, phase } = game;
   const theme = generation.theme;
   const passed = game.validCount >= generation.params.minWordsRequired;
@@ -48,7 +48,8 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
   }, [settings.music, phase]);
 
   const isNative = Capacitor.isNativePlatform();
-  const topPad = isNative ? 48 : 14;
+  const topPad = isNative ? 'max(48px, env(safe-area-inset-top))' : '14px';
+  const bottomPad = 'max(20px, env(safe-area-inset-bottom))';
 
   return (
     <div
@@ -69,9 +70,11 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
       <div style={{
         position: 'relative', zIndex: 2, height: '100%',
         display: 'flex', flexDirection: 'column',
-        padding: `${topPad}px 16px 20px`,
+        padding: `${topPad} 16px ${bottomPad}`,
         maxWidth: 480,
         margin: '0 auto',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
       }}>
         <header>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
@@ -98,7 +101,7 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
                   Word Forge {preview ? '· Preview' : '· Beta'}
                 </p>
                 <p style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
-                  {preview ? 'Mock ARX-P' : 'Earn 10 ARX-P per word'}
+                  {theme.label} · {preview ? 'Mock ARX-P' : 'Earn 10 ARX-P per word'}
                 </p>
               </div>
             </div>
@@ -197,10 +200,11 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
           <BoardArena arena={generation.arena} shapeLabel={generation.shape.label} />
           <div style={{ position: 'relative', zIndex: 2 }}>
             <LetterBoard
-              tiles={generation.tiles}
+              tiles={game.tiles}
               selection={game.selection}
               theme={theme}
               onToggle={game.toggleTile}
+              onAppend={game.appendTile}
             />
           </div>
         </div>
@@ -217,7 +221,7 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
             <div style={{ flex: 1, display: 'flex', gap: 4, flexWrap: 'wrap', minHeight: 32, alignItems: 'center' }}>
               {game.selection.length === 0 ? (
                 <span style={{ fontSize: 15, color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
-                  Tap letters to spell…
+                  Drag or tap letters…
                 </span>
               ) : (
                 game.selection.map((idx, i) => (
@@ -232,7 +236,7 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
                       animation: `wf-letter-in 0.2s ease ${i * 0.04}s both`,
                     }}
                   >
-                    {generation.tiles[idx]?.letter}
+                    {game.tiles[idx]?.letter}
                   </span>
                 ))
               )}
@@ -279,6 +283,29 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
               ))}
             </div>
           )}
+          {game.hintReveal && phase === 'playing' && (
+            <div style={{
+              marginTop: 8, padding: '8px 12px', borderRadius: 10,
+              background: 'rgba(127,231,196,0.12)', border: '1px solid rgba(127,231,196,0.35)',
+              fontSize: 11, fontWeight: 700, color: theme.accent,
+            }}>
+              💡 {game.hintReveal}
+            </div>
+          )}
+
+          <div style={{
+            display: 'flex', gap: 8, marginTop: 10, justifyContent: 'center',
+          }}>
+            <PowerBtn label="Undo" count={null} onClick={game.undoLetter} disabled={game.selection.length === 0} theme={theme} />
+            <PowerBtn label="Hint" count={game.hintsLeft} onClick={game.useHint} disabled={game.hintsLeft <= 0 || phase !== 'playing'} theme={theme} />
+            <PowerBtn label="Shuffle" count={game.shufflesLeft} onClick={game.shuffleTiles} disabled={game.shufflesLeft <= 0 || phase !== 'playing'} theme={theme} />
+          </div>
+
+          <div style={{
+            marginTop: 10, fontSize: 10, textAlign: 'center', color: 'rgba(255,255,255,0.35)', fontWeight: 600,
+          }}>
+            Drag across letters or tap to spell
+          </div>
         </footer>
       </div>
 
@@ -408,4 +435,31 @@ function btnGhost(theme: { tileBorder: string }) {
     fontSize: 14,
     cursor: 'pointer',
   } as const;
+}
+
+function PowerBtn({
+  label, count, onClick, disabled, theme,
+}: {
+  label: string;
+  count: number | null;
+  onClick: () => void;
+  disabled: boolean;
+  theme: { accent: string; tileBorder: string };
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        flex: 1, maxWidth: 100, padding: '10px 8px', borderRadius: 12,
+        border: `1px solid ${theme.tileBorder}`,
+        background: disabled ? 'rgba(0,0,0,0.25)' : 'rgba(0,0,0,0.45)',
+        color: disabled ? 'rgba(255,255,255,0.3)' : theme.accent,
+        fontWeight: 800, fontSize: 11, cursor: disabled ? 'default' : 'pointer',
+      }}
+    >
+      {label}{count != null ? ` (${count})` : ''}
+    </button>
+  );
 }

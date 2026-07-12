@@ -1,64 +1,160 @@
-import { getTileTexture, TILE_SHAPES, type TileTextureId } from '../data/tileTextures';
+import { useCallback, useRef } from 'react';
+import { tileImageForBiome } from '../data/biomeTiles';
+import { TILE_SHAPES } from '../data/tileTextures';
 import type { LetterTile } from '../engine/poolGenerator';
 import type { ThemeSkin } from '../data/themes';
+
+const TILE = 60;
 
 interface LetterBoardProps {
   tiles: LetterTile[];
   selection: number[];
   theme: ThemeSkin;
   onToggle: (index: number) => void;
+  onAppend: (index: number) => void;
 }
 
-export function LetterBoard({ tiles, selection, theme, onToggle }: LetterBoardProps) {
+function tileCenterPct(tile: LetterTile): { x: number; y: number } {
+  return { x: 50 + tile.x * 40, y: 50 + tile.y * 40 };
+}
+
+export function LetterBoard({ tiles, selection, theme, onToggle, onAppend }: LetterBoardProps) {
   const selectedSet = new Set(selection);
   const orderMap = new Map(selection.map((idx, i) => [idx, i + 1]));
+  const boardRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef(false);
+  const tileImg = tileImageForBiome(theme.biome);
+
+  const hitTest = useCallback((clientX: number, clientY: number): number | null => {
+    const board = boardRef.current;
+    if (!board) return null;
+    const rect = board.getBoundingClientRect();
+    for (let i = 0; i < tiles.length; i++) {
+      const tile = tiles[i];
+      const cx = rect.left + rect.width * (0.5 + tile.x * 0.4);
+      const cy = rect.top + rect.height * (0.5 + tile.y * 0.4);
+      if (Math.abs(clientX - cx) <= TILE / 2 && Math.abs(clientY - cy) <= TILE / 2) {
+        return i;
+      }
+    }
+    return null;
+  }, [tiles]);
+
+  const onPointerDown = useCallback((index: number, e: React.PointerEvent) => {
+    e.preventDefault();
+    dragRef.current = true;
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    onToggle(index);
+  }, [onToggle]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent) => {
+    if (!dragRef.current) return;
+    const hit = hitTest(e.clientX, e.clientY);
+    if (hit != null) onAppend(hit);
+  }, [hitTest, onAppend]);
+
+  const onPointerUp = useCallback(() => {
+    dragRef.current = false;
+  }, []);
+
+  const linePoints = selection.map((idx) => {
+    const t = tiles[idx];
+    if (!t) return null;
+    const c = tileCenterPct(t);
+    return `${c.x},${c.y}`;
+  }).filter(Boolean).join(' ');
 
   return (
     <div
+      ref={boardRef}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      onPointerLeave={onPointerUp}
       style={{
         position: 'relative',
         width: 'min(92vw, 360px)',
         height: 'min(78vw, 320px)',
         margin: '0 auto',
+        touchAction: 'none',
       }}
     >
+      {linePoints && selection.length > 1 && (
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          style={{
+            position: 'absolute', inset: 0, width: '100%', height: '100%',
+            pointerEvents: 'none', zIndex: 5,
+          }}
+        >
+          <polyline
+            points={linePoints}
+            fill="none"
+            stroke={theme.accent}
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            opacity="0.85"
+            vectorEffect="non-scaling-stroke"
+          />
+          {selection.map((idx, i) => {
+            if (i === 0) return null;
+            const c = tileCenterPct(tiles[idx]);
+            const prev = tileCenterPct(tiles[selection[i - 1]]);
+            const mx = (c.x + prev.x) / 2;
+            const my = (c.y + prev.y) / 2;
+            return (
+              <polygon
+                key={`arr-${idx}-${i}`}
+                points={`${mx},${my - 1.2} ${mx + 1.4},${my} ${mx},${my + 1.2}`}
+                fill={theme.accent}
+                opacity="0.9"
+              />
+            );
+          })}
+        </svg>
+      )}
+
       {tiles.map((tile, index) => {
         const selected = selectedSet.has(index);
         const order = orderMap.get(index);
-        const tex = getTileTexture(tile.textureId);
         const clipPath = TILE_SHAPES[tile.shapeId];
         const isPoly = clipPath.includes('polygon');
+        const depth = selected ? 4 : 7;
 
         return (
           <button
             key={tile.id}
             type="button"
-            onClick={() => onToggle(index)}
-            className={tex.animated ? 'wf-tile-animated' : undefined}
+            data-tile-index={index}
+            onPointerDown={(e) => onPointerDown(index, e)}
             style={{
               position: 'absolute',
-              left: `calc(50% + ${tile.x * 40}% - 30px)`,
-              top: `calc(50% + ${tile.y * 40}% - 30px)`,
-              width: 60,
-              height: 60,
-              border: `2.5px solid ${selected ? theme.accent : tex.border}`,
-              background: tex.background,
+              left: `calc(50% + ${tile.x * 40}% - ${TILE / 2}px)`,
+              top: `calc(50% + ${tile.y * 40}% - ${TILE / 2}px)`,
+              width: TILE,
+              height: TILE,
+              border: 'none',
+              backgroundImage: `url(${tileImg})`,
               backgroundSize: 'cover',
+              backgroundPosition: 'center',
               color: theme.tileText,
               fontSize: 24,
               fontWeight: 900,
               fontFamily: theme.fontFamily,
-              textShadow: tex.letterShadow,
+              textShadow: '0 1px 0 rgba(255,255,255,0.35), 0 2px 4px rgba(0,0,0,0.55)',
               boxShadow: selected
-                ? `${tex.innerGlow}, ${theme.tileGlow}, 0 8px 20px rgba(0,0,0,0.45)`
-                : `${tex.innerGlow}, 0 6px 16px rgba(0,0,0,0.4)`,
-              transform: selected ? 'scale(1.12) translateY(-3px)' : 'scale(1)',
-              transition: 'transform 0.14s cubic-bezier(0.34,1.4,0.64,1), border-color 0.12s ease, box-shadow 0.12s ease',
+                ? `0 ${depth}px 0 rgba(0,0,0,0.35), inset 0 3px 0 rgba(255,255,255,0.55), inset 0 -4px 8px rgba(0,0,0,0.15), ${theme.tileGlow}`
+                : `0 ${depth}px 0 rgba(0,0,0,0.42), inset 0 3px 0 rgba(255,255,255,0.45), inset 0 -5px 10px rgba(0,0,0,0.22), 0 6px 16px rgba(0,0,0,0.35)`,
+              transform: selected ? 'translateY(-5px) scale(1.08)' : 'translateY(0) scale(1)',
+              transition: 'transform 0.14s cubic-bezier(0.34,1.4,0.64,1), box-shadow 0.12s ease',
               cursor: 'pointer',
-              touchAction: 'manipulation',
+              touchAction: 'none',
               clipPath: isPoly ? clipPath : undefined,
-              borderRadius: isPoly ? undefined : clipPath,
-              zIndex: selected ? 10 : 1,
+              borderRadius: isPoly ? undefined : '22%',
+              zIndex: selected ? 10 : 2,
+              outline: selected ? `2px solid ${theme.accent}` : '1.5px solid rgba(255,255,255,0.25)',
+              outlineOffset: -2,
             }}
           >
             <span style={{
@@ -77,37 +173,16 @@ export function LetterBoard({ tiles, selection, theme, onToggle }: LetterBoardPr
                 {order}
               </span>
             )}
-            {selected && (
-              <span style={{
-                position: 'absolute', inset: -4, borderRadius: 'inherit',
-                border: `2px solid ${theme.accent}`,
-                opacity: 0.5, animation: 'wf-pulse 0.8s ease infinite',
-                pointerEvents: 'none',
-              }} />
-            )}
           </button>
         );
       })}
-      <style>{`
-        @keyframes wf-pulse {
-          0%,100% { opacity: 0.35; transform: scale(1); }
-          50% { opacity: 0.7; transform: scale(1.04); }
-        }
-        .wf-tile-animated {
-          animation: wf-shimmer 2.5s ease-in-out infinite;
-        }
-        @keyframes wf-shimmer {
-          0%,100% { filter: brightness(1); }
-          50% { filter: brightness(1.15); }
-        }
-      `}</style>
     </div>
   );
 }
 
 /** SVG pattern defs for arena textures */
 export function TexturePatternDefs() {
-  const patterns: { id: TileTextureId; stops: string[] }[] = [
+  const patterns: { id: string; stops: string[] }[] = [
     { id: 'wood', stops: ['#6b4423', '#8b5a2b', '#5c3d1e'] },
     { id: 'ice', stops: ['#e8f8ff', '#9dd4f0', '#5eb8e8'] },
     { id: 'water', stops: ['#1e6fa8', '#2d8fc4', '#0e4d7a'] },

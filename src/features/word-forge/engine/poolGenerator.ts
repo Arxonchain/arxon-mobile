@@ -1,10 +1,9 @@
 import { bonusWordsInRange } from '../data/bonusWords';
 import { arenaForLevel, type ArenaFrame } from '../data/boardFrames';
-import { shapeForIndex, textureForSeed, type TileShapeId, type TileTextureId } from '../data/tileTextures';
+import { shapeForIndex, type TileShapeId } from '../data/tileTextures';
 import { wordsInRange } from '../data/dictionary';
 import type { ShapeTemplate } from '../data/shapes';
 import { shapesForTier } from '../data/shapes';
-import type { ThemeSkin } from '../data/themes';
 import { themeForLevel } from '../data/themes';
 import type { LevelParams } from './difficultyCurve';
 import { hashSeed, mulberry32, pick, shuffle } from './seedHash';
@@ -104,8 +103,8 @@ export function generateLevel(
 
   const tierShapes = shapesForTier(params.shapeTier);
   const shape = pick(rng, tierShapes);
-  const theme = themeForLevel(params.level, rng);
-  const arena = arenaForLevel(rng);
+  const theme = themeForLevel(params.level);
+  const arena = arenaForLevel(rng, theme);
 
   const bonusRoll = rng() < params.bonusWordDensity;
   const targetWords = pickTargetWords(
@@ -126,7 +125,7 @@ export function generateLevel(
     letter,
     x: positions[i]?.x ?? 0,
     y: positions[i]?.y ?? 0,
-    textureId: textureForSeed(rng),
+    textureId: theme.textureId,
     shapeId: shapeForIndex(i, params.poolSize),
   }));
 
