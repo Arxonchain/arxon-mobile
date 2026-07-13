@@ -3,7 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { usePoints } from '@/hooks/usePoints';
 import {
-  playBonus, playClear, playError, playLevelFail, playLevelWin,
+  playBonus, playClear, playCoinCredit, playError, playLevelFail, playLevelWin,
   playSubmit, playTap, playTick,
 } from '../audio/forgeAudio';
 import { bonusDefinition } from '../data/bonusWords';
@@ -12,6 +12,7 @@ import { payoutForWord } from '../engine/payoutCalculator';
 import { generateLevel, type LevelGeneration, type LetterTile } from '../engine/poolGenerator';
 import { validateWordLocal, validateWordServer } from '../engine/wordValidator';
 import { saveForgeProgress, loadForgeProgress } from './useForgeProgress';
+import { loadForgeSettings } from './useForgeSettings';
 import { shuffle as shuffleArr } from '../engine/seedHash';
 
 export interface FoundWord {
@@ -43,7 +44,7 @@ function userId(): string {
 }
 
 async function haptic(style: ImpactStyle): Promise<void> {
-  if (!Capacitor.isNativePlatform()) return;
+  if (!loadForgeSettings().haptics || !Capacitor.isNativePlatform()) return;
   try {
     await Haptics.impact({ style });
   } catch { /* ignore */ }
@@ -178,6 +179,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     setStreak((s) => s + 1);
     persistMeta({ totalWords: loadForgeProgress().totalWords + 1 });
     spawnCoinFly(payout);
+    playCoinCredit();
     setSelection([]);
 
     if (local.isBonus) {

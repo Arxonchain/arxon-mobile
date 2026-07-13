@@ -1,18 +1,18 @@
 import { bonusWordsInRange } from '../data/bonusWords';
-import { arenaForLevel, type ArenaFrame } from '../data/boardFrames';
-import { shapeForIndex, type TileShapeId } from '../data/tileTextures';
 import { wordsInRange } from '../data/dictionary';
-import type { ShapeTemplate } from '../data/shapes';
-import { shapesForTier } from '../data/shapes';
+import type { ThemeSkin } from '../data/themes';
 import { themeForLevel } from '../data/themes';
+import type { TileShapeId } from '../data/tileTextures';
+import { shapeForIndex } from '../data/tileTextures';
 import type { LevelParams } from './difficultyCurve';
+import { gridLayoutForCount, type GridLayout } from './gridLayout';
 import { hashSeed, mulberry32, pick, shuffle } from './seedHash';
+import type { TileTextureId } from '../data/tileTextures';
 
 export interface LetterTile {
   id: string;
   letter: string;
-  x: number;
-  y: number;
+  gridIndex: number;
   textureId: TileTextureId;
   shapeId: TileShapeId;
 }
@@ -20,16 +20,13 @@ export interface LetterTile {
 export interface LevelGeneration {
   params: LevelParams;
   seed: number;
-  shape: ShapeTemplate;
+  grid: GridLayout;
   theme: ThemeSkin;
-  arena: ArenaFrame;
   tiles: LetterTile[];
   targetWords: string[];
   poolLetters: string[];
   hintBonus?: string;
 }
-
-const FREQ = 'EEEEEEEEAAAATTTTTTTIIIIINNNNNNSSSSSHHHHHHRRRRDDDLLLUUCCMMPPYYWWFFGGVVBBKKJJXXQQZZ';
 
 function letterCounts(letters: string[]): Map<string, number> {
   const m = new Map<string, number>();
@@ -40,7 +37,7 @@ function letterCounts(letters: string[]): Map<string, number> {
   return m;
 }
 
-function canForm(word: string, pool: Map<string, number>): boolean {
+export function canForm(word: string, pool: Map<string, number>): boolean {
   const need = letterCounts(word.split(''));
   for (const [ch, n] of need) {
     if ((pool.get(ch) ?? 0) < n) return false;
@@ -48,49 +45,101 @@ function canForm(word: string, pool: Map<string, number>): boolean {
   return true;
 }
 
-function unionLetters(words: string[]): string[] {
-  const out: string[] = [];
-  for (const w of words) out.push(...w.split(''));
-  return out;
+function countFormableWords(
+  letters: string[],
+  minLen: number,
+  maxLen: number,
+): number {
+  const pool = letterCounts(letters);
+  const dict = wordsInRange(minLen, maxLen);
+  let count = 0;
+  for (const w of dict) {
+    if (canForm(w, pool)) count++;
+  }
+  return count;
 }
 
-function padPool(rng: () => number, letters: string[], targetSize: number): string[] {
-  const out = [...letters];
+function trimToSize(letters: string[], targetSize: number): string[] {
+  const bag = [...letters];
+  const counts = letterCounts(bag);
+  while (bag.length > targetSize) {
+    let removed = false;
+    for (let i = bag.length - 1; i >= 0; i--) {
+      const ch = bag[i];
+      if ((counts.get(ch) ?? 0) > 1) {
+        counts.set(ch, (counts.get(ch) ?? 0) - 1);
+        bag.splice(i, 1);
+        removed = true;
+        break;
+      }
+    }
+    if (!removed) break;
+  }
+  return bag;
+}
+
+function padFromSeedWords(
+  rng: () => number,
+  bag: string[],
+  seedWords: string[],
+  targetSize: number,
+): string[] {
+  const out = [...bag];
   while (out.length < targetSize) {
-    out.push(FREQ[Math.floor(rng() * FREQ.length)]);
+    const w = pick(rng, seedWords);
+    out.push(w[Math.floor(rng() * w.length)]);
   }
   return out.slice(0, targetSize);
 }
 
-function pickTargetWords(
+function buildSolvablePool(
   rng: () => number,
-  count: number,
-  minLen: number,
-  maxLen: number,
+  params: LevelParams,
   bonusRoll: boolean,
-): string[] {
-  const pool = wordsInRange(minLen, maxLen);
-  const picked: string[] = [];
-  const used = new Set<string>();
+): { letters: string[]; targetWords: string[]; hintBonus?: string } {
+  const dict = wordsInRange(params.minWordLen, params.maxWordLen);
+  const minFormable = params.minWordsRequired + 2;
+  const seedTarget = Math.min(6, Math.max(3, Math.ceil(params.minWordsRequired / 2) + 1));
 
-  if (bonusRoll) {
-    const bonus = bonusWordsInRange(minLen, maxLen);
-    if (bonus.length) {
-      const bw = pick(rng, bonus);
-      picked.push(bw);
-      used.add(bw);
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const seedWords: string[] = [];
+    const used = new Set<string>();
+
+    if (bonusRoll) {
+      const bonus = bonusWordsInRange(params.minWordLen, params.maxWordLen);
+      if (bonus.length) {
+        const bw = pick(rng, bonus);
+        seedWords.push(bw);
+        used.add(bw);
+      }
+    }
+
+    let guard = 0;
+    while (seedWords.length < seedTarget && guard++ < 300) {
+      const w = pick(rng, dict);
+      if (used.has(w)) continue;
+      seedWords.push(w);
+      used.add(w);
+    }
+
+    let bag = seedWords.flatMap((w) => w.split(''));
+    bag = trimToSize(bag, params.poolSize);
+    bag = padFromSeedWords(rng, bag, seedWords, params.poolSize);
+    const letters = shuffle(rng, bag);
+
+    const formable = countFormableWords(letters, params.minWordLen, params.maxWordLen);
+    if (formable >= minFormable) {
+      const hintBonus = bonusRoll
+        ? seedWords.find((w) => bonusWordsInRange(3, 12).includes(w))
+        : undefined;
+      return { letters, targetWords: seedWords, hintBonus };
     }
   }
 
-  let guard = 0;
-  while (picked.length < count && guard < 500) {
-    guard++;
-    const w = pick(rng, pool);
-    if (used.has(w)) continue;
-    picked.push(w);
-    used.add(w);
-  }
-  return picked;
+  // Guaranteed fallback — letters drawn only from one rich word
+  const fallback = pick(rng, dict.filter((w) => w.length >= 4 && w.length <= params.maxWordLen));
+  const letters = shuffle(rng, padFromSeedWords(rng, fallback.split(''), [fallback], params.poolSize));
+  return { letters, targetWords: [fallback] };
 }
 
 export function generateLevel(
@@ -100,45 +149,25 @@ export function generateLevel(
 ): LevelGeneration {
   const seed = hashSeed(userId, params.level, attemptId);
   const rng = mulberry32(seed);
-
-  const tierShapes = shapesForTier(params.shapeTier);
-  const shape = pick(rng, tierShapes);
   const theme = themeForLevel(params.level);
-  const arena = arenaForLevel(rng, theme);
-
+  const grid = gridLayoutForCount(params.poolSize);
   const bonusRoll = rng() < params.bonusWordDensity;
-  const targetWords = pickTargetWords(
-    rng,
-    params.minWordsRequired,
-    params.minWordLen,
-    params.maxWordLen,
-    bonusRoll,
-  );
 
-  let letters = unionLetters(targetWords);
-  letters = padPool(rng, letters, params.poolSize);
-  letters = shuffle(rng, letters);
+  const { letters, targetWords, hintBonus } = buildSolvablePool(rng, params, bonusRoll);
 
-  const positions = shape.positions.slice(0, params.poolSize);
   const tiles: LetterTile[] = letters.map((letter, i) => ({
     id: `${seed}-${i}`,
     letter,
-    x: positions[i]?.x ?? 0,
-    y: positions[i]?.y ?? 0,
+    gridIndex: i,
     textureId: theme.textureId,
     shapeId: shapeForIndex(i, params.poolSize),
   }));
 
-  const hintBonus = bonusRoll
-    ? targetWords.find((w) => bonusWordsInRange(3, 12).includes(w))
-    : undefined;
-
   return {
     params,
     seed,
-    shape,
+    grid,
     theme,
-    arena,
     tiles,
     targetWords,
     poolLetters: letters,
@@ -149,5 +178,3 @@ export function generateLevel(
 export function poolCountMap(letters: string[]): Map<string, number> {
   return letterCounts(letters);
 }
-
-export { canForm };

@@ -10,7 +10,7 @@ export interface LevelParams {
 }
 
 export function poolSize(L: number): number {
-  return Math.min(14, Math.max(6, 6 + Math.floor(L / 5)));
+  return Math.min(16, Math.max(6, 6 + Math.floor(L / 3)));
 }
 
 export function timerSeconds(L: number): number {
