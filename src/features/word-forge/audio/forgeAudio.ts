@@ -1,17 +1,17 @@
 import type { ForgeSettings } from '../hooks/useForgeSettings';
+import { FORGE_MUSIC_TRACKS, trackById } from '../data/audioTracks';
 
 let ctx: AudioContext | null = null;
-let musicNodes: { oscs: OscillatorNode[]; gains: GainNode[]; lfo: OscillatorNode } | null = null;
-let settings: ForgeSettings = { sfx: true, music: true };
+let audioEl: HTMLAudioElement | null = null;
+let settings: ForgeSettings = {
+  sfx: true, music: true, musicTrack: 'energy',
+  sfxVolume: 0.85, musicVolume: 0.45, haptics: true,
+};
 
 function getCtx(): AudioContext | null {
   if (typeof window === 'undefined') return null;
   if (!ctx) {
-    try {
-      ctx = new AudioContext();
-    } catch {
-      return null;
-    }
+    try { ctx = new AudioContext(); } catch { return null; }
   }
   return ctx;
 }
@@ -24,8 +24,18 @@ async function resume(): Promise<AudioContext | null> {
 }
 
 export function setForgeAudioSettings(s: ForgeSettings): void {
+  const prevTrack = settings.musicTrack;
   settings = s;
-  if (!s.music) stopMusic();
+  if (audioEl) audioEl.volume = s.musicVolume;
+  if (!s.music) {
+    stopMusic();
+    return;
+  }
+  if (audioEl && prevTrack !== s.musicTrack) void startMusic();
+}
+
+function vol(base: number): number {
+  return base * settings.sfxVolume;
 }
 
 function tone(
@@ -44,7 +54,7 @@ function tone(
   osc.type = type;
   osc.frequency.setValueAtTime(freq, c.currentTime);
   if (ramp) osc.frequency.exponentialRampToValueAtTime(ramp.end, c.currentTime + ramp.at);
-  gain.gain.setValueAtTime(volume, c.currentTime);
+  gain.gain.setValueAtTime(vol(volume), c.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.001, c.currentTime + duration);
   osc.connect(gain);
   gain.connect(c.destination);
@@ -52,13 +62,8 @@ function tone(
   osc.stop(c.currentTime + duration + 0.02);
 }
 
-export function playTap(): void {
-  tone(520, 0.05, 'sine', 0.08);
-}
-
-export function playClear(): void {
-  tone(320, 0.06, 'triangle', 0.06);
-}
+export function playTap(): void { tone(520, 0.05, 'sine', 0.08); }
+export function playClear(): void { tone(320, 0.06, 'triangle', 0.06); }
 
 export function playSubmit(): void {
   if (!settings.sfx) return;
@@ -77,9 +82,7 @@ export function playError(): void {
   tone(180, 0.15, 'sawtooth', 0.08, { end: 120, at: 0.1 });
 }
 
-export function playTick(): void {
-  tone(440, 0.04, 'square', 0.05);
-}
+export function playTick(): void { tone(440, 0.04, 'square', 0.05); }
 
 export function playLevelWin(): void {
   if (!settings.sfx) return;
@@ -92,54 +95,64 @@ export function playLevelFail(): void {
   tone(220, 0.25, 'sine', 0.1, { end: 160, at: 0.2 });
 }
 
-export async function startMusic(): Promise<void> {
-  if (!settings.music || musicNodes) return;
-  const c = await resume();
+/** Cash-register style cha-ching when ARX-P credits */
+export function playCoinCredit(): void {
+  if (!settings.sfx) return;
+  const c = getCtx();
   if (!c) return;
+  void resume();
+  const t = c.currentTime;
 
-  const master = c.createGain();
-  master.gain.value = 0.04;
-  master.connect(c.destination);
+  const ding = c.createOscillator();
+  const dingGain = c.createGain();
+  ding.type = 'sine';
+  ding.frequency.setValueAtTime(880, t);
+  ding.frequency.exponentialRampToValueAtTime(1320, t + 0.06);
+  dingGain.gain.setValueAtTime(vol(0.18), t);
+  dingGain.gain.exponentialRampToValueAtTime(0.001, t + 0.14);
+  ding.connect(dingGain);
+  dingGain.connect(c.destination);
+  ding.start(t);
+  ding.stop(t + 0.16);
 
-  const freqs = [110, 164.81, 220, 277.18];
-  const oscs: OscillatorNode[] = [];
-  const gains: GainNode[] = [];
+  const coin = c.createOscillator();
+  const coinGain = c.createGain();
+  coin.type = 'triangle';
+  coin.frequency.setValueAtTime(2100, t + 0.05);
+  coin.frequency.exponentialRampToValueAtTime(1600, t + 0.12);
+  coinGain.gain.setValueAtTime(0, t);
+  coinGain.gain.linearRampToValueAtTime(vol(0.12), t + 0.05);
+  coinGain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+  coin.connect(coinGain);
+  coinGain.connect(c.destination);
+  coin.start(t + 0.05);
+  coin.stop(t + 0.24);
 
-  freqs.forEach((f, i) => {
-    const osc = c.createOscillator();
-    const g = c.createGain();
-    osc.type = i % 2 === 0 ? 'sine' : 'triangle';
-    osc.frequency.value = f;
-    g.gain.value = 0.15 / freqs.length;
-    osc.connect(g);
-    g.connect(master);
-    osc.start();
-    oscs.push(osc);
-    gains.push(g);
-  });
+  window.setTimeout(() => tone(660, 0.05, 'square', 0.06), 80);
+}
 
-  const lfo = c.createOscillator();
-  const lfoGain = c.createGain();
-  lfo.frequency.value = 0.08;
-  lfoGain.gain.value = 0.015;
-  lfo.connect(lfoGain);
-  lfoGain.connect(master.gain);
-  lfo.start();
-
-  musicNodes = { oscs, gains, lfo };
+export async function startMusic(): Promise<void> {
+  if (!settings.music) return;
+  stopMusic();
+  const track = trackById(settings.musicTrack);
+  audioEl = new Audio(track.src);
+  audioEl.loop = true;
+  audioEl.volume = settings.musicVolume;
+  try {
+    await audioEl.play();
+  } catch { /* needs user gesture */ }
 }
 
 export function stopMusic(): void {
-  if (!musicNodes) return;
-  const c = getCtx();
-  musicNodes.oscs.forEach((o) => {
-    try { o.stop(); } catch { /* already stopped */ }
-  });
-  try { musicNodes.lfo.stop(); } catch { /* */ }
-  musicNodes = null;
-  if (c) void c.suspend();
+  if (audioEl) {
+    audioEl.pause();
+    audioEl.src = '';
+    audioEl = null;
+  }
 }
 
 export function unlockAudio(): void {
   void resume();
 }
+
+export { FORGE_MUSIC_TRACKS };
