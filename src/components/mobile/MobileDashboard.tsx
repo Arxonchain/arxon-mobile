@@ -383,7 +383,7 @@ export default function MobileDashboard() {
 
   const quickItems = [
     ...(WORD_FORGE_ENABLED ? [{
-      id:'word-forge', label:'Word Forge', path:'/games',
+      id:'word-forge', label:'Word Forge', path:'/word-forge',
       col:'hsl(38 90% 55%)', bg:'hsl(38 90% 55%/0.12)', bd:'hsl(38 90% 55%/0.22)',
       badge: 'BETA' as const,
       icon:<><path d="M4 7h16M7 7v12a2 2 0 002 2h6a2 2 0 002-2V7"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,

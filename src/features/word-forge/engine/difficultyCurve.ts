@@ -4,31 +4,29 @@ export interface LevelParams {
   timerSeconds: number;
   minWordsRequired: number;
   bonusWordDensity: number;
-  shapeTier: 1 | 2 | 3;
   minWordLen: number;
   maxWordLen: number;
+  /** Relaxed requirements for tutorial levels 1–3 */
+  tutorialMode: boolean;
 }
 
 export function poolSize(L: number): number {
+  if (L <= 3) return 6;
   return Math.min(16, Math.max(6, 6 + Math.floor(L / 3)));
 }
 
 export function timerSeconds(L: number): number {
-  return Math.min(90, Math.max(30, Math.round(90 - L * 1.5)));
+  if (L <= 3) return 90;
+  return Math.min(90, Math.max(40, Math.round(90 - L * 1.5)));
 }
 
 export function minWordsRequired(L: number): number {
-  return Math.min(12, Math.max(3, 3 + Math.floor(L / 8)));
+  if (L <= 3) return 2;
+  return Math.min(8, Math.max(3, 3 + Math.floor(L / 8)));
 }
 
 export function bonusWordDensity(L: number): number {
   return Math.min(0.6, Math.max(0.05, 0.05 + L * 0.004));
-}
-
-export function shapeTier(L: number): 1 | 2 | 3 {
-  if (L <= 10) return 1;
-  if (L <= 25) return 2;
-  return 3;
 }
 
 function wordLenRange(L: number): { min: number; max: number } {
@@ -46,8 +44,8 @@ export function levelParams(L: number): LevelParams {
     timerSeconds: timerSeconds(L),
     minWordsRequired: minWordsRequired(L),
     bonusWordDensity: bonusWordDensity(L),
-    shapeTier: shapeTier(L),
     minWordLen: len.min,
     maxWordLen: len.max,
+    tutorialMode: L <= 3,
   };
 }

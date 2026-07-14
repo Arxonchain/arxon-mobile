@@ -1,3 +1,6 @@
-/** Word Forge gated until tested — set VITE_WORD_FORGE_ENABLED=true in .env.word-forge */
+/** Word Forge enabled on native iOS/Android by default; override via VITE_WORD_FORGE_ENABLED */
+import { Capacitor } from '@capacitor/core';
+
+const envFlag = import.meta.env.VITE_WORD_FORGE_ENABLED;
 export const WORD_FORGE_ENABLED =
-  import.meta.env.VITE_WORD_FORGE_ENABLED === 'true';
+  envFlag === 'true' || (envFlag !== 'false' && Capacitor.isNativePlatform());

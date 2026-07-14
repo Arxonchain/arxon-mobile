@@ -9,11 +9,12 @@ interface LevelCompleteModalProps {
   wordsFormed: number;
   wordsRequired: number;
   balance: number;
+  newBest?: boolean;
   onContinue: () => void;
 }
 
 export function LevelCompleteModal({
-  open, passed, level, wordsFormed, wordsRequired, balance, onContinue,
+  open, passed, level, wordsFormed, wordsRequired, balance, newBest, onContinue,
 }: LevelCompleteModalProps) {
   const nextLevel = level + 1;
   const accent = passed ? '#4FD8EB' : '#ff6b4a';
@@ -155,7 +156,9 @@ export function LevelCompleteModal({
                 color: 'rgba(200,230,255,0.65)', letterSpacing: '0.14em',
                 textTransform: 'uppercase',
               }}>
-                {passed ? `Level ${nextLevel} Ready` : `${wordsRequired - wordsFormed} Words Short`}
+                {passed
+                  ? (newBest ? `NEW BEST — Level ${nextLevel} Ready` : `Level ${nextLevel} Ready`)
+                  : `${wordsRequired - wordsFormed} Words Short`}
               </p>
             </motion.div>
 

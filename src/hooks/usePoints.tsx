@@ -24,6 +24,7 @@ interface UserPoints {
   task_points: number;
   social_points: number;
   referral_points: number;
+  game_points: number;
   referral_bonus_percentage: number; // Boost from referrals only
   x_post_boost_percentage: number; // Boost from X post submissions (social yapping)
 }
@@ -32,7 +33,7 @@ type PointsContextType = {
   points: UserPoints | null;
   loading: boolean;
   rank: number | null;
-  addPoints: (amount: number, type: 'mining' | 'task' | 'social' | 'referral', sessionId?: string) => Promise<{ success: boolean; points?: number; error?: string }>;
+  addPoints: (amount: number, type: 'mining' | 'task' | 'social' | 'referral' | 'game', sessionId?: string) => Promise<{ success: boolean; points?: number; error?: string }>;
   refreshPoints: () => Promise<void>;
   triggerConfetti: () => void;
 };
@@ -160,7 +161,7 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
   const addPoints = useCallback(
     async (
       amount: number,
-      type: 'mining' | 'task' | 'social' | 'referral',
+      type: 'mining' | 'task' | 'social' | 'referral' | 'game',
       sessionId?: string
     ): Promise<{ success: boolean; points?: number; error?: string }> => {
       if (!user) return { success: false, error: 'Not authenticated' };
