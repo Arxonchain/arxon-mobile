@@ -47,7 +47,6 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 
 // Mobile
 import MobileDashboard from "@/components/mobile/MobileDashboard";
-import GamingHubPage from "@/components/mobile/GamingHubPage";
 import MobileMining from "@/components/mobile/MobileMining";
 import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
 import MobileBottomNav from "@/components/mobile/MobileBottomNav";
@@ -64,6 +63,10 @@ import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
+
+const GamingHubPage = WORD_FORGE_ENABLED
+  ? lazy(() => import("@/components/mobile/GamingHubPage"))
+  : null;
 
 const WordForgePreviewPage = lazy(() => import("@/features/word-forge/preview/WordForgePreviewPage"));
 
@@ -187,8 +190,14 @@ function AppRoutes() {
         {isNative ? (
           <>
             <Route path="/"             element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
-            {WORD_FORGE_ENABLED && (
-              <Route path="/games" element={<ProtectedRoute><GamingHubPage /></ProtectedRoute>} />
+            {WORD_FORGE_ENABLED && GamingHubPage && (
+              <Route path="/games" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<Spinner />}>
+                    <GamingHubPage />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
             )}
             <Route path="/mining"       element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena"        element={<MobileArena />} />
@@ -223,6 +232,26 @@ function AppRoutes() {
             <Route path="/profile"      element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
             <Route path="/settings"     element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            {WORD_FORGE_ENABLED && GamingHubPage && (
+              <Route path="/games" element={
+                <ProtectedRoute>
+                  <DashboardLayout>
+                    <Suspense fallback={<Spinner />}>
+                      <GamingHubPage />
+                    </Suspense>
+                  </DashboardLayout>
+                </ProtectedRoute>
+              } />
+            )}
+            {WORD_FORGE_ENABLED && WordForgePage && (
+              <Route path="/word-forge" element={
+                <ProtectedRoute>
+                  <Suspense fallback={<Spinner />}>
+                    <WordForgePage />
+                  </Suspense>
+                </ProtectedRoute>
+              } />
+            )}
           </>
         )}
 

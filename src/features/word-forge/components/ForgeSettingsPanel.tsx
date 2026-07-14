@@ -6,16 +6,22 @@ interface ForgeSettingsPanelProps {
   settings: ForgeSettings;
   onChange: (s: ForgeSettings) => void;
   accent: string;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export function ForgeSettingsPanel({ settings, onChange, accent }: ForgeSettingsPanelProps) {
+export function ForgeSettingsPanel({ settings, onChange, accent, onOpenChange }: ForgeSettingsPanelProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+
+  const setOpenState = (v: boolean) => {
+    setOpen(v);
+    onOpenChange?.(v);
+  };
 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpenState(false);
     };
     document.addEventListener('mousedown', close);
     document.addEventListener('touchstart', close);
@@ -29,7 +35,7 @@ export function ForgeSettingsPanel({ settings, onChange, accent }: ForgeSettings
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => setOpenState(true)}
         aria-label="Game settings"
         style={{
           width: 36, height: 36, borderRadius: 8,
@@ -68,7 +74,7 @@ export function ForgeSettingsPanel({ settings, onChange, accent }: ForgeSettings
               </h2>
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => setOpenState(false)}
                 style={{
                   border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)',
                   fontSize: 20, cursor: 'pointer', lineHeight: 1,

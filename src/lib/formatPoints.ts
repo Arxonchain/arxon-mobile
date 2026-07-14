@@ -73,6 +73,7 @@ export function sanitizeUserPoints<T>(data: T): T {
     'task_points',
     'social_points',
     'referral_points',
+    'game_points',
   ];
 
   // Create a shallow copy to avoid mutating the original

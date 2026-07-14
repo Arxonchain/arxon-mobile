@@ -9,16 +9,14 @@ export interface ValidationResult {
   definition?: string | null;
 }
 
-const MIN_LEN = 3;
-const SERVER_DELAY_MS = 180;
-
 export function validateWordLocal(
   word: string,
   poolLetters: string[],
   claimed: Set<string>,
+  minLen = 3,
 ): ValidationResult {
   const w = word.toUpperCase().trim();
-  if (w.length < MIN_LEN) return { ok: false, reason: 'short' };
+  if (w.length < minLen) return { ok: false, reason: 'short' };
   if (claimed.has(w)) return { ok: false, reason: 'duplicate' };
   if (!hasWord(w) && !isBonusWord(w)) return { ok: false, reason: 'unknown' };
   if (!canForm(w, poolCountMap(poolLetters))) return { ok: false, reason: 'pool' };
@@ -29,14 +27,13 @@ export function validateWordLocal(
   };
 }
 
-/** Mock authoritative server — same rules, no rate-limit false rejects in preview. */
-export async function validateWordServer(
-  word: string,
-  poolLetters: string[],
-  claimed: Set<string>,
-): Promise<ValidationResult> {
-  await new Promise((r) => setTimeout(r, SERVER_DELAY_MS));
-  const w = word.toUpperCase().trim();
-  const others = new Set([...claimed].filter((x) => x !== w));
-  return validateWordLocal(w, poolLetters, others);
+export function reasonMessage(reason?: ValidationResult['reason'], minLen = 3): string {
+  switch (reason) {
+    case 'short': return `Need ${minLen}+ letters`;
+    case 'unknown': return 'Not in dictionary';
+    case 'duplicate': return 'Already found';
+    case 'pool': return 'Letters not in pool';
+    case 'rate': return 'Too fast — try again';
+    default: return 'Invalid word';
+  }
 }

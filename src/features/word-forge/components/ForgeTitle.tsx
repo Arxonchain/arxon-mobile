@@ -87,7 +87,7 @@ export function TechButton({
       disabled={disabled}
       onClick={onClick}
       style={{
-        padding: '12px 20px',
+        padding: '12px 20px', minHeight: 44,
         borderRadius: 2,
         border: primary ? '1px solid rgba(79,216,235,0.55)' : '1px solid rgba(255,255,255,0.15)',
         background: primary
