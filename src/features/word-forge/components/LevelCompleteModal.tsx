@@ -10,15 +10,28 @@ interface LevelCompleteModalProps {
   wordsRequired: number;
   balance: number;
   newBest?: boolean;
+  isDaily?: boolean;
+  completionistBonus?: number;
+  dailyBonus?: number;
   onContinue: () => void;
 }
 
 export function LevelCompleteModal({
-  open, passed, level, wordsFormed, wordsRequired, balance, newBest, onContinue,
+  open, passed, level, wordsFormed, wordsRequired, balance, newBest,
+  isDaily, completionistBonus = 0, dailyBonus = 0, onContinue,
 }: LevelCompleteModalProps) {
   const nextLevel = level + 1;
   const accent = passed ? '#4FD8EB' : '#ff6b4a';
   const accentGlow = passed ? 'rgba(79,216,235,0.55)' : 'rgba(255,107,74,0.45)';
+  const headline = isDaily ? (passed ? 'DAILY' : 'DAILY') : (passed ? nextLevel : level);
+  const subtitle = isDaily
+    ? (passed ? `+${dailyBonus} ARX-P Daily Bonus${completionistBonus ? ` · +${completionistBonus} completionist` : ''}` : `${wordsRequired - wordsFormed} Words Short`)
+    : passed
+      ? (newBest ? `NEW BEST — Level ${nextLevel} Ready` : `Level ${nextLevel} Ready`)
+      : `${wordsRequired - wordsFormed} Words Short`;
+  const continueLabel = isDaily
+    ? (passed ? 'Back to Hub' : 'Retry Daily')
+    : (passed ? `Enter Level ${nextLevel}` : 'Retry Sector');
 
   return (
     <AnimatePresence>
@@ -144,21 +157,20 @@ export function LevelCompleteModal({
                 animate={{ textShadow: [`0 0 20px ${accentGlow}`, `0 0 40px ${accentGlow}`, `0 0 20px ${accentGlow}`] }}
                 transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
                 style={{
-                  fontSize: 72, fontWeight: 900, lineHeight: 1,
+                  fontSize: isDaily ? 48 : 72, fontWeight: 900, lineHeight: 1,
                   color: '#fff',
                   fontFamily: "'Creato Display', system-ui, sans-serif",
+                  letterSpacing: isDaily ? '0.08em' : undefined,
                 }}
               >
-                {passed ? nextLevel : level}
+                {headline}
               </motion.div>
               <p style={{
                 margin: '6px 0 0', fontSize: 11, fontWeight: 700,
                 color: 'rgba(200,230,255,0.65)', letterSpacing: '0.14em',
                 textTransform: 'uppercase',
               }}>
-                {passed
-                  ? (newBest ? `NEW BEST — Level ${nextLevel} Ready` : `Level ${nextLevel} Ready`)
-                  : `${wordsRequired - wordsFormed} Words Short`}
+                {subtitle}
               </p>
             </motion.div>
 
@@ -177,7 +189,7 @@ export function LevelCompleteModal({
               <ResultCard
                 delay={0.38}
                 label="Session Earn"
-                value={`+${balance}`}
+                value={`+${balance + completionistBonus + (passed && isDaily ? dailyBonus : 0)}`}
                 sub="ARX-P"
                 accent="#ffd93d"
                 slideFrom="right"
@@ -191,7 +203,7 @@ export function LevelCompleteModal({
               transition={{ delay: 0.46 }}
             >
               <TechButton onClick={onContinue}>
-                {passed ? `Enter Level ${nextLevel}` : 'Retry Sector'}
+                {continueLabel}
               </TechButton>
             </motion.div>
           </motion.div>
@@ -249,6 +261,10 @@ interface TimeUpModalProps {
   wordsFormed: number;
   wordsRequired: number;
   balance: number;
+  newBest?: boolean;
+  isDaily?: boolean;
+  completionistBonus?: number;
+  dailyBonus?: number;
   onContinue: () => void;
 }
 

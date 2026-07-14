@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ChevronLeft, Bell, Shield, Zap, Gift, Trophy, AlertCircle, Swords,
+  ChevronLeft, Bell, Shield, Zap, Gift, Trophy, AlertCircle, Swords, Flame,
   Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
@@ -22,6 +22,7 @@ const NOTIF_OPTIONS: {
   { key: 'arenaLive',          icon: Swords,      title: 'Arena Live',         description: 'New prediction battles go live' },
   { key: 'arenaResults',       icon: Trophy,      title: 'Arena Results',      description: 'Win or loss on battles you joined' },
   { key: 'rewardUpdates',      icon: Gift,        title: 'Reward Updates',     description: 'Significant ARX-P rewards earned' },
+  { key: 'wordForgeDaily',     icon: Flame,       title: 'Word Forge Daily',   description: 'Daily challenge and streak reminders' },
   { key: 'adminAnnouncements', icon: AlertCircle, title: 'Announcements',      description: 'Updates from the Arxon team' },
 ];
 

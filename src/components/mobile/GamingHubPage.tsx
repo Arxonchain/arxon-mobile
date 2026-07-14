@@ -16,7 +16,8 @@ export default function GamingHubPage() {
   const continueGame = () => navigate('/word-forge');
   const openDaily = () => navigate('/word-forge?mode=daily');
   const openStats = () => navigate('/word-forge/stats');
-  const openLeaderboard = () => navigate('/leaderboard');
+  const openMap = () => navigate('/word-forge/map');
+  const openLeaderboard = () => navigate('/word-forge/leaderboard');
 
   return (
     <div style={{
@@ -56,6 +57,9 @@ export default function GamingHubPage() {
           <TechButton variant="ghost" onClick={openDaily} disabled={!WORD_FORGE_ENABLED || dailyDone}>
             {dailyDone ? `Daily Complete (${dailySeed()})` : 'Daily Forge Challenge +50 ARX-P'}
           </TechButton>
+          <TechButton variant="ghost" onClick={openMap} disabled={!WORD_FORGE_ENABLED}>
+            Sector Map
+          </TechButton>
         </motion.div>
 
         <div style={{
@@ -80,6 +84,47 @@ export default function GamingHubPage() {
         <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
           <TechButton variant="ghost" onClick={openStats}>Stats</TechButton>
           <TechButton variant="ghost" onClick={openLeaderboard}>Leaderboard</TechButton>
+        </div>
+
+        <p style={{
+          margin: '28px auto 10px', maxWidth: 360, textAlign: 'center',
+          fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', color: 'rgba(79,216,235,0.45)',
+        }}>
+          MORE GAMES
+        </p>
+
+        <div style={{ maxWidth: 360, margin: '0 auto', display: 'grid', gap: 10 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.15 }}
+            style={{
+              padding: '16px 14px', borderRadius: 4,
+              border: '1px solid rgba(79,216,235,0.35)', background: 'rgba(0,8,16,0.72)',
+            }}
+          >
+            <div style={{ fontSize: 11, fontWeight: 900, color: '#4FD8EB', letterSpacing: '0.08em' }}>WORD FORGE</div>
+            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>Live · Sector {progress.currentLevel}</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            style={{
+              padding: '16px 14px', borderRadius: 4,
+              border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.45)',
+              opacity: 0.72,
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.08em' }}>CIPHER DROP</div>
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Decode falling blocks · Coming soon</div>
+              </div>
+              <span style={{ fontSize: 16 }}>🔒</span>
+            </div>
+          </motion.div>
         </div>
 
         {dailyBadge && (

@@ -44,6 +44,7 @@ import AdminReferrals from "@/pages/admin/AdminReferrals";
 import AdminReferralRecovery from "@/pages/admin/AdminReferralRecovery";   // ← NEW
 
 import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
 
 // Mobile
 import MobileDashboard from "@/components/mobile/MobileDashboard";
@@ -72,6 +73,18 @@ const WordForgePreviewPage = lazy(() => import("@/features/word-forge/preview/Wo
 
 const WordForgePage = WORD_FORGE_ENABLED
   ? lazy(() => import("@/features/word-forge/WordForgePage"))
+  : null;
+
+const ForgeStatsPage = WORD_FORGE_ENABLED
+  ? lazy(() => import("@/features/word-forge/pages/ForgeStatsPage"))
+  : null;
+
+const SectorMapPage = WORD_FORGE_ENABLED
+  ? lazy(() => import("@/features/word-forge/pages/SectorMapPage"))
+  : null;
+
+const WordForgeLeaderboardPage = WORD_FORGE_ENABLED
+  ? lazy(() => import("@/features/word-forge/pages/WordForgeLeaderboardPage"))
   : null;
 
 const queryClient = new QueryClient({
@@ -118,7 +131,8 @@ class AppErrorBoundary extends React.Component<
 }
 
 function PushNotificationInit() {
-  usePushNotifications();
+  const { preferences } = usePushNotifications();
+  useForgeDailyReminder(preferences.wordForgeDaily);
   return null;
 }
 
@@ -211,13 +225,42 @@ function AppRoutes() {
             <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             {WORD_FORGE_ENABLED && WordForgePage && (
-              <Route path="/word-forge" element={
-                <ProtectedRoute>
-                  <Suspense fallback={<Spinner />}>
-                    <WordForgePage />
-                  </Suspense>
-                </ProtectedRoute>
-              } />
+              <>
+                <Route path="/word-forge" element={
+                  <ProtectedRoute>
+                    <Suspense fallback={<Spinner />}>
+                      <WordForgePage />
+                    </Suspense>
+                  </ProtectedRoute>
+                } />
+                {ForgeStatsPage && (
+                  <Route path="/word-forge/stats" element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<Spinner />}>
+                        <ForgeStatsPage />
+                      </Suspense>
+                    </ProtectedRoute>
+                  } />
+                )}
+                {SectorMapPage && (
+                  <Route path="/word-forge/map" element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<Spinner />}>
+                        <SectorMapPage />
+                      </Suspense>
+                    </ProtectedRoute>
+                  } />
+                )}
+                {WordForgeLeaderboardPage && (
+                  <Route path="/word-forge/leaderboard" element={
+                    <ProtectedRoute>
+                      <Suspense fallback={<Spinner />}>
+                        <WordForgeLeaderboardPage />
+                      </Suspense>
+                    </ProtectedRoute>
+                  } />
+                )}
+              </>
             )}
           </>
         ) : (
@@ -244,13 +287,48 @@ function AppRoutes() {
               } />
             )}
             {WORD_FORGE_ENABLED && WordForgePage && (
-              <Route path="/word-forge" element={
-                <ProtectedRoute>
-                  <Suspense fallback={<Spinner />}>
-                    <WordForgePage />
-                  </Suspense>
-                </ProtectedRoute>
-              } />
+              <>
+                <Route path="/word-forge" element={
+                  <ProtectedRoute>
+                    <Suspense fallback={<Spinner />}>
+                      <WordForgePage />
+                    </Suspense>
+                  </ProtectedRoute>
+                } />
+                {ForgeStatsPage && (
+                  <Route path="/word-forge/stats" element={
+                    <ProtectedRoute>
+                      <DashboardLayout>
+                        <Suspense fallback={<Spinner />}>
+                          <ForgeStatsPage />
+                        </Suspense>
+                      </DashboardLayout>
+                    </ProtectedRoute>
+                  } />
+                )}
+                {SectorMapPage && (
+                  <Route path="/word-forge/map" element={
+                    <ProtectedRoute>
+                      <DashboardLayout>
+                        <Suspense fallback={<Spinner />}>
+                          <SectorMapPage />
+                        </Suspense>
+                      </DashboardLayout>
+                    </ProtectedRoute>
+                  } />
+                )}
+                {WordForgeLeaderboardPage && (
+                  <Route path="/word-forge/leaderboard" element={
+                    <ProtectedRoute>
+                      <DashboardLayout>
+                        <Suspense fallback={<Spinner />}>
+                          <WordForgeLeaderboardPage />
+                        </Suspense>
+                      </DashboardLayout>
+                    </ProtectedRoute>
+                  } />
+                )}
+              </>
             )}
           </>
         )}

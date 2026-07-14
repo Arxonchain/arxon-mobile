@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import {
-  setForgeAudioSettings, startMusic, stopMusic, unlockAudio,
+  setForgeAudioSettings, startMusic, stopMusic, unlockAudio, restoreMusic,
 } from '../audio/forgeAudio';
 import { ForgeSettingsPanel } from './ForgeSettingsPanel';
 import { CoinFlyLayer } from './CoinFlyLayer';
@@ -14,20 +14,22 @@ import { LetterBoard, TimerRing } from './LetterBoard';
 import { RoundEndModal } from './LevelCompleteModal';
 import { TutorialOverlay } from './TutorialOverlay';
 import { loadForgeSettings, saveForgeSettings } from '../hooks/useForgeSettings';
-import { useWordForgeGame } from '../hooks/useWordForgeGame';
+import { useWordForgeGame, type ForgeGameMode } from '../hooks/useWordForgeGame';
+import { DAILY_BONUS_PAYOUT } from '../engine/dailyChallenge';
 import { prefersReducedMotion } from '../design-system/forgeTheme';
 
 interface WordForgeGameProps {
   preview?: boolean;
+  mode?: ForgeGameMode;
 }
 
-export function WordForgeGame({ preview = false }: WordForgeGameProps) {
+export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeGameProps) {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(loadForgeSettings);
   const [tutorialStep, setTutorialStep] = useState(0);
   const [exitConfirm, setExitConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const game = useWordForgeGame({ preview });
+  const game = useWordForgeGame({ preview, mode });
   const { generation, phase } = game;
   const passed = game.validCount >= game.minWords;
   const urgent = game.timeLeft <= 10 && phase === 'playing';
@@ -68,6 +70,19 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
     stopMusic();
     navigate(preview ? '/word-forge-preview' : '/games');
   }, [navigate, preview]);
+
+  const handleRoundContinue = useCallback(() => {
+    if (game.isDaily) {
+      if (passed) {
+        navigate('/games');
+        return;
+      }
+      restoreMusic();
+      game.resetRound(game.level, true);
+      return;
+    }
+    game.advanceOrRetry();
+  }, [game, passed, navigate]);
 
   const topPad = Capacitor.isNativePlatform()
     ? 'max(48px, env(safe-area-inset-top))'
@@ -168,7 +183,7 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
               )}
               <ForgeTitle compact />
               <p style={{ margin: '4px 0 0', fontSize: 9, color: 'rgba(79,216,235,0.4)', letterSpacing: '0.1em' }}>
-                {game.skin.label} · {generation.grid.label} · {preview ? 'SIM' : 'LIVE'}
+                {game.skin.label} · {generation.grid.label} · {game.isDaily ? 'DAILY' : preview ? 'SIM' : 'LIVE'}
               </p>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -202,8 +217,8 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
             display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 6, alignItems: 'end',
           }}>
             <div>
-              <TechLabel>Sector</TechLabel>
-              <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1, marginTop: 2 }}>{game.level}</div>
+              <TechLabel>{game.isDaily ? 'Challenge' : 'Sector'}</TechLabel>
+              <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1, marginTop: 2 }}>{game.displayLevel}</div>
               {game.streak >= 2 && (
                 <div style={{
                   marginTop: 2, fontSize: 9, fontWeight: 800, color: '#ffd93d',
@@ -345,7 +360,10 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
         wordsRequired={game.minWords}
         balance={game.displayBalance}
         newBest={game.newBest}
-        onContinue={game.advanceOrRetry}
+        isDaily={game.isDaily}
+        completionistBonus={game.completionistPayout}
+        dailyBonus={game.dailyBonusAwarded ? DAILY_BONUS_PAYOUT : 0}
+        onContinue={handleRoundContinue}
       />
 
       <CoinFlyLayer events={game.coinFlies} targetRef={game.balanceRef} />
