@@ -3,6 +3,7 @@ import { FORGE_MUSIC_TRACKS, trackById } from '../data/audioTracks';
 
 let ctx: AudioContext | null = null;
 let audioEl: HTMLAudioElement | null = null;
+let currentTrackId: string | null = null;
 let settings: ForgeSettings = {
   sfx: true, music: true, musicTrack: 'energy',
   sfxVolume: 0.85, musicVolume: 0.45, haptics: true,
@@ -24,14 +25,20 @@ async function resume(): Promise<AudioContext | null> {
 }
 
 export function setForgeAudioSettings(s: ForgeSettings): void {
+  const prevMusic = settings.music;
   const prevTrack = settings.musicTrack;
   settings = s;
-  if (audioEl) audioEl.volume = s.musicVolume;
+
   if (!s.music) {
     stopMusic();
     return;
   }
-  if (audioEl && prevTrack !== s.musicTrack) void startMusic();
+
+  if (audioEl) audioEl.volume = s.musicVolume;
+
+  if (!prevMusic || prevTrack !== s.musicTrack) {
+    void startMusic();
+  }
 }
 
 function vol(base: number): number {
@@ -133,9 +140,21 @@ export function playCoinCredit(): void {
 
 export async function startMusic(): Promise<void> {
   if (!settings.music) return;
+
+  const trackId = settings.musicTrack;
+
+  if (audioEl && currentTrackId === trackId) {
+    audioEl.volume = settings.musicVolume;
+    if (audioEl.paused) {
+      try { await audioEl.play(); } catch { /* needs user gesture */ }
+    }
+    return;
+  }
+
   stopMusic();
-  const track = trackById(settings.musicTrack);
+  const track = trackById(trackId);
   audioEl = new Audio(track.src);
+  currentTrackId = trackId;
   audioEl.loop = true;
   audioEl.volume = settings.musicVolume;
   try {
@@ -148,6 +167,7 @@ export function stopMusic(): void {
     audioEl.pause();
     audioEl.src = '';
     audioEl = null;
+    currentTrackId = null;
   }
 }
 

@@ -3,11 +3,6 @@ import levelCoin from '@/assets/word-forge/ui/level-coin.png';
 import forgeFrameBg from '@/assets/word-forge/ui/forge-frame-bg.png';
 import discoveryBg from '@/assets/word-forge/ui/discovery-bg.png';
 import arxCoin from '@/assets/word-forge/ui/arx-coin.png';
-import tileHex from '@/assets/word-forge/ui/tile-hex.png';
-import tileDiamond from '@/assets/word-forge/ui/tile-diamond.png';
-import tileBanner from '@/assets/word-forge/ui/tile-banner.png';
-import tileScallop from '@/assets/word-forge/ui/tile-scallop.png';
-import tileSplash from '@/assets/word-forge/ui/tile-splash.png';
 
 export const FORGE_UI = {
   arcadePlay,
@@ -19,19 +14,19 @@ export const FORGE_UI = {
 
 export interface LevelTileSkin {
   id: string;
-  image: string;
   letterColor: string;
   glow: string;
+  accent: string;
   label: string;
 }
 
-/** Images 4–8 — one skin per level cycle */
+/** CSS tile accent palettes — one skin per level cycle */
 export const LEVEL_TILE_SKINS: LevelTileSkin[] = [
-  { id: 'hex', image: tileHex, letterColor: '#1e3a22', glow: 'rgba(127,231,196,0.55)', label: 'Hex Forge' },
-  { id: 'diamond', image: tileDiamond, letterColor: '#0c1a28', glow: 'rgba(79,216,235,0.6)', label: 'Crystal Cut' },
-  { id: 'banner', image: tileBanner, letterColor: '#2a2218', glow: 'rgba(255,217,61,0.5)', label: 'Vault Seal' },
-  { id: 'scallop', image: tileScallop, letterColor: '#e8fff8', glow: 'rgba(127,231,196,0.45)', label: 'Node Badge' },
-  { id: 'splash', image: tileSplash, letterColor: '#1a3a18', glow: 'rgba(160,255,140,0.4)', label: 'Flux Mark' },
+  { id: 'hex', letterColor: '#e8fcff', glow: 'rgba(127,231,196,0.65)', accent: '#7FE7C4', label: 'Hex Forge' },
+  { id: 'diamond', letterColor: '#f0fcff', glow: 'rgba(79,216,235,0.7)', accent: '#4FD8EB', label: 'Crystal Cut' },
+  { id: 'banner', letterColor: '#fff8e8', glow: 'rgba(255,217,61,0.55)', accent: '#ffd93d', label: 'Vault Seal' },
+  { id: 'scallop', letterColor: '#e8fff8', glow: 'rgba(127,231,196,0.5)', accent: '#5eead4', label: 'Node Badge' },
+  { id: 'splash', letterColor: '#f0ffe8', glow: 'rgba(160,255,140,0.45)', accent: '#86efac', label: 'Flux Mark' },
 ];
 
 export function tileSkinForLevel(level: number): LevelTileSkin {

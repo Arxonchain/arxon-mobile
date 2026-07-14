@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
 import {
@@ -28,22 +28,24 @@ export function WordForgeGame({ preview = false }: WordForgeGameProps) {
   const urgent = game.timeLeft <= 10 && phase === 'playing';
   const progress = Math.min(1, game.validCount / generation.params.minWordsRequired);
 
+  const audioUnlockedRef = useRef(false);
+
   const updateSettings = useCallback((s: typeof settings) => {
     setSettings(s);
     saveForgeSettings(s);
     setForgeAudioSettings(s);
-    if (s.music && phase === 'playing') void startMusic();
-    else stopMusic();
-  }, [phase]);
+  }, []);
 
   useEffect(() => {
     setForgeAudioSettings(settings);
     if (settings.music && phase === 'playing') void startMusic();
     else stopMusic();
     return () => stopMusic();
-  }, [settings.music, settings.musicTrack, settings.musicVolume, phase, settings]);
+  }, [settings.music, settings.musicTrack, settings.musicVolume, phase]);
 
   const onFirstInteract = useCallback(() => {
+    if (audioUnlockedRef.current) return;
+    audioUnlockedRef.current = true;
     unlockAudio();
     if (settings.music && phase === 'playing') void startMusic();
   }, [settings.music, phase]);

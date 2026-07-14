@@ -37,13 +37,13 @@ export function ForgePlayfield({ level, tiles, forgeField }: ForgePlayfieldProps
           pointerEvents: 'none',
         }} />
 
-        {/* Upper void — circled tile zone */}
+        {/* Screen void — letter tile zone inside the frame bezel */}
         <div style={{
           position: 'absolute',
-          top: '7%',
-          left: '11%',
-          width: '78%',
-          height: '40%',
+          top: '14.5%',
+          left: '10.5%',
+          width: '79%',
+          height: '31%',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
