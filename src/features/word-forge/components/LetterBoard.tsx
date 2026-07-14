@@ -63,7 +63,7 @@ export function LetterBoard({
     return `${x},${y}`;
   }).filter(Boolean).join(' ');
 
-  const tileSize = grid.cols >= 4 ? 52 : 58;
+  const fontSize = grid.cols >= 4 ? 18 : grid.cols >= 3 ? 22 : 24;
 
   return (
     <div
@@ -79,10 +79,9 @@ export function LetterBoard({
         display: 'grid',
         gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
         gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-        gap: 6,
-        alignContent: 'center',
-        justifyContent: 'center',
-        padding: '4px 2px',
+        gap: grid.cols >= 4 ? 4 : 6,
+        placeItems: 'center',
+        padding: '2px',
       }}
     >
       {linePoints && selection.length > 1 && (
@@ -115,7 +114,7 @@ export function LetterBoard({
           selected={selectedSet.has(index)}
           order={orderMap.get(index)}
           skin={skin}
-          size={tileSize}
+          fontSize={fontSize}
           onPointerDown={onPointerDown}
         />
       ))}
@@ -124,71 +123,105 @@ export function LetterBoard({
 }
 
 const TileButton = forwardRef(function TileButton({
-  tile, index, selected, order, skin, size, onPointerDown,
+  tile, index, selected, order, skin, fontSize, onPointerDown,
 }: {
   tile: LetterTile;
   index: number;
   selected: boolean;
   order?: number;
   skin: LevelTileSkin;
-  size: number;
+  fontSize: number;
   onPointerDown: (i: number, e: React.PointerEvent) => void;
 }, ref: React.Ref<HTMLButtonElement>) {
   return (
-  <button
-    ref={ref}
-    type="button"
-    onPointerDown={(e) => onPointerDown(index, e)}
-    style={{
-      position: 'relative',
-      width: '100%',
-      aspectRatio: '1',
-      maxWidth: size,
-      maxHeight: size,
-      margin: '0 auto',
-      border: 'none',
-      background: 'transparent',
-      padding: 0,
-      cursor: 'pointer',
-      touchAction: 'none',
-      transform: selected ? 'translateY(-3px) scale(1.08)' : 'scale(1)',
-      transition: 'transform 0.12s cubic-bezier(0.34,1.4,0.64,1)',
-      zIndex: selected ? 10 : 2,
-      filter: selected ? `drop-shadow(0 0 14px ${skin.glow})` : undefined,
-    }}
-  >
-    <img
-      src={skin.image}
-      alt=""
-      draggable={false}
+    <button
+      ref={ref}
+      type="button"
+      onPointerDown={(e) => onPointerDown(index, e)}
       style={{
-        position: 'absolute', inset: 0, width: '100%', height: '100%',
-        objectFit: 'contain', pointerEvents: 'none',
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        maxWidth: '100%',
+        maxHeight: '100%',
+        aspectRatio: '1',
+        border: 'none',
+        background: 'transparent',
+        padding: 0,
+        cursor: 'pointer',
+        touchAction: 'none',
+        transform: selected ? 'translateY(-2px) scale(1.06)' : 'scale(1)',
+        transition: 'transform 0.12s cubic-bezier(0.34,1.4,0.64,1)',
+        zIndex: selected ? 10 : 2,
+        filter: selected ? `drop-shadow(0 0 16px ${skin.glow})` : undefined,
       }}
-    />
-    <span style={{
-      position: 'relative', zIndex: 2,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      width: '100%', height: '100%',
-      fontSize: size >= 58 ? 24 : 21, fontWeight: 900,
-      color: skin.letterColor,
-      fontFamily: "'Creato Display', system-ui, sans-serif",
-      textShadow: '0 1px 0 rgba(255,255,255,0.35), 0 2px 6px rgba(0,0,0,0.45)',
-    }}>
-      {tile.letter}
-    </span>
-    {order != null && (
-      <span style={{
-        position: 'absolute', top: 2, right: 4, zIndex: 3,
-        fontSize: 8, fontWeight: 900, color: '#4FD8EB',
-        background: 'rgba(0,0,0,0.7)', borderRadius: 3,
-        width: 13, height: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        border: '1px solid rgba(79,216,235,0.45)',
+    >
+      {/* Sci-fi tile face */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        borderRadius: 5,
+        background: selected
+          ? `linear-gradient(155deg, ${skin.accent}44 0%, rgba(4,16,28,0.96) 55%, rgba(2,8,16,0.98) 100%)`
+          : 'linear-gradient(155deg, rgba(20,40,58,0.82) 0%, rgba(4,12,22,0.96) 55%, rgba(2,6,12,0.98) 100%)',
+        border: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.32)'}`,
+        boxShadow: selected
+          ? `0 0 18px ${skin.glow}, inset 0 1px 0 rgba(255,255,255,0.18), inset 0 -2px 6px rgba(0,0,0,0.4)`
+          : '0 2px 8px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 4px rgba(0,0,0,0.35)',
+        pointerEvents: 'none',
       }}>
-        {order}
+        {/* Corner brackets */}
+        <span style={{
+          position: 'absolute', top: 3, left: 3, width: 7, height: 7,
+          borderTop: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+          borderLeft: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+        }} />
+        <span style={{
+          position: 'absolute', top: 3, right: 3, width: 7, height: 7,
+          borderTop: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+          borderRight: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+        }} />
+        <span style={{
+          position: 'absolute', bottom: 3, left: 3, width: 7, height: 7,
+          borderBottom: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+          borderLeft: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+        }} />
+        <span style={{
+          position: 'absolute', bottom: 3, right: 3, width: 7, height: 7,
+          borderBottom: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+          borderRight: `1.5px solid ${selected ? skin.accent : 'rgba(79,216,235,0.5)'}`,
+        }} />
+        {/* Inner glow strip */}
+        <div style={{
+          position: 'absolute', top: 0, left: '15%', right: '15%', height: 1,
+          background: `linear-gradient(90deg, transparent, ${selected ? skin.accent : 'rgba(79,216,235,0.45)'}, transparent)`,
+        }} />
+      </div>
+
+      <span style={{
+        position: 'relative', zIndex: 2,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        width: '100%', height: '100%',
+        fontSize, fontWeight: 900,
+        color: skin.letterColor,
+        fontFamily: "'Creato Display', system-ui, sans-serif",
+        textShadow: `0 0 12px ${skin.glow}, 0 2px 4px rgba(0,0,0,0.8)`,
+        letterSpacing: '-0.02em',
+      }}>
+        {tile.letter}
       </span>
-    )}
-  </button>
+
+      {order != null && (
+        <span style={{
+          position: 'absolute', top: 2, right: 3, zIndex: 3,
+          fontSize: 8, fontWeight: 900, color: skin.accent,
+          background: 'rgba(0,0,0,0.75)', borderRadius: 3,
+          width: 13, height: 13, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          border: `1px solid ${skin.accent}66`,
+        }}>
+          {order}
+        </span>
+      )}
+    </button>
   );
 });
 
