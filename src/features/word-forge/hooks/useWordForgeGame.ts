@@ -7,9 +7,13 @@ import {
   playBonus, playClear, playCoinCredit, playError, playHint, playLevelFail, playLevelWin,
   playShuffle, playStreak, playSubmit, playTap, duckMusic, restoreMusic,
 } from '../audio/forgeAudio';
-import { bonusDefinition } from '../data/bonusWords';
+
+import { lookupDefinition } from '../data/wordDefinitions';
+import {
+  DAILY_BONUS_PAYOUT, dailySeed, generateDailyChallenge, isDailyCompleted,
+} from '../engine/dailyChallenge';
 import { levelParams } from '../engine/difficultyCurve';
-import { payoutForWord } from '../engine/payoutCalculator';
+import { completionistBonus, payoutForWord } from '../engine/payoutCalculator';
 import { generateLevel, type LevelGeneration, type LetterTile } from '../engine/poolGenerator';
 import { validateWordLocal, reasonMessage } from '../engine/wordValidator';
 import { validateAndCreditWord } from '../engine/wordValidatorServer';
@@ -42,8 +46,11 @@ export interface HintReveal {
 
 export type RoundPhase = 'playing' | 'paused' | 'ended';
 
+export type ForgeGameMode = 'campaign' | 'daily';
+
 interface UseWordForgeGameOptions {
   preview?: boolean;
+  mode?: ForgeGameMode;
 }
 
 async function haptic(style: ImpactStyle): Promise<void> {
@@ -52,7 +59,8 @@ async function haptic(style: ImpactStyle): Promise<void> {
 }
 
 export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
-  const { preview = false } = options;
+  const { preview = false, mode = 'campaign' } = options;
+  const isDaily = mode === 'daily';
   const { user } = useAuth();
   const { addPoints, triggerConfetti } = usePoints();
   const { push: pushCloud } = useForgeCloudSync(preview);
@@ -61,7 +69,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const [level, setLevel] = useState(saved.currentLevel);
   const [attemptId, setAttemptId] = useState(() => String(Date.now()));
   const [phase, setPhase] = useState<RoundPhase>(
-    saved.tutorialCompleted ? 'playing' : 'paused',
+    saved.tutorialCompleted || isDaily ? 'playing' : 'paused',
   );
   const [balance, setBalance] = useState(0);
   const [displayBalance, setDisplayBalance] = useState(0);
@@ -79,9 +87,11 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const [hintReveal, setHintReveal] = useState<HintReveal | null>(null);
   const [liveTiles, setLiveTiles] = useState<LetterTile[] | null>(null);
   const [shuffleAnim, setShuffleAnim] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(!saved.tutorialCompleted);
+  const [showTutorial, setShowTutorial] = useState(!saved.tutorialCompleted && !isDaily);
   const [roundEnded, setRoundEnded] = useState(false);
   const [newBest, setNewBest] = useState(false);
+  const [completionistPayout, setCompletionistPayout] = useState(0);
+  const [dailyBonusAwarded, setDailyBonusAwarded] = useState(false);
 
   const claimedRef = useRef(new Set<string>());
   const flyId = useRef(0);
@@ -93,8 +103,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const uid = user?.id ?? 'preview-user';
 
   const generation: LevelGeneration = useMemo(
-    () => generateLevel(levelParams(level), uid, attemptId),
-    [level, uid, attemptId],
+    () => (isDaily ? generateDailyChallenge(uid) : generateLevel(levelParams(level), uid, attemptId)),
+    [isDaily, level, uid, attemptId],
   );
 
   const tiles = liveTiles ?? generation.tiles;
@@ -144,9 +154,11 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   });
 
   const resetRound = useCallback((nextLevel: number, newAttempt: boolean) => {
-    const params = levelParams(nextLevel);
-    setLevel(nextLevel);
-    persistMeta({ currentLevel: nextLevel });
+    const params = isDaily ? { timerSeconds: 120 } : levelParams(nextLevel);
+    if (!isDaily) {
+      setLevel(nextLevel);
+      persistMeta({ currentLevel: nextLevel });
+    }
     if (newAttempt) setAttemptId(String(Date.now()));
     setPhase(showTutorial ? 'paused' : 'playing');
     resetTimer(params.timerSeconds);
@@ -162,8 +174,10 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     setLiveTiles(null);
     setRoundEnded(false);
     setNewBest(false);
+    setCompletionistPayout(0);
+    setDailyBonusAwarded(false);
     claimedRef.current = new Set();
-  }, [persistMeta, resetTimer, showTutorial]);
+  }, [persistMeta, resetTimer, showTutorial, isDaily]);
 
   const spawnCoinFly = useCallback((amount: number) => {
     const board = boardRef.current?.getBoundingClientRect();
@@ -236,11 +250,13 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     } else {
       playSubmit();
       void haptic(ImpactStyle.Light);
+      const def = lookupDefinition(word);
+      if (def) showToast(`${word}: ${def}`, 2400);
     }
 
     const server = await validateAndCreditWord(
       word, poolLetters, [...claimedRef.current].filter((w) => w !== word),
-      level, attemptId, streak, minWordLen,
+      isDaily ? 0 : level, attemptId, streak, minWordLen,
     );
 
     if (!server.ok) {
@@ -282,10 +298,25 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       triggerConfetti();
       duckMusic();
       const prog2 = loadForgeProgress(preview);
-      const isBest = level + 1 > prog2.bestLevel;
+      const isBest = !isDaily && level + 1 > prog2.bestLevel;
       setNewBest(isBest);
+
+      if (validCount >= generation.formableCount) {
+        const bonus = completionistBonus(generation.formableCount);
+        setCompletionistPayout(bonus);
+        if (bonus > 0) {
+          void creditPoints(bonus);
+          animateBalance(balance + credited + bonus);
+        }
+      }
+
+      if (isDaily && !isDailyCompleted(prog2.dailyCompletedDate)) {
+        setDailyBonusAwarded(true);
+        persistMeta({ dailyCompletedDate: dailySeed() });
+        void creditPoints(DAILY_BONUS_PAYOUT);
+      }
     }
-  }, [phase, selection.length, minWordLen, currentWord, tiles, streak, spawnCoinFly, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, minWords, roundEnded, schedule, showToast, triggerConfetti]);
+  }, [phase, selection.length, minWordLen, currentWord, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, minWords, roundEnded, generation.formableCount, schedule, showToast, triggerConfetti]);
 
   const appendTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
@@ -360,6 +391,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
   const advanceOrRetry = useCallback(() => {
     restoreMusic();
+    if (isDaily) return;
+
     const validCount = foundWords.filter((w) => !w.rejected).length;
     const passed = validCount >= minWords;
     const prog = loadForgeProgress(preview);
@@ -386,12 +419,16 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       setHintsLeft((h) => Math.min(3, h + 1));
       resetRound(level, true);
     }
-  }, [foundWords, minWords, level, balance, resetRound, persistMeta, preview, hintsLeft]);
+  }, [foundWords, minWords, level, balance, resetRound, persistMeta, preview, hintsLeft, isDaily]);
 
   const unlockedSkinCount = loadForgeProgress(preview).unlockedSkins;
+  const displayLevel = isDaily ? 'DAILY' : level;
 
   return {
+    mode,
+    isDaily,
     level,
+    displayLevel,
     generation,
     tiles,
     phase,
@@ -414,6 +451,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     shuffleAnim,
     showTutorial,
     newBest,
+    completionistPayout,
+    dailyBonusAwarded,
     minWords,
     minWordLen,
     boardRef,

@@ -22,6 +22,7 @@ export interface NotificationPreferences {
   arenaResults: boolean;
   rewardUpdates: boolean;
   adminAnnouncements: boolean;
+  wordForgeDaily: boolean;
 }
 
 const defaultPrefs: NotificationPreferences = {
@@ -31,6 +32,7 @@ const defaultPrefs: NotificationPreferences = {
   arenaResults: true,
   rewardUpdates: true,
   adminAnnouncements: true,
+  wordForgeDaily: true,
 };
 
 function normalizePrefs(raw: Record<string, unknown>): NotificationPreferences {
@@ -41,6 +43,7 @@ function normalizePrefs(raw: Record<string, unknown>): NotificationPreferences {
     arenaResults: raw.arenaResults !== false && raw.rewardDistributed !== false,
     rewardUpdates: raw.rewardUpdates !== false && raw.rewardDistributed !== false,
     adminAnnouncements: raw.adminAnnouncements !== false && raw.systemAnnouncements !== false,
+    wordForgeDaily: raw.wordForgeDaily !== false,
   };
 }
 
