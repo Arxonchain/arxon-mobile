@@ -234,7 +234,8 @@ Deno.serve(async (req) => {
     }
 
     // For task/social points, validate and cap the amount - ALWAYS round UP
-    const safeAmount = Math.min(Math.max(Math.ceil(Number(amount) || 0), 0), 500)
+    const maxAmount = type === 'task' ? 10000 : 500
+    const safeAmount = Math.min(Math.max(Math.ceil(Number(amount) || 0), 0), maxAmount)
     if (safeAmount <= 0) {
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid amount' }),

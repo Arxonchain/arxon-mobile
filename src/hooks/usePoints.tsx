@@ -165,8 +165,9 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
     ): Promise<{ success: boolean; points?: number; error?: string }> => {
       if (!user) return { success: false, error: 'Not authenticated' };
 
-      // Always round up to whole number
-      const safeAmount = Math.min(Math.max(Math.ceil(amount), 0), 500);
+      // Always round up to whole number (tasks allow up to 10k; others capped at 500)
+      const maxAmount = type === 'task' ? 10000 : 500;
+      const safeAmount = Math.min(Math.max(Math.ceil(amount), 0), maxAmount);
       if (safeAmount <= 0) return { success: false, error: 'Invalid amount' };
 
       const applyUserPoints = (userPoints: any) => {
