@@ -9,7 +9,7 @@ import {
   Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks,
   ChevronRight, ChevronLeft, Users, Wallet, Camera,
   LayoutDashboard, Trophy, History, Scale, User2,
-  CalendarDays, FileDown, Globe, Zap,
+  CalendarDays, FileDown, Globe, Zap, Receipt,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -34,6 +34,7 @@ function Toggle({ on, onToggle }: { on:boolean; onToggle:()=>void }) {
 }
 
 const MENU = [
+  {Icon:Receipt,  label:'Points History', sub:'All credits & deductions',  path:'/points-history', col:'hsl(38 55% 52%)', bg:'hsl(38 55% 52%/0.1)'},
   {Icon:Users,   label:'Referrals',    sub:'Earn 100 ARX-P per friend', path:'/referrals', col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'},
   {Icon:Wallet,  label:'Wallet',       sub:'Connect your Web3 wallet',  path:'/wallet',    col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
   {Icon:Shield,  label:'Security',     sub:'Password & account security', path:'/settings?tab=security', col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
