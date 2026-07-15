@@ -1,27 +1,23 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { FORGE_MUSIC_TRACKS } from '../audio/forgeAudio';
 import type { ForgeSettings } from '../hooks/useForgeSettings';
 
 interface ForgeSettingsPanelProps {
+  open: boolean;
+  onClose: () => void;
   settings: ForgeSettings;
   onChange: (s: ForgeSettings) => void;
   accent: string;
-  onOpenChange?: (open: boolean) => void;
 }
 
-export function ForgeSettingsPanel({ settings, onChange, accent, onOpenChange }: ForgeSettingsPanelProps) {
-  const [open, setOpen] = useState(false);
+/** Controlled bottom-sheet settings panel — parent owns the trigger. */
+export function ForgeSettingsPanel({ open, onClose, settings, onChange, accent }: ForgeSettingsPanelProps) {
   const ref = useRef<HTMLDivElement>(null);
-
-  const setOpenState = (v: boolean) => {
-    setOpen(v);
-    onOpenChange?.(v);
-  };
 
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpenState(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
     document.addEventListener('mousedown', close);
     document.addEventListener('touchstart', close);
@@ -29,24 +25,10 @@ export function ForgeSettingsPanel({ settings, onChange, accent, onOpenChange }:
       document.removeEventListener('mousedown', close);
       document.removeEventListener('touchstart', close);
     };
-  }, [open]);
+  }, [open, onClose]);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpenState(true)}
-        aria-label="Game settings"
-        style={{
-          width: 36, height: 36, borderRadius: 8,
-          border: '1px solid rgba(79,216,235,0.25)',
-          background: 'rgba(0,0,0,0.45)',
-          color: accent, cursor: 'pointer', fontSize: 15,
-        }}
-      >
-        ⚙
-      </button>
-
       {open && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 55,
@@ -74,7 +56,7 @@ export function ForgeSettingsPanel({ settings, onChange, accent, onOpenChange }:
               </h2>
               <button
                 type="button"
-                onClick={() => setOpenState(false)}
+                onClick={onClose}
                 style={{
                   border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)',
                   fontSize: 20, cursor: 'pointer', lineHeight: 1,
@@ -197,9 +179,4 @@ function SliderRow({
       />
     </label>
   );
-}
-
-/** @deprecated use ForgeSettingsPanel */
-export function AudioSettings(props: ForgeSettingsPanelProps) {
-  return <ForgeSettingsPanel {...props} />;
 }

@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { TechButton } from './ForgeTitle';
+import { HelpCircle, LogOut, Pause, Play, RotateCcw, Settings } from 'lucide-react';
+import { GamePanel, GlossyButton, GlossyIconButton, RibbonBanner } from './GlossyKit';
 
 interface ConfirmDialogProps {
   open: boolean;
@@ -23,26 +24,32 @@ export function ConfirmDialog({
           exit={{ opacity: 0 }}
           style={{
             position: 'fixed', inset: 0, zIndex: 70,
-            background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20,
+            background: 'rgba(2,6,14,0.8)', backdropFilter: 'blur(4px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
           }}
         >
           <motion.div
-            initial={{ scale: 0.92, y: 12 }}
+            initial={{ scale: 0.86, y: 18 }}
             animate={{ scale: 1, y: 0 }}
-            exit={{ scale: 0.95, opacity: 0 }}
-            style={{
-              width: 'min(100%, 340px)', padding: '20px 18px',
-              borderRadius: 8, background: 'rgba(4,18,32,0.98)',
-              border: '1px solid rgba(79,216,235,0.3)',
-            }}
+            exit={{ scale: 0.92, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 26 }}
+            style={{ width: 'min(100%, 330px)' }}
           >
-            <h3 style={{ margin: '0 0 8px', fontSize: 16, fontWeight: 900, color: '#fff' }}>{title}</h3>
-            <p style={{ margin: '0 0 18px', fontSize: 13, color: 'rgba(255,255,255,0.6)', lineHeight: 1.5 }}>{message}</p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <TechButton variant="ghost" onClick={onCancel}>{cancelLabel}</TechButton>
-              <div style={{ flex: 1 }} />
-              <TechButton onClick={onConfirm}>{confirmLabel}</TechButton>
-            </div>
+            <GamePanel style={{ textAlign: 'center' }}>
+              <h3 style={{
+                margin: '0 0 8px', fontSize: 18, fontWeight: 900, color: '#ffe89a',
+                letterSpacing: '0.06em', textTransform: 'uppercase',
+              }}>
+                {title}
+              </h3>
+              <p style={{ margin: '0 0 20px', fontSize: 13, color: 'rgba(220,240,255,0.7)', lineHeight: 1.5 }}>
+                {message}
+              </p>
+              <div style={{ display: 'grid', gap: 10 }}>
+                <GlossyButton color="red" size="md" onClick={onConfirm}>{confirmLabel}</GlossyButton>
+                <GlossyButton color="slate" size="md" onClick={onCancel}>{cancelLabel}</GlossyButton>
+              </div>
+            </GamePanel>
           </motion.div>
         </motion.div>
       )}
@@ -53,10 +60,14 @@ export function ConfirmDialog({
 interface PauseOverlayProps {
   open: boolean;
   onResume: () => void;
+  onReplay: () => void;
   onExit: () => void;
+  onFaq: () => void;
+  onSettings: () => void;
 }
 
-export function PauseOverlay({ open, onResume, onExit }: PauseOverlayProps) {
+/** Image-3 style pause card: banner tab, stacked actions, utility icon row */
+export function PauseOverlay({ open, onResume, onReplay, onExit, onFaq, onSettings }: PauseOverlayProps) {
   return (
     <AnimatePresence>
       {open && (
@@ -66,17 +77,52 @@ export function PauseOverlay({ open, onResume, onExit }: PauseOverlayProps) {
           exit={{ opacity: 0 }}
           style={{
             position: 'fixed', inset: 0, zIndex: 50,
-            background: 'rgba(0,4,12,0.82)', backdropFilter: 'blur(6px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(2,6,14,0.78)', backdropFilter: 'blur(7px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
           }}
         >
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: '0 0 16px', fontSize: 11, fontWeight: 800, letterSpacing: '0.3em', color: 'rgba(79,216,235,0.7)' }}>FORGE PAUSED</p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 200 }}>
-              <TechButton onClick={onResume}>Resume</TechButton>
-              <TechButton variant="ghost" onClick={onExit}>Exit Sector</TechButton>
-            </div>
-          </div>
+          <motion.div
+            initial={{ scale: 0.8, y: 34 }}
+            animate={{ scale: 1, y: 0 }}
+            exit={{ scale: 0.88, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 280, damping: 24 }}
+            style={{ width: 'min(100%, 320px)' }}
+          >
+            <GamePanel style={{ paddingTop: 38, textAlign: 'center' }}>
+              <RibbonBanner color="gold">
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <Pause size={17} strokeWidth={3.2} /> Paused
+                </span>
+              </RibbonBanner>
+
+              <div style={{ display: 'grid', gap: 12, marginTop: 6 }}>
+                <GlossyButton color="cyan" size="lg" onClick={onResume}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <Play size={17} strokeWidth={3} fill="currentColor" /> Resume
+                  </span>
+                </GlossyButton>
+                <GlossyButton color="green" size="lg" onClick={onReplay}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <RotateCcw size={17} strokeWidth={3} /> Replay
+                  </span>
+                </GlossyButton>
+                <GlossyButton color="red" size="lg" onClick={onExit}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <LogOut size={17} strokeWidth={3} /> Exit
+                  </span>
+                </GlossyButton>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 18, marginTop: 20 }}>
+                <GlossyIconButton label="How to play" color="cyan" size={50} onClick={onFaq}>
+                  <HelpCircle size={22} strokeWidth={2.8} />
+                </GlossyIconButton>
+                <GlossyIconButton label="Settings" color="cyan" size={50} onClick={onSettings}>
+                  <Settings size={22} strokeWidth={2.8} />
+                </GlossyIconButton>
+              </div>
+            </GamePanel>
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>

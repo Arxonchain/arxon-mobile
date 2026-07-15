@@ -1,10 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Crown, Trophy } from 'lucide-react';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
-import { ForgeTitle, TechButton } from '@/features/word-forge/components/ForgeTitle';
+import {
+  GamePanel, GlossyBackButton, GlossyButton, RibbonBanner, TreasureBackdrop,
+} from '@/features/word-forge/components/GlossyKit';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 
 interface ForgeLeaderRow {
@@ -16,6 +20,8 @@ interface ForgeLeaderRow {
   best_streak: number;
   rank: number;
 }
+
+const RANK_COLORS = ['#ffd93d', '#cfd8e3', '#e8a367'];
 
 export default function WordForgeLeaderboardPage() {
   const navigate = useNavigate();
@@ -48,84 +54,104 @@ export default function WordForgeLeaderboardPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', background: '#050810', position: 'relative', overflow: 'hidden',
+      minHeight: '100vh', background: '#04070f', position: 'relative', overflow: 'hidden',
       fontFamily: "'Creato Display', 'Rajdhani', system-ui, sans-serif",
       paddingBottom: mobileScrollPadding(),
     }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage: `url(${FORGE_UI.discoveryBg})`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        filter: 'blur(8px) brightness(0.28)', transform: 'scale(1.06)',
-      }} />
+      <TreasureBackdrop />
+
       <div style={{
         position: 'relative', zIndex: 2,
-        padding: 'max(48px, env(safe-area-inset-top)) 16px 24px',
-        maxWidth: 420, margin: '0 auto',
+        padding: 'max(26px, env(safe-area-inset-top)) 18px 24px',
+        maxWidth: 400, margin: '0 auto',
       }}>
-        <button
-          type="button"
-          onClick={() => navigate('/games')}
-          style={{
-            marginBottom: 12, padding: '6px 12px', borderRadius: 4,
-            border: '1px solid rgba(79,216,235,0.22)', background: 'rgba(0,0,0,0.55)',
-            color: 'rgba(79,216,235,0.85)', cursor: 'pointer', fontSize: 10, fontWeight: 800,
-            letterSpacing: '0.12em',
-          }}
-        >
-          ← HUB
-        </button>
-
-        <ForgeTitle />
-        <p style={{
-          margin: '8px 0 16px', textAlign: 'center', fontSize: 10, fontWeight: 700,
-          color: 'rgba(255,255,255,0.4)', letterSpacing: '0.1em',
-        }}>
-          TOP FORGE OPERATORS
-        </p>
-
-        {loading ? (
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>Loading ranks…</p>
-        ) : rows.length === 0 ? (
-          <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: 12 }}>
-            No forge rankings yet. Clear sectors to appear here.
-          </p>
-        ) : (
-          <div style={{ display: 'grid', gap: 6 }}>
-            {rows.map((row) => {
-              const isMe = row.user_id === user?.id;
-              return (
-                <div key={row.user_id} style={{
-                  display: 'grid', gridTemplateColumns: '36px 1fr auto', gap: 10, alignItems: 'center',
-                  padding: '10px 12px', borderRadius: 4,
-                  border: `1px solid ${isMe ? '#ffd93d55' : 'rgba(79,216,235,0.18)'}`,
-                  background: isMe ? 'rgba(255,217,61,0.08)' : 'rgba(0,8,16,0.72)',
-                }}>
-                  <span style={{ fontSize: 14, fontWeight: 900, color: row.rank <= 3 ? '#ffd93d' : '#4FD8EB' }}>
-                    #{row.rank}
-                  </span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 800, color: '#e8fcff' }}>
-                      {row.username || 'Operator'}
-                      {isMe && <span style={{ color: '#ffd93d', fontSize: 9, marginLeft: 6 }}>YOU</span>}
-                    </div>
-                    <div style={{ fontSize: 9, color: 'rgba(255,255,255,0.38)', marginTop: 2 }}>
-                      {row.total_words} words · streak {row.best_streak}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 16, fontWeight: 900, color: '#4FD8EB' }}>{row.best_level}</div>
-                    <div style={{ fontSize: 8, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.35)' }}>SECTOR</div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        <div style={{ marginTop: 20 }}>
-          <TechButton variant="ghost" onClick={() => navigate('/word-forge/stats')}>My Stats</TechButton>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <GlossyBackButton onClick={() => navigate('/games')} />
+          <img src={FORGE_UI.forgeLogo} alt="Arxon Word Forge" style={{
+            width: 128, height: 'auto',
+            filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.65))',
+          }} />
+          <div style={{ width: 44 }} />
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, type: 'spring', stiffness: 260, damping: 24 }}
+          style={{ marginTop: 30 }}
+        >
+          <GamePanel style={{ paddingTop: 34 }}>
+            <RibbonBanner color="gold">
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <Trophy size={16} strokeWidth={3} /> Top Forgers
+              </span>
+            </RibbonBanner>
+
+            {loading ? (
+              <p style={{ textAlign: 'center', color: 'rgba(220,240,255,0.55)', fontSize: 12, padding: '18px 0' }}>
+                Loading ranks…
+              </p>
+            ) : rows.length === 0 ? (
+              <p style={{ textAlign: 'center', color: 'rgba(220,240,255,0.55)', fontSize: 12, padding: '18px 0', lineHeight: 1.6 }}>
+                No forge rankings yet.<br />Clear sectors to claim the crown.
+              </p>
+            ) : (
+              <div style={{ display: 'grid', gap: 7, maxHeight: '52vh', overflowY: 'auto', padding: '2px 1px' }}>
+                {rows.map((row, i) => {
+                  const isMe = row.user_id === user?.id;
+                  const podium = row.rank <= 3 ? RANK_COLORS[row.rank - 1] : null;
+                  return (
+                    <motion.div
+                      key={row.user_id}
+                      initial={{ opacity: 0, x: -14 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: Math.min(0.15 + i * 0.04, 0.7) }}
+                      style={{
+                        display: 'grid', gridTemplateColumns: '34px 1fr auto', gap: 10, alignItems: 'center',
+                        padding: '9px 12px', borderRadius: 13,
+                        background: isMe ? 'rgba(255,217,61,0.1)' : 'rgba(2,10,22,0.7)',
+                        border: `1.5px solid ${isMe ? 'rgba(255,217,61,0.5)' : podium ? `${podium}44` : 'rgba(79,216,235,0.16)'}`,
+                        boxShadow: podium ? `0 0 14px ${podium}22` : undefined,
+                      }}
+                    >
+                      <span style={{
+                        fontSize: 15, fontWeight: 900,
+                        color: podium ?? '#4FD8EB',
+                        display: 'inline-flex', alignItems: 'center', gap: 2,
+                        textShadow: podium ? `0 0 10px ${podium}66` : undefined,
+                      }}>
+                        {row.rank === 1 && <Crown size={13} fill={podium ?? undefined} strokeWidth={2.4} />}
+                        {row.rank}
+                      </span>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{
+                          fontSize: 13, fontWeight: 800, color: '#fff',
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>
+                          {row.username || 'Operator'}
+                          {isMe && <span style={{ color: '#ffd93d', fontSize: 8.5, fontWeight: 900, marginLeft: 6, letterSpacing: '0.1em' }}>YOU</span>}
+                        </div>
+                        <div style={{ fontSize: 9, color: 'rgba(220,240,255,0.45)', marginTop: 1.5 }}>
+                          {row.total_words} words · streak {row.best_streak}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: 17, fontWeight: 900, color: '#4FD8EB', lineHeight: 1 }}>{row.best_level}</div>
+                        <div style={{ fontSize: 7, fontWeight: 800, letterSpacing: '0.16em', color: 'rgba(220,240,255,0.4)' }}>SECTOR</div>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ marginTop: 14 }}>
+              <GlossyButton color="cyan" onClick={() => navigate('/word-forge/stats')}>
+                My Stats
+              </GlossyButton>
+            </div>
+          </GamePanel>
+        </motion.div>
       </div>
     </div>
   );

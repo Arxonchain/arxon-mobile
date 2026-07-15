@@ -1,22 +1,25 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
+import { Lightbulb, Pause, Shuffle } from 'lucide-react';
 import {
-  setForgeAudioSettings, startMusic, stopMusic, unlockAudio, restoreMusic,
+  restoreMusic, setForgeAudioSettings, startMusic, stopMusic, unlockAudio,
 } from '../audio/forgeAudio';
-import { ForgeSettingsPanel } from './ForgeSettingsPanel';
-import { CoinFlyLayer } from './CoinFlyLayer';
-import { ForgePlayfield } from './ForgePlayfield';
-import { ConfirmDialog, PauseOverlay } from './ForgeOverlays';
-import { ForgeTitle, TechButton, TechLabel, TechPanel } from './ForgeTitle';
-import { LetterBoard, TimerRing } from './LetterBoard';
-import { RoundEndModal } from './LevelCompleteModal';
-import { TutorialOverlay } from './TutorialOverlay';
+import { FORGE_UI } from '../data/uiAssets';
+import { DAILY_BONUS_PAYOUT } from '../engine/dailyChallenge';
 import { loadForgeSettings, saveForgeSettings } from '../hooks/useForgeSettings';
 import { useWordForgeGame, type ForgeGameMode } from '../hooks/useWordForgeGame';
-import { DAILY_BONUS_PAYOUT } from '../engine/dailyChallenge';
 import { prefersReducedMotion } from '../design-system/forgeTheme';
+import { CoinFlyLayer } from './CoinFlyLayer';
+import { ForgeFaqModal } from './ForgeFaqModal';
+import { ForgeSettingsPanel } from './ForgeSettingsPanel';
+import { ConfirmDialog, PauseOverlay } from './ForgeOverlays';
+import { GlossyIconButton, TimerRing, TreasureBackdrop } from './GlossyKit';
+import { LetterWheel } from './LetterWheel';
+import { RoundEndModal } from './LevelCompleteModal';
+import { TutorialOverlay } from './TutorialOverlay';
+import { WordSlots } from './WordSlots';
 
 interface WordForgeGameProps {
   preview?: boolean;
@@ -29,6 +32,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const [tutorialStep, setTutorialStep] = useState(0);
   const [exitConfirm, setExitConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [faqOpen, setFaqOpen] = useState(false);
   const game = useWordForgeGame({ preview, mode });
   const { generation, phase } = game;
   const passed = game.validCount >= game.minWords;
@@ -36,6 +40,11 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const progress = Math.min(1, game.validCount / game.minWords);
   const audioUnlockedRef = useRef(false);
   const reduced = prefersReducedMotion();
+
+  const wheelSize = useMemo(
+    () => Math.round(Math.min((typeof window !== 'undefined' ? window.innerWidth : 380) - 118, 288)),
+    [],
+  );
 
   const updateSettings = useCallback((s: typeof settings) => {
     setSettings(s);
@@ -71,6 +80,11 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     navigate(preview ? '/word-forge-preview' : '/games');
   }, [navigate, preview]);
 
+  const handleReplay = useCallback(() => {
+    restoreMusic();
+    game.resetRound(game.level, true);
+  }, [game]);
+
   const handleRoundContinue = useCallback(() => {
     if (game.isDaily) {
       if (passed) {
@@ -84,75 +98,39 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     game.advanceOrRetry();
   }, [game, passed, navigate]);
 
+  const handleWheelRelease = useCallback(() => {
+    if (game.selection.length >= game.minWordLen) {
+      void game.submitWord();
+    } else if (game.selection.length > 0) {
+      game.clearSelection();
+    }
+  }, [game]);
+
+  const foundValidWords = game.foundWords.filter((w) => !w.rejected).map((w) => w.word);
+  const timeRatio = generation.params.timerSeconds > 0 ? game.timeLeft / generation.params.timerSeconds : 0;
+  const stars = passed ? (timeRatio >= 0.5 ? 3 : timeRatio >= 0.22 ? 2 : 1) : 0;
+
   const topPad = Capacitor.isNativePlatform()
     ? 'max(48px, env(safe-area-inset-top))'
     : '14px';
-
-  const forgeField = (
-    <>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, minHeight: 44,
-        animation: !reduced && game.shakeWord ? 'wf-shake 0.35s ease' : undefined,
-      }}>
-        <div style={{
-          flex: 1, display: 'flex', gap: 5, flexWrap: 'wrap', minHeight: 32, alignItems: 'center',
-          padding: '4px 6px', borderRadius: 4,
-          background: 'rgba(0,0,0,0.35)', border: '1px dashed rgba(79,216,235,0.2)',
-        }}>
-          {game.selection.length === 0 ? (
-            <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.28)', fontWeight: 600, letterSpacing: '0.08em' }}>
-              SWIPE LETTERS INTO FORGE
-            </span>
-          ) : (
-            game.selection.map((idx, i) => (
-              <span key={`${idx}-${i}`} style={{
-                width: 32, height: 32, borderRadius: 4,
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                border: '1px solid rgba(79,216,235,0.5)',
-                background: 'linear-gradient(180deg, rgba(79,216,235,0.15), rgba(79,216,235,0.05))',
-                fontSize: 16, fontWeight: 900, color: '#4FD8EB',
-              }}>
-                {game.tiles[idx]?.letter}
-              </span>
-            ))
-          )}
-        </div>
-        {game.selection.length > 0 && (
-          <TechButton variant="ghost" onClick={game.clearSelection}>CLR</TechButton>
-        )}
-        <TechButton
-          onClick={game.submitWord}
-          disabled={game.selection.length < game.minWordLen || phase !== 'playing'}
-        >
-          FORGE
-        </TechButton>
-      </div>
-      <div style={{ display: 'flex', gap: 6, marginTop: 8, justifyContent: 'center' }}>
-        <TechButton variant="ghost" onClick={game.undoLetter} disabled={game.selection.length === 0}>UNDO</TechButton>
-        <TechButton variant="ghost" onClick={game.useHint} disabled={game.hintsLeft <= 0 || phase !== 'playing'}>
-          HINT ({game.hintsLeft})
-        </TechButton>
-        <TechButton variant="ghost" onClick={game.shuffleTiles} disabled={game.shufflesLeft <= 0 || phase !== 'playing'}>
-          MIX ({game.shufflesLeft})
-        </TechButton>
-      </div>
-    </>
-  );
 
   return (
     <div
       onPointerDown={onFirstInteract}
       style={{
-        position: 'fixed', inset: 0, background: '#020508', color: '#e8fcff',
+        position: 'fixed', inset: 0, background: '#04070f', color: '#e8fcff',
         overflow: 'hidden', touchAction: 'none',
         fontFamily: "'Creato Display', 'Rajdhani', system-ui, sans-serif",
       }}
     >
+      {/* Arena background — own treasure art, heavily blurred for focus */}
+      <TreasureBackdrop blur={11} brightness={0.5} />
+
       {/* Urgent vignette */}
       {urgent && !reduced && (
         <div style={{
           position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 1,
-          boxShadow: 'inset 0 0 80px rgba(255,107,74,0.25)',
+          boxShadow: 'inset 0 0 90px rgba(255,107,74,0.3)',
           animation: 'wf-urgent-vignette 0.8s ease infinite',
         }} />
       )}
@@ -160,156 +138,183 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
       <div style={{
         position: 'relative', zIndex: 2, height: '100%',
         display: 'flex', flexDirection: 'column',
-        padding: `${topPad} 12px max(12px, env(safe-area-inset-bottom))`,
-        maxWidth: 480, margin: '0 auto', overflow: 'hidden',
+        padding: `${topPad} 14px max(10px, env(safe-area-inset-bottom))`,
+        maxWidth: 440, margin: '0 auto', overflow: 'hidden',
       }}>
-        <header style={{ flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              {!preview && (
-                <button
-                  type="button"
-                  aria-label="Exit game"
-                  onClick={() => setExitConfirm(true)}
-                  style={{
-                    marginBottom: 6, padding: '5px 10px', borderRadius: 4,
-                    border: '1px solid rgba(79,216,235,0.22)',
-                    background: 'rgba(0,0,0,0.55)', color: 'rgba(79,216,235,0.85)',
-                    cursor: 'pointer', fontSize: 10, fontWeight: 800, letterSpacing: '0.12em',
-                  }}
-                >
-                  ← EXIT
-                </button>
-              )}
-              <ForgeTitle compact />
-              <p style={{ margin: '4px 0 0', fontSize: 9, color: 'rgba(79,216,235,0.4)', letterSpacing: '0.1em' }}>
-                {game.skin.label} · {generation.grid.label} · {game.isDaily ? 'DAILY' : preview ? 'SIM' : 'LIVE'}
-              </p>
+        {/* ── Top bar: pause · sector · timer · balance ─────────────── */}
+        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+          <GlossyIconButton label="Pause game" color="slate" size={46} onClick={game.togglePause}>
+            <Pause size={19} strokeWidth={3} />
+          </GlossyIconButton>
+
+          <div style={{
+            flex: 1, padding: '7px 12px', borderRadius: 14, textAlign: 'center',
+            background: 'rgba(5,14,28,0.8)', border: '1px solid rgba(79,216,235,0.25)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+          }}>
+            <div style={{ fontSize: 7.5, fontWeight: 900, letterSpacing: '0.22em', color: 'rgba(79,216,235,0.6)' }}>
+              {game.isDaily ? 'DAILY CHALLENGE' : 'SECTOR'}
             </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <button
-                type="button"
-                aria-label="Pause game"
-                onClick={game.togglePause}
-                style={{
-                  padding: '8px 10px', borderRadius: 4, marginTop: 2,
-                  border: '1px solid rgba(79,216,235,0.22)', background: 'rgba(0,0,0,0.55)',
-                  color: 'rgba(79,216,235,0.85)', cursor: 'pointer', fontSize: 10, fontWeight: 800,
-                }}
-              >
-                ⏸
-              </button>
-              <ForgeSettingsPanel
-                settings={settings}
-                onChange={updateSettings}
-                accent="#4FD8EB"
-                onOpenChange={(open) => {
-                  setSettingsOpen(open);
-                  if (open && phase === 'playing') game.togglePause();
-                  else if (!open && phase === 'paused' && !game.showTutorial) game.togglePause();
-                }}
-              />
+            <div style={{ fontSize: 19, fontWeight: 900, lineHeight: 1.1, color: '#fff' }}>
+              {game.isDaily ? new Date().toISOString().slice(5, 10) : game.level}
             </div>
           </div>
 
-          <TechPanel style={{
-            marginTop: 10, padding: '10px 12px',
-            display: 'grid', gridTemplateColumns: '1fr auto 1fr', gap: 6, alignItems: 'end',
+          <div style={{
+            animation: urgent && !reduced ? 'wf-urgent 0.5s ease infinite' : undefined,
+            flexShrink: 0,
           }}>
-            <div>
-              <TechLabel>{game.isDaily ? 'Challenge' : 'Sector'}</TechLabel>
-              <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1, marginTop: 2 }}>{game.displayLevel}</div>
-              {game.streak >= 2 && (
-                <div style={{
-                  marginTop: 2, fontSize: 9, fontWeight: 800, color: '#ffd93d',
-                  animation: game.streakPopup && !reduced ? 'wf-streak-pop 0.4s ease' : undefined,
-                }}>
-                  STREAK ×{game.streak}{game.streak >= 3 ? ` (${game.streak >= 5 ? '2×' : '1.5×'} ARX-P)` : ''}
-                </div>
-              )}
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <TimerRing timeLeft={game.timeLeft} total={generation.params.timerSeconds} urgent={urgent} />
-              <div style={{
-                fontSize: 17, fontWeight: 900, marginTop: -2,
-                color: urgent ? '#ff6b4a' : '#4FD8EB',
-                animation: urgent && !reduced ? 'wf-urgent 0.5s ease infinite' : undefined,
+            <TimerRing timeLeft={game.timeLeft} total={generation.params.timerSeconds} urgent={urgent} size={52} />
+          </div>
+
+          <div ref={game.balanceRef} style={{
+            flex: 1, padding: '6px 10px 7px', borderRadius: 14,
+            background: 'rgba(5,14,28,0.8)', border: '1px solid rgba(255,217,61,0.3)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+          }}>
+            <img src={FORGE_UI.arxCoin} alt="ARX-P" style={{
+              width: 24, height: 24, objectFit: 'contain',
+              filter: 'drop-shadow(0 0 6px rgba(140,180,255,0.55))',
+            }} />
+            <div style={{ textAlign: 'left' }}>
+              <div key={game.balance} style={{
+                fontSize: 17, fontWeight: 900, lineHeight: 1, color: '#ffd93d',
+                animation: !reduced && game.balance > 0 ? 'wf-balance-pop 0.3s ease' : undefined,
               }}>
-                {game.timeLeft}s
-              </div>
-            </div>
-            <div ref={game.balanceRef} style={{ textAlign: 'right' }}>
-              <TechLabel>Balance</TechLabel>
-              <div style={{ fontSize: 26, fontWeight: 900, lineHeight: 1, marginTop: 2, color: '#ffd93d' }}>
                 {game.displayBalance}
               </div>
-              <div style={{ fontSize: 7, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)' }}>ARX-P</div>
-            </div>
-          </TechPanel>
-
-          <div style={{ marginTop: 8 }}>
-            <div style={{ height: 3, background: 'rgba(79,216,235,0.08)', overflow: 'hidden', borderRadius: 1 }}>
-              <div style={{
-                width: `${progress * 100}%`, height: '100%',
-                background: progress >= 1 ? 'linear-gradient(90deg, #4FD8EB, #ffd93d)' : 'linear-gradient(90deg, rgba(79,216,235,0.35), #4FD8EB)',
-                transition: 'width 0.35s ease',
-              }} />
-            </div>
-            <div style={{
-              display: 'flex', justifyContent: 'space-between', marginTop: 4,
-              fontSize: 8, fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(255,255,255,0.38)',
-            }}>
-              <span>{generation.params.poolSize} LETTERS</span>
-              <span style={{ color: progress >= 1 ? '#4FD8EB' : undefined }}>
-                {game.validCount}/{game.minWords} TO CLEAR
-              </span>
+              <div style={{ fontSize: 6.5, fontWeight: 800, letterSpacing: '0.2em', color: 'rgba(255,232,154,0.55)' }}>
+                ARX-P
+              </div>
             </div>
           </div>
         </header>
 
-        <div ref={game.boardRef} style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-          <ForgePlayfield
-            level={game.level}
-            tiles={(
-              <LetterBoard
-                tiles={game.tiles}
-                selection={game.selection}
-                skin={game.skin}
-                grid={generation.grid}
-                hintReveal={game.hintReveal}
-                celebrateWord={game.celebrateWord}
-                shuffleAnim={game.shuffleAnim}
-                onToggle={game.toggleTile}
-                onAppend={game.appendTile}
-              />
+        {/* ── Progress + streak ─────────────────────────────────────── */}
+        <div style={{ flexShrink: 0, marginTop: 9 }}>
+          <div style={{
+            height: 8, borderRadius: 4, overflow: 'hidden',
+            background: 'rgba(4,12,26,0.85)', border: '1px solid rgba(79,216,235,0.2)',
+          }}>
+            <div style={{
+              width: `${progress * 100}%`, height: '100%', borderRadius: 4,
+              background: progress >= 1
+                ? 'linear-gradient(90deg, #84d92f, #ffd93d)'
+                : 'linear-gradient(90deg, #1592b4, #4FD8EB)',
+              boxShadow: '0 0 10px rgba(79,216,235,0.5), inset 0 1px 0 rgba(255,255,255,0.4)',
+              transition: 'width 0.35s ease',
+            }} />
+          </div>
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4,
+            fontSize: 9, fontWeight: 800, letterSpacing: '0.1em',
+          }}>
+            <span style={{ color: 'rgba(220,240,255,0.55)' }}>
+              {game.validCount}/{game.minWords} WORDS
+            </span>
+            {game.streak >= 2 && (
+              <span style={{
+                color: '#ffd93d', textShadow: '0 0 10px rgba(255,217,61,0.6)',
+                animation: game.streakPopup && !reduced ? 'wf-streak-pop 0.4s ease' : undefined,
+              }}>
+                STREAK ×{game.streak}{game.streak >= 3 ? ` · ${game.streak >= 5 ? '2×' : '1.5×'} PAY` : ''}
+              </span>
             )}
-            forgeField={forgeField}
+          </div>
+        </div>
+
+        {/* ── Word slots (image-2 crossword boxes) ──────────────────── */}
+        <div style={{
+          flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          marginTop: 6,
+          animation: !reduced && game.shakeWord ? 'wf-shake 0.35s ease' : undefined,
+        }}>
+          <WordSlots
+            targetWords={generation.targetWords}
+            foundWords={foundValidWords}
+            minWords={game.minWords}
+            minWordLen={game.minWordLen}
+            skin={game.skin}
+            hintWord={game.hintReveal?.word ?? null}
+            celebrateWord={game.celebrateWord}
           />
         </div>
 
-        {game.foundWords.length > 0 && (
-          <div style={{ flexShrink: 0, marginTop: 6, display: 'flex', flexWrap: 'wrap', gap: 5, maxHeight: 56, overflow: 'auto' }}>
-            {game.foundWords.map((w) => (
-              <span key={w.word} style={{
-                padding: '3px 8px', borderRadius: 3, fontSize: 10, fontWeight: 800,
-                border: `1px solid ${w.rejected ? '#ff6b4a' : w.isBonus ? '#ffd93d' : 'rgba(79,216,235,0.22)'}`,
-                background: w.rejected ? 'rgba(255,80,60,0.12)' : 'rgba(0,0,0,0.5)',
-                color: w.rejected ? '#ff9b8a' : w.isBonus ? '#ffd93d' : '#cbd5e1',
-                textDecoration: w.rejected ? 'line-through' : undefined,
+        {/* ── Current word trace ────────────────────────────────────── */}
+        <div style={{
+          flexShrink: 0, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+        }}>
+          {game.selection.length === 0 ? (
+            <span style={{
+              fontSize: 10, fontWeight: 800, letterSpacing: '0.22em',
+              color: 'rgba(220,240,255,0.35)', textTransform: 'uppercase',
+            }}>
+              Swipe the wheel to spell
+            </span>
+          ) : (
+            game.currentWord.split('').map((ch, i) => (
+              <span key={i} style={{
+                width: 34, height: 34, borderRadius: 9,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 17, fontWeight: 900, color: '#fff',
+                background: `linear-gradient(180deg, ${game.skin.accent}, ${game.skin.accent}88)`,
+                border: '1.5px solid rgba(255,255,255,0.4)',
+                boxShadow: `0 3px 0 rgba(0,0,0,0.4), 0 0 12px ${game.skin.glow}`,
+                textShadow: '0 2px 3px rgba(0,0,0,0.5)',
+                animation: !reduced ? 'wf-letter-pop 0.16s ease both' : undefined,
               }}>
-                {w.isBonus ? '◆ ' : ''}{w.word} +{w.payout}
+                {ch}
               </span>
-            ))}
+            ))
+          )}
+        </div>
+
+        {/* ── Letter wheel + power-up rail ──────────────────────────── */}
+        <div ref={game.boardRef} style={{
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 14, paddingBottom: 4,
+        }}>
+          <LetterWheel
+            tiles={game.tiles}
+            selection={game.selection}
+            skin={game.skin}
+            size={wheelSize}
+            hintReveal={game.hintReveal}
+            shuffleAnim={game.shuffleAnim}
+            onStart={game.beginSelection}
+            onAppend={game.appendTile}
+            onRelease={handleWheelRelease}
+          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <GlossyIconButton
+              label="Use hint" caption="Hint" color="gold" size={54}
+              badge={game.hintsLeft}
+              disabled={game.hintsLeft <= 0 || phase !== 'playing'}
+              onClick={game.useHint}
+            >
+              <Lightbulb size={23} strokeWidth={2.8} />
+            </GlossyIconButton>
+            <GlossyIconButton
+              label="Shuffle letters" caption="Mix" color="cyan" size={54}
+              badge={game.shufflesLeft}
+              disabled={game.shufflesLeft <= 0 || phase !== 'playing'}
+              onClick={game.shuffleTiles}
+            >
+              <Shuffle size={23} strokeWidth={2.8} />
+            </GlossyIconButton>
           </div>
-        )}
+        </div>
       </div>
 
+      {/* ── Feedback layers ─────────────────────────────────────────── */}
       {game.toast && (
         <div role="status" aria-live="polite" style={{
-          position: 'fixed', bottom: 90, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 40, padding: '10px 18px', borderRadius: 4,
-          background: 'rgba(0,8,16,0.92)', border: '1px solid rgba(79,216,235,0.35)',
-          fontSize: 12, fontWeight: 700,
+          position: 'fixed', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 40, padding: '10px 18px', borderRadius: 12, maxWidth: '86vw',
+          background: 'rgba(3,10,22,0.94)', border: '1px solid rgba(79,216,235,0.4)',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          fontSize: 12, fontWeight: 700, textAlign: 'center',
         }}>
           {game.toast}
         </div>
@@ -317,12 +322,13 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
 
       {game.bonusPopup && (
         <div role="status" style={{
-          position: 'fixed', top: '22%', left: '50%', transform: 'translateX(-50%)',
-          zIndex: 40, padding: '14px 20px', borderRadius: 4, maxWidth: 320,
-          background: 'rgba(0,8,16,0.94)', border: '1px solid #ffd93d',
+          position: 'fixed', top: '20%', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 40, padding: '14px 20px', borderRadius: 14, maxWidth: 320,
+          background: 'rgba(3,10,22,0.96)', border: '1.5px solid #ffd93d',
+          boxShadow: '0 0 30px rgba(255,217,61,0.35), 0 10px 30px rgba(0,0,0,0.5)',
           fontSize: 13, fontWeight: 700, color: '#ffd93d', textAlign: 'center',
         }}>
-          {game.bonusPopup}
+          ◆ {game.bonusPopup}
         </div>
       )}
 
@@ -337,9 +343,12 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
       />
 
       <PauseOverlay
-        open={phase === 'paused' && !game.showTutorial && !settingsOpen}
+        open={phase === 'paused' && !game.showTutorial && !settingsOpen && !faqOpen}
         onResume={game.togglePause}
+        onReplay={handleReplay}
         onExit={() => setExitConfirm(true)}
+        onFaq={() => setFaqOpen(true)}
+        onSettings={() => setSettingsOpen(true)}
       />
 
       <ConfirmDialog
@@ -359,11 +368,22 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         wordsFormed={game.validCount}
         wordsRequired={game.minWords}
         balance={game.displayBalance}
+        stars={stars}
         newBest={game.newBest}
         isDaily={game.isDaily}
         completionistBonus={game.completionistPayout}
         dailyBonus={game.dailyBonusAwarded ? DAILY_BONUS_PAYOUT : 0}
+        onReplay={handleReplay}
         onContinue={handleRoundContinue}
+      />
+
+      <ForgeFaqModal open={faqOpen} onClose={() => setFaqOpen(false)} />
+      <ForgeSettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onChange={updateSettings}
+        accent="#4FD8EB"
       />
 
       <CoinFlyLayer events={game.coinFlies} targetRef={game.balanceRef} />
@@ -373,9 +393,9 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         @keyframes wf-urgent { 0%,100%{opacity:1} 50%{opacity:0.55} }
         @keyframes wf-urgent-vignette { 0%,100%{opacity:0.6} 50%{opacity:1} }
         @keyframes wf-streak-pop { 0%{transform:scale(1)} 50%{transform:scale(1.15)} 100%{transform:scale(1)} }
-        @keyframes wf-tile-drop { from{opacity:0;transform:translateY(-12px) scale(0.9)} to{opacity:1;transform:translateY(0) scale(1)} }
-        @keyframes wf-tile-flash { 0%,100%{filter:brightness(1)} 50%{filter:brightness(1.8)} }
-        @keyframes wf-shuffle { 0%{transform:rotate(0deg)} 50%{transform:rotate(180deg) scale(0.8)} 100%{transform:rotate(360deg)} }
+        @keyframes wf-shuffle { 0%{transform:rotate(0deg) scale(1)} 50%{transform:rotate(180deg) scale(0.85)} 100%{transform:rotate(360deg) scale(1)} }
+        @keyframes wf-letter-pop { 0%{transform:scale(0);opacity:0} 100%{transform:scale(1);opacity:1} }
+        @keyframes wf-balance-pop { 0%{transform:scale(1)} 45%{transform:scale(1.22)} 100%{transform:scale(1)} }
       `}</style>
     </div>
   );
