@@ -71,7 +71,7 @@ function TaskTypeColor(type: string) {
 export default function Tasks() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { refreshPoints, triggerConfetti, addPoints } = usePoints();
+  const { refreshPoints, triggerConfetti } = usePoints();
   const { canCheckin, loading: checkinLoading, performCheckin, currentStreak, streakBoost, refreshCheckin } = useCheckin();
   const [showAuth,       setShowAuth]       = useState(false);
   const [tasks,          setTasks]          = useState<Task[]>([]);
@@ -151,35 +151,26 @@ export default function Tasks() {
     setCompleting(task.id);
 
     try {
-      const { data: existingTask } = await supabase
-        .from('user_tasks').select('id, status')
-        .eq('user_id', user.id).eq('task_id', task.id).maybeSingle();
-
-      if (existingTask?.status === 'completed') {
+      const existing = userTasks.get(task.id);
+      if (existing?.status === 'completed') {
         toast({ title: 'Already Completed', description: "You've already completed this task", variant: 'destructive' });
         setCompleting(null);
         return;
       }
 
-      let error;
-      if (existingTask) {
-        const { error: e } = await supabase.from('user_tasks').update({
-          status: 'completed', points_awarded: task.points_reward,
-          completed_at: new Date().toISOString(),
-        }).eq('id', existingTask.id);
-        error = e;
-      } else {
-        const { error: e } = await supabase.from('user_tasks').insert({
-          user_id: user.id, task_id: task.id, status: 'completed',
-          points_awarded: task.points_reward, completed_at: new Date().toISOString(),
-        });
-        error = e;
-      }
+      // Atomic: credit points + mark complete in one DB transaction (prevents lost credits)
+      const { data, error } = await supabase.rpc('complete_task_and_award_points' as any, {
+        p_task_id: task.id,
+        p_points_reward: task.points_reward,
+      });
 
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'Failed to credit points');
 
-      const credited = await addPoints(task.points_reward, 'task');
-      if (!credited.success) throw new Error(credited.error || 'Failed to credit points');
+      const awarded = Math.ceil(Number(data?.points ?? task.points_reward));
+      if (data?.user_points) {
+        await refreshPoints();
+      }
 
       setUserTasks((prev) => {
         const next = new Map(prev);
@@ -190,9 +181,12 @@ export default function Tasks() {
         return next;
       });
 
-      triggerConfetti();
-      toast({ title: '🎉 Task Completed!', description: `+${task.points_reward.toLocaleString()} ARX-P added to your balance!` });
-      await refreshPoints();
+      if (awarded > 0) {
+        triggerConfetti();
+        toast({ title: '🎉 Task Completed!', description: `+${awarded.toLocaleString()} ARX-P added to your balance!` });
+      } else {
+        toast({ title: 'Already Completed', description: "Points were already credited for this task" });
+      }
     } catch (err: any) {
       toast({ title: 'Error', description: err.message, variant: 'destructive' });
     } finally {
