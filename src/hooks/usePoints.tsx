@@ -10,7 +10,7 @@ import {
 } from 'react';
 import confetti from 'canvas-confetti';
 import { supabase } from '@/integrations/supabase/client';
-import { cacheGet, cacheSet } from '@/lib/localCache';
+import { cacheGet, cacheSet, cacheRemove } from '@/lib/localCache';
 import { useAuth } from '@/contexts/AuthContext';
 import { formatPoints, sanitizeUserPoints } from '@/lib/formatPoints';
 
@@ -39,8 +39,9 @@ type PointsContextType = {
 
 const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
-const pointsCacheKey = (userId: string) => `arxon:points:v3:${userId}`;
-const rankCacheKey = (userId: string) => `arxon:rank:v2:${userId}`;
+const pointsCacheKey = (userId: string) => `arxon:points:v4:${userId}`;
+const rankCacheKey = (userId: string) => `arxon:rank:v3:${userId}`;
+const POINTS_CACHE_MAX_AGE_MS = 30_000;
 
 // Rank computation is an expensive global aggregate.
 // Under high concurrency, we must NOT run it on every points update.
@@ -113,7 +114,6 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      // Fetch points first
       const { data: pointsData, error: pointsError } = await supabase
         .from('user_points')
         .select('*')
@@ -122,11 +122,9 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
 
       if (pointsError) throw pointsError;
 
-      // Sanitize points to ensure whole numbers (fixes UI display issues)
       let nextPoints = pointsData ? sanitizeUserPoints(pointsData) as UserPoints : null;
 
       if (!nextPoints) {
-        // Ensure row exists (avoid unique race)
         const { error: ensureError } = await supabase
           .from('user_points')
           .upsert({ user_id: user.id }, { onConflict: 'user_id', ignoreDuplicates: true });
@@ -143,15 +141,15 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
         nextPoints = ensured ? sanitizeUserPoints(ensured) as UserPoints : null;
       }
 
-      // Set sanitized points (whole numbers only)
       setPoints(nextPoints);
-      cacheSet(pointsCacheKey(user.id), nextPoints);
+      if (nextPoints) {
+        cacheSet(pointsCacheKey(user.id), nextPoints);
+      }
 
-      // Rank is non-critical; compute in the background (and throttled).
       void calculateRank();
     } catch (error) {
-      // Keep any cached/previous values; don't block UI
       console.error('Error fetching points:', error);
+      cacheRemove(pointsCacheKey(user.id));
     } finally {
       setLoading(false);
     }
@@ -275,8 +273,12 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
     if (hydratedUserIdRef.current !== userId) {
       hydratedUserIdRef.current = userId;
 
-      const cachedPoints = cacheGet<UserPoints | null>(pointsCacheKey(userId));
-      const cachedRank = cacheGet<number>(rankCacheKey(userId));
+      const cachedPoints = cacheGet<UserPoints | null>(pointsCacheKey(userId), {
+        maxAgeMs: POINTS_CACHE_MAX_AGE_MS,
+      });
+      const cachedRank = cacheGet<number>(rankCacheKey(userId), {
+        maxAgeMs: POINTS_CACHE_MAX_AGE_MS,
+      });
 
       if (cachedPoints?.data) {
         // Sanitize cached points to ensure whole numbers
@@ -295,6 +297,20 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
     // Always refresh in background
     void fetchPoints();
   }, [fetchPoints, user?.id]);
+
+  // Refetch when app/tab becomes visible (no Play Store update needed — server is source of truth)
+  useEffect(() => {
+    if (!user) return;
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void fetchPoints();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchPoints, user]);
 
   // Single real-time subscription for user_points (consolidated via provider)
   useEffect(() => {
