@@ -5,6 +5,10 @@ let ctx: AudioContext | null = null;
 let audioEl: HTMLAudioElement | null = null;
 let currentTrackId: string | null = null;
 let ducking = false;
+/** Music may only play while a game page is mounted */
+let musicAllowed = false;
+/** Invalidates in-flight async startMusic calls when stop/start supersedes them */
+let playToken = 0;
 let settings: ForgeSettings = {
   sfx: true, music: true, musicTrack: 'energy',
   sfxVolume: 0.85, musicVolume: 0.45, haptics: true,
@@ -41,7 +45,17 @@ export function setForgeAudioSettings(s: ForgeSettings): void {
   settings = s;
   if (!s.music) { stopMusic(); return; }
   if (audioEl) audioEl.volume = ducking ? s.musicVolume * 0.4 : s.musicVolume;
-  if (!prevMusic || prevTrack !== s.musicTrack) void startMusic();
+  if (musicAllowed && (!prevMusic || prevTrack !== s.musicTrack)) void startMusic();
+}
+
+/**
+ * Gate music playback to game pages: WordForgeGame enables the scope on
+ * mount and disables it on unmount, which also hard-stops any playing or
+ * in-flight track. Nothing can (re)start music while the scope is off.
+ */
+export function setMusicScope(allowed: boolean): void {
+  musicAllowed = allowed;
+  if (!allowed) stopMusic();
 }
 
 function vol(base: number): number { return base * settings.sfxVolume; }
@@ -119,7 +133,7 @@ export function restoreMusic(): void {
 }
 
 export async function startMusic(): Promise<void> {
-  if (!settings.music) return;
+  if (!settings.music || !musicAllowed) return;
   const trackId = settings.musicTrack;
   if (audioEl && currentTrackId === trackId) {
     audioEl.volume = ducking ? settings.musicVolume * 0.35 : settings.musicVolume;
@@ -127,15 +141,19 @@ export async function startMusic(): Promise<void> {
     return;
   }
   stopMusic();
+  const token = ++playToken;
   const mod = await TRACK_URLS[trackId]();
+  // A stopMusic()/newer startMusic() during the import supersedes this call
+  if (token !== playToken || !musicAllowed || !settings.music) return;
   audioEl = new Audio(mod.default);
   currentTrackId = trackId;
   audioEl.loop = true;
-  audioEl.volume = settings.musicVolume;
+  audioEl.volume = ducking ? settings.musicVolume * 0.35 : settings.musicVolume;
   try { await audioEl.play(); } catch { /* gesture */ }
 }
 
 export function stopMusic(): void {
+  ++playToken;
   if (audioEl) {
     audioEl.pause();
     audioEl.src = '';

@@ -8,6 +8,7 @@ import {
   playShuffle, playStreak, playSubmit, playTap, duckMusic, restoreMusic,
 } from '../audio/forgeAudio';
 
+import { preloadFullDictionary } from '../data/dictionary';
 import { lookupDefinition } from '../data/wordDefinitions';
 import {
   DAILY_BONUS_PAYOUT, dailySeed, generateDailyChallenge, isDailyCompleted,
@@ -15,6 +16,7 @@ import {
 import { levelParams } from '../engine/difficultyCurve';
 import { completionistBonus, payoutForWord } from '../engine/payoutCalculator';
 import { generateLevel, type LevelGeneration, type LetterTile } from '../engine/poolGenerator';
+import { assignSlots } from '../engine/slotAssignment';
 import { validateWordLocal, reasonMessage } from '../engine/wordValidator';
 import { validateAndCreditWord } from '../engine/wordValidatorServer';
 import { mulberry32, shuffle as shuffleArr } from '../engine/seedHash';
@@ -111,6 +113,15 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const minWords = generation.effectiveMinWords;
   const minWordLen = generation.params.minWordLen;
 
+  const validWords = useMemo(
+    () => foundWords.filter((w) => !w.rejected).map((w) => w.word),
+    [foundWords],
+  );
+  const slots = useMemo(
+    () => assignSlots(generation.slotWords, validWords),
+    [generation.slotWords, validWords],
+  );
+
   const currentWord = useMemo(
     () => selection.map((i) => tiles[i]?.letter ?? '').join(''),
     [selection, tiles],
@@ -125,6 +136,9 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     timersRef.current.forEach((id) => window.clearTimeout(id));
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
   }, []);
+
+  // Warm up the full 192k-word validation dictionary (separate lazy chunk)
+  useEffect(() => { void preloadFullDictionary(); }, []);
 
   const showToast = useCallback((msg: string, ms = 1400) => {
     setToast(msg);
@@ -290,8 +304,10 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     });
     setFoundWords((prev) => prev.map((w) => (w.word === word ? { ...w, pending: false, payout: credited } : w)));
 
-    const validCount = foundWords.filter((w) => !w.rejected).length + 1;
-    if (validCount >= minWords && !roundEnded) {
+    const nextValidWords = [...foundWords.filter((w) => !w.rejected).map((w) => w.word), word];
+    const validCount = nextValidWords.length;
+    const slotsFilledNext = assignSlots(generation.slotWords, nextValidWords).filledCount;
+    if (slotsFilledNext >= generation.slotWords.length && !roundEnded) {
       setRoundEnded(true);
       setPhase('ended');
       playLevelWin();
@@ -312,11 +328,13 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
       if (isDaily && !isDailyCompleted(prog2.dailyCompletedDate)) {
         setDailyBonusAwarded(true);
-        persistMeta({ dailyCompletedDate: dailySeed() });
+        const yesterday = dailySeed(new Date(Date.now() - 86_400_000));
+        const nextDailyStreak = prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1;
+        persistMeta({ dailyCompletedDate: dailySeed(), dailyStreak: nextDailyStreak });
         void creditPoints(DAILY_BONUS_PAYOUT);
       }
     }
-  }, [phase, selection.length, minWordLen, currentWord, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, minWords, roundEnded, generation.formableCount, schedule, showToast, triggerConfetti]);
+  }, [phase, selection.length, minWordLen, currentWord, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti]);
 
   const appendTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
@@ -375,7 +393,10 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
   const useHint = useCallback(() => {
     if (phase !== 'playing' || hintsLeft <= 0) return;
-    const target = generation.hintBonus ?? generation.targetWords.find((w) => !claimedRef.current.has(w)) ?? generation.targetWords[0];
+    const unfilled = slots.rows.filter((r) => !r.filledBy).map((r) => r.target);
+    const target = unfilled.find((w) => !claimedRef.current.has(w))
+      ?? generation.hintBonus
+      ?? generation.slotWords[0];
     if (!target) return;
     const left = hintsLeft - 1;
     setHintsLeft(left);
@@ -383,7 +404,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     playHint();
     setHintReveal({ word: target, revealedIndices: [0, target.length - 1] });
     showToast(`Hint: ${target[0]}${'·'.repeat(Math.max(0, target.length - 2))}${target[target.length - 1]}`, 2500);
-  }, [phase, hintsLeft, generation, persistMeta, showToast]);
+  }, [phase, hintsLeft, generation, slots.rows, persistMeta, showToast]);
 
   const completeTutorial = useCallback(() => {
     setShowTutorial(false);
@@ -400,8 +421,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     restoreMusic();
     if (isDaily) return;
 
-    const validCount = foundWords.filter((w) => !w.rejected).length;
-    const passed = validCount >= minWords;
+    const passed = slots.filledCount >= generation.slotWords.length;
     const prog = loadForgeProgress(preview);
 
     if (passed) {
@@ -426,7 +446,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       setHintsLeft((h) => Math.min(3, h + 1));
       resetRound(level, true);
     }
-  }, [foundWords, minWords, level, balance, resetRound, persistMeta, preview, hintsLeft, isDaily]);
+  }, [slots.filledCount, generation.slotWords, level, balance, resetRound, persistMeta, preview, hintsLeft, isDaily]);
 
   const unlockedSkinCount = loadForgeProgress(preview).unlockedSkins;
   const displayLevel = isDaily ? 'DAILY' : level;
@@ -462,6 +482,9 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     dailyBonusAwarded,
     minWords,
     minWordLen,
+    slotRows: slots.rows,
+    slotsFilled: slots.filledCount,
+    extraWords: slots.extraWords,
     boardRef,
     balanceRef,
     unlockedSkinCount,

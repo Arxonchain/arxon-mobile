@@ -36,6 +36,7 @@ export default function ForgeStatsPage() {
     { label: 'Shuffles Ready', value: `${progress.shufflesLeft}/2` },
     { label: 'Skins Unlocked', value: `${progress.unlockedSkins}/5` },
     { label: 'Daily Challenge', value: dailyDone ? `Done · ${dailySeed()}` : '+50 ARX-P waiting' },
+    { label: 'Daily Streak', value: progress.dailyStreak > 0 ? `${progress.dailyStreak} day${progress.dailyStreak === 1 ? '' : 's'}` : '—' },
   ];
 
   return (

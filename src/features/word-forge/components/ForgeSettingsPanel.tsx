@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react';
-import { FORGE_MUSIC_TRACKS } from '../audio/forgeAudio';
+import { useCallback, useEffect, useRef } from 'react';
+import { Minus, Plus } from 'lucide-react';
+import { FORGE_MUSIC_TRACKS, playTap } from '../audio/forgeAudio';
 import type { ForgeSettings } from '../hooks/useForgeSettings';
 
 interface ForgeSettingsPanelProps {
@@ -16,15 +17,11 @@ export function ForgeSettingsPanel({ open, onClose, settings, onChange, accent }
 
   useEffect(() => {
     if (!open) return;
-    const close = (e: MouseEvent | TouchEvent) => {
+    const close = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose();
     };
-    document.addEventListener('mousedown', close);
-    document.addEventListener('touchstart', close);
-    return () => {
-      document.removeEventListener('mousedown', close);
-      document.removeEventListener('touchstart', close);
-    };
+    document.addEventListener('pointerdown', close);
+    return () => document.removeEventListener('pointerdown', close);
   }, [open, onClose]);
 
   return (
@@ -70,7 +67,8 @@ export function ForgeSettingsPanel({ open, onClose, settings, onChange, accent }
               <ToggleRow label="Sound FX" on={settings.sfx} accent={accent}
                 onToggle={() => onChange({ ...settings, sfx: !settings.sfx })} />
               <SliderRow label="SFX Volume" value={settings.sfxVolume} accent={accent}
-                onChange={(v) => onChange({ ...settings, sfxVolume: v })} />
+                onChange={(v) => onChange({ ...settings, sfxVolume: v })}
+                onCommit={() => playTap()} />
               <ToggleRow label="Background Music" on={settings.music} accent={accent}
                 onToggle={() => onChange({ ...settings, music: !settings.music })} />
               <SliderRow label="Music Volume" value={settings.musicVolume} accent={accent}
@@ -159,24 +157,109 @@ function ToggleRow({
   );
 }
 
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
+}
+
+/**
+ * Pointer-driven volume control: drag the bar or use the −/+ step buttons.
+ * Custom (not <input type=range>) so it works reliably inside the game's
+ * gesture-heavy layout on touch devices.
+ */
 function SliderRow({
-  label, value, onChange, accent,
-}: { label: string; value: number; onChange: (v: number) => void; accent: string }) {
+  label, value, onChange, onCommit, accent,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  onCommit?: () => void;
+  accent: string;
+}) {
+  const barRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef(false);
+
+  const setFromClientX = useCallback((clientX: number) => {
+    const rect = barRef.current?.getBoundingClientRect();
+    if (!rect || rect.width === 0) return;
+    const raw = clamp01((clientX - rect.left) / rect.width);
+    onChange(Math.round(raw * 20) / 20);
+  }, [onChange]);
+
+  const step = (delta: number) => {
+    onChange(clamp01(Math.round((value + delta) * 20) / 20));
+    onCommit?.();
+  };
+
+  const btnStyle: React.CSSProperties = {
+    width: 30, height: 30, borderRadius: 9, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '1px solid rgba(255,255,255,0.15)', cursor: 'pointer',
+    background: 'rgba(255,255,255,0.08)', color: '#e2e8f0',
+  };
+
   return (
-    <label style={{ display: 'block', marginBottom: 12 }}>
+    <div style={{ marginBottom: 14 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
         <span style={{ fontSize: 11, color: '#94a3b8' }}>{label}</span>
-        <span style={{ fontSize: 10, color: accent }}>{Math.round(value * 100)}%</span>
+        <span style={{ fontSize: 10, fontWeight: 800, color: accent }}>{Math.round(value * 100)}%</span>
       </div>
-      <input
-        type="range"
-        min={0}
-        max={1}
-        step={0.05}
-        value={value}
-        onChange={(e) => onChange(Number(e.target.value))}
-        style={{ width: '100%', accentColor: accent }}
-      />
-    </label>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <button type="button" aria-label={`Decrease ${label}`} style={btnStyle} onClick={() => step(-0.1)}>
+          <Minus size={15} strokeWidth={3} />
+        </button>
+        <div
+          ref={barRef}
+          role="slider"
+          aria-label={label}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(value * 100)}
+          onPointerDown={(e) => {
+            e.preventDefault();
+            draggingRef.current = true;
+            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+            setFromClientX(e.clientX);
+          }}
+          onPointerMove={(e) => {
+            if (draggingRef.current) setFromClientX(e.clientX);
+          }}
+          onPointerUp={() => {
+            if (!draggingRef.current) return;
+            draggingRef.current = false;
+            onCommit?.();
+          }}
+          onPointerCancel={() => { draggingRef.current = false; }}
+          style={{
+            flex: 1, height: 30, display: 'flex', alignItems: 'center',
+            cursor: 'pointer', touchAction: 'none',
+          }}
+        >
+          <div style={{
+            position: 'relative', width: '100%', height: 10, borderRadius: 5,
+            background: 'rgba(255,255,255,0.12)',
+            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)',
+          }}>
+            <div style={{
+              position: 'absolute', left: 0, top: 0, bottom: 0,
+              width: `${value * 100}%`, borderRadius: 5,
+              background: `linear-gradient(180deg, ${accent}, ${accent}99)`,
+              boxShadow: `0 0 8px ${accent}66`,
+            }} />
+            <div style={{
+              position: 'absolute', top: '50%', left: `${value * 100}%`,
+              transform: 'translate(-50%, -50%)',
+              width: 20, height: 20, borderRadius: '50%',
+              background: 'linear-gradient(180deg, #ffffff, #cfe8f2)',
+              border: `2px solid ${accent}`,
+              boxShadow: '0 2px 6px rgba(0,0,0,0.5)',
+              pointerEvents: 'none',
+            }} />
+          </div>
+        </div>
+        <button type="button" aria-label={`Increase ${label}`} style={btnStyle} onClick={() => step(0.1)}>
+          <Plus size={15} strokeWidth={3} />
+        </button>
+      </div>
+    </div>
   );
 }

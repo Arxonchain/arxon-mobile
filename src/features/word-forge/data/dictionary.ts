@@ -1,4 +1,9 @@
-/** Curated common English words for preview validation (expand server-side later). */
+/**
+ * Curated common English words — used to SEED levels and pick slot words,
+ * so targets are always familiar words. Player submissions are validated
+ * against the FULL standard-English list (192k words, 3-10 letters) loaded
+ * lazily via preloadFullDictionary().
+ */
 const RAW = `
 THE AND FOR ARE BUT NOT YOU ALL CAN HER WAS ONE OUR OUT DAY GET HAS HIM HIS HOW MAN NEW NOW OLD SEE WAY WHO BOY DID ITS LET PUT SAY SHE TOO USE
 CAT DOG RUN SUN HOT RED BIG BOX FIX MIX SIX FOX TOP COP POP MOP HOP LOG JOG BAG RAG TAG WAG NAG SAG GAG DIG FIG WIG BIG PIG RIG KID LID BID HID
@@ -44,10 +49,30 @@ ABOUT ABOVE AFTER AGAIN ALONG AMONG ANGER ANGLE APPLE AROUND ARROW AUDIO AWAKE B
 
 export const DICTIONARY = new Set(RAW.map((w) => w.toUpperCase()));
 
-export function hasWord(word: string): boolean {
-  return DICTIONARY.has(word.toUpperCase());
+/** Full standard English dictionary (3-10 letters) for validating player words.
+ * Loaded as a separate lazy chunk so it never weighs down app startup. */
+let fullDict: Set<string> | null = null;
+let fullDictLoading: Promise<void> | null = null;
+
+export function preloadFullDictionary(): Promise<void> {
+  if (fullDict) return Promise.resolve();
+  fullDictLoading ??= import('./wordlist.txt?raw').then((mod) => {
+    const set = new Set(mod.default.split('\n'));
+    for (const w of DICTIONARY) set.add(w);
+    fullDict = set;
+  });
+  return fullDictLoading;
 }
 
+export function hasWord(word: string): boolean {
+  const w = word.toUpperCase();
+  if (fullDict) return fullDict.has(w);
+  // Full list not ready yet (first seconds after load) — curated fallback
+  void preloadFullDictionary();
+  return DICTIONARY.has(w);
+}
+
+/** Common-word pool used for level generation and slot targets */
 export function wordsInRange(minLen: number, maxLen: number): string[] {
   return [...DICTIONARY].filter((w) => w.length >= minLen && w.length <= maxLen);
 }

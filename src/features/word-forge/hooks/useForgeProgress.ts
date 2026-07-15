@@ -9,6 +9,8 @@ export interface ForgeProgress {
   bestStreak: number;
   longestWord: string;
   dailyCompletedDate: string | null;
+  /** Consecutive days the daily challenge was completed */
+  dailyStreak: number;
   tutorialCompleted: boolean;
   unlockedSkins: number;
 }
@@ -28,12 +30,18 @@ const DEFAULT: ForgeProgress = {
   bestStreak: 0,
   longestWord: '',
   dailyCompletedDate: null,
+  dailyStreak: 0,
   tutorialCompleted: false,
   unlockedSkins: 1,
 };
 
 function keyFor(preview: boolean): string {
   return preview ? PREVIEW_KEY : LIVE_KEY;
+}
+
+function num(v: unknown, fallback: number): number {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : fallback;
 }
 
 function sanitize(raw: Partial<ForgeProgress>): ForgeProgress {
@@ -43,11 +51,12 @@ function sanitize(raw: Partial<ForgeProgress>): ForgeProgress {
     currentLevel: Math.max(1, Number(raw.currentLevel) || 1),
     totalWords: Math.max(0, Number(raw.totalWords) || 0),
     sessionHigh: Math.max(0, Number(raw.sessionHigh) || 0),
-    hintsLeft: Math.max(0, Math.min(10, Number(raw.hintsLeft) ?? 3)),
-    shufflesLeft: Math.max(0, Math.min(10, Number(raw.shufflesLeft) ?? 2)),
+    hintsLeft: Math.max(0, Math.min(10, num(raw.hintsLeft, 3))),
+    shufflesLeft: Math.max(0, Math.min(10, num(raw.shufflesLeft, 2))),
     bestStreak: Math.max(0, Number(raw.bestStreak) || 0),
     longestWord: typeof raw.longestWord === 'string' ? raw.longestWord : '',
     dailyCompletedDate: typeof raw.dailyCompletedDate === 'string' ? raw.dailyCompletedDate : null,
+    dailyStreak: Math.max(0, Number(raw.dailyStreak) || 0),
     tutorialCompleted: Boolean(raw.tutorialCompleted),
     unlockedSkins: Math.max(1, Math.min(5, Number(raw.unlockedSkins) || 1)),
   };
@@ -80,6 +89,7 @@ export function progressFromCloud(row: Record<string, unknown>): ForgeProgress {
     bestStreak: row.best_streak as number,
     longestWord: row.longest_word as string,
     dailyCompletedDate: row.daily_completed_date as string | null,
+    dailyStreak: row.daily_streak as number,
     tutorialCompleted: row.tutorial_completed as boolean,
     unlockedSkins: row.unlocked_skins as number,
   });
@@ -96,6 +106,7 @@ export function progressToCloud(p: ForgeProgress): Record<string, unknown> {
     best_streak: p.bestStreak,
     longest_word: p.longestWord,
     daily_completed_date: p.dailyCompletedDate,
+    daily_streak: p.dailyStreak,
     tutorial_completed: p.tutorialCompleted,
     unlocked_skins: p.unlockedSkins,
   };

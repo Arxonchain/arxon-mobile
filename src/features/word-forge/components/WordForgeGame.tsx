@@ -4,7 +4,7 @@ import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import { Lightbulb, Pause, Shuffle } from 'lucide-react';
 import {
-  restoreMusic, setForgeAudioSettings, startMusic, stopMusic, unlockAudio,
+  restoreMusic, setForgeAudioSettings, setMusicScope, startMusic, stopMusic, unlockAudio,
 } from '../audio/forgeAudio';
 import { FORGE_UI } from '../data/uiAssets';
 import { DAILY_BONUS_PAYOUT } from '../engine/dailyChallenge';
@@ -35,21 +35,31 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const [faqOpen, setFaqOpen] = useState(false);
   const game = useWordForgeGame({ preview, mode });
   const { generation, phase } = game;
-  const passed = game.validCount >= game.minWords;
+  const passed = game.slotsFilled >= game.minWords;
   const urgent = game.timeLeft <= 10 && phase === 'playing';
-  const progress = Math.min(1, game.validCount / game.minWords);
+  const progress = Math.min(1, game.slotsFilled / Math.max(1, game.minWords));
   const audioUnlockedRef = useRef(false);
   const reduced = prefersReducedMotion();
 
-  const wheelSize = useMemo(
-    () => Math.round(Math.min((typeof window !== 'undefined' ? window.innerWidth : 380) - 118, 288)),
-    [],
-  );
+  // Compact disc centered on the same axis as the word slots. Sized so the
+  // wheel plus the side booster rail (50px buttons + gap, mirrored to keep
+  // the wheel centered) always fits the viewport, even at ~360px wide.
+  const wheelSize = useMemo(() => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 380;
+    const content = Math.min(vw, 440) - 28; // container max-width minus padding
+    return Math.round(Math.min(250, content - 2 * (50 + 14)));
+  }, []);
 
   const updateSettings = useCallback((s: typeof settings) => {
     setSettings(s);
     saveForgeSettings(s);
     setForgeAudioSettings(s);
+  }, []);
+
+  // Music is scoped to game pages only — entering enables it, leaving kills it
+  useEffect(() => {
+    setMusicScope(true);
+    return () => setMusicScope(false);
   }, []);
 
   useEffect(() => {
@@ -106,7 +116,6 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     }
   }, [game]);
 
-  const foundValidWords = game.foundWords.filter((w) => !w.rejected).map((w) => w.word);
   const timeRatio = generation.params.timerSeconds > 0 ? game.timeLeft / generation.params.timerSeconds : 0;
   const stars = passed ? (timeRatio >= 0.5 ? 3 : timeRatio >= 0.22 ? 2 : 1) : 0;
 
@@ -119,7 +128,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
       onPointerDown={onFirstInteract}
       style={{
         position: 'fixed', inset: 0, background: '#04070f', color: '#e8fcff',
-        overflow: 'hidden', touchAction: 'none',
+        overflow: 'hidden',
         fontFamily: "'Creato Display', 'Rajdhani', system-ui, sans-serif",
       }}
     >
@@ -211,7 +220,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             fontSize: 9, fontWeight: 800, letterSpacing: '0.1em',
           }}>
             <span style={{ color: 'rgba(220,240,255,0.55)' }}>
-              {game.validCount}/{game.minWords} WORDS
+              {game.slotsFilled}/{game.minWords} WORDS
             </span>
             {game.streak >= 2 && (
               <span style={{
@@ -231,10 +240,8 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
           animation: !reduced && game.shakeWord ? 'wf-shake 0.35s ease' : undefined,
         }}>
           <WordSlots
-            targetWords={generation.targetWords}
-            foundWords={foundValidWords}
-            minWords={game.minWords}
-            minWordLen={game.minWordLen}
+            rows={game.slotRows}
+            extraCount={game.extraWords.length}
             skin={game.skin}
             hintWord={game.hintReveal?.word ?? null}
             celebrateWord={game.celebrateWord}
@@ -270,10 +277,11 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
           )}
         </div>
 
-        {/* ── Letter wheel + power-up rail ──────────────────────────── */}
+        {/* ── Letter wheel, centered with the slot boxes — booster rail sits
+               clear of the disc on the right, vertically centered ────────── */}
         <div ref={game.boardRef} style={{
-          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          gap: 14, paddingBottom: 4,
+          flexShrink: 0, position: 'relative', width: '100%', paddingBottom: 4,
+          display: 'flex', justifyContent: 'center',
         }}>
           <LetterWheel
             tiles={game.tiles}
@@ -286,22 +294,26 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             onAppend={game.appendTile}
             onRelease={handleWheelRelease}
           />
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <div style={{
+            position: 'absolute', top: '50%', transform: 'translateY(-50%)',
+            left: `calc(50% + ${wheelSize / 2 + 14}px)`,
+            display: 'flex', flexDirection: 'column', gap: 12, zIndex: 6,
+          }}>
             <GlossyIconButton
-              label="Use hint" caption="Hint" color="gold" size={54}
+              label="Use hint" caption="Hint" color="gold" size={50}
               badge={game.hintsLeft}
               disabled={game.hintsLeft <= 0 || phase !== 'playing'}
               onClick={game.useHint}
             >
-              <Lightbulb size={23} strokeWidth={2.8} />
+              <Lightbulb size={21} strokeWidth={2.8} />
             </GlossyIconButton>
             <GlossyIconButton
-              label="Shuffle letters" caption="Mix" color="cyan" size={54}
+              label="Shuffle letters" caption="Mix" color="cyan" size={50}
               badge={game.shufflesLeft}
               disabled={game.shufflesLeft <= 0 || phase !== 'playing'}
               onClick={game.shuffleTiles}
             >
-              <Shuffle size={23} strokeWidth={2.8} />
+              <Shuffle size={21} strokeWidth={2.8} />
             </GlossyIconButton>
           </div>
         </div>
@@ -365,7 +377,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         open={phase === 'ended'}
         passed={passed}
         level={game.level}
-        wordsFormed={game.validCount}
+        wordsFormed={game.slotsFilled}
         wordsRequired={game.minWords}
         balance={game.displayBalance}
         stars={stars}

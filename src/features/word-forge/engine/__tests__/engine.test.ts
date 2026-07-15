@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { levelParams } from '../difficultyCurve';
 import { payoutForWord, streakMultiplier } from '../payoutCalculator';
-import { generateLevel } from '../poolGenerator';
+import { generateLevel, canForm, poolCountMap } from '../poolGenerator';
+import { assignSlots } from '../slotAssignment';
 import { validateWordLocal } from '../wordValidator';
 
 describe('difficultyCurve', () => {
@@ -9,7 +10,6 @@ describe('difficultyCurve', () => {
     for (let L = 1; L <= 3; L++) {
       const p = levelParams(L);
       expect(p.timerSeconds).toBeGreaterThanOrEqual(90);
-      expect(p.minWordsRequired).toBe(2);
       expect(p.tutorialMode).toBe(true);
     }
   });
@@ -18,8 +18,12 @@ describe('difficultyCurve', () => {
     expect(levelParams(60).timerSeconds).toBeGreaterThanOrEqual(40);
   });
 
-  it('min words capped at 8', () => {
-    expect(levelParams(100).minWordsRequired).toBeLessThanOrEqual(8);
+  it('requires 3-5 slot words per level', () => {
+    for (const L of [1, 2, 3, 5, 6, 20, 100]) {
+      const n = levelParams(L).minWordsRequired;
+      expect(n).toBeGreaterThanOrEqual(3);
+      expect(n).toBeLessThanOrEqual(5);
+    }
   });
 });
 
@@ -36,12 +40,55 @@ describe('payoutCalculator', () => {
 });
 
 describe('poolGenerator', () => {
-  it('always produces solvable levels', () => {
+  it('always produces solvable levels with formable slot words', () => {
     for (let level = 1; level <= 30; level++) {
       const params = levelParams(level);
       const gen = generateLevel(params, 'test-user', `attempt-${level}`);
       expect(gen.formableCount).toBeGreaterThanOrEqual(gen.effectiveMinWords);
+      expect(gen.slotWords.length).toBe(gen.effectiveMinWords);
+      const pool = poolCountMap(gen.poolLetters);
+      for (const w of gen.slotWords) {
+        expect(canForm(w, pool)).toBe(true);
+      }
     }
+  });
+
+  it('slot words come in varied lengths on standard levels', () => {
+    const gen = generateLevel(levelParams(10), 'test-user', 'attempt-x');
+    const lengths = new Set(gen.slotWords.map((w) => w.length));
+    expect(gen.slotWords.length).toBeGreaterThanOrEqual(4);
+    expect(lengths.size).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('slotAssignment', () => {
+  const slots = ['CAT', 'FISH', 'LUNCH'];
+
+  it('fills the exact slot when the target word is found', () => {
+    const r = assignSlots(slots, ['FISH']);
+    expect(r.rows[1].filledBy).toBe('FISH');
+    expect(r.filledCount).toBe(1);
+  });
+
+  it('fills a same-length slot without reshaping boxes', () => {
+    const r = assignSlots(slots, ['DOG']);
+    expect(r.rows[0].filledBy).toBe('DOG');
+    expect(r.rows[0].target).toBe('CAT');
+    expect(r.rows[1].filledBy).toBeNull();
+    expect(r.rows[1].target.length).toBe(4);
+  });
+
+  it('routes words that fit no slot to extras', () => {
+    const r = assignSlots(slots, ['DOG', 'RAT', 'PLANETS']);
+    expect(r.rows[0].filledBy).toBe('DOG');
+    expect(r.extraWords).toEqual(['RAT', 'PLANETS']);
+    expect(r.filledCount).toBe(1);
+  });
+
+  it('completes when all slots are filled regardless of extras', () => {
+    const r = assignSlots(slots, ['CAT', 'WISH', 'MUNCH', 'BONUS']);
+    expect(r.filledCount).toBe(3);
+    expect(r.extraWords).toEqual(['BONUS']);
   });
 });
 
