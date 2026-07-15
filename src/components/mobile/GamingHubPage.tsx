@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BarChart3, Flame, Gift, HelpCircle, Map, Settings, Trophy } from 'lucide-react';
+import { BarChart3, Flame, Gift, HelpCircle, Lock, Map, Settings, Sparkles, Trophy } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
-import { loadForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
+import { frontierLevel } from '@/features/word-forge/engine/sectorProgress';
+import { loadForgeProgress, saveForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
 import { isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
 import { loadForgeSettings, saveForgeSettings } from '@/features/word-forge/hooks/useForgeSettings';
 import { setForgeAudioSettings } from '@/features/word-forge/audio/forgeAudio';
@@ -19,6 +20,7 @@ export default function GamingHubPage() {
   const dailyDone = isDailyCompleted(progress.dailyCompletedDate);
   const [faqOpen, setFaqOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [rewardsToast, setRewardsToast] = useState(false);
   const [settings, setSettings] = useState(loadForgeSettings);
 
   const updateSettings = useCallback((s: typeof settings) => {
@@ -26,6 +28,12 @@ export default function GamingHubPage() {
     saveForgeSettings(s);
     setForgeAudioSettings(s);
   }, []);
+
+  const startCampaign = useCallback(() => {
+    const next = frontierLevel(progress);
+    saveForgeProgress({ currentLevel: next });
+    navigate('/word-forge');
+  }, [navigate, progress]);
 
   return (
     <div style={{
@@ -83,7 +91,7 @@ export default function GamingHubPage() {
               size="xl"
               color="gold"
               disabled={!WORD_FORGE_ENABLED}
-              onClick={() => navigate('/word-forge')}
+              onClick={startCampaign}
             >
               Play
             </GlossyButton>
@@ -92,7 +100,7 @@ export default function GamingHubPage() {
               letterSpacing: '0.14em', color: 'rgba(255,232,154,0.8)', textTransform: 'uppercase',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
             }}>
-              <span>Sector {progress.currentLevel}</span>
+              <span>Sector {frontierLevel(progress)}</span>
               {progress.dailyStreak > 0 && (
                 <span style={{
                   display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -120,15 +128,22 @@ export default function GamingHubPage() {
                 onClick={() => navigate('/word-forge/leaderboard')}>
                 <Trophy size={26} strokeWidth={2.6} />
               </GlossyIconButton>
+              <GlossyIconButton label="Sector map" caption="Map" color="green"
+                onClick={() => navigate('/word-forge/map')}>
+                <Map size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
               <GlossyIconButton label="Daily reward challenge" caption="Daily" color={dailyDone ? 'slate' : 'gold'}
                 badge={dailyDone ? null : '+50'}
                 disabled={!WORD_FORGE_ENABLED || dailyDone}
                 onClick={() => navigate('/word-forge?mode=daily')}>
                 <Gift size={26} strokeWidth={2.6} />
               </GlossyIconButton>
-              <GlossyIconButton label="Sector map" caption="Map" color="green"
-                onClick={() => navigate('/word-forge/map')}>
-                <Map size={26} strokeWidth={2.6} />
+              <GlossyIconButton label="Forge rewards" caption="Rewards" color="slate"
+                onClick={() => {
+                  setRewardsToast(true);
+                  window.setTimeout(() => setRewardsToast(false), 2400);
+                }}>
+                <Sparkles size={26} strokeWidth={2.6} />
               </GlossyIconButton>
               <GlossyIconButton label="How to play" caption="FAQ" color="green"
                 onClick={() => setFaqOpen(true)}>
@@ -174,7 +189,47 @@ export default function GamingHubPage() {
         }}>
           Spell words · Stack ARX-P · Clear sectors
         </p>
+
+        {/* Second game — clearly marked coming soon */}
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.36 }}
+          style={{ width: '100%', marginTop: 18 }}
+        >
+          <div style={{
+            padding: '14px 16px', borderRadius: 16, textAlign: 'center',
+            background: 'rgba(5,14,28,0.72)', border: '1px dashed rgba(79,216,235,0.28)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+            opacity: 0.88,
+          }}>
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, marginBottom: 6,
+              fontSize: 9, fontWeight: 900, letterSpacing: '0.18em', color: 'rgba(79,216,235,0.65)',
+              textTransform: 'uppercase',
+            }}>
+              <Lock size={11} strokeWidth={3} /> Coming Soon
+            </div>
+            <div style={{ fontSize: 17, fontWeight: 900, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.04em' }}>
+              Cipher Drop
+            </div>
+            <p style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(220,240,255,0.38)', lineHeight: 1.45 }}>
+              Decode falling ciphers for bonus ARX-P
+            </p>
+          </div>
+        </motion.div>
       </div>
+
+      {rewardsToast && (
+        <div role="status" style={{
+          position: 'fixed', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 40, padding: '10px 18px', borderRadius: 12, maxWidth: '86vw',
+          background: 'rgba(3,10,22,0.94)', border: '1px solid rgba(255,217,61,0.4)',
+          fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#ffd93d',
+        }}>
+          Forge rewards shop — coming soon
+        </div>
+      )}
 
       <ForgeFaqModal open={faqOpen} onClose={() => setFaqOpen(false)} />
       <ForgeSettingsPanel

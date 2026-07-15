@@ -4,6 +4,9 @@ import { motion } from 'framer-motion';
 import { Lock, Star } from 'lucide-react';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { loadForgeProgress, saveForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
+import {
+  canSelectSector, frontierLevel, maxUnlockedLevel, sectorMapState, type SectorMapState,
+} from '@/features/word-forge/engine/sectorProgress';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import {
   GlossyBackButton, GlossyButton, TreasureBackdrop,
@@ -12,27 +15,14 @@ import { mobileScrollPadding } from '@/lib/mobileLayout';
 
 const MAX_SECTORS = 50;
 
-type SectorState = 'locked' | 'current' | 'cleared' | 'available';
-
-function sectorState(sector: number, current: number, best: number): SectorState {
-  if (sector > best + 1) return 'locked';
-  if (sector === current) return 'current';
-  if (sector < current) return 'cleared';
-  return 'available';
-}
-
-const NODE_STYLE: Record<SectorState, { grad: string; ridge: string; border: string; text: string; glow: string }> = {
-  current: {
+const NODE_STYLE: Record<SectorMapState, { grad: string; ridge: string; border: string; text: string; glow: string }> = {
+  frontier: {
     grad: 'linear-gradient(180deg,#ffe89a 0%,#ffc93c 40%,#ff9d1b 100%)',
     ridge: '#a85a06', border: '#7d4203', text: '#5b2e00', glow: 'rgba(255,201,60,0.5)',
   },
   cleared: {
     grad: 'linear-gradient(180deg,#c9f77e 0%,#84d92f 45%,#4ba412 100%)',
     ridge: '#2e6f0a', border: '#245808', text: '#173f02', glow: 'rgba(132,217,47,0.35)',
-  },
-  available: {
-    grad: 'linear-gradient(180deg,#b8f4ff 0%,#4FD8EB 45%,#1592b4 100%)',
-    ridge: '#0b5a73', border: '#08455a', text: '#013647', glow: 'rgba(79,216,235,0.4)',
   },
   locked: {
     grad: 'linear-gradient(180deg,#2c3d52 0%,#1b2a3c 50%,#101c2c 100%)',
@@ -44,7 +34,8 @@ export default function SectorMapPage() {
   const navigate = useNavigate();
   const { setHideNav } = useMobileNav();
   const progress = loadForgeProgress();
-  const visible = Math.min(MAX_SECTORS, Math.max(20, progress.bestLevel + 5));
+  const unlocked = maxUnlockedLevel(progress.bestLevel);
+  const visible = Math.min(MAX_SECTORS, Math.max(20, unlocked + 4));
 
   useEffect(() => {
     setHideNav(true);
@@ -52,8 +43,14 @@ export default function SectorMapPage() {
   }, [setHideNav]);
 
   const selectSector = (sector: number) => {
-    if (sectorState(sector, progress.currentLevel, progress.bestLevel) === 'locked') return;
+    if (!canSelectSector(sector, progress.bestLevel)) return;
     saveForgeProgress({ currentLevel: sector });
+    navigate('/word-forge');
+  };
+
+  const continueFrontier = () => {
+    const next = frontierLevel(progress);
+    saveForgeProgress({ currentLevel: next });
     navigate('/word-forge');
   };
 
@@ -84,20 +81,22 @@ export default function SectorMapPage() {
           color: 'rgba(255,232,154,0.75)', letterSpacing: '0.22em', textTransform: 'uppercase',
           textShadow: '0 2px 8px rgba(0,0,0,0.8)',
         }}>
-          Sector Map · Best {progress.bestLevel}
+          Sector Map · Unlocked through {unlocked}
         </p>
 
-        {/* Candy node grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 11 }}>
           {Array.from({ length: visible }, (_, i) => i + 1).map((sector, i) => {
-            const state = sectorState(sector, progress.currentLevel, progress.bestLevel);
+            const state = sectorMapState(sector, progress.bestLevel);
             const c = NODE_STYLE[state];
             const locked = state === 'locked';
+            const isReplay = state === 'cleared' && sector === progress.currentLevel;
+            const isFrontier = state === 'frontier';
             return (
               <motion.button
                 key={sector}
                 type="button"
                 disabled={locked}
+                aria-label={locked ? `Sector ${sector} locked` : `Sector ${sector}`}
                 onClick={() => selectSector(sector)}
                 initial={{ opacity: 0, scale: 0.7 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -105,7 +104,8 @@ export default function SectorMapPage() {
                 whileTap={locked ? undefined : { scale: 0.9, y: 2 }}
                 style={{
                   position: 'relative', aspectRatio: '1', borderRadius: 15,
-                  cursor: locked ? 'default' : 'pointer',
+                  cursor: locked ? 'not-allowed' : 'pointer',
+                  opacity: locked ? 0.72 : 1,
                   border: `2px solid ${c.border}`,
                   background: c.grad,
                   boxShadow: locked
@@ -113,10 +113,9 @@ export default function SectorMapPage() {
                     : `0 4px 0 ${c.ridge}, inset 0 2px 0 rgba(255,255,255,0.5), 0 7px 14px rgba(0,0,0,0.45), 0 0 16px ${c.glow}`,
                   display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                   WebkitTapHighlightColor: 'transparent',
-                  animation: state === 'current' ? 'wf-node-pulse 1.8s ease-in-out infinite' : undefined,
+                  animation: isFrontier ? 'wf-node-pulse 1.8s ease-in-out infinite' : undefined,
                 }}
               >
-                {/* gloss sweep */}
                 <span style={{
                   position: 'absolute', top: 2, left: '12%', right: '12%', height: '38%',
                   borderRadius: 10, pointerEvents: 'none',
@@ -135,12 +134,12 @@ export default function SectorMapPage() {
                     {state === 'cleared' && (
                       <Star size={10} fill={c.text} color={c.text} style={{ marginTop: 2, position: 'relative' }} />
                     )}
-                    {state === 'current' && (
+                    {(isFrontier || isReplay) && (
                       <span style={{
                         fontSize: 6.5, fontWeight: 900, letterSpacing: '0.12em',
                         color: c.text, marginTop: 2, position: 'relative',
                       }}>
-                        NOW
+                        {isFrontier ? 'NEXT' : 'NOW'}
                       </span>
                     )}
                   </>
@@ -151,8 +150,8 @@ export default function SectorMapPage() {
         </div>
 
         <div style={{ marginTop: 22 }}>
-          <GlossyButton color="gold" size="lg" onClick={() => navigate('/word-forge')}>
-            Continue Sector {progress.currentLevel}
+          <GlossyButton color="gold" size="lg" onClick={continueFrontier}>
+            Continue Sector {frontierLevel(progress)}
           </GlossyButton>
         </div>
       </div>

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Award, Flame, Hash, Map as MapIcon, Sparkles, Trophy } from 'lucide-react';
 import { useMobileNav } from '@/contexts/MobileNavContext';
-import { loadForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
+import { loadForgeProgress, saveForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
+import { frontierLevel } from '@/features/word-forge/engine/sectorProgress';
 import { dailySeed, isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import {
@@ -22,6 +23,13 @@ export default function ForgeStatsPage() {
     return () => setHideNav(false);
   }, [setHideNav]);
 
+  const nextSector = frontierLevel(progress);
+
+  const startCampaign = () => {
+    saveForgeProgress({ currentLevel: nextSector });
+    navigate('/word-forge');
+  };
+
   const heroStats = [
     { label: 'Best Sector', value: progress.bestLevel, icon: Trophy, color: '#ffd93d' },
     { label: 'Words Forged', value: progress.totalWords, icon: Hash, color: '#4FD8EB' },
@@ -29,7 +37,7 @@ export default function ForgeStatsPage() {
   ];
 
   const detailStats = [
-    { label: 'Current Sector', value: progress.currentLevel },
+    { label: 'Current Sector', value: nextSector },
     { label: 'Longest Word', value: progress.longestWord || '—' },
     { label: 'Session High', value: `${progress.sessionHigh} ARX-P` },
     { label: 'Hints Ready', value: `${progress.hintsLeft}/3` },
@@ -120,9 +128,9 @@ export default function ForgeStatsPage() {
             </div>
 
             <div style={{ display: 'grid', gap: 10, marginTop: 16 }}>
-              <GlossyButton color="gold" size="lg" onClick={() => navigate('/word-forge')}>
+              <GlossyButton color="gold" size="lg" onClick={startCampaign}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <Sparkles size={16} strokeWidth={3} /> Play Sector {progress.currentLevel}
+                  <Sparkles size={16} strokeWidth={3} /> Play Sector {nextSector}
                 </span>
               </GlossyButton>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>

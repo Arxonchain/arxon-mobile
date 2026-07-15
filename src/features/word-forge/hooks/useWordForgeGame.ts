@@ -21,6 +21,7 @@ import { validateWordLocal, reasonMessage } from '../engine/wordValidator';
 import { validateAndCreditWord } from '../engine/wordValidatorServer';
 import { mulberry32, shuffle as shuffleArr } from '../engine/seedHash';
 import { loadForgeProgress, saveForgeProgress } from './useForgeProgress';
+import { clampCampaignLevel, isSectorUnlocked } from '../engine/sectorProgress';
 import { loadForgeSettings } from './useForgeSettings';
 import { useForgeCloudSync } from './useForgeCloudSync';
 import { useRoundTimer } from './useRoundTimer';
@@ -68,7 +69,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const { push: pushCloud } = useForgeCloudSync(preview);
 
   const saved = useMemo(() => loadForgeProgress(preview), [preview]);
-  const [level, setLevel] = useState(saved.currentLevel);
+  const campaignStart = isDaily ? saved.currentLevel : clampCampaignLevel(saved.currentLevel, saved.bestLevel);
+  const [level, setLevel] = useState(campaignStart);
   const [attemptId, setAttemptId] = useState(() => String(Date.now()));
   const [phase, setPhase] = useState<RoundPhase>(
     saved.tutorialCompleted || isDaily ? 'playing' : 'paused',
@@ -140,6 +142,16 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   // Warm up the full 192k-word validation dictionary (separate lazy chunk)
   useEffect(() => { void preloadFullDictionary(); }, []);
 
+  // Clamp tampered progress on campaign mount
+  useEffect(() => {
+    if (preview || isDaily) return;
+    const prog = loadForgeProgress(preview);
+    const allowed = clampCampaignLevel(prog.currentLevel, prog.bestLevel);
+    if (allowed !== prog.currentLevel) persistMeta({ currentLevel: allowed });
+    if (allowed !== level) setLevel(allowed);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on mount
+  }, []);
+
   const showToast = useCallback((msg: string, ms = 1400) => {
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
@@ -168,10 +180,14 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   });
 
   const resetRound = useCallback((nextLevel: number, newAttempt: boolean) => {
-    const params = isDaily ? { timerSeconds: 120 } : levelParams(nextLevel);
+    const prog = loadForgeProgress(preview);
+    const playLevel = isDaily ? nextLevel : clampCampaignLevel(nextLevel, prog.bestLevel);
+    if (!isDaily && !isSectorUnlocked(playLevel, prog.bestLevel)) return;
+
+    const params = isDaily ? { timerSeconds: 120 } : levelParams(playLevel);
     if (!isDaily) {
-      setLevel(nextLevel);
-      persistMeta({ currentLevel: nextLevel });
+      setLevel(playLevel);
+      persistMeta({ currentLevel: playLevel });
     }
     if (newAttempt) setAttemptId(String(Date.now()));
     setPhase(showTutorial ? 'paused' : 'playing');
@@ -191,7 +207,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     setCompletionistPayout(0);
     setDailyBonusAwarded(false);
     claimedRef.current = new Set();
-  }, [persistMeta, resetTimer, showTutorial, isDaily]);
+  }, [persistMeta, resetTimer, showTutorial, isDaily, preview]);
 
   const spawnCoinFly = useCallback((amount: number) => {
     const board = boardRef.current?.getBoundingClientRect();

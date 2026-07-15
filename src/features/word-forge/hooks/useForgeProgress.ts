@@ -1,3 +1,5 @@
+import { clampCampaignLevel, maxUnlockedLevel } from '../engine/sectorProgress';
+
 export interface ForgeProgress {
   version: number;
   bestLevel: number;
@@ -45,10 +47,12 @@ function num(v: unknown, fallback: number): number {
 }
 
 function sanitize(raw: Partial<ForgeProgress>): ForgeProgress {
+  const bestLevel = maxUnlockedLevel(Number(raw.bestLevel) || 1);
+  const currentLevel = clampCampaignLevel(Number(raw.currentLevel) || 1, bestLevel);
   return {
     version: VERSION,
-    bestLevel: Math.max(1, Number(raw.bestLevel) || 1),
-    currentLevel: Math.max(1, Number(raw.currentLevel) || 1),
+    bestLevel,
+    currentLevel,
     totalWords: Math.max(0, Number(raw.totalWords) || 0),
     sessionHigh: Math.max(0, Number(raw.sessionHigh) || 0),
     hintsLeft: Math.max(0, Math.min(10, num(raw.hintsLeft, 3))),
@@ -92,6 +96,31 @@ export function progressFromCloud(row: Record<string, unknown>): ForgeProgress {
     dailyStreak: row.daily_streak as number,
     tutorialCompleted: row.tutorial_completed as boolean,
     unlockedSkins: row.unlocked_skins as number,
+  });
+}
+
+/** Merge local + cloud snapshots — bestLevel and cumulative stats win per-field. */
+export function mergeForgeProgress(local: ForgeProgress, cloud: ForgeProgress): ForgeProgress {
+  const bestLevel = Math.max(local.bestLevel, cloud.bestLevel);
+  const source = local.bestLevel >= cloud.bestLevel ? local : cloud;
+  const longestWord = local.longestWord.length >= cloud.longestWord.length ? local.longestWord : cloud.longestWord;
+  let dailyCompletedDate = local.dailyCompletedDate;
+  if (cloud.dailyCompletedDate && (!dailyCompletedDate || cloud.dailyCompletedDate > dailyCompletedDate)) {
+    dailyCompletedDate = cloud.dailyCompletedDate;
+  }
+  return sanitize({
+    bestLevel,
+    currentLevel: Math.max(local.currentLevel, cloud.currentLevel),
+    totalWords: Math.max(local.totalWords, cloud.totalWords),
+    sessionHigh: Math.max(local.sessionHigh, cloud.sessionHigh),
+    bestStreak: Math.max(local.bestStreak, cloud.bestStreak),
+    dailyStreak: Math.max(local.dailyStreak, cloud.dailyStreak),
+    longestWord,
+    dailyCompletedDate,
+    tutorialCompleted: local.tutorialCompleted || cloud.tutorialCompleted,
+    unlockedSkins: Math.max(local.unlockedSkins, cloud.unlockedSkins),
+    hintsLeft: source.hintsLeft,
+    shufflesLeft: source.shufflesLeft,
   });
 }
 

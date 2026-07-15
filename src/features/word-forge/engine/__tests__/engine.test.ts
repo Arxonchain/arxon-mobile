@@ -1,9 +1,33 @@
 import { describe, it, expect } from 'vitest';
+import { mergeForgeProgress } from '../../hooks/useForgeProgress';
 import { levelParams } from '../difficultyCurve';
 import { payoutForWord, streakMultiplier } from '../payoutCalculator';
 import { generateLevel, canForm, poolCountMap } from '../poolGenerator';
 import { assignSlots } from '../slotAssignment';
 import { validateWordLocal } from '../wordValidator';
+
+describe('mergeForgeProgress', () => {
+  it('keeps the highest bestLevel and cumulative stats from either device', () => {
+    const local = mergeForgeProgress(
+      {
+        version: 2, bestLevel: 8, currentLevel: 8, totalWords: 120, sessionHigh: 90,
+        hintsLeft: 2, shufflesLeft: 1, bestStreak: 5, longestWord: 'PLANET',
+        dailyCompletedDate: '2026-07-14', dailyStreak: 3, tutorialCompleted: true, unlockedSkins: 2,
+      },
+      {
+        version: 2, bestLevel: 12, currentLevel: 10, totalWords: 200, sessionHigh: 150,
+        hintsLeft: 3, shufflesLeft: 2, bestStreak: 7, longestWord: 'STELLAR',
+        dailyCompletedDate: '2026-07-15', dailyStreak: 4, tutorialCompleted: false, unlockedSkins: 3,
+      },
+    );
+    expect(local.bestLevel).toBe(12);
+    expect(local.currentLevel).toBe(10);
+    expect(local.totalWords).toBe(200);
+    expect(local.dailyStreak).toBe(4);
+    expect(local.longestWord).toBe('STELLAR');
+    expect(local.dailyCompletedDate).toBe('2026-07-15');
+  });
+});
 
 describe('difficultyCurve', () => {
   it('levels 1-3 are tutorial-friendly', () => {
