@@ -18,6 +18,8 @@ export interface LevelGeneration {
   grid: GridLayout;
   tiles: LetterTile[];
   targetWords: string[];
+  /** Fixed crossword slots for the round — varied lengths, all formable from the pool */
+  slotWords: string[];
   poolLetters: string[];
   hintBonus?: string;
   formableCount: number;
@@ -87,25 +89,56 @@ function padFromSeedWords(
   return out.slice(0, targetSize);
 }
 
+/**
+ * Choose the fixed crossword slot words for a round: sampled from the words
+ * actually formable from the pool, round-robin across word lengths so the
+ * board mixes 3s, 4s, 5s etc. Sorted shortest-first for stable display.
+ */
+function chooseSlotWords(rng: () => number, formable: string[], count: number): string[] {
+  const byLen = new Map<number, string[]>();
+  for (const w of formable) {
+    const arr = byLen.get(w.length) ?? [];
+    arr.push(w);
+    byLen.set(w.length, arr);
+  }
+  const buckets = [...byLen.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, words]) => shuffle(rng, words));
+
+  const out: string[] = [];
+  let cursor = 0;
+  while (out.length < count) {
+    const nonEmpty = buckets.filter((b) => b.length > 0);
+    if (nonEmpty.length === 0) break;
+    out.push(nonEmpty[cursor % nonEmpty.length].pop()!);
+    cursor++;
+  }
+  return out.sort((a, b) => a.length - b.length || a.localeCompare(b));
+}
+
 function buildSolvablePool(
   rng: () => number,
   params: LevelParams,
   bonusRoll: boolean,
-): { letters: string[]; targetWords: string[]; hintBonus?: string; effectiveMinWords: number; formableCount: number } {
+): { letters: string[]; slotWords: string[]; hintBonus?: string; effectiveMinWords: number; formableCount: number } {
   const dict = wordsInRange(params.minWordLen, params.maxWordLen);
-  const minFormable = params.minWordsRequired + 2;
-  const seedTarget = Math.min(6, Math.max(3, Math.ceil(params.minWordsRequired / 2) + 1));
+  const want = params.minWordsRequired;
+  const minFormable = want + 2;
+  const seedTarget = Math.min(6, Math.max(3, Math.ceil(want / 2) + 2));
+
+  let best: { letters: string[]; formable: string[]; bonusSeed?: string } | null = null;
 
   for (let attempt = 0; attempt < 100; attempt++) {
     const seedWords: string[] = [];
     const used = new Set<string>();
+    let bonusSeed: string | undefined;
 
     if (bonusRoll) {
       const bonus = bonusWordsInRange(params.minWordLen, params.maxWordLen);
       if (bonus.length) {
-        const bw = pick(rng, bonus);
-        seedWords.push(bw);
-        used.add(bw);
+        bonusSeed = pick(rng, bonus);
+        seedWords.push(bonusSeed);
+        used.add(bonusSeed);
       }
     }
 
@@ -122,24 +155,29 @@ function buildSolvablePool(
     bag = padFromSeedWords(rng, bag, seedWords, params.poolSize);
     const letters = shuffle(rng, bag);
 
-    const formable = countFormableWords(letters, params.minWordLen, params.maxWordLen);
-    if (formable >= minFormable) {
-      const hintBonus = bonusRoll
-        ? seedWords.find((w) => bonusWordsInRange(params.minWordLen, params.maxWordLen).includes(w))
-        : undefined;
-      return { letters, targetWords: seedWords, hintBonus, effectiveMinWords: params.minWordsRequired, formableCount: formable };
+    const pool = letterCounts(letters);
+    const formable = dict.filter((w) => canForm(w, pool));
+    if (!best || formable.length > best.formable.length) best = { letters, formable, bonusSeed };
+
+    if (formable.length >= minFormable) {
+      const slotWords = chooseSlotWords(rng, formable, want);
+      if (slotWords.length === want) {
+        const hintBonus = bonusSeed && formable.includes(bonusSeed) ? bonusSeed : undefined;
+        return { letters, slotWords, hintBonus, effectiveMinWords: want, formableCount: formable.length };
+      }
     }
   }
 
-  // Fallback — enforce solvability by adjusting required words
-  for (let attempt = 0; attempt < 80; attempt++) {
-    const fallback = pick(rng, dict.filter((w) => w.length >= params.minWordLen && w.length <= params.maxWordLen));
-    const letters = shuffle(rng, padFromSeedWords(rng, fallback.split(''), [fallback], params.poolSize));
-    const formable = countFormableWords(letters, params.minWordLen, params.maxWordLen);
-    const effectiveMinWords = Math.min(params.minWordsRequired, Math.max(1, formable - 2));
-    if (formable >= effectiveMinWords) {
-      return { letters, targetWords: [fallback], effectiveMinWords, formableCount: formable };
-    }
+  // Fallback — use the richest pool seen and shrink the slot count to fit
+  if (best && best.formable.length > 0) {
+    const count = Math.max(1, Math.min(want, best.formable.length - 1 || 1));
+    const slotWords = chooseSlotWords(rng, best.formable, count);
+    return {
+      letters: best.letters,
+      slotWords,
+      effectiveMinWords: slotWords.length,
+      formableCount: best.formable.length,
+    };
   }
 
   // Last resort — single rich word, require 1 word
@@ -148,7 +186,7 @@ function buildSolvablePool(
   const formable = countFormableWords(letters, params.minWordLen, params.maxWordLen);
   return {
     letters,
-    targetWords: [fallback],
+    slotWords: [fallback],
     effectiveMinWords: 1,
     formableCount: formable,
   };
@@ -164,7 +202,7 @@ export function generateLevel(
   const grid = gridLayoutForCount(params.poolSize);
   const bonusRoll = rng() < params.bonusWordDensity;
 
-  const { letters, targetWords, hintBonus, effectiveMinWords, formableCount } = buildSolvablePool(rng, params, bonusRoll);
+  const { letters, slotWords, hintBonus, effectiveMinWords, formableCount } = buildSolvablePool(rng, params, bonusRoll);
 
   const tiles: LetterTile[] = letters.map((letter, i) => ({
     id: `${seed}-${i}`,
@@ -178,7 +216,8 @@ export function generateLevel(
     seed,
     grid,
     tiles,
-    targetWords,
+    targetWords: slotWords,
+    slotWords,
     poolLetters: letters,
     hintBonus,
     formableCount,

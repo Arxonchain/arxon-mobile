@@ -20,9 +20,11 @@ export function timerSeconds(L: number): number {
   return Math.min(90, Math.max(40, Math.round(90 - L * 1.5)));
 }
 
+/** 3-5 crossword slots per level (varied word lengths) */
 export function minWordsRequired(L: number): number {
-  if (L <= 3) return 2;
-  return Math.min(8, Math.max(3, 3 + Math.floor(L / 8)));
+  if (L <= 2) return 3;
+  if (L <= 5) return 4;
+  return 5;
 }
 
 export function bonusWordDensity(L: number): number {

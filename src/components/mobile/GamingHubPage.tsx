@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BarChart3, Gift, HelpCircle, Map, Settings, Trophy } from 'lucide-react';
+import { BarChart3, Flame, Gift, HelpCircle, Map, Settings, Trophy } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { loadForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
 import { isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
@@ -90,8 +90,18 @@ export default function GamingHubPage() {
             <p style={{
               margin: '8px 0 0', textAlign: 'center', fontSize: 10.5, fontWeight: 800,
               letterSpacing: '0.14em', color: 'rgba(255,232,154,0.8)', textTransform: 'uppercase',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
             }}>
-              Sector {progress.currentLevel}
+              <span>Sector {progress.currentLevel}</span>
+              {progress.dailyStreak > 0 && (
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  color: '#ff9d4a', textShadow: '0 0 10px rgba(255,140,50,0.5)',
+                }}>
+                  <Flame size={12} strokeWidth={3} />
+                  {progress.dailyStreak}-day
+                </span>
+              )}
             </p>
 
             <div style={{
