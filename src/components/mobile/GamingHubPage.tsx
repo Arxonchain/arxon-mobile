@@ -1,143 +1,184 @@
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { BarChart3, Gift, HelpCircle, Map, Settings, Trophy } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { loadForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
-import { isDailyCompleted, dailySeed } from '@/features/word-forge/engine/dailyChallenge';
+import { isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
+import { loadForgeSettings, saveForgeSettings } from '@/features/word-forge/hooks/useForgeSettings';
+import { setForgeAudioSettings } from '@/features/word-forge/audio/forgeAudio';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
-import { ForgeTitle, TechButton } from '@/features/word-forge/components/ForgeTitle';
+import { GamePanel, GlossyButton, GlossyIconButton, TreasureBackdrop } from '@/features/word-forge/components/GlossyKit';
+import { ForgeFaqModal } from '@/features/word-forge/components/ForgeFaqModal';
+import { ForgeSettingsPanel } from '@/features/word-forge/components/ForgeSettingsPanel';
 
 export default function GamingHubPage() {
   const navigate = useNavigate();
   const progress = loadForgeProgress();
   const dailyDone = isDailyCompleted(progress.dailyCompletedDate);
-  const dailyBadge = dailyDone ? null : 'DAILY';
+  const [faqOpen, setFaqOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settings, setSettings] = useState(loadForgeSettings);
 
-  const continueGame = () => navigate('/word-forge');
-  const openDaily = () => navigate('/word-forge?mode=daily');
-  const openStats = () => navigate('/word-forge/stats');
-  const openMap = () => navigate('/word-forge/map');
-  const openLeaderboard = () => navigate('/word-forge/leaderboard');
+  const updateSettings = useCallback((s: typeof settings) => {
+    setSettings(s);
+    saveForgeSettings(s);
+    setForgeAudioSettings(s);
+  }, []);
 
   return (
     <div style={{
-      minHeight: '100vh', background: '#050810', position: 'relative', overflow: 'hidden',
+      minHeight: '100vh', position: 'relative', overflow: 'hidden',
       fontFamily: "'Creato Display', 'Rajdhani', system-ui, sans-serif",
       paddingBottom: mobileScrollPadding(),
+      background: '#04070f',
     }}>
-      <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage: `url(${FORGE_UI.discoveryBg})`,
-        backgroundSize: 'cover', backgroundPosition: 'center',
-        filter: 'blur(6px) brightness(0.35)', transform: 'scale(1.06)',
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0,
-        background: 'radial-gradient(ellipse 80% 60% at 50% 30%, rgba(79,216,235,0.12), transparent 70%)',
-      }} />
+      {/* Treasure background — blurred so the panel stays readable */}
+      <TreasureBackdrop blur={7} brightness={0.72} />
 
-      <div style={{ position: 'relative', zIndex: 2, padding: 'max(48px, env(safe-area-inset-top)) 20px 24px' }}>
-        <ForgeTitle />
-        <p style={{
-          margin: '12px auto 0', maxWidth: 320, textAlign: 'center',
-          fontSize: 12, lineHeight: 1.55, color: 'rgba(255,255,255,0.45)', fontWeight: 600,
-        }}>
-          Spell words. Stack ARX-P. Clear sectors before the forge cools.
-        </p>
+      {/* Ambient sparkles */}
+      {[
+        { top: '9%', left: '12%', s: 5, d: 0 }, { top: '15%', left: '84%', s: 4, d: 0.9 },
+        { top: '30%', left: '6%', s: 3, d: 1.7 }, { top: '26%', left: '92%', s: 5, d: 0.4 },
+        { top: '58%', left: '8%', s: 4, d: 1.2 }, { top: '64%', left: '90%', s: 3, d: 2.1 },
+      ].map((p, i) => (
+        <span key={i} style={{
+          position: 'absolute', top: p.top, left: p.left, width: p.s, height: p.s,
+          borderRadius: '50%', background: '#ffe89a',
+          boxShadow: '0 0 10px 3px rgba(255,220,120,0.55)',
+          animation: `wf-sparkle 2.6s ease-in-out ${p.d}s infinite`,
+          zIndex: 1,
+        }} />
+      ))}
 
+      <div style={{
+        position: 'relative', zIndex: 2, maxWidth: 400, margin: '0 auto',
+        padding: 'max(26px, env(safe-area-inset-top)) 22px 20px',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+      }}>
+        {/* Logo overlay — transparent cutout, floating */}
+        <motion.img
+          src={FORGE_UI.forgeLogo}
+          alt="Arxon Word Forge"
+          initial={{ opacity: 0, y: -24, scale: 0.9 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 20 }}
+          style={{
+            width: 'min(76%, 290px)', height: 'auto', marginTop: 8,
+            filter: 'drop-shadow(0 10px 26px rgba(0,0,0,0.7)) drop-shadow(0 0 30px rgba(255,180,50,0.25))',
+            animation: 'wf-logo-float 3.6s ease-in-out infinite',
+          }}
+        />
+
+        {/* Main menu panel — image-1 layout */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          style={{ margin: '24px auto 0', maxWidth: 360, display: 'grid', gap: 10 }}
+          initial={{ opacity: 0, y: 30, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ delay: 0.12, type: 'spring', stiffness: 220, damping: 24 }}
+          style={{ width: '100%', marginTop: 22 }}
         >
-          <TechButton onClick={continueGame} disabled={!WORD_FORGE_ENABLED}>
-            Continue Sector {progress.currentLevel}
-          </TechButton>
-          <TechButton variant="ghost" onClick={openDaily} disabled={!WORD_FORGE_ENABLED || dailyDone}>
-            {dailyDone ? `Daily Complete (${dailySeed()})` : 'Daily Forge Challenge +50 ARX-P'}
-          </TechButton>
-          <TechButton variant="ghost" onClick={openMap} disabled={!WORD_FORGE_ENABLED}>
-            Sector Map
-          </TechButton>
+          <GamePanel>
+            <GlossyButton
+              size="xl"
+              color="gold"
+              disabled={!WORD_FORGE_ENABLED}
+              onClick={() => navigate('/word-forge')}
+            >
+              Play
+            </GlossyButton>
+            <p style={{
+              margin: '8px 0 0', textAlign: 'center', fontSize: 10.5, fontWeight: 800,
+              letterSpacing: '0.14em', color: 'rgba(255,232,154,0.8)', textTransform: 'uppercase',
+            }}>
+              Sector {progress.currentLevel}
+            </p>
+
+            <div style={{
+              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
+              justifyItems: 'center', marginTop: 20,
+            }}>
+              <GlossyIconButton label="Stats" caption="Stats" color="green"
+                onClick={() => navigate('/word-forge/stats')}>
+                <BarChart3 size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
+              <GlossyIconButton label="Settings" caption="Settings" color="green"
+                onClick={() => setSettingsOpen(true)}>
+                <Settings size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
+              <GlossyIconButton label="Leaderboard" caption="Ranks" color="green"
+                onClick={() => navigate('/word-forge/leaderboard')}>
+                <Trophy size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
+              <GlossyIconButton label="Daily reward challenge" caption="Daily" color={dailyDone ? 'slate' : 'gold'}
+                badge={dailyDone ? null : '+50'}
+                disabled={!WORD_FORGE_ENABLED || dailyDone}
+                onClick={() => navigate('/word-forge?mode=daily')}>
+                <Gift size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
+              <GlossyIconButton label="Sector map" caption="Map" color="green"
+                onClick={() => navigate('/word-forge/map')}>
+                <Map size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
+              <GlossyIconButton label="How to play" caption="FAQ" color="green"
+                onClick={() => setFaqOpen(true)}>
+                <HelpCircle size={26} strokeWidth={2.6} />
+              </GlossyIconButton>
+            </div>
+          </GamePanel>
         </motion.div>
 
-        <div style={{
-          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10,
-          margin: '20px auto 0', maxWidth: 360,
-        }}>
+        {/* Compact career stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.28 }}
+          style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10,
+            width: '100%', marginTop: 16,
+          }}
+        >
           {[
-            { label: 'Best', value: progress.bestLevel },
+            { label: 'Best Sector', value: progress.bestLevel },
             { label: 'Words', value: progress.totalWords },
-            { label: 'Streak', value: progress.bestStreak },
+            { label: 'Top Streak', value: progress.bestStreak },
           ].map((s) => (
             <div key={s.label} style={{
-              padding: '12px 8px', textAlign: 'center', borderRadius: 4,
-              border: '1px solid rgba(79,216,235,0.18)', background: 'rgba(0,8,16,0.65)',
+              padding: '10px 6px', textAlign: 'center', borderRadius: 14,
+              background: 'rgba(5,14,28,0.78)', border: '1px solid rgba(79,216,235,0.22)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
             }}>
-              <div style={{ fontSize: 8, fontWeight: 800, letterSpacing: '0.2em', color: 'rgba(79,216,235,0.55)' }}>{s.label}</div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: '#e8fcff', marginTop: 4 }}>{s.value}</div>
+              <div style={{ fontSize: 8, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(79,216,235,0.6)', textTransform: 'uppercase' }}>
+                {s.label}
+              </div>
+              <div style={{ fontSize: 21, fontWeight: 900, color: '#ffe89a', marginTop: 3, textShadow: '0 2px 8px rgba(255,200,60,0.3)' }}>
+                {s.value}
+              </div>
             </div>
           ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 16 }}>
-          <TechButton variant="ghost" onClick={openStats}>Stats</TechButton>
-          <TechButton variant="ghost" onClick={openLeaderboard}>Leaderboard</TechButton>
-        </div>
+        </motion.div>
 
         <p style={{
-          margin: '28px auto 10px', maxWidth: 360, textAlign: 'center',
-          fontSize: 9, fontWeight: 800, letterSpacing: '0.2em', color: 'rgba(79,216,235,0.45)',
+          margin: '16px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
+          color: 'rgba(255,255,255,0.4)', textAlign: 'center',
         }}>
-          MORE GAMES
+          Spell words · Stack ARX-P · Clear sectors
         </p>
-
-        <div style={{ maxWidth: 360, margin: '0 auto', display: 'grid', gap: 10 }}>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            style={{
-              padding: '16px 14px', borderRadius: 4,
-              border: '1px solid rgba(79,216,235,0.35)', background: 'rgba(0,8,16,0.72)',
-            }}
-          >
-            <div style={{ fontSize: 11, fontWeight: 900, color: '#4FD8EB', letterSpacing: '0.08em' }}>WORD FORGE</div>
-            <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', marginTop: 4 }}>Live · Sector {progress.currentLevel}</div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            style={{
-              padding: '16px 14px', borderRadius: 4,
-              border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(0,0,0,0.45)',
-              opacity: 0.72,
-            }}
-          >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 900, color: 'rgba(255,255,255,0.55)', letterSpacing: '0.08em' }}>CIPHER DROP</div>
-                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>Decode falling blocks · Coming soon</div>
-              </div>
-              <span style={{ fontSize: 16 }}>🔒</span>
-            </div>
-          </motion.div>
-        </div>
-
-        {dailyBadge && (
-          <div style={{
-            position: 'absolute', top: 'max(48px, env(safe-area-inset-top))', right: 20,
-            padding: '4px 10px', borderRadius: 3, fontSize: 9, fontWeight: 900,
-            letterSpacing: '0.15em', color: '#ffd93d', border: '1px solid #ffd93d55',
-            background: 'rgba(255,217,61,0.12)',
-          }}>
-            {dailyBadge}
-          </div>
-        )}
       </div>
+
+      <ForgeFaqModal open={faqOpen} onClose={() => setFaqOpen(false)} />
+      <ForgeSettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        settings={settings}
+        onChange={updateSettings}
+        accent="#4FD8EB"
+      />
+
+      <style>{`
+        @keyframes wf-logo-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+        @keyframes wf-sparkle { 0%,100%{opacity:0.15;transform:scale(0.7)} 50%{opacity:1;transform:scale(1.25)} }
+      `}</style>
     </div>
   );
 }

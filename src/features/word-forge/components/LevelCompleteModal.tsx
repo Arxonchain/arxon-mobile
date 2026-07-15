@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronRight, RotateCcw } from 'lucide-react';
 import { FORGE_UI } from '../data/uiAssets';
-import { TechButton } from './ForgeTitle';
+import { GamePanel, GlossyButton, RibbonBanner } from './GlossyKit';
 
 interface LevelCompleteModalProps {
   open: boolean;
@@ -9,29 +10,26 @@ interface LevelCompleteModalProps {
   wordsFormed: number;
   wordsRequired: number;
   balance: number;
+  /** 0-3, only meaningful when passed */
+  stars: number;
   newBest?: boolean;
   isDaily?: boolean;
   completionistBonus?: number;
   dailyBonus?: number;
+  onReplay: () => void;
   onContinue: () => void;
 }
 
+/** Image-4 style result card: ribbon, star rating, score, replay/next */
 export function LevelCompleteModal({
-  open, passed, level, wordsFormed, wordsRequired, balance, newBest,
-  isDaily, completionistBonus = 0, dailyBonus = 0, onContinue,
+  open, passed, level, wordsFormed, wordsRequired, balance, stars, newBest,
+  isDaily, completionistBonus = 0, dailyBonus = 0, onReplay, onContinue,
 }: LevelCompleteModalProps) {
-  const nextLevel = level + 1;
-  const accent = passed ? '#4FD8EB' : '#ff6b4a';
-  const accentGlow = passed ? 'rgba(79,216,235,0.55)' : 'rgba(255,107,74,0.45)';
-  const headline = isDaily ? (passed ? 'DAILY' : 'DAILY') : (passed ? nextLevel : level);
-  const subtitle = isDaily
-    ? (passed ? `+${dailyBonus} ARX-P Daily Bonus${completionistBonus ? ` · +${completionistBonus} completionist` : ''}` : `${wordsRequired - wordsFormed} Words Short`)
-    : passed
-      ? (newBest ? `NEW BEST — Level ${nextLevel} Ready` : `Level ${nextLevel} Ready`)
-      : `${wordsRequired - wordsFormed} Words Short`;
+  const totalEarn = balance + completionistBonus + (passed && isDaily ? dailyBonus : 0);
+  const heading = isDaily ? 'Daily Challenge' : `Level ${level}`;
   const continueLabel = isDaily
-    ? (passed ? 'Back to Hub' : 'Retry Daily')
-    : (passed ? `Enter Level ${nextLevel}` : 'Retry Sector');
+    ? (passed ? 'Hub' : 'Retry')
+    : (passed ? 'Next' : 'Retry');
 
   return (
     <AnimatePresence>
@@ -40,234 +38,166 @@ export function LevelCompleteModal({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.35 }}
+          transition={{ duration: 0.3 }}
           style={{
-            position: 'fixed', inset: 0, zIndex: 60,
-            overflow: 'hidden',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            position: 'fixed', inset: 0, zIndex: 60, overflow: 'hidden',
+            background: 'rgba(2,5,12,0.86)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
           }}
         >
-          {/* Animated background */}
-          <motion.div
-            initial={{ scale: 1.08, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.6, ease: 'easeOut' }}
-            style={{
-              position: 'absolute', inset: 0,
-              backgroundImage: `url(${FORGE_UI.forgeFrameBg})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center 20%',
-            }}
-          />
-
-          {/* Dark vignette */}
-          <div style={{
-            position: 'absolute', inset: 0,
-            background: 'radial-gradient(ellipse 80% 70% at 50% 45%, rgba(0,8,18,0.55) 0%, rgba(0,2,8,0.92) 100%)',
-          }} />
-
-          {/* Animated scan lines */}
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden',
-          }}>
-            <motion.div
-              animate={{ y: ['-100%', '200%'] }}
-              transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-              style={{
-                position: 'absolute', left: 0, right: 0, height: '30%',
-                background: 'linear-gradient(180deg, transparent 0%, rgba(79,216,235,0.04) 50%, transparent 100%)',
-              }}
-            />
-          </div>
-
-          {/* Horizontal accent bars */}
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.15, duration: 0.5, ease: 'easeOut' }}
-            style={{
-              position: 'absolute', top: '18%', left: '8%', right: '8%', height: 1,
-              background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
-              transformOrigin: 'center',
-              boxShadow: `0 0 12px ${accentGlow}`,
-            }}
-          />
-          <motion.div
-            initial={{ scaleX: 0 }}
-            animate={{ scaleX: 1 }}
-            transition={{ delay: 0.2, duration: 0.5, ease: 'easeOut' }}
-            style={{
-              position: 'absolute', bottom: '18%', left: '8%', right: '8%', height: 1,
-              background: `linear-gradient(90deg, transparent, ${accent}88, transparent)`,
-              transformOrigin: 'center',
-            }}
-          />
-
-          {/* Center terminal card */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.88, y: 30 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.92, y: 20 }}
-            transition={{ type: 'spring', stiffness: 260, damping: 28, delay: 0.08 }}
-            style={{
-              position: 'relative', zIndex: 2,
-              width: 'min(92%, 380px)',
-              padding: '28px 22px 24px',
-              borderRadius: 8,
-              background: 'linear-gradient(180deg, rgba(4,18,32,0.94) 0%, rgba(2,8,16,0.97) 100%)',
-              border: `1px solid ${accent}55`,
-              boxShadow: `0 0 48px ${accentGlow}, 0 24px 64px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)`,
-            }}
-          >
-            {/* Top glow strip */}
+          {/* Rotating celebration rays behind the card */}
+          {passed && (
             <div style={{
-              position: 'absolute', top: 0, left: '10%', right: '10%', height: 2,
-              background: `linear-gradient(90deg, transparent, ${accent}, transparent)`,
-              borderRadius: 1,
+              position: 'absolute', width: 620, height: 620, borderRadius: '50%',
+              background: 'conic-gradient(from 0deg, rgba(255,217,61,0.14) 0deg, transparent 24deg, rgba(255,217,61,0.14) 48deg, transparent 72deg, rgba(255,217,61,0.14) 96deg, transparent 120deg, rgba(255,217,61,0.14) 144deg, transparent 168deg, rgba(255,217,61,0.14) 192deg, transparent 216deg, rgba(255,217,61,0.14) 240deg, transparent 264deg, rgba(255,217,61,0.14) 288deg, transparent 312deg, rgba(255,217,61,0.14) 336deg, transparent 360deg)',
+              animation: 'wf-rays-spin 14s linear infinite',
+              maskImage: 'radial-gradient(circle, black 0%, transparent 68%)',
+              WebkitMaskImage: 'radial-gradient(circle, black 0%, transparent 68%)',
             }} />
+          )}
 
-            {/* Status badge */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              style={{ textAlign: 'center', marginBottom: 6 }}
-            >
-              <span style={{
-                display: 'inline-block',
-                padding: '4px 14px', borderRadius: 2,
-                fontSize: 9, fontWeight: 800, letterSpacing: '0.35em',
-                textTransform: 'uppercase',
-                color: accent,
-                background: `${accent}18`,
-                border: `1px solid ${accent}44`,
-              }}>
-                {passed ? 'Sector Cleared' : 'Forge Timeout'}
-              </span>
-            </motion.div>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.72, y: 46 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.86, y: 24 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.06 }}
+            style={{ position: 'relative', width: 'min(100%, 340px)' }}
+          >
+            <GamePanel style={{ paddingTop: 40, textAlign: 'center' }}>
+              <RibbonBanner color={passed ? 'green' : 'red'}>
+                {passed ? 'Complete!' : 'Time Up'}
+              </RibbonBanner>
 
-            {/* Level number */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.6 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.25 }}
-              style={{ textAlign: 'center', marginBottom: 4 }}
-            >
-              <motion.div
-                animate={{ textShadow: [`0 0 20px ${accentGlow}`, `0 0 40px ${accentGlow}`, `0 0 20px ${accentGlow}`] }}
-                transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+              <motion.p
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
                 style={{
-                  fontSize: isDaily ? 48 : 72, fontWeight: 900, lineHeight: 1,
-                  color: '#fff',
-                  fontFamily: "'Creato Display', system-ui, sans-serif",
-                  letterSpacing: isDaily ? '0.08em' : undefined,
+                  margin: 0, fontSize: 24, fontWeight: 900, color: '#fff',
+                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                  textShadow: '0 2px 10px rgba(79,216,235,0.4)',
                 }}
               >
-                {headline}
+                {heading}
+              </motion.p>
+              {newBest && passed && (
+                <motion.p
+                  initial={{ opacity: 0, scale: 0.7 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.32, type: 'spring', stiffness: 320 }}
+                  style={{
+                    margin: '4px 0 0', fontSize: 10, fontWeight: 900, letterSpacing: '0.22em',
+                    color: '#ffd93d', textShadow: '0 0 12px rgba(255,217,61,0.7)',
+                  }}
+                >
+                  ★ NEW BEST ★
+                </motion.p>
+              )}
+
+              {/* Star rating */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '14px 0 4px' }}>
+                {[1, 2, 3].map((s) => {
+                  const earned = passed && stars >= s;
+                  const mid = s === 2;
+                  return (
+                    <motion.div
+                      key={s}
+                      initial={{ scale: 0, rotate: -32 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ delay: 0.34 + s * 0.14, type: 'spring', stiffness: 340, damping: 14 }}
+                      style={{
+                        fontSize: mid ? 54 : 42,
+                        lineHeight: 1,
+                        marginTop: mid ? 0 : 10,
+                        filter: earned
+                          ? 'drop-shadow(0 0 14px rgba(255,200,40,0.8)) drop-shadow(0 3px 4px rgba(0,0,0,0.5))'
+                          : 'grayscale(1) brightness(0.32)',
+                      }}
+                    >
+                      <span style={{
+                        background: earned
+                          ? 'linear-gradient(180deg,#fff3b0 0%,#ffd93d 42%,#ff9d1b 100%)'
+                          : 'linear-gradient(180deg,#3a4a5c,#1a2635)',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                      }}>
+                        ★
+                      </span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+
+              {/* Score card */}
+              <motion.div
+                initial={{ opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.62 }}
+                style={{
+                  margin: '10px 0 0', padding: '12px 14px', borderRadius: 14,
+                  background: 'rgba(2,10,22,0.75)', border: '1px solid rgba(255,217,61,0.3)',
+                  boxShadow: 'inset 0 2px 8px rgba(0,0,0,0.5)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                  <img src={FORGE_UI.arxCoin} alt="" style={{
+                    width: 30, height: 30, objectFit: 'contain',
+                    filter: 'drop-shadow(0 0 8px rgba(140,180,255,0.6))',
+                    animation: 'wf-result-coin-spin 2.8s ease-in-out infinite',
+                  }} />
+                  <div style={{ textAlign: 'left' }}>
+                    <div style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: '0.2em', color: 'rgba(255,232,154,0.6)' }}>
+                      SESSION EARNINGS
+                    </div>
+                    <div style={{ fontSize: 26, fontWeight: 900, color: '#ffd93d', lineHeight: 1.05, textShadow: '0 0 16px rgba(255,217,61,0.45)' }}>
+                      +{totalEarn} <span style={{ fontSize: 11, opacity: 0.7 }}>ARX-P</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{
+                  display: 'flex', justifyContent: 'center', gap: 14, marginTop: 8,
+                  fontSize: 10, fontWeight: 800, color: 'rgba(200,230,255,0.6)',
+                }}>
+                  <span>{wordsFormed}/{wordsRequired} words</span>
+                  {completionistBonus > 0 && <span style={{ color: '#7FE7C4' }}>+{completionistBonus} completionist</span>}
+                  {passed && isDaily && dailyBonus > 0 && <span style={{ color: '#ffd93d' }}>+{dailyBonus} daily</span>}
+                </div>
               </motion.div>
-              <p style={{
-                margin: '6px 0 0', fontSize: 11, fontWeight: 700,
-                color: 'rgba(200,230,255,0.65)', letterSpacing: '0.14em',
-                textTransform: 'uppercase',
-              }}>
-                {subtitle}
-              </p>
-            </motion.div>
 
-            {/* Stats row */}
-            <div style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10,
-              margin: '20px 0 18px',
-            }}>
-              <ResultCard
-                delay={0.32}
-                label="Words Forged"
-                value={`${wordsFormed}/${wordsRequired}`}
-                accent="#4FD8EB"
-                slideFrom="left"
-              />
-              <ResultCard
-                delay={0.38}
-                label="Session Earn"
-                value={`+${balance + completionistBonus + (passed && isDaily ? dailyBonus : 0)}`}
-                sub="ARX-P"
-                accent="#ffd93d"
-                slideFrom="right"
-              />
-            </div>
-
-            {/* Continue button */}
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.46 }}
-            >
-              <TechButton onClick={onContinue}>
-                {continueLabel}
-              </TechButton>
-            </motion.div>
+              {/* Actions */}
+              <motion.div
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.74 }}
+                style={{ display: 'grid', gridTemplateColumns: passed && !isDaily ? '1fr 1.4fr' : '1fr', gap: 10, marginTop: 16 }}
+              >
+                {passed && !isDaily && (
+                  <GlossyButton color="cyan" size="lg" onClick={onReplay}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <RotateCcw size={15} strokeWidth={3} /> Replay
+                    </span>
+                  </GlossyButton>
+                )}
+                <GlossyButton color={passed ? 'green' : 'gold'} size="lg" onClick={onContinue}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    {continueLabel} <ChevronRight size={17} strokeWidth={3.4} />
+                  </span>
+                </GlossyButton>
+              </motion.div>
+            </GamePanel>
           </motion.div>
+
+          <style>{`
+            @keyframes wf-rays-spin { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+            @keyframes wf-result-coin-spin { 0%,100%{transform:rotateY(0)} 50%{transform:rotateY(180deg)} }
+          `}</style>
         </motion.div>
       )}
     </AnimatePresence>
   );
 }
 
-function ResultCard({
-  label, value, sub, accent, delay, slideFrom,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent: string;
-  delay: number;
-  slideFrom: 'left' | 'right';
-}) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: slideFrom === 'left' ? -20 : 20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay, type: 'spring', stiffness: 280, damping: 26 }}
-      style={{
-        padding: '12px 14px', borderRadius: 6,
-        background: 'rgba(0,10,20,0.75)',
-        border: `1px solid ${accent}33`,
-        boxShadow: `inset 0 1px 0 rgba(255,255,255,0.04), 0 4px 16px ${accent}15`,
-        textAlign: 'center',
-      }}
-    >
-      <div style={{
-        fontSize: 9, fontWeight: 800, letterSpacing: '0.14em',
-        color: 'rgba(255,255,255,0.45)', textTransform: 'uppercase', marginBottom: 4,
-      }}>
-        {label}
-      </div>
-      <div style={{ fontSize: 22, fontWeight: 900, color: accent, lineHeight: 1 }}>
-        {value}
-      </div>
-      {sub && (
-        <div style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.18em', color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-          {sub}
-        </div>
-      )}
-    </motion.div>
-  );
-}
-
-interface TimeUpModalProps {
-  open: boolean;
-  passed: boolean;
-  level: number;
-  wordsFormed: number;
-  wordsRequired: number;
-  balance: number;
-  newBest?: boolean;
-  isDaily?: boolean;
-  completionistBonus?: number;
-  dailyBonus?: number;
-  onContinue: () => void;
-}
-
-export function RoundEndModal(props: TimeUpModalProps) {
+export function RoundEndModal(props: LevelCompleteModalProps) {
   return <LevelCompleteModal {...props} />;
 }

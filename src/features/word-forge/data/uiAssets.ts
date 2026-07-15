@@ -1,13 +1,13 @@
-import arcadePlay from '@/assets/word-forge/ui/arcade-play.png';
-import forgeFrameBg from '@/assets/word-forge/ui/forge-frame-bg.png';
 import discoveryBg from '@/assets/word-forge/ui/discovery-bg.png';
-import arxCoin from '@/assets/word-forge/ui/arx-coin.png';
+import arxCoin from '@/assets/word-forge/ui/arx-coin-3d.png';
+import forgeLogo from '@/assets/word-forge/ui/forge-logo.png';
+import treasureBg from '@/assets/word-forge/ui/treasure-bg.png';
 
 export const FORGE_UI = {
-  arcadePlay,
-  forgeFrameBg,
   discoveryBg,
   arxCoin,
+  forgeLogo,
+  treasureBg,
 } as const;
 
 export interface LevelTileSkin {
@@ -32,7 +32,3 @@ export function tileSkinForLevel(level: number, unlockedSkins = 5): LevelTileSki
   return available[(Math.max(1, level) - 1) % available.length] ?? LEVEL_TILE_SKINS[0];
 }
 
-export function playfieldBgForLevel(level: number): string {
-  const band = Math.floor((level - 1) / 5);
-  return band % 2 === 0 ? forgeFrameBg : discoveryBg;
-}

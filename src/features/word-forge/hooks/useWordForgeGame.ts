@@ -184,7 +184,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     if (!board) return;
     const id = ++flyId.current;
     setCoinFlies((prev) => [...prev, { id, amount, fromX: board.left + board.width / 2, fromY: board.top + board.height * 0.35 }]);
-    schedule(() => setCoinFlies((prev) => prev.filter((c) => c.id !== id)), 700);
+    schedule(() => setCoinFlies((prev) => prev.filter((c) => c.id !== id)), 1800);
   }, [schedule]);
 
   const animateBalance = useCallback((target: number) => {
@@ -328,6 +328,13 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     });
   }, [phase]);
 
+  const beginSelection = useCallback((index: number) => {
+    if (phase !== 'playing') return;
+    playTap();
+    void haptic(ImpactStyle.Light);
+    setSelection([index]);
+  }, [phase]);
+
   const toggleTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
     playTap();
@@ -461,6 +468,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     skin: tileSkinForLevel(level, unlockedSkinCount),
     toggleTile,
     appendTile,
+    beginSelection,
     undoLetter,
     clearSelection,
     submitWord,
