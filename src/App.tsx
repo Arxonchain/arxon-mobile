@@ -23,7 +23,7 @@ import Nexus from "@/pages/Nexus";
 import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
-import Litepaper from "@/pages/Litepaper";
+import PointsHistory from "@/pages/PointsHistory";
 
 // Admin
 import AdminLayout from "@/components/admin/AdminLayout";
@@ -185,6 +185,7 @@ function AppRoutes() {
             <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
             <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/points-history" element={<ProtectedRoute><MobilePage><PointsHistory /></MobilePage></ProtectedRoute>} />
           </>
         ) : (
           <>
@@ -198,6 +199,7 @@ function AppRoutes() {
             <Route path="/profile"      element={<ProtectedRoute><DashboardLayout><Profile /></DashboardLayout></ProtectedRoute>} />
             <Route path="/settings"     element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
+            <Route path="/points-history" element={<ProtectedRoute><DashboardLayout><PointsHistory /></DashboardLayout></ProtectedRoute>} />
           </>
         )}
 

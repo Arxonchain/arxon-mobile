@@ -261,40 +261,42 @@ export default function MobileDashboard() {
     const maxDay = Math.max(...dayTotals, 1);
     setWeekChart(dayTotals.map(v => Math.max(0.08, v / maxDay)));
 
-    const [{ data: sessions }, { data: nexusTx }] = await Promise.all([
+    const [{ data: sessions }, { data: ledgerRows }] = await Promise.all([
       supabase.from('mining_sessions').select('id,arx_mined,started_at,ended_at,is_active')
         .eq('user_id', user.id).order('started_at', { ascending: false }).limit(3),
-      supabase.from('nexus_transactions').select('id,amount,created_at,sender_id,receiver_id')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false }).limit(3),
+      supabase.from('points_ledger' as any).select('id,amount,description,category,created_at')
+        .eq('user_id', user.id).order('created_at', { ascending: false }).limit(6),
     ]);
 
     const activities: any[] = [];
-    (sessions || []).forEach(s => {
+    (ledgerRows || []).forEach((row: any) => {
+      const amount = Number(row.amount || 0);
+      const isCredit = amount > 0;
       activities.push({
-        type: s.is_active ? 'mining_active' : 'mining_done',
-        label: s.is_active ? 'Mining Session' : 'Session Completed',
-        sub: relTime(s.started_at),
-        val: s.is_active ? null : `+${Number(s.arx_mined||0).toFixed(2)}`,
-        time: s.started_at,
-        col: 'hsl(155 45% 43%)', bg: 'hsl(155 45% 43%/0.1)',
-        bd: 'hsl(155 45% 43%/0.2)', vc: 'hsl(155 45% 55%)',
+        type: row.category,
+        label: row.description,
+        sub: relTime(row.created_at),
+        val: `${isCredit ? '+' : ''}${Math.round(amount).toLocaleString()}`,
+        time: row.created_at,
+        col: isCredit ? 'hsl(155 45% 43%)' : 'hsl(0 60% 56%)',
+        bg: isCredit ? 'hsl(155 45% 43%/0.1)' : 'hsl(0 60% 56%/0.08)',
+        bd: isCredit ? 'hsl(155 45% 43%/0.2)' : 'hsl(0 60% 56%/0.18)',
+        vc: isCredit ? 'hsl(155 45% 55%)' : 'hsl(0 60% 62%)',
       });
     });
-    (nexusTx || []).forEach(tx => {
-      const isSend = tx.sender_id === user.id;
-      activities.push({
-        type: isSend ? 'nexus_send' : 'nexus_recv',
-        label: isSend ? 'Sent ARX-P' : 'Received ARX-P',
-        sub: relTime(tx.created_at),
-        val: `${isSend ? '-' : '+'}${tx.amount}`,
-        time: tx.created_at,
-        col: isSend ? 'hsl(0 60% 56%)' : 'hsl(155 45% 43%)',
-        bg: isSend ? 'hsl(0 60% 56%/0.08)' : 'hsl(155 45% 43%/0.08)',
-        bd: isSend ? 'hsl(0 60% 56%/0.18)' : 'hsl(155 45% 43%/0.18)',
-        vc: isSend ? 'hsl(0 60% 62%)' : 'hsl(155 45% 55%)',
+    if (activities.length === 0) {
+      (sessions || []).forEach(s => {
+        activities.push({
+          type: s.is_active ? 'mining_active' : 'mining_done',
+          label: s.is_active ? 'Mining Session' : 'Session Completed',
+          sub: relTime(s.started_at),
+          val: s.is_active ? null : `+${Number(s.arx_mined||0).toFixed(2)}`,
+          time: s.started_at,
+          col: 'hsl(155 45% 43%)', bg: 'hsl(155 45% 43%/0.1)',
+          bd: 'hsl(155 45% 43%/0.2)', vc: 'hsl(155 45% 55%)',
+        });
       });
-    });
+    }
     activities.sort((a,b) => new Date(b.time).getTime() - new Date(a.time).getTime());
     setRecentActivity(activities.slice(0, 4));
   }, [user]);
@@ -757,7 +759,7 @@ export default function MobileDashboard() {
         <motion.div variants={fadeUp} style={{padding:'24px 20px 0'}}>
           <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
             <p style={{fontSize:15,fontWeight:700,color:'hsl(215 20% 93%)'}}>Recent Activity</p>
-            <button onClick={()=>navigate('/nexus')}
+            <button onClick={()=>navigate('/points-history')}
               style={{display:'flex',alignItems:'center',gap:3,fontSize:11,color:'hsl(215 35% 62%)',fontWeight:600,background:'none',border:'none',cursor:'pointer'}}>
               See all <ChevronRight size={13}/>
             </button>
