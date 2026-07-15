@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import {
-  loadForgeProgress, saveForgeProgress, progressFromCloud, progressToCloud, type ForgeProgress,
+  loadForgeProgress, saveForgeProgress, progressFromCloud, progressToCloud, mergeForgeProgress, type ForgeProgress,
 } from './useForgeProgress';
 
 export function useForgeCloudSync(preview = false) {
@@ -19,7 +19,7 @@ export function useForgeCloudSync(preview = false) {
     if (error || !data) return null;
     const cloud = progressFromCloud(data as Record<string, unknown>);
     const local = loadForgeProgress(false);
-    const merged = cloud.bestLevel >= local.bestLevel ? cloud : { ...cloud, ...local, bestLevel: Math.max(cloud.bestLevel, local.bestLevel) };
+    const merged = mergeForgeProgress(local, cloud);
     saveForgeProgress(merged, false);
     return merged;
   }, [preview, user]);

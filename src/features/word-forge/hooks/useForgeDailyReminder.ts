@@ -71,17 +71,17 @@ export function useForgeDailyReminder(enabled: boolean) {
         });
       }
 
-      if (progress.bestStreak >= 3) {
+      if (progress.dailyStreak >= 2) {
         notifications.push({
           id: STREAK_NOTIF_ID,
-          title: 'Keep Your Forge Streak',
-          body: `You're on a ${progress.bestStreak}-word streak record. Jump back in!`,
+          title: 'Keep Your Daily Streak',
+          body: `${progress.dailyStreak}-day forge streak — complete today's challenge!`,
           schedule: { at: nextReminderAt(12, 0) },
           sound: 'default',
           smallIcon: ARXON_NOTIF_SMALL_ICON,
           largeIcon: ARXON_NOTIF_LARGE_ICON,
           channelId: ARXON_NOTIF_CHANNEL,
-          extra: { url: '/games' },
+          extra: { url: '/word-forge?mode=daily' },
         });
       }
 
