@@ -24,6 +24,7 @@ import Profile from "@/pages/Profile";
 import Settings from "@/pages/Settings";
 import Notifications from "@/pages/Notifications";
 import PointsHistory from "@/pages/PointsHistory";
+import Litepaper from "@/pages/Litepaper";
 
 // Admin
 import AdminLayout from "@/components/admin/AdminLayout";
