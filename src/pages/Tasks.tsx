@@ -161,16 +161,13 @@ export default function Tasks() {
       // Atomic: credit points + mark complete in one DB transaction (prevents lost credits)
       const { data, error } = await supabase.rpc('complete_task_and_award_points' as any, {
         p_task_id: task.id,
-        p_points_reward: task.points_reward,
       });
 
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'Failed to credit points');
 
-      const awarded = Math.ceil(Number(data?.points ?? task.points_reward));
-      if (data?.user_points) {
-        await refreshPoints();
-      }
+      const awarded = Math.ceil(Number(data?.points ?? 0));
+      await refreshPoints();
 
       setUserTasks((prev) => {
         const next = new Map(prev);
