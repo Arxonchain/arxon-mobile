@@ -833,7 +833,7 @@ const AdminArena = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -926,34 +926,28 @@ const AdminArena = () => {
                   key={battle.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors"
+                  className="p-3 sm:p-4 rounded-lg border border-border bg-card hover:bg-muted/30 transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
                         {getStatusBadge(battle)}
                         <span className="text-xs text-muted-foreground">
                           {CATEGORIES.find(c => c.value === battle.category)?.label || battle.category}
                         </span>
                       </div>
-                      <h3 className="font-medium text-foreground truncate">{battle.title}</h3>
-                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                      <h3 className="font-medium text-foreground text-sm sm:text-base leading-snug">{battle.title}</h3>
+                      <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
                         <span className="flex items-center gap-1">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: battle.side_a_color }}
-                          />
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: battle.side_a_color }} />
                           {battle.side_a_name}: {battle.side_a_power.toLocaleString()}
                         </span>
                         <span className="flex items-center gap-1">
-                          <div 
-                            className="w-3 h-3 rounded-full" 
-                            style={{ backgroundColor: battle.side_b_color }}
-                          />
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: battle.side_b_color }} />
                           {battle.side_b_name}: {battle.side_b_power.toLocaleString()}
                         </span>
                       </div>
-                      <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10px] sm:text-xs text-muted-foreground">
                         <span><Users className="w-3 h-3 inline mr-1" />{battle.total_participants} voters</span>
                         <span><Gift className="w-3 h-3 inline mr-1" />Pool: {battle.prize_pool?.toLocaleString() || 0}</span>
                         <span><Zap className="w-3 h-3 inline mr-1" />Bonus: {battle.bonus_percentage}%</span>
@@ -965,7 +959,7 @@ const AdminArena = () => {
                       </div>
                     </div>
                     
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:max-w-[280px] sm:justify-end">
                       {/* Resolution buttons */}
                       {!battle.winner_side && (
                         <>
@@ -977,7 +971,7 @@ const AdminArena = () => {
                               if (!confirm(`Resolve: Winner = ${battle.side_a_name} (Side A)?\n\nThis will distribute rewards immediately.`)) return;
                               handleManualResolve(battle.id, 'a');
                             }}
-                            className="text-xs"
+                            className="text-xs flex-1 sm:flex-none min-w-0"
                             style={{ borderColor: battle.side_a_color, color: battle.side_a_color }}
                           >
                             {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_a_name} Wins`}
@@ -990,7 +984,7 @@ const AdminArena = () => {
                               if (!confirm(`Resolve: Winner = ${battle.side_b_name} (Side B)?\n\nThis will distribute rewards immediately.`)) return;
                               handleManualResolve(battle.id, 'b');
                             }}
-                            className="text-xs"
+                            className="text-xs flex-1 sm:flex-none min-w-0"
                             style={{ borderColor: battle.side_b_color, color: battle.side_b_color }}
                           >
                             {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_b_name} Wins`}
@@ -1058,7 +1052,7 @@ const AdminArena = () => {
 
       {/* Edit Market Dialog */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader>
             <DialogTitle>Edit Market</DialogTitle>
             <DialogDescription>

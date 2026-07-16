@@ -1,6 +1,6 @@
 import {
   LayoutDashboard, Users, Settings2, LogOut, CalendarDays, Scale, Trophy,
-  FileDown, Upload, History, Globe, Presentation, ListChecks, Link2,
+  FileDown, Upload, History, Globe, ListChecks, Link2,
   BarChart3, Megaphone, Coins, RotateCcw, BookOpen,
 } from "lucide-react";
 
@@ -56,7 +56,6 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
   {
     title: "Resources",
     items: [
-      { icon: Presentation, label: "Pitch Deck", path: "/admin/pitch-deck" },
       { icon: BookOpen, label: "Litepaper ↗", path: "/litepaper", external: true },
     ],
   },
