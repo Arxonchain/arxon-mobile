@@ -1,26 +1,36 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Shield } from "lucide-react";
+import { checkUserIsAdmin } from "@/lib/adminAuth";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (session?.user && (await checkUserIsAdmin(session.user))) {
+        navigate("/admin", { replace: true });
+      }
+      setCheckingSession(false);
+    });
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      // Sign in only - no signup allowed
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -28,17 +38,7 @@ const AdminLogin = () => {
 
       if (authError) throw authError;
 
-      // Check if user has admin role
-      const { data: roleData, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", authData.user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-
-      if (roleError) throw roleError;
-
-      if (!roleData) {
+      if (!(await checkUserIsAdmin(authData.user))) {
         await supabase.auth.signOut();
         toast({
           title: "Access Denied",
@@ -64,11 +64,18 @@ const AdminLogin = () => {
     }
   };
 
+  if (checkingSession) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-10 w-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-background flex items-center justify-center p-4 pb-8">
       <div className="w-full max-w-md">
-        <div className="glass-card p-8 space-y-6">
-          {/* Header */}
+        <div className="glass-card p-6 sm:p-8 space-y-6">
           <div className="text-center space-y-2">
             <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
               <Shield className="h-8 w-8 text-primary" />
@@ -79,7 +86,6 @@ const AdminLogin = () => {
             </p>
           </div>
 
-          {/* Form - Login Only */}
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -91,6 +97,7 @@ const AdminLogin = () => {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="bg-muted/50"
+                autoComplete="email"
               />
             </div>
 
@@ -106,6 +113,7 @@ const AdminLogin = () => {
                   required
                   minLength={6}
                   className="bg-muted/50 pr-10"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -122,9 +130,14 @@ const AdminLogin = () => {
             </Button>
           </form>
 
-          <p className="text-center text-xs text-muted-foreground">
-            Secured admin access • Contact system administrator for access
-          </p>
+          <div className="flex flex-col gap-2 text-center">
+            <Link to="/" className="text-xs text-primary hover:underline">
+              ← Back to mining app
+            </Link>
+            <p className="text-xs text-muted-foreground">
+              Secured admin access · Contact system administrator for access
+            </p>
+          </div>
         </div>
       </div>
     </div>

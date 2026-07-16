@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { Send, Trash2, Edit2, Clock } from "lucide-react";
+import { Send, Trash2, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -111,11 +112,10 @@ const AdminAnnouncements = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-xl md:text-2xl font-bold text-foreground">Announcements</h1>
-        <p className="text-sm md:text-base text-muted-foreground">Send announcements to all miners</p>
-      </div>
+      <AdminPageHeader
+        title="Announcements"
+        description="Create and manage network-wide announcements for all miners"
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
         {/* Create Announcement */}
@@ -174,14 +174,12 @@ const AdminAnnouncements = () => {
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-medium text-sm md:text-base text-foreground line-clamp-1">{announcement.title}</h4>
                     <div className="flex gap-1 shrink-0">
-                      <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
-                        <Edit2 className="h-3 w-3 md:h-4 md:w-4" />
-                      </Button>
                       <Button 
                         variant="ghost" 
                         size="icon" 
                         className="h-7 w-7 md:h-8 md:w-8 text-destructive hover:text-destructive"
                         onClick={() => handleDelete(announcement.id)}
+                        aria-label="Delete announcement"
                       >
                         <Trash2 className="h-3 w-3 md:h-4 md:w-4" />
                       </Button>

@@ -9,7 +9,8 @@ import {
   Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks,
   ChevronRight, ChevronLeft, Users, Wallet, Camera,
   LayoutDashboard, Trophy, History, Scale, User2,
-  CalendarDays, FileDown, Globe, Zap, Receipt,
+  CalendarDays, FileDown, Globe, Zap, Receipt, Upload, Link2,
+  BarChart3, Megaphone, RotateCcw, Coins, Presentation,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,16 +44,23 @@ const MENU = [
 ];
 
 const ADMIN_MENU = [
-  { Icon:LayoutDashboard, label:'Dashboard',       sub:'Platform overview & stats',   path:'/admin',                col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.12)' },
-  { Icon:User2,           label:'Users & Miners',  sub:'Manage all users',            path:'/admin/users',          col:'hsl(155 45% 50%)', bg:'hsl(155 45% 50%/0.1)'  },
-  { Icon:ListChecks,      label:'Task Manager',    sub:'Add & manage tasks',          path:'/admin/tasks',          col:'hsl(207 90% 54%)', bg:'hsl(207 90% 54%/0.1)'  },
-  { Icon:Trophy,          label:'Arena Markets',   sub:'Create & manage battles',     path:'/admin/arena',          col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.1)'  },
-  { Icon:History,         label:'Battle History',  sub:'Resolved arena battles',      path:'/admin/battle-history', col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
-  { Icon:CalendarDays,    label:'Daily Signups',   sub:'Signup analytics',            path:'/admin/signups',        col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'  },
-  { Icon:Zap,             label:'Mining Controls', sub:'Block reward & claiming',     path:'/admin/controls',       col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
-  { Icon:Scale,           label:'Reconciliation',  sub:'Points reconciliation',       path:'/admin/reconciliation', col:'hsl(155 45% 50%)', bg:'hsl(155 45% 50%/0.1)'  },
-  { Icon:FileDown,        label:'Export Filter',   sub:'Export user data',            path:'/admin/export-filter',  col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)' },
-  { Icon:Globe,           label:'Global Map',      sub:'Worldwide miner activity',    path:'/admin/global-map',     col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'  },
+  { Icon:LayoutDashboard, label:'Dashboard',         sub:'Platform overview & stats',     path:'/admin',                  col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.12)' },
+  { Icon:BarChart3,        label:'Analytics',         sub:'Deep platform metrics',         path:'/admin/analytics',        col:'hsl(207 90% 54%)', bg:'hsl(207 90% 54%/0.1)'  },
+  { Icon:User2,            label:'Users & Miners',    sub:'Manage all users',              path:'/admin/users',            col:'hsl(155 45% 50%)', bg:'hsl(155 45% 50%/0.1)'  },
+  { Icon:ListChecks,       label:'Task Manager',      sub:'Add & manage tasks',            path:'/admin/tasks',            col:'hsl(207 90% 54%)', bg:'hsl(207 90% 54%/0.1)'  },
+  { Icon:Trophy,           label:'Arena Markets',     sub:'Create & manage battles',       path:'/admin/arena',            col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.1)'  },
+  { Icon:History,          label:'Battle History',    sub:'Resolved arena battles',        path:'/admin/battle-history',   col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
+  { Icon:Link2,            label:'Referral Manager',  sub:'Link & manage referrals',       path:'/admin/referrals',        col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'  },
+  { Icon:RotateCcw,        label:'Referral Recovery', sub:'Bulk recover missed referrals', path:'/admin/referral-recovery',col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
+  { Icon:CalendarDays,     label:'Daily Signups',     sub:'Signup analytics',              path:'/admin/signups',          col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'  },
+  { Icon:Zap,              label:'Mining Controls',   sub:'Mining, claiming & broadcast',  path:'/admin/controls',         col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
+  { Icon:Megaphone,        label:'Announcements',     sub:'Create & manage broadcasts',    path:'/admin/announcements',    col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.1)'  },
+  { Icon:Scale,            label:'Reconciliation',    sub:'Audit & restore points',        path:'/admin/reconciliation',   col:'hsl(155 45% 50%)', bg:'hsl(155 45% 50%/0.1)'  },
+  { Icon:Coins,            label:'$ARX Claims',       sub:'Monitor token claims',          path:'/admin/claims',           col:'hsl(38 55% 52%)',  bg:'hsl(38 55% 52%/0.1)'   },
+  { Icon:FileDown,         label:'Export Filter',     sub:'Export user data CSV',          path:'/admin/export-filter',    col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)' },
+  { Icon:Upload,           label:'Import Users',      sub:'Bulk import legacy users',      path:'/admin/import-users',     col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)' },
+  { Icon:Globe,            label:'Global Map',        sub:'Worldwide miner activity',      path:'/admin/global-map',       col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'  },
+  { Icon:Presentation,     label:'Pitch Deck',          sub:'Investor presentation',         path:'/admin/pitch-deck',       col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'  },
 ];
 
 export default function MobileProfile() {

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Search, Filter, Download, RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
+import { Search, RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,8 +15,11 @@ interface ClaimData {
   lastActive: string;
 }
 
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+
 const AdminClaims = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "verified" | "pending" | "invalid">("all");
 
   const { data: claims = [], isLoading, refetch } = useQuery({
     queryKey: ["admin-claims"],
@@ -61,9 +64,11 @@ const AdminClaims = () => {
     refetchInterval: 30000,
   });
 
-  const filteredClaims = claims.filter((claim) =>
-    claim.wallet.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredClaims = claims.filter((claim) => {
+    const matchesSearch = claim.wallet.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = statusFilter === "all" || claim.proofStatus === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   const getProofBadge = (status: string) => {
     const config = {
@@ -87,25 +92,38 @@ const AdminClaims = () => {
     return num.toLocaleString();
   };
 
+  const exportClaims = () => {
+    if (filteredClaims.length === 0) return;
+    const csv = [
+      ["Wallet", "Eligible", "Claimed", "Status", "Last Active"].join(","),
+      ...filteredClaims.map((c) => [c.wallet, c.eligible, c.claimed, c.proofStatus, c.lastActive].join(",")),
+    ].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `claims-${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 md:gap-4">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">$ARX Claim Manager</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Manage ARX-P to $ARX token claims</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex items-center gap-2" onClick={() => refetch()}>
-            <RefreshCw className="h-4 w-4" />
-            <span className="hidden sm:inline">Refresh</span>
-          </Button>
-          <Button variant="outline" size="sm" className="flex items-center gap-2">
-            <Download className="h-4 w-4" />
-            <span className="hidden sm:inline">Export CSV</span>
-          </Button>
-        </div>
-      </div>
+      <AdminPageHeader
+        title="$ARX Claim Manager"
+        description="Monitor ARX-P to $ARX token claims and proof status"
+        actions={
+          <>
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => refetch()}>
+              <RefreshCw className="h-4 w-4" />
+              Refresh
+            </Button>
+            <Button variant="outline" size="sm" className="gap-2" onClick={exportClaims} disabled={filteredClaims.length === 0}>
+              Export CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Claim Info Banner */}
       <div className="glass-card p-3 md:p-4 border-accent/30 bg-accent/5">
@@ -136,7 +154,7 @@ const AdminClaims = () => {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
+      <div className="flex flex-col gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -146,10 +164,19 @@ const AdminClaims = () => {
             className="pl-10 bg-muted/50 text-sm"
           />
         </div>
-        <Button variant="outline" size="sm" className="flex items-center gap-2 w-fit">
-          <Filter className="h-4 w-4" />
-          Filters
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {(["all", "verified", "pending", "invalid"] as const).map((status) => (
+            <Button
+              key={status}
+              variant={statusFilter === status ? "default" : "outline"}
+              size="sm"
+              onClick={() => setStatusFilter(status)}
+              className="capitalize"
+            >
+              {status === "all" ? "All" : status}
+            </Button>
+          ))}
+        </div>
       </div>
 
       {/* Table */}

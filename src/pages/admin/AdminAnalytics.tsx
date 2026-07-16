@@ -13,12 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAdminStats, formatNumber } from "@/hooks/useAdminStats";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { AdminPageHeader, AdminTableScroll } from "@/components/admin/AdminPageHeader";
 
 const AdminAnalytics = () => {
   const [timeRange, setTimeRange] = useState<"24H" | "7D" | "30D">("7D");
@@ -253,55 +248,44 @@ const AdminAnalytics = () => {
   const remainingPercentage = ((remainingSupply / maxSupply) * 100).toFixed(1);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <h1 className="text-2xl font-bold text-primary">Analytics</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-            className="border-border/50"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <div className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-card border border-border/50">
-            <span className="text-sm text-muted-foreground">Network:</span>
-            <span className="text-sm font-medium text-foreground">Mainnet</span>
-            <span className="w-2 h-2 rounded-full bg-green-500 ml-1"></span>
-          </div>
-          <div className="flex bg-card border border-border/50 rounded-lg overflow-hidden">
-            {(["24H", "7D", "30D"] as const).map((range) => (
-              <button
-                key={range}
-                onClick={() => setTimeRange(range)}
-                className={`px-3 py-1.5 text-sm font-medium transition-colors ${
-                  timeRange === range 
-                    ? "bg-muted text-foreground" 
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {range}
-              </button>
-            ))}
-            <button className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground">
-              Custom
-            </button>
-          </div>
-          <Button size="sm" onClick={handleExportCSV} className="bg-primary hover:bg-primary/90">
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </Button>
-        </div>
-      </div>
+    <div className="space-y-4 md:space-y-6">
+      <AdminPageHeader
+        title="Analytics"
+        description="Deep platform metrics, performance, and claims overview"
+        actions={
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            <div className="flex bg-card border border-border/50 rounded-lg overflow-hidden">
+              {(["24H", "7D", "30D"] as const).map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+                    timeRange === range 
+                      ? "bg-muted text-foreground" 
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {range}
+                </button>
+              ))}
+            </div>
+          </>
+        }
+      />
 
       {/* Description Card */}
-      <div className="glass-card p-4 border-border/30 flex items-center justify-between">
-        <p className="text-foreground">Network performance, mining activity, and protocol health.</p>
-        <Button size="sm" onClick={handleExportCSV} className="bg-primary hover:bg-primary/90">
+      <div className="glass-card p-4 border-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <p className="text-sm text-foreground">Network performance, mining activity, and protocol health.</p>
+        <Button size="sm" onClick={handleExportCSV} className="bg-primary hover:bg-primary/90 shrink-0">
           <Download className="h-4 w-4 mr-2" />
           Export CSV
         </Button>
