@@ -197,7 +197,10 @@ export function AdminMobileHeader({
 
   return (
     <>
-      <div className="fixed top-0 left-0 right-0 h-14 bg-sidebar/95 backdrop-blur-md border-b border-border/50 flex items-center px-3 z-50 pt-[env(safe-area-inset-top)]">
+      <div
+        className="fixed top-0 left-0 right-0 z-50 bg-sidebar/95 backdrop-blur-md border-b border-border/50 flex items-center px-3"
+        style={{ paddingTop: 'env(safe-area-inset-top)', minHeight: 'calc(3.5rem + env(safe-area-inset-top))' }}
+      >
         <Sheet open={open} onOpenChange={setOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="mr-2 shrink-0" aria-label="Open admin menu">
@@ -218,7 +221,11 @@ export function AdminMobileHeader({
           <span className="font-semibold text-foreground text-sm truncate">{pageTitle}</span>
         </div>
       </div>
-      <div className="h-14 shrink-0 pt-[env(safe-area-inset-top)]" aria-hidden />
+      <div
+        className="shrink-0"
+        style={{ height: 'calc(3.5rem + env(safe-area-inset-top))' }}
+        aria-hidden
+      />
     </>
   );
 }
