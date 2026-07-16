@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node scripts/write-web-bundle-version.mjs && vite build",
     "build:dev": "vite build --mode development",
     "cap:sync": "npx cap sync android",
     "lint": "eslint .",

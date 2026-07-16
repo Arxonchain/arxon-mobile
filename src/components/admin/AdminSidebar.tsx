@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { NavLink, useNavigate, useLocation } from "react-router-dom";
-import { ChevronLeft, ChevronRight, User, Menu, LogOut } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { ChevronLeft, ChevronRight, User, LogOut } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
 import { useAdmin } from "@/hooks/useAdmin";
 import { ADMIN_NAV_SECTIONS, getAdminPageTitle } from "@/lib/adminNav";
+import { AdminMobileHeader } from "./AdminMobileMenu";
 
 const SidebarContent = ({
   collapsed,
@@ -141,42 +141,13 @@ const SidebarContent = ({
 
 const AdminSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
   const isMobile = useIsMobile();
   const { user } = useAdmin();
   const location = useLocation();
   const pageTitle = getAdminPageTitle(location.pathname);
 
   if (isMobile) {
-    return (
-      <>
-        <div className="fixed top-0 left-0 right-0 h-14 bg-sidebar border-b border-border/50 flex items-center px-3 z-50 safe-area-top">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="mr-2 shrink-0" aria-label="Open admin menu">
-                <Menu className="h-5 w-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[min(100vw,288px)] p-0 bg-sidebar">
-              <div className="min-h-full py-4 flex flex-col">
-                <SidebarContent
-                  collapsed={false}
-                  onNavigate={() => setMobileOpen(false)}
-                  userEmail={user?.email}
-                />
-              </div>
-            </SheetContent>
-          </Sheet>
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <div className="h-7 w-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground font-bold text-xs">A</span>
-            </div>
-            <span className="font-semibold text-foreground text-sm truncate">{pageTitle}</span>
-          </div>
-        </div>
-        <div className="h-14 shrink-0" aria-hidden />
-      </>
-    );
+    return <AdminMobileHeader pageTitle={pageTitle} userEmail={user?.email} />;
   }
 
   return (

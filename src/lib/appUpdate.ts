@@ -9,7 +9,7 @@ export type AppVersionRequirement = {
 };
 
 const ANDROID_PACKAGE = 'xyz.arxonchain.app';
-const PRODUCTION_ORIGIN = 'https://arxon-mobile.pages.dev';
+import { PRODUCTION_APP_ORIGIN } from '@/lib/appOrigins';
 
 export async function getNativeBuildNumber(): Promise<number | null> {
   if (!Capacitor.isNativePlatform()) return null;
@@ -53,7 +53,7 @@ async function fetchFromSupabase(platform: string): Promise<AppVersionRequiremen
 
 async function fetchFromJson(platform: string): Promise<AppVersionRequirement | null> {
   try {
-    const origin = Capacitor.isNativePlatform() ? PRODUCTION_ORIGIN : window.location.origin;
+    const origin = Capacitor.isNativePlatform() ? PRODUCTION_APP_ORIGIN : window.location.origin;
     const res = await fetch(`${origin}/app-version.json`, { cache: 'no-store' });
     if (!res.ok) return null;
     const json = await res.json();

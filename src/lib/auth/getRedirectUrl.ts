@@ -4,8 +4,7 @@
  * match Supabase allowlist (not capacitor:// or transient WebView origins).
  */
 import { Capacitor } from '@capacitor/core';
-
-const PRODUCTION_APP_ORIGIN = 'https://arxon-mobile.pages.dev';
+import { PRODUCTION_APP_ORIGIN } from '@/lib/appOrigins';
 
 export function getAuthRedirectUrl(path = "/"): string {
   const origin = Capacitor.isNativePlatform()
