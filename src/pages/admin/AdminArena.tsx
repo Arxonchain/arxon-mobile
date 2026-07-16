@@ -506,23 +506,23 @@ const AdminArena = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Arena Markets</h1>
-          <p className="text-muted-foreground">Create and manage prediction markets</p>
+          <h1 className="text-xl sm:text-2xl font-bold text-foreground">Arena Markets</h1>
+          <p className="text-sm text-muted-foreground">Create and manage prediction markets</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={fetchBattles}>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button variant="outline" size="icon" onClick={fetchBattles} className="shrink-0">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </Button>
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
-              <Button>
+              <Button className="flex-1 sm:flex-none">
                 <Plus className="w-4 h-4 mr-2" />
                 Create Market
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
               <DialogHeader>
                 <DialogTitle>Create New Market</DialogTitle>
               </DialogHeader>

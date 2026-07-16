@@ -10,16 +10,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { 
-  RefreshCw, 
-  Search, 
-  CheckCircle2, 
-  AlertTriangle, 
-  MinusCircle,
-  Download,
-  Play,
-  History
+import {
+  RefreshCw, Search, CheckCircle2, AlertTriangle, MinusCircle, Download, Play, History,
 } from "lucide-react";
+import { AdminPageHeader, AdminTableScroll } from "@/components/admin/AdminPageHeader";
 
 interface ReconciliationResult {
   userId: string;
@@ -142,11 +136,11 @@ export default function AdminReconciliation() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Points Reconciliation</h1>
-          <p className="text-muted-foreground">Compute provable points from source tables and restore missing points</p>
-        </div>
+    <div className="space-y-4 md:space-y-6">
+      <AdminPageHeader
+        title="Points Reconciliation"
+        description="Compute provable points from source tables and restore missing points"
+      />
 
         {/* Controls */}
         <div className="grid gap-4 md:grid-cols-2">
@@ -156,7 +150,7 @@ export default function AdminReconciliation() {
               <CardDescription>Check and restore points for a specific user</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <Input
                   placeholder="Enter User ID..."
                   value={searchUserId}
@@ -166,6 +160,7 @@ export default function AdminReconciliation() {
                 <Button 
                   onClick={handleSingleUserReconcile}
                   disabled={reconcileMutation.isPending}
+                  className="shrink-0"
                 >
                   <Search className="w-4 h-4 mr-2" />
                   Check
@@ -262,8 +257,9 @@ export default function AdminReconciliation() {
               <CardTitle className="text-lg">Detailed Results</CardTitle>
             </CardHeader>
             <CardContent>
+              <AdminTableScroll>
               <ScrollArea className="h-[400px]">
-                <Table>
+                <Table className="min-w-[480px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>User</TableHead>
@@ -298,6 +294,7 @@ export default function AdminReconciliation() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+              </AdminTableScroll>
             </CardContent>
           </Card>
         )}
@@ -317,8 +314,9 @@ export default function AdminReconciliation() {
                 <RefreshCw className="w-5 h-5 animate-spin text-muted-foreground" />
               </div>
             ) : (
+              <AdminTableScroll>
               <ScrollArea className="h-[300px]">
-                <Table>
+                <Table className="min-w-[640px]">
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
@@ -359,9 +357,10 @@ export default function AdminReconciliation() {
                   </TableBody>
                 </Table>
               </ScrollArea>
+              </AdminTableScroll>
             )}
           </CardContent>
         </Card>
-      </div>
+    </div>
   );
 }

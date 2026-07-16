@@ -42,7 +42,10 @@ import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
 import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 import AdminTasks from "@/pages/admin/AdminTasks";
 import AdminReferrals from "@/pages/admin/AdminReferrals";
-import AdminReferralRecovery from "@/pages/admin/AdminReferralRecovery";   // ← NEW
+import AdminReferralRecovery from "@/pages/admin/AdminReferralRecovery";
+import AdminAnalytics from "@/pages/admin/AdminAnalytics";
+import AdminAnnouncements from "@/pages/admin/AdminAnnouncements";
+import AdminClaims from "@/pages/admin/AdminClaims";
 
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 
@@ -162,9 +165,12 @@ function AppRoutes() {
           <Route path="controls"        element={<AdminControls />} />
           <Route path="arena"           element={<AdminArena />} />
           <Route path="battle-history"  element={<AdminBattleHistory />} />
-          <Route path="tasks"           element={<AdminTasks />} />     {/* ← NEW */}
+          <Route path="tasks"           element={<AdminTasks />} />
           <Route path="referrals"       element={<AdminReferrals />} />
           <Route path="referral-recovery" element={<AdminReferralRecovery />} />
+          <Route path="analytics"       element={<AdminAnalytics />} />
+          <Route path="announcements"   element={<AdminAnnouncements />} />
+          <Route path="claims"          element={<AdminClaims />} />
           <Route path="reconciliation"  element={<AdminReconciliation />} />
           <Route path="export-filter"   element={<AdminExportFilter />} />
           <Route path="import-users"    element={<AdminImportUsers />} />

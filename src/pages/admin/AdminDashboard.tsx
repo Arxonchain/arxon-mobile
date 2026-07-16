@@ -8,11 +8,14 @@ import { format, subHours, startOfHour, eachHourOfInterval } from "date-fns";
 import { formatDistanceToNow } from "date-fns";
 import { useAdminStats, formatNumber } from "@/hooks/useAdminStats";
 import { AdminStatCard } from "@/components/admin/AdminStatCard";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
 const AdminDashboard = () => {
   const [isExporting, setIsExporting] = useState(false);
+  const isMobile = useIsMobile();
   
   // Use centralized stats hook for consistent data
   const { data: stats, isLoading: loadingStats } = useAdminStats();
@@ -173,34 +176,28 @@ const AdminDashboard = () => {
     refetchInterval: 30000,
   });
 
-  const formatNumber = (num: number) => {
-    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
-    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
-    return num.toLocaleString();
-  };
-
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">ARXON Admin Dashboard</h1>
-          <p className="text-sm md:text-base text-muted-foreground">Monitor ARX-P mining activity and user engagement</p>
-        </div>
-        <Button 
-          onClick={handleExportUsers} 
-          disabled={isExporting}
-          variant="outline"
-          className="gap-2"
-        >
-          {isExporting ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="h-4 w-4" />
-          )}
-          {isExporting ? "Exporting..." : "Download Users CSV"}
-        </Button>
-      </div>
+      <AdminPageHeader
+        title="ARXON Admin Dashboard"
+        description="Monitor ARX-P mining activity and user engagement"
+        actions={
+          <Button 
+            onClick={handleExportUsers} 
+            disabled={isExporting}
+            variant="outline"
+            className="gap-2 w-full sm:w-auto"
+            size="sm"
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            {isExporting ? "Exporting..." : "Download Users CSV"}
+          </Button>
+        }
+      />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 md:gap-4">
@@ -401,6 +398,29 @@ const AdminDashboard = () => {
           ) : recentSessions.length === 0 ? (
             <div className="py-8 text-center text-muted-foreground text-sm">
               No mining sessions yet
+            </div>
+          ) : isMobile ? (
+            <div className="space-y-2">
+              {recentSessions.map((session, index) => (
+                <div key={index} className="rounded-xl border border-border/50 p-3 bg-muted/20 space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-mono text-primary truncate">{session.id}</span>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${
+                      session.status === "active" 
+                        ? "bg-green-500/10 text-green-500" 
+                        : "bg-muted text-muted-foreground"
+                    }`}>
+                      {session.status === "active" ? "Mining" : "Done"}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-foreground">{session.username}</p>
+                  <p className="text-xs font-mono text-muted-foreground truncate">{session.miner}</p>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-xs text-muted-foreground">{session.time}</span>
+                    <span className="text-sm text-accent font-semibold">{session.earned}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <table className="w-full min-w-[600px]">
