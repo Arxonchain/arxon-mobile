@@ -39,7 +39,6 @@ import AdminImportUsers from "@/pages/admin/AdminImportUsers";
 import AdminExportFilter from "@/pages/admin/AdminExportFilter";
 import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
 import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
-import AdminPitchDeck from "@/pages/admin/AdminPitchDeck";
 import AdminTasks from "@/pages/admin/AdminTasks";
 import AdminReferrals from "@/pages/admin/AdminReferrals";
 import AdminReferralRecovery from "@/pages/admin/AdminReferralRecovery";
@@ -175,7 +174,6 @@ function AppRoutes() {
           <Route path="export-filter"   element={<AdminExportFilter />} />
           <Route path="import-users"    element={<AdminImportUsers />} />
           <Route path="global-map"      element={<AdminGlobalMap />} />
-          <Route path="pitch-deck"      element={<AdminPitchDeck />} />
         </Route>
 
         {isNative ? (

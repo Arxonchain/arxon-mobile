@@ -10,7 +10,7 @@ import {
   ChevronRight, ChevronLeft, Users, Wallet, Camera,
   LayoutDashboard, Trophy, History, Scale, User2,
   CalendarDays, FileDown, Globe, Zap, Receipt, Upload, Link2,
-  BarChart3, Megaphone, RotateCcw, Coins, Presentation,
+  BarChart3, Megaphone, RotateCcw, Coins,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,7 +60,6 @@ const ADMIN_MENU = [
   { Icon:FileDown,         label:'Export Filter',     sub:'Export user data CSV',          path:'/admin/export-filter',    col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)' },
   { Icon:Upload,           label:'Import Users',      sub:'Bulk import legacy users',      path:'/admin/import-users',     col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)' },
   { Icon:Globe,            label:'Global Map',        sub:'Worldwide miner activity',      path:'/admin/global-map',       col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'  },
-  { Icon:Presentation,     label:'Pitch Deck',          sub:'Investor presentation',         path:'/admin/pitch-deck',       col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'  },
 ];
 
 export default function MobileProfile() {

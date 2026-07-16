@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface ResolvedBattle {
   id: string;
@@ -60,6 +62,7 @@ const AdminBattleHistory = () => {
   const [loading, setLoading] = useState(true);
   const [loadingEarnings, setLoadingEarnings] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const isMobile = useIsMobile();
 
   const fetchBattles = async () => {
     setLoading(true);
@@ -141,20 +144,19 @@ const AdminBattleHistory = () => {
   const losersInBattle = earnings.filter(e => !e.is_winner);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Battle History</h1>
-          <p className="text-muted-foreground">Resolved battles, rewards & statistics</p>
-        </div>
-        <Button variant="outline" size="icon" onClick={fetchBattles}>
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
-      </div>
+    <div className="space-y-4 md:space-y-6">
+      <AdminPageHeader
+        title="Battle History"
+        description="Resolved battles, rewards & statistics"
+        actions={
+          <Button variant="outline" size="icon" onClick={fetchBattles}>
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+        }
+      />
 
       {/* Overview Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -209,14 +211,14 @@ const AdminBattleHistory = () => {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid gap-4 md:gap-6 ${isMobile ? 'grid-cols-1' : 'grid-cols-1 lg:grid-cols-3'}`}>
         {/* Battle List */}
-        <Card className="lg:col-span-1">
-          <CardHeader>
+        <Card className={isMobile ? '' : 'lg:col-span-1'}>
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">Resolved Battles</CardTitle>
             <CardDescription>{battles.length} battles</CardDescription>
           </CardHeader>
-          <CardContent className="max-h-[600px] overflow-y-auto space-y-2">
+          <CardContent className={`space-y-2 ${isMobile ? 'max-h-[280px]' : 'max-h-[600px]'} overflow-y-auto`}>
             {loading ? (
               <div className="space-y-2">
                 {[1,2,3].map(i => <div key={i} className="h-20 bg-muted/50 rounded-lg animate-pulse" />)}
@@ -259,21 +261,21 @@ const AdminBattleHistory = () => {
         </Card>
 
         {/* Battle Detail */}
-        <Card className="lg:col-span-2">
+        <Card className={isMobile ? '' : 'lg:col-span-2'}>
           {selectedBattle ? (
             <>
-              <CardHeader>
-                <CardTitle className="text-lg">{selectedBattle.title}</CardTitle>
-                <CardDescription>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base md:text-lg leading-snug">{selectedBattle.title}</CardTitle>
+                <CardDescription className="text-xs md:text-sm">
                   Resolved {format(new Date(selectedBattle.ends_at), 'MMM d, yyyy HH:mm')} UTC
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs value={activeTab} onValueChange={setActiveTab}>
-                  <TabsList className="w-full grid grid-cols-3 mb-4">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="winners">Winners ({winnersInBattle.length})</TabsTrigger>
-                    <TabsTrigger value="losers">Losers ({losersInBattle.length})</TabsTrigger>
+                  <TabsList className="w-full grid grid-cols-3 mb-4 h-auto">
+                    <TabsTrigger value="overview" className="text-xs sm:text-sm py-2">Overview</TabsTrigger>
+                    <TabsTrigger value="winners" className="text-xs sm:text-sm py-2">Winners ({winnersInBattle.length})</TabsTrigger>
+                    <TabsTrigger value="losers" className="text-xs sm:text-sm py-2">Losers ({losersInBattle.length})</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="overview">
@@ -429,7 +431,7 @@ const AdminBattleHistory = () => {
               </CardContent>
             </>
           ) : (
-            <CardContent className="flex items-center justify-center h-[400px]">
+            <CardContent className={`flex items-center justify-center ${isMobile ? 'h-[200px]' : 'h-[400px]'}`}>
               <div className="text-center">
                 <BarChart3 className="w-12 h-12 mx-auto mb-3 text-muted-foreground/30" />
                 <p className="text-muted-foreground">Select a battle to view details</p>

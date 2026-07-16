@@ -6,6 +6,8 @@ import { AdminStatCard } from "@/components/admin/AdminStatCard";
 import { Users, TrendingUp, Calendar, UserPlus, RefreshCw } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar, CartesianGrid, Cell } from "recharts";
 import { Button } from "@/components/ui/button";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface DailySignup {
   date: string;
@@ -14,6 +16,7 @@ interface DailySignup {
 
 const AdminSignups = () => {
   const [realtimeSignups, setRealtimeSignups] = useState<number>(0);
+  const isMobile = useIsMobile();
 
   // Fetch daily signups using server-side aggregation to bypass 1000-row limit
   const { data: dailySignups, isLoading, refetch, isFetching } = useQuery({
@@ -141,10 +144,10 @@ const AdminSignups = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 space-y-6">
+      <div className="space-y-4 md:space-y-6">
         <div className="animate-pulse space-y-4">
           <div className="h-8 bg-muted rounded w-1/4" />
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[1, 2, 3, 4].map((i) => (
               <div key={i} className="h-24 bg-muted rounded-lg" />
             ))}
@@ -155,32 +158,31 @@ const AdminSignups = () => {
     );
   }
 
+  const reversedSignups = [...(dailySignups || [])].reverse();
+
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Daily Signups</h1>
-          <p className="text-muted-foreground">
-            Track user registration growth • Total Users: <span className="text-primary font-semibold">{totalUsersCount?.toLocaleString() || '...'}</span>
-          </p>
-          {realtimeSignups > 0 && (
-            <p className="text-sm text-primary mt-1 animate-pulse">
-              +{realtimeSignups} new signup{realtimeSignups > 1 ? "s" : ""} since page load
-            </p>
-          )}
-        </div>
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleRefresh}
-          disabled={isFetching}
-          className="gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
-      </div>
+    <div className="space-y-4 md:space-y-6">
+      <AdminPageHeader
+        title="Daily Signups"
+        description={`Track user registration growth · Total Users: ${totalUsersCount?.toLocaleString() || '…'}`}
+        actions={
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh}
+            disabled={isFetching}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        }
+      />
+      {realtimeSignups > 0 && (
+        <p className="text-sm text-primary animate-pulse -mt-2">
+          +{realtimeSignups} new signup{realtimeSignups > 1 ? "s" : ""} since page load
+        </p>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -211,7 +213,7 @@ const AdminSignups = () => {
       </div>
 
       {/* Area Chart - Last 14 Days */}
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card border border-border rounded-xl p-4 md:p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Signup Trend (Last 14 Days)</h2>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -256,7 +258,7 @@ const AdminSignups = () => {
       </div>
 
       {/* Bar Chart - Daily Breakdown */}
-      <div className="bg-card border border-border rounded-xl p-6">
+      <div className="bg-card border border-border rounded-xl p-4 md:p-6">
         <h2 className="text-lg font-semibold text-foreground mb-4">Daily Breakdown</h2>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
@@ -295,11 +297,40 @@ const AdminSignups = () => {
         </div>
       </div>
 
-      {/* Daily Table */}
+      {/* Daily breakdown */}
       <div className="bg-card border border-border rounded-xl overflow-hidden">
         <div className="p-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">All Daily Signups (Last 30 Days)</h2>
+          <h2 className="text-base md:text-lg font-semibold text-foreground">All Daily Signups (Last 30 Days)</h2>
         </div>
+        {isMobile ? (
+          <div className="divide-y divide-border max-h-[28rem] overflow-y-auto">
+            {reversedSignups.map((day, index, arr) => {
+              const prevDay = arr[index + 1];
+              const change = prevDay ? day.signups - prevDay.signups : 0;
+              const isToday = day.date === todayStr;
+              const displaySignups = isToday ? day.signups + realtimeSignups : day.signups;
+              const changePercent = prevDay && prevDay.signups > 0
+                ? Math.round(((day.signups - prevDay.signups) / prevDay.signups) * 100)
+                : 0;
+              return (
+                <div key={day.date} className={`px-4 py-3 flex items-center justify-between gap-3 ${isToday ? "bg-primary/5" : ""}`}>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">
+                      {format(new Date(day.date), "EEE, MMM d")}
+                      {isToday && <span className="ml-1.5 text-xs text-primary">Today</span>}
+                    </p>
+                    {change !== 0 && prevDay && (
+                      <p className={`text-xs ${change > 0 ? "text-green-500" : "text-red-500"}`}>
+                        {change > 0 ? "+" : ""}{change} ({changePercent >= 0 ? "+" : ""}{changePercent}%)
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-lg font-bold text-foreground shrink-0">{displaySignups.toLocaleString()}</p>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
         <div className="overflow-x-auto max-h-96">
           <table className="w-full">
             <thead className="bg-muted/50 sticky top-0">
@@ -310,7 +341,7 @@ const AdminSignups = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {[...(dailySignups || [])].reverse().map((day, index, arr) => {
+              {reversedSignups.map((day, index, arr) => {
                 const prevDay = arr[index + 1];
                 const change = prevDay ? day.signups - prevDay.signups : 0;
                 const isToday = day.date === todayStr;
@@ -342,6 +373,7 @@ const AdminSignups = () => {
             </tbody>
           </table>
         </div>
+        )}
       </div>
     </div>
   );

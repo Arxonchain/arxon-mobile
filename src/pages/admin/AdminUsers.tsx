@@ -9,7 +9,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { toast } from "sonner";
 import { useAdminStats, formatNumber } from "@/hooks/useAdminStats";
 import { AdminStatCardCompact } from "@/components/admin/AdminStatCard";
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface XProfileData {
   id: string;
@@ -109,6 +111,7 @@ const AdminUsers = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("all");
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
 
   // Helper to fetch all rows from a table (bypasses 1000 row limit)
   const fetchAllPaginated = async (
@@ -433,91 +436,82 @@ const AdminUsers = () => {
 
   return (
     <div className="space-y-4 md:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-foreground">Users & Miners</h1>
-          <p className="text-sm md:text-base text-muted-foreground">View all users, their stats, and mining activity</p>
-        </div>
-       <div className="flex gap-2">
-         <Button 
-           variant="outline" 
-           size="sm" 
-           className="flex items-center gap-2 w-fit"
-           onClick={async () => {
-             try {
-               toast.loading('Exporting auth emails...', { id: 'export-emails' });
-               const { data: sessionData } = await supabase.auth.getSession();
-               const response = await fetch(
-                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-users-csv`,
-                 {
-                   headers: {
-                     Authorization: `Bearer ${sessionData.session?.access_token}`,
-                   },
-                 }
-               );
-               if (!response.ok) {
-                 const errorData = await response.json();
-                 throw new Error(errorData.error || 'Export failed');
-               }
-               const blob = await response.blob();
-               const url = window.URL.createObjectURL(blob);
-               const a = document.createElement('a');
-               a.href = url;
-               a.download = `auth_users_${new Date().toISOString().split('T')[0]}.csv`;
-               document.body.appendChild(a);
-               a.click();
-               window.URL.revokeObjectURL(url);
-               document.body.removeChild(a);
-               toast.success('Auth emails exported!', { id: 'export-emails' });
-             } catch (err: any) {
-               toast.error(err.message || 'Export failed', { id: 'export-emails' });
-             }
-           }}
-         >
-           <Download className="h-4 w-4" />
-           <span className="hidden sm:inline">Export Auth Emails</span>
-         </Button>
-         <Button 
-           variant="outline" 
-           size="sm" 
-           className="flex items-center gap-2 w-fit"
-           onClick={async () => {
-             try {
-               toast.loading('Exporting all user data...', { id: 'export' });
-               const { data: sessionData } = await supabase.auth.getSession();
-               const response = await fetch(
-                 `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-user-data-csv`,
-                 {
-                   headers: {
-                     Authorization: `Bearer ${sessionData.session?.access_token}`,
-                   },
-                 }
-               );
-               if (!response.ok) {
-                 const errorData = await response.json();
-                 throw new Error(errorData.error || 'Export failed');
-               }
-               const blob = await response.blob();
-               const url = window.URL.createObjectURL(blob);
-               const a = document.createElement('a');
-               a.href = url;
-               a.download = `full_user_export_${new Date().toISOString().split('T')[0]}.csv`;
-               document.body.appendChild(a);
-               a.click();
-               window.URL.revokeObjectURL(url);
-               document.body.removeChild(a);
-               toast.success('Export complete!', { id: 'export' });
-             } catch (err: any) {
-               toast.error(err.message || 'Export failed', { id: 'export' });
-             }
-           }}
-         >
-           <Download className="h-4 w-4" />
-           <span className="hidden sm:inline">Export Full Data (CSV)</span>
-         </Button>
-       </div>
-      </div>
+      <AdminPageHeader
+        title="Users & Miners"
+        description="View all users, their stats, and mining activity"
+        actions={
+          <>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  toast.loading('Exporting auth emails...', { id: 'export-emails' });
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-users-csv`,
+                    { headers: { Authorization: `Bearer ${sessionData.session?.access_token}` } }
+                  );
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Export failed');
+                  }
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `auth_users_${new Date().toISOString().split('T')[0]}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                  toast.success('Auth emails exported!', { id: 'export-emails' });
+                } catch (err: any) {
+                  toast.error(err.message || 'Export failed', { id: 'export-emails' });
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Auth Emails</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-2"
+              onClick={async () => {
+                try {
+                  toast.loading('Exporting all user data...', { id: 'export' });
+                  const { data: sessionData } = await supabase.auth.getSession();
+                  const response = await fetch(
+                    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/export-user-data-csv`,
+                    { headers: { Authorization: `Bearer ${sessionData.session?.access_token}` } }
+                  );
+                  if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Export failed');
+                  }
+                  const blob = await response.blob();
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `full_user_export_${new Date().toISOString().split('T')[0]}.csv`;
+                  document.body.appendChild(a);
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                  document.body.removeChild(a);
+                  toast.success('Export complete!', { id: 'export' });
+                } catch (err: any) {
+                  toast.error(err.message || 'Export failed', { id: 'export' });
+                }
+              }}
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Full CSV</span>
+            </Button>
+          </>
+        }
+      />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-2 md:gap-4">
@@ -585,14 +579,65 @@ const AdminUsers = () => {
         />
       </div>
 
-      {/* Users Table */}
+      {/* Users list */}
       <div className="glass-card overflow-hidden">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <div className="py-8 text-center text-muted-foreground text-sm">No users found</div>
+        ) : isMobile ? (
+          <div className="divide-y divide-border/50">
+            {filteredUsers.map((user) => (
+              <div key={user.user_id} className="p-3 space-y-2">
+                <div className="flex items-start gap-3" onClick={() => toggleRow(user.user_id)}>
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-foreground truncate">{user.username}</p>
+                      {getStatusBadge(user.active_session)}
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {user.x_profile ? `@${user.x_profile.username}` : "No X linked"}
+                    </p>
+                    <p className="text-xs font-mono text-primary mt-0.5">{user.user_id.slice(0, 8)}…</p>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0"
+                    onClick={(e) => { e.stopPropagation(); setSelectedUser(user); }}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-between text-sm pl-[52px]">
+                  <div>
+                    <p className="font-bold text-accent">{formatNumber(user.total_points)} ARX-P</p>
+                    <p className="text-[10px] text-muted-foreground">{formatNumber(user.mining_points)} mined · {user.referral_count} refs</p>
+                  </div>
+                  <button type="button" className="text-muted-foreground p-1" onClick={() => toggleRow(user.user_id)}>
+                    {expandedRows.has(user.user_id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                </div>
+                {expandedRows.has(user.user_id) && (
+                  <div className="grid grid-cols-2 gap-2 text-xs pl-[52px] pt-1 border-t border-border/30">
+                    <div><p className="text-muted-foreground">Sessions</p><p className="font-medium">{user.total_sessions}</p></div>
+                    <div><p className="text-muted-foreground">Streak</p><p className="font-medium">{user.daily_streak}d</p></div>
+                    <div><p className="text-muted-foreground">Task pts</p><p className="font-medium">{formatNumber(user.task_points)}</p></div>
+                    <div><p className="text-muted-foreground">Arena</p><p className="font-medium">{user.arena_votes} votes</p></div>
+                    <div className="col-span-2"><p className="text-muted-foreground">Wallet</p><p className="font-mono truncate">{user.wallet ? `${user.wallet.slice(0, 10)}…` : "Not connected"}</p></div>
+                    <div className="col-span-2"><p className="text-muted-foreground">Joined</p><p className="font-medium">{format(new Date(user.created_at), "MMM d, yyyy")}</p></div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
         <div className="overflow-x-auto">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
             <table className="w-full min-w-[800px]">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
@@ -744,13 +789,13 @@ const AdminUsers = () => {
                 )}
               </tbody>
             </table>
-          )}
         </div>
+        )}
       </div>
 
       {/* User Detail Modal */}
       <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
