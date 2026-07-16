@@ -39,7 +39,7 @@ type PointsContextType = {
 
 const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
-const pointsCacheKey = (userId: string) => `arxon:points:v4:${userId}`;
+const pointsCacheKey = (userId: string) => `arxon:points:v5:${userId}`;
 const rankCacheKey = (userId: string) => `arxon:rank:v3:${userId}`;
 const POINTS_CACHE_MAX_AGE_MS = 30_000;
 

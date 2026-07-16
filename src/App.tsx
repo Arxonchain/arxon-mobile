@@ -64,6 +64,7 @@ import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
+import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 
 const queryClient = new QueryClient({
@@ -150,6 +151,7 @@ function AppRoutes() {
       <PushNavListener />
       <SessionRecovery />
       <PushNotificationInit />
+      <WebBundleRefreshInit />
       <Routes>
         <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
         <Route path="/auth/confirm"   element={<AuthConfirm />} />
