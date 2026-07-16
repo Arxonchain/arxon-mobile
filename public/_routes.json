@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/web-bundle-version.json",
+    "/app-version.json",
+    "/_headers",
+    "/assets/*",
+    "/*.png",
+    "/*.jpg",
+    "/*.svg",
+    "/*.ico",
+    "/*.webp",
+    "/*.json",
+    "/*.txt",
+    "/*.xml"
+  ]
+}
