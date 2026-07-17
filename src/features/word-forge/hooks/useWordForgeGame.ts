@@ -13,6 +13,7 @@ import { lookupDefinition } from '../data/wordDefinitions';
 import {
   DAILY_BONUS_PAYOUT, dailySeed, generateDailyChallenge, isDailyCompleted,
 } from '../engine/dailyChallenge';
+import { dailyMissionBonusEligible, getDailyMission, type MissionSnapshot } from '../engine/dailyMission';
 import { levelParams } from '../engine/difficultyCurve';
 import { completionistBonus, payoutForWord } from '../engine/payoutCalculator';
 import { generateLevel, type LevelGeneration, type LetterTile } from '../engine/poolGenerator';
@@ -98,6 +99,9 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const [dailyBonusAwarded, setDailyBonusAwarded] = useState(false);
 
   const claimedRef = useRef(new Set<string>());
+  const hintsAtStartRef = useRef(hintsLeft);
+  const maxStreakRef = useRef(0);
+  const longestWordRef = useRef(0);
   const flyId = useRef(0);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const balanceRef = useRef<HTMLDivElement | null>(null);
@@ -207,7 +211,10 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     setCompletionistPayout(0);
     setDailyBonusAwarded(false);
     claimedRef.current = new Set();
-  }, [persistMeta, resetTimer, showTutorial, isDaily, preview]);
+    hintsAtStartRef.current = hintsLeft;
+    maxStreakRef.current = 0;
+    longestWordRef.current = 0;
+  }, [persistMeta, resetTimer, showTutorial, isDaily, preview, hintsLeft]);
 
   const spawnCoinFly = useCallback((amount: number) => {
     const board = boardRef.current?.getBoundingClientRect();
@@ -254,6 +261,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     }
 
     const nextStreak = streak + 1;
+    maxStreakRef.current = Math.max(maxStreakRef.current, nextStreak);
+    longestWordRef.current = Math.max(longestWordRef.current, word.length);
     const payout = payoutForWord(word, nextStreak);
     claimedRef.current.add(word);
 
@@ -343,11 +352,23 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       }
 
       if (isDaily && !isDailyCompleted(prog2.dailyCompletedDate)) {
-        setDailyBonusAwarded(true);
+        const missionSnap: MissionSnapshot = {
+          puzzleCleared: true,
+          longestWord: longestWordRef.current,
+          timeLeft,
+          wordsFound: validCount,
+          hintsUsed: Math.max(0, hintsAtStartRef.current - hintsLeft),
+          bestStreak: maxStreakRef.current,
+          minWords: generation.slotWords.length,
+        };
+        const missionMet = dailyMissionBonusEligible(getDailyMission(), missionSnap);
+        if (missionMet) {
+          setDailyBonusAwarded(true);
+          void creditPoints(DAILY_BONUS_PAYOUT);
+        }
         const yesterday = dailySeed(new Date(Date.now() - 86_400_000));
         const nextDailyStreak = prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1;
         persistMeta({ dailyCompletedDate: dailySeed(), dailyStreak: nextDailyStreak });
-        void creditPoints(DAILY_BONUS_PAYOUT);
       }
     }
   }, [phase, selection.length, minWordLen, currentWord, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti]);
@@ -467,6 +488,16 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const unlockedSkinCount = loadForgeProgress(preview).unlockedSkins;
   const displayLevel = isDaily ? 'DAILY' : level;
 
+  const missionSnapshot: MissionSnapshot = {
+    puzzleCleared: slots.filledCount >= generation.slotWords.length,
+    longestWord: longestWordRef.current,
+    timeLeft,
+    wordsFound: foundWords.filter((w) => !w.rejected).length,
+    hintsUsed: Math.max(0, hintsAtStartRef.current - hintsLeft),
+    bestStreak: maxStreakRef.current,
+    minWords: generation.slotWords.length,
+  };
+
   return {
     mode,
     isDaily,
@@ -518,5 +549,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     togglePause,
     resetRound,
     validCount: foundWords.filter((w) => !w.rejected).length,
+    missionSnapshot,
+    dailyMission: isDaily ? getDailyMission() : null,
   };
 }

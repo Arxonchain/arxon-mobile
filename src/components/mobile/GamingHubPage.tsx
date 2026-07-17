@@ -1,39 +1,38 @@
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BarChart3, Flame, Gift, HelpCircle, Lock, Map, Settings, Sparkles, Trophy } from 'lucide-react';
+import { Flame, HelpCircle, Lock, Sparkles } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { frontierLevel } from '@/features/word-forge/engine/sectorProgress';
 import { loadForgeProgress, saveForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
 import { isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
-import { loadForgeSettings, saveForgeSettings } from '@/features/word-forge/hooks/useForgeSettings';
-import { setForgeAudioSettings } from '@/features/word-forge/audio/forgeAudio';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import { GamePanel, GlossyButton, GlossyIconButton, TreasureBackdrop } from '@/features/word-forge/components/GlossyKit';
 import { ForgeFaqModal } from '@/features/word-forge/components/ForgeFaqModal';
-import { ForgeSettingsPanel } from '@/features/word-forge/components/ForgeSettingsPanel';
+import { DailyMilestoneCard } from '@/features/word-forge/components/DailyMilestoneCard';
+
+const INTRO_STEPS = [
+  { n: '1', title: 'Swipe the wheel', body: 'Drag across letters on the forge disc to spell words.' },
+  { n: '2', title: 'Fill the slots', body: 'Match words to the sector grid before the timer hits zero.' },
+  { n: '3', title: 'Stack ARX-P', body: 'Longer words, streaks, and bonus terms pay more points.' },
+];
 
 export default function GamingHubPage() {
   const navigate = useNavigate();
   const progress = loadForgeProgress();
   const dailyDone = isDailyCompleted(progress.dailyCompletedDate);
   const [faqOpen, setFaqOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [rewardsToast, setRewardsToast] = useState(false);
-  const [settings, setSettings] = useState(loadForgeSettings);
-
-  const updateSettings = useCallback((s: typeof settings) => {
-    setSettings(s);
-    saveForgeSettings(s);
-    setForgeAudioSettings(s);
-  }, []);
 
   const startCampaign = useCallback(() => {
     const next = frontierLevel(progress);
     saveForgeProgress({ currentLevel: next });
     navigate('/word-forge');
   }, [navigate, progress]);
+
+  const startDaily = useCallback(() => {
+    navigate('/word-forge?mode=daily');
+  }, [navigate]);
 
   return (
     <div style={{
@@ -42,10 +41,8 @@ export default function GamingHubPage() {
       paddingBottom: mobileScrollPadding(),
       background: '#04070f',
     }}>
-      {/* Treasure background — blurred so the panel stays readable */}
       <TreasureBackdrop blur={7} brightness={0.72} />
 
-      {/* Ambient sparkles */}
       {[
         { top: '9%', left: '12%', s: 5, d: 0 }, { top: '15%', left: '84%', s: 4, d: 0.9 },
         { top: '30%', left: '6%', s: 3, d: 1.7 }, { top: '26%', left: '92%', s: 5, d: 0.4 },
@@ -65,7 +62,6 @@ export default function GamingHubPage() {
         padding: 'max(26px, env(safe-area-inset-top)) 22px 20px',
         display: 'flex', flexDirection: 'column', alignItems: 'center',
       }}>
-        {/* Logo overlay — transparent cutout, floating */}
         <motion.img
           src={FORGE_UI.forgeLogo}
           alt="Arxon Word Forge"
@@ -79,22 +75,75 @@ export default function GamingHubPage() {
           }}
         />
 
-        {/* Main menu panel — image-1 layout */}
         <motion.div
           initial={{ opacity: 0, y: 30, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={{ delay: 0.12, type: 'spring', stiffness: 220, damping: 24 }}
           style={{ width: '100%', marginTop: 22 }}
         >
-          <GamePanel>
-            <GlossyButton
-              size="xl"
-              color="gold"
-              disabled={!WORD_FORGE_ENABLED}
-              onClick={startCampaign}
-            >
-              Play
-            </GlossyButton>
+          <GamePanel style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', top: 14, right: 14, zIndex: 2 }}>
+              <GlossyIconButton label="How to play" color="green" size={44} onClick={() => setFaqOpen(true)}>
+                <HelpCircle size={22} strokeWidth={2.6} />
+              </GlossyIconButton>
+            </div>
+
+            <p style={{
+              margin: '0 0 6px', textAlign: 'center', fontSize: 11, fontWeight: 800,
+              letterSpacing: '0.2em', color: 'rgba(79,216,235,0.65)', textTransform: 'uppercase',
+            }}>
+              Word Forge
+            </p>
+            <h1 style={{
+              margin: 0, textAlign: 'center', fontSize: 22, fontWeight: 900, color: '#fff',
+              lineHeight: 1.15, letterSpacing: '0.02em',
+            }}>
+              Spell. Stack. Survive.
+            </h1>
+            <p style={{
+              margin: '10px 0 0', textAlign: 'center', fontSize: 12, fontWeight: 600,
+              lineHeight: 1.55, color: 'rgba(220,240,255,0.62)', padding: '0 8px',
+            }}>
+              A sci-fi word arena where every sector is a timed puzzle. Forge words from the letter wheel,
+              fill the grid, and earn ARX-P as you push deeper into the map.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+              {INTRO_STEPS.map((step) => (
+                <div key={step.n} style={{
+                  display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+                  borderRadius: 14, background: 'rgba(2,10,22,0.55)',
+                  border: '1px solid rgba(79,216,235,0.18)',
+                }}>
+                  <span style={{
+                    width: 26, height: 26, borderRadius: 8, flexShrink: 0,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 900, color: '#013647',
+                    background: 'linear-gradient(180deg,#b8f4ff,#4FD8EB)',
+                    border: '1px solid #08455a',
+                  }}>
+                    {step.n}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 900, color: '#ffe89a' }}>{step.title}</div>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(200,230,255,0.58)', marginTop: 2, lineHeight: 1.4 }}>
+                      {step.body}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 18 }}>
+              <GlossyButton
+                size="xl"
+                color="gold"
+                disabled={!WORD_FORGE_ENABLED}
+                onClick={startCampaign}
+              >
+                Play Campaign
+              </GlossyButton>
+            </div>
             <p style={{
               margin: '8px 0 0', textAlign: 'center', fontSize: 10.5, fontWeight: 800,
               letterSpacing: '0.14em', color: 'rgba(255,232,154,0.8)', textTransform: 'uppercase',
@@ -111,49 +160,16 @@ export default function GamingHubPage() {
                 </span>
               )}
             </p>
-
-            <div style={{
-              display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14,
-              justifyItems: 'center', marginTop: 20,
-            }}>
-              <GlossyIconButton label="Stats" caption="Stats" color="green"
-                onClick={() => navigate('/word-forge/stats')}>
-                <BarChart3 size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-              <GlossyIconButton label="Settings" caption="Settings" color="green"
-                onClick={() => setSettingsOpen(true)}>
-                <Settings size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-              <GlossyIconButton label="Leaderboard" caption="Ranks" color="green"
-                onClick={() => navigate('/word-forge/leaderboard')}>
-                <Trophy size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-              <GlossyIconButton label="Sector map" caption="Map" color="green"
-                onClick={() => navigate('/word-forge/map')}>
-                <Map size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-              <GlossyIconButton label="Daily reward challenge" caption="Daily" color={dailyDone ? 'slate' : 'gold'}
-                badge={dailyDone ? null : '+50'}
-                disabled={!WORD_FORGE_ENABLED || dailyDone}
-                onClick={() => navigate('/word-forge?mode=daily')}>
-                <Gift size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-              <GlossyIconButton label="Forge rewards" caption="Rewards" color="slate"
-                onClick={() => {
-                  setRewardsToast(true);
-                  window.setTimeout(() => setRewardsToast(false), 2400);
-                }}>
-                <Sparkles size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-              <GlossyIconButton label="How to play" caption="FAQ" color="green"
-                onClick={() => setFaqOpen(true)}>
-                <HelpCircle size={26} strokeWidth={2.6} />
-              </GlossyIconButton>
-            </div>
           </GamePanel>
         </motion.div>
 
-        {/* Compact career stats */}
+        <DailyMilestoneCard
+          completed={dailyDone}
+          streak={progress.dailyStreak}
+          disabled={!WORD_FORGE_ENABLED}
+          onStart={startDaily}
+        />
+
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
@@ -183,14 +199,6 @@ export default function GamingHubPage() {
           ))}
         </motion.div>
 
-        <p style={{
-          margin: '16px 0 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.08em',
-          color: 'rgba(255,255,255,0.4)', textAlign: 'center',
-        }}>
-          Spell words · Stack ARX-P · Clear sectors
-        </p>
-
-        {/* Second game — clearly marked coming soon */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -214,31 +222,14 @@ export default function GamingHubPage() {
               Cipher Drop
             </div>
             <p style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(220,240,255,0.38)', lineHeight: 1.45 }}>
+              <Sparkles size={10} style={{ display: 'inline', verticalAlign: -1, marginRight: 4 }} />
               Decode falling ciphers for bonus ARX-P
             </p>
           </div>
         </motion.div>
       </div>
 
-      {rewardsToast && (
-        <div role="status" style={{
-          position: 'fixed', bottom: 96, left: '50%', transform: 'translateX(-50%)',
-          zIndex: 40, padding: '10px 18px', borderRadius: 12, maxWidth: '86vw',
-          background: 'rgba(3,10,22,0.94)', border: '1px solid rgba(255,217,61,0.4)',
-          fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#ffd93d',
-        }}>
-          Forge rewards shop — coming soon
-        </div>
-      )}
-
       <ForgeFaqModal open={faqOpen} onClose={() => setFaqOpen(false)} />
-      <ForgeSettingsPanel
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        settings={settings}
-        onChange={updateSettings}
-        accent="#4FD8EB"
-      />
 
       <style>{`
         @keyframes wf-logo-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }

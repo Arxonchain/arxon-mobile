@@ -7,11 +7,14 @@ import {
   restoreMusic, setForgeAudioSettings, setMusicScope, startMusic, stopMusic, unlockAudio,
 } from '../audio/forgeAudio';
 import { FORGE_UI } from '../data/uiAssets';
-import { DAILY_BONUS_PAYOUT } from '../engine/dailyChallenge';
+import { DAILY_BONUS_PAYOUT, isDailyCompleted } from '../engine/dailyChallenge';
 import { loadForgeSettings, saveForgeSettings } from '../hooks/useForgeSettings';
+import { loadForgeProgress } from '../hooks/useForgeProgress';
 import { useWordForgeGame, type ForgeGameMode } from '../hooks/useWordForgeGame';
 import { prefersReducedMotion } from '../design-system/forgeTheme';
 import { CoinFlyLayer } from './CoinFlyLayer';
+import { DailyMissionStrip } from './DailyMissionStrip';
+import { ForgeArenaDock } from './ForgeArenaDock';
 import { ForgeFaqModal } from './ForgeFaqModal';
 import { ForgeSettingsPanel } from './ForgeSettingsPanel';
 import { ConfirmDialog, PauseOverlay } from './ForgeOverlays';
@@ -33,6 +36,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const [exitConfirm, setExitConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [rewardsToast, setRewardsToast] = useState(false);
   const game = useWordForgeGame({ preview, mode });
   const { generation, phase } = game;
   const passed = game.slotsFilled >= game.minWords;
@@ -40,6 +44,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const progress = Math.min(1, game.slotsFilled / Math.max(1, game.minWords));
   const audioUnlockedRef = useRef(false);
   const reduced = prefersReducedMotion();
+  const dailyDone = isDailyCompleted(loadForgeProgress(preview).dailyCompletedDate);
 
   // Compact disc centered on the same axis as the word slots. Sized so the
   // wheel plus the side booster rail (50px buttons + gap, mirrored to keep
@@ -148,6 +153,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         position: 'relative', zIndex: 2, height: '100%',
         display: 'flex', flexDirection: 'column',
         padding: `${topPad} 14px max(10px, env(safe-area-inset-bottom))`,
+        paddingLeft: 'max(52px, calc(14px + env(safe-area-inset-left)))',
         maxWidth: 440, margin: '0 auto', overflow: 'hidden',
       }}>
         {/* ── Top bar: pause · sector · timer · balance ─────────────── */}
@@ -162,10 +168,10 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
           }}>
             <div style={{ fontSize: 7.5, fontWeight: 900, letterSpacing: '0.22em', color: 'rgba(79,216,235,0.6)' }}>
-              {game.isDaily ? 'DAILY CHALLENGE' : 'SECTOR'}
+              {game.isDaily ? 'MILESTONE' : 'SECTOR'}
             </div>
             <div style={{ fontSize: 19, fontWeight: 900, lineHeight: 1.1, color: '#fff' }}>
-              {game.isDaily ? new Date().toISOString().slice(5, 10) : game.level}
+              {game.isDaily ? (game.dailyMission?.shortLabel ?? 'Daily') : game.level}
             </div>
           </div>
 
@@ -232,6 +238,8 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             )}
           </div>
         </div>
+
+        {game.isDaily && <DailyMissionStrip snapshot={game.missionSnapshot} />}
 
         {/* ── Word slots (image-2 crossword boxes) ──────────────────── */}
         <div style={{
@@ -319,6 +327,21 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         </div>
       </div>
 
+      <ForgeArenaDock
+        dailyDone={dailyDone}
+        onStats={() => navigate('/word-forge/stats')}
+        onSettings={() => setSettingsOpen(true)}
+        onLeaderboard={() => navigate('/word-forge/leaderboard')}
+        onMap={() => navigate('/word-forge/map')}
+        onDaily={() => {
+          if (!game.isDaily) navigate('/word-forge?mode=daily');
+        }}
+        onRewards={() => {
+          setRewardsToast(true);
+          window.setTimeout(() => setRewardsToast(false), 2400);
+        }}
+      />
+
       {/* ── Feedback layers ─────────────────────────────────────────── */}
       {game.toast && (
         <div role="status" aria-live="polite" style={{
@@ -341,6 +364,17 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
           fontSize: 13, fontWeight: 700, color: '#ffd93d', textAlign: 'center',
         }}>
           ◆ {game.bonusPopup}
+        </div>
+      )}
+
+      {rewardsToast && (
+        <div role="status" style={{
+          position: 'fixed', bottom: 96, left: '50%', transform: 'translateX(-50%)',
+          zIndex: 40, padding: '10px 18px', borderRadius: 12, maxWidth: '86vw',
+          background: 'rgba(3,10,22,0.94)', border: '1px solid rgba(255,217,61,0.4)',
+          fontSize: 12, fontWeight: 700, textAlign: 'center', color: '#ffd93d',
+        }}>
+          Forge rewards shop — coming soon
         </div>
       )}
 
