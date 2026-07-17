@@ -7,7 +7,7 @@ const FAQ_ITEMS: { q: string; a: string }[] = [
   { q: 'What are streaks?', a: 'Forge words back-to-back without a miss. 3 in a row pays 1.5x, 5 in a row pays 2x.' },
   { q: 'What are bonus words?', a: 'Crypto-themed words marked with a gem. They pay 4x and show you their meaning.' },
   { q: 'What do hints do?', a: 'A hint reveals the first and last letters of a hidden word. You get 3 per sector, refilled when you clear it.' },
-  { q: 'Daily Forge Challenge?', a: 'One shared puzzle a day for everyone. Clear it for a +50 ARX-P bonus on top of word payouts.' },
+  { q: 'Daily Milestone?', a: 'Each day brings a new goal — speed runs, long words, no-hint clears, and more. Hit today\'s milestone on the shared puzzle for +50 ARX-P.' },
   { q: 'Where do my points go?', a: 'ARX-P earned in the forge is credited to your Arxon balance automatically.' },
 ];
 

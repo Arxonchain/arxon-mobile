@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, RotateCcw } from 'lucide-react';
+import { ChevronRight, RotateCcw, Star } from 'lucide-react';
 import { FORGE_UI } from '../data/uiAssets';
 import { GamePanel, GlossyButton, RibbonBanner } from './GlossyKit';
 
@@ -95,10 +95,11 @@ export function LevelCompleteModal({
               )}
 
               {/* Star rating */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: 6, margin: '14px 0 4px' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, margin: '14px 0 4px' }}>
                 {[1, 2, 3].map((s) => {
                   const earned = passed && stars >= s;
                   const mid = s === 2;
+                  const dim = mid ? 54 : 42;
                   return (
                     <motion.div
                       key={s}
@@ -106,23 +107,20 @@ export function LevelCompleteModal({
                       animate={{ scale: 1, rotate: 0 }}
                       transition={{ delay: 0.34 + s * 0.14, type: 'spring', stiffness: 340, damping: 14 }}
                       style={{
-                        fontSize: mid ? 54 : 42,
                         lineHeight: 1,
-                        marginTop: mid ? 0 : 10,
+                        marginBottom: mid ? 0 : 6,
                         filter: earned
                           ? 'drop-shadow(0 0 14px rgba(255,200,40,0.8)) drop-shadow(0 3px 4px rgba(0,0,0,0.5))'
-                          : 'grayscale(1) brightness(0.32)',
+                          : 'grayscale(1) brightness(0.38)',
                       }}
                     >
-                      <span style={{
-                        background: earned
-                          ? 'linear-gradient(180deg,#fff3b0 0%,#ffd93d 42%,#ff9d1b 100%)'
-                          : 'linear-gradient(180deg,#3a4a5c,#1a2635)',
-                        WebkitBackgroundClip: 'text',
-                        WebkitTextFillColor: 'transparent',
-                      }}>
-                        ★
-                      </span>
+                      <Star
+                        size={dim}
+                        strokeWidth={1.5}
+                        fill={earned ? '#ffd93d' : '#2a3a4c'}
+                        color={earned ? '#ff9d1b' : '#1a2635'}
+                        style={{ display: 'block' }}
+                      />
                     </motion.div>
                   );
                 })}
@@ -161,7 +159,8 @@ export function LevelCompleteModal({
                 }}>
                   <span>{wordsFormed}/{wordsRequired} words</span>
                   {completionistBonus > 0 && <span style={{ color: '#7FE7C4' }}>+{completionistBonus} completionist</span>}
-                  {passed && isDaily && dailyBonus > 0 && <span style={{ color: '#ffd93d' }}>+{dailyBonus} daily</span>}
+                  {passed && isDaily && dailyBonus > 0 && <span style={{ color: '#ffd93d' }}>+{dailyBonus} milestone</span>}
+                  {passed && isDaily && dailyBonus === 0 && <span style={{ color: 'rgba(200,230,255,0.45)' }}>Milestone missed</span>}
                 </div>
               </motion.div>
 
