@@ -49,23 +49,41 @@ ABOUT ABOVE AFTER AGAIN ALONG AMONG ANGER ANGLE APPLE AROUND ARROW AUDIO AWAKE B
 
 export const DICTIONARY = new Set(RAW.map((w) => w.toUpperCase()));
 
+/** Minimum letters for any player-formed word (always 3, regardless of sector). */
+export const PLAYER_MIN_WORD_LEN = 3;
+
 /** Full standard English dictionary (3-10 letters) for validating player words.
  * Loaded as a separate lazy chunk so it never weighs down app startup. */
 let fullDict: Set<string> | null = null;
 let fullDictLoading: Promise<void> | null = null;
 
+function ingestWordlist(raw: string): Set<string> {
+  const set = new Set<string>();
+  for (const line of raw.split(/\r?\n/)) {
+    const w = line.trim().toUpperCase();
+    if (w.length >= PLAYER_MIN_WORD_LEN && w.length <= 10 && /^[A-Z]+$/.test(w)) {
+      set.add(w);
+    }
+  }
+  for (const w of DICTIONARY) set.add(w);
+  return set;
+}
+
 export function preloadFullDictionary(): Promise<void> {
   if (fullDict) return Promise.resolve();
   fullDictLoading ??= import('./wordlist.txt?raw').then((mod) => {
-    const set = new Set(mod.default.split('\n'));
-    for (const w of DICTIONARY) set.add(w);
-    fullDict = set;
+    fullDict = ingestWordlist(mod.default);
   });
   return fullDictLoading;
 }
 
+/** Test hook — inject parsed wordlist without loading the 2MB chunk */
+export function ingestWordlistForTest(raw: string): void {
+  fullDict = ingestWordlist(raw);
+}
+
 export function hasWord(word: string): boolean {
-  const w = word.toUpperCase();
+  const w = word.toUpperCase().trim();
   if (fullDict) return fullDict.has(w);
   // Full list not ready yet (first seconds after load) — curated fallback
   void preloadFullDictionary();
