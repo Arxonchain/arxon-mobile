@@ -66,7 +66,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const { preview = false, mode = 'campaign' } = options;
   const isDaily = mode === 'daily';
   const { user } = useAuth();
-  const { addPoints, triggerConfetti } = usePoints();
+  const { addPoints, triggerConfetti, refreshPoints } = usePoints();
   const { push: pushCloud } = useForgeCloudSync(preview);
 
   const saved = useMemo(() => loadForgeProgress(preview), [preview]);
@@ -198,6 +198,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     if (newAttempt) setAttemptId(String(Date.now()));
     setPhase(showTutorial ? 'paused' : 'playing');
     resetTimer(params.timerSeconds);
+    setBalance(0);
+    setDisplayBalance(0);
     setFoundWords([]);
     setSelection([]);
     setToast(null);
@@ -226,21 +228,14 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     schedule(() => setCoinFlies((prev) => prev.filter((c) => c.id !== id)), 1800);
   }, [schedule]);
 
-  const animateBalance = useCallback((target: number) => {
-    setBalance(target);
-    const start = displayBalance;
-    const diff = target - start;
-    if (diff <= 0) { setDisplayBalance(target); return; }
-    const steps = 12;
-    let step = 0;
-    const id = window.setInterval(() => {
-      step++;
-      setDisplayBalance(Math.round(start + (diff * step) / steps));
-      if (step >= steps) window.clearInterval(id);
-    }, 40);
-  }, [displayBalance]);
+  /** In-round ARX-P counter — always updates, independent of profile sync */
+  const addToSessionBalance = useCallback((delta: number) => {
+    if (delta === 0) return;
+    setBalance((prev) => Math.max(0, prev + delta));
+    setDisplayBalance((prev) => Math.max(0, prev + delta));
+  }, []);
 
-  const creditPoints = useCallback(async (amount: number) => {
+  const creditProfilePoints = useCallback(async (amount: number) => {
     if (preview || amount <= 0) return true;
     const result = await addPoints(amount, 'game');
     return result.success;
@@ -287,6 +282,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     }
     spawnCoinFly(payout);
     playCoinCredit();
+    addToSessionBalance(payout);
     setSelection([]);
 
     if (local.isBonus) {
@@ -311,6 +307,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     if (!server.ok) {
       claimedRef.current.delete(word);
       setStreak(0);
+      addToSessionBalance(-payout);
       setFoundWords((prev) => prev.map((w) => (w.word === word ? { ...w, pending: false, rejected: true } : w)));
       setShakeWord(word);
       playError();
@@ -320,18 +317,24 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       return;
     }
 
-    const credited = server.payout ?? payout;
-    let pointsApplied = preview || server.credited !== false;
-    if (!pointsApplied && !preview) {
-      pointsApplied = await creditPoints(credited);
-      if (!pointsApplied) {
-        showToast('Word saved — points syncing shortly');
+    const credited = typeof server.payout === 'number' && server.payout > 0
+      ? server.payout
+      : payout;
+    if (credited !== payout) {
+      addToSessionBalance(credited - payout);
+    }
+
+    if (!preview) {
+      if (server.credited === true) {
+        void refreshPoints();
+      } else {
+        const synced = await creditProfilePoints(credited);
+        if (!synced) {
+          showToast('Word saved — profile points syncing shortly');
+        }
       }
     }
 
-    if (pointsApplied) {
-      animateBalance(balance + credited);
-    }
     const prog = loadForgeProgress(preview);
     persistMeta({
       totalWords: prog.totalWords + 1,
@@ -357,8 +360,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
         const bonus = completionistBonus(generation.formableCount);
         setCompletionistPayout(bonus);
         if (bonus > 0) {
-          void creditPoints(bonus);
-          animateBalance(balance + credited + bonus);
+          addToSessionBalance(bonus);
+          void creditProfilePoints(bonus);
         }
       }
 
@@ -375,7 +378,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
         const missionMet = dailyMissionBonusEligible(getDailyMission(), missionSnap);
         if (missionMet) {
           setDailyBonusAwarded(true);
-          void creditPoints(DAILY_BONUS_PAYOUT);
+          void creditProfilePoints(DAILY_BONUS_PAYOUT);
         }
         const yesterday = dailySeed(new Date(Date.now() - 86_400_000));
         const nextDailyStreak = prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1;
@@ -383,7 +386,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       }
     }
     submittingRef.current = false;
-  }, [phase, selection, submitMinLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
+  }, [phase, selection, submitMinLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, addToSessionBalance, creditProfilePoints, refreshPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
 
   const appendTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
