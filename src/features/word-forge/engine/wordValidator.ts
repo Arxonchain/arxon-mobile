@@ -33,7 +33,7 @@ export function reasonMessage(reason?: ValidationResult['reason'], minLen = 3): 
     case 'unknown': return 'Not in dictionary';
     case 'duplicate': return 'Already found';
     case 'pool': return 'Letters not in pool';
-    case 'rate': return 'Too fast — try again';
+    case 'rate': return 'Could not verify — try again';
     default: return 'Invalid word';
   }
 }

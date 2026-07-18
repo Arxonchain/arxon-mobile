@@ -316,18 +316,17 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     }
 
     const credited = server.payout ?? payout;
-    if (server.credited === false && !preview) {
-      const ok = await creditPoints(credited);
-      if (!ok) {
-        claimedRef.current.delete(word);
-        setFoundWords((prev) => prev.map((w) => (w.word === word ? { ...w, pending: false, rejected: true } : w)));
-        showToast('Credit failed — try again');
-        submittingRef.current = false;
-        return;
+    let pointsApplied = preview || server.credited !== false;
+    if (!pointsApplied && !preview) {
+      pointsApplied = await creditPoints(credited);
+      if (!pointsApplied) {
+        showToast('Word saved — points syncing shortly');
       }
     }
 
-    animateBalance(balance + credited);
+    if (pointsApplied) {
+      animateBalance(balance + credited);
+    }
     const prog = loadForgeProgress(preview);
     persistMeta({
       totalWords: prog.totalWords + 1,
