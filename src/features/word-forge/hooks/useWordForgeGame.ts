@@ -107,6 +107,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const balanceRef = useRef<HTMLDivElement | null>(null);
   const toastTimer = useRef<number | null>(null);
   const timersRef = useRef<number[]>([]);
+  const submittingRef = useRef(false);
 
   const uid = user?.id ?? 'preview-user';
 
@@ -244,9 +245,12 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     return result.success;
   }, [addPoints, preview]);
 
-  const submitWord = useCallback(async () => {
-    if (phase !== 'playing' || selection.length < minWordLen) return;
-    const word = currentWord.toUpperCase();
+  const submitWord = useCallback(async (pathOverride?: number[]) => {
+    const path = pathOverride ?? selection;
+    if (phase !== 'playing' || path.length < minWordLen || submittingRef.current) return;
+    submittingRef.current = true;
+    if (pathOverride) setSelection(pathOverride);
+    const word = path.map((i) => tiles[i]?.letter ?? '').join('').toUpperCase();
     const poolLetters = tiles.map((t) => t.letter);
     const local = validateWordLocal(word, poolLetters, claimedRef.current, minWordLen);
     if (!local.ok) {
@@ -257,6 +261,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       schedule(() => setShakeWord(null), 400);
       showToast(reasonMessage(local.reason, minWordLen));
       setSelection([]);
+      submittingRef.current = false;
       return;
     }
 
@@ -306,6 +311,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       playError();
       schedule(() => setShakeWord(null), 400);
       showToast(reasonMessage(server.reason, minWordLen));
+      submittingRef.current = false;
       return;
     }
 
@@ -316,6 +322,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
         claimedRef.current.delete(word);
         setFoundWords((prev) => prev.map((w) => (w.word === word ? { ...w, pending: false, rejected: true } : w)));
         showToast('Credit failed — try again');
+        submittingRef.current = false;
         return;
       }
     }
@@ -371,7 +378,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
         persistMeta({ dailyCompletedDate: dailySeed(), dailyStreak: nextDailyStreak });
       }
     }
-  }, [phase, selection.length, minWordLen, currentWord, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti]);
+    submittingRef.current = false;
+  }, [phase, selection, minWordLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
 
   const appendTile = useCallback((index: number) => {
     if (phase !== 'playing') return;

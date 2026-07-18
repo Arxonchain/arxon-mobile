@@ -223,7 +223,7 @@ export default function GamingHubPage() {
             </div>
             <p style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(220,240,255,0.38)', lineHeight: 1.45 }}>
               <Sparkles size={10} style={{ display: 'inline', verticalAlign: -1, marginRight: 4 }} />
-              Decode falling ciphers for bonus ARX-P
+              Planned arcade mode — decode falling cipher tiles for bonus ARX-P. Not live yet.
             </p>
           </div>
         </motion.div>

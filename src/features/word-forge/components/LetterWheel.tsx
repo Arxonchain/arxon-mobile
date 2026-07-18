@@ -14,8 +14,8 @@ interface LetterWheelProps {
   onStart: (index: number) => void;
   /** Pointer dragged onto another letter mid-gesture */
   onAppend: (index: number) => void;
-  /** Gesture released — submit if long enough, otherwise clear */
-  onRelease: () => void;
+  /** Gesture released — receives the full swipe path synchronously (avoids stale React state) */
+  onRelease: (path: number[]) => void;
 }
 
 /**
@@ -40,7 +40,8 @@ export function LetterWheel({
 
   const containerRef = useRef<HTMLDivElement>(null);
   const draggingRef = useRef(false);
-  const lastIndexRef = useRef<number | null>(null);
+  const pathRef = useRef<number[]>([]);
+  const lastPointerRef = useRef<{ x: number; y: number } | null>(null);
 
   const hitTest = useCallback((clientX: number, clientY: number): number | null => {
     const rect = containerRef.current?.getBoundingClientRect();
@@ -48,7 +49,7 @@ export function LetterWheel({
     const px = clientX - rect.left;
     const py = clientY - rect.top;
     let best: number | null = null;
-    let bestDist = tileSize * 0.58;
+    let bestDist = tileSize * 0.72;
     for (let i = 0; i < positions.length; i++) {
       const d = Math.hypot(px - positions[i].x, py - positions[i].y);
       if (d < bestDist) { bestDist = d; best = i; }
@@ -56,29 +57,56 @@ export function LetterWheel({
     return best;
   }, [positions, tileSize]);
 
+  const appendHit = useCallback((hit: number) => {
+    if (pathRef.current.includes(hit)) return;
+    pathRef.current = [...pathRef.current, hit];
+    onAppend(hit);
+  }, [onAppend]);
+
+  const samplePointer = useCallback((clientX: number, clientY: number) => {
+    const prev = lastPointerRef.current;
+    if (!prev) {
+      const hit = hitTest(clientX, clientY);
+      if (hit != null) appendHit(hit);
+      lastPointerRef.current = { x: clientX, y: clientY };
+      return;
+    }
+    const dx = clientX - prev.x;
+    const dy = clientY - prev.y;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(dist / (tileSize * 0.35)));
+    for (let s = 1; s <= steps; s++) {
+      const t = s / steps;
+      const hit = hitTest(prev.x + dx * t, prev.y + dy * t);
+      if (hit != null) appendHit(hit);
+    }
+    lastPointerRef.current = { x: clientX, y: clientY };
+  }, [appendHit, hitTest, tileSize]);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
     const hit = hitTest(e.clientX, e.clientY);
     if (hit == null) return;
     e.preventDefault();
     containerRef.current?.setPointerCapture?.(e.pointerId);
     draggingRef.current = true;
-    lastIndexRef.current = hit;
+    pathRef.current = [hit];
+    lastPointerRef.current = { x: e.clientX, y: e.clientY };
     onStart(hit);
   }, [hitTest, onStart]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!draggingRef.current) return;
-    const hit = hitTest(e.clientX, e.clientY);
-    if (hit == null || hit === lastIndexRef.current) return;
-    lastIndexRef.current = hit;
-    onAppend(hit);
-  }, [hitTest, onAppend]);
+    e.preventDefault();
+    samplePointer(e.clientX, e.clientY);
+  }, [samplePointer]);
 
   const handlePointerUp = useCallback(() => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
-    lastIndexRef.current = null;
-    onRelease();
+    lastPointerRef.current = null;
+    const path = [...pathRef.current];
+    pathRef.current = [];
+    onRelease(path);
   }, [onRelease]);
 
   const selectedSet = new Set(selection);
