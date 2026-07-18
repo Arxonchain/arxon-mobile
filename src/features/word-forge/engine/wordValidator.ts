@@ -1,5 +1,5 @@
 import { bonusDefinition, isBonusWord } from '../data/bonusWords';
-import { hasWord } from '../data/dictionary';
+import { hasWord, PLAYER_MIN_WORD_LEN } from '../data/dictionary';
 import { canForm, poolCountMap } from './poolGenerator';
 
 export interface ValidationResult {
@@ -13,13 +13,24 @@ export function validateWordLocal(
   word: string,
   poolLetters: string[],
   claimed: Set<string>,
-  minLen = 3,
+  minLen = PLAYER_MIN_WORD_LEN,
+  /** Letters from the swipe path — when set, pool check uses only those tiles */
+  selectedLetters?: string[],
 ): ValidationResult {
   const w = word.toUpperCase().trim();
   if (w.length < minLen) return { ok: false, reason: 'short' };
   if (claimed.has(w)) return { ok: false, reason: 'duplicate' };
   if (!hasWord(w) && !isBonusWord(w)) return { ok: false, reason: 'unknown' };
-  if (!canForm(w, poolCountMap(poolLetters))) return { ok: false, reason: 'pool' };
+
+  const poolSource = selectedLetters?.length
+    ? selectedLetters.map((l) => l.toUpperCase())
+    : poolLetters.map((l) => l.toUpperCase());
+
+  if (selectedLetters?.length && poolSource.join('') !== w) {
+    return { ok: false, reason: 'pool' };
+  }
+
+  if (!canForm(w, poolCountMap(poolSource))) return { ok: false, reason: 'pool' };
   return {
     ok: true,
     isBonus: isBonusWord(w),
@@ -27,7 +38,7 @@ export function validateWordLocal(
   };
 }
 
-export function reasonMessage(reason?: ValidationResult['reason'], minLen = 3): string {
+export function reasonMessage(reason?: ValidationResult['reason'], minLen = PLAYER_MIN_WORD_LEN): string {
   switch (reason) {
     case 'short': return `Need ${minLen}+ letters`;
     case 'unknown': return 'Not in dictionary';

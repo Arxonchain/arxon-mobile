@@ -10,6 +10,7 @@ import { FORGE_UI } from '../data/uiAssets';
 import { DAILY_BONUS_PAYOUT, isDailyCompleted } from '../engine/dailyChallenge';
 import { loadForgeSettings, saveForgeSettings } from '../hooks/useForgeSettings';
 import { loadForgeProgress } from '../hooks/useForgeProgress';
+import { PLAYER_MIN_WORD_LEN } from '../data/dictionary';
 import { useWordForgeGame, type ForgeGameMode } from '../hooks/useWordForgeGame';
 import { prefersReducedMotion } from '../design-system/forgeTheme';
 import { CoinFlyLayer } from './CoinFlyLayer';
@@ -112,7 +113,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   }, [game, passed, navigate]);
 
   const handleWheelRelease = useCallback((path: number[]) => {
-    if (path.length >= game.minWordLen) {
+    if (path.length >= PLAYER_MIN_WORD_LEN) {
       void game.submitWord(path);
     } else if (path.length > 0) {
       game.clearSelection();

@@ -8,7 +8,7 @@ export interface ServerWordResult extends ValidationResult {
   credited?: boolean;
 }
 
-const HARD_REJECT: ValidationResult['reason'][] = ['duplicate', 'pool', 'short'];
+const HARD_REJECT: ValidationResult['reason'][] = ['duplicate', 'short'];
 
 function localCreditFallback(local: ValidationResult, payout: number): ServerWordResult {
   return {
@@ -28,8 +28,11 @@ export async function validateAndCreditWord(
   attemptId: string,
   streak: number,
   minWordLen: number,
+  selectedLetters?: string[],
 ): Promise<ServerWordResult> {
-  const local = validateWordLocal(word, poolLetters, new Set(claimed), minWordLen);
+  const local = validateWordLocal(
+    word, poolLetters, new Set(claimed), minWordLen, selectedLetters,
+  );
   if (!local.ok) return local;
 
   const payout = payoutForWord(word, streak + 1);

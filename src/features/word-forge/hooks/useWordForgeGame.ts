@@ -8,7 +8,7 @@ import {
   playShuffle, playStreak, playSubmit, playTap, duckMusic, restoreMusic,
 } from '../audio/forgeAudio';
 
-import { preloadFullDictionary } from '../data/dictionary';
+import { preloadFullDictionary, PLAYER_MIN_WORD_LEN } from '../data/dictionary';
 import { lookupDefinition } from '../data/wordDefinitions';
 import {
   DAILY_BONUS_PAYOUT, dailySeed, generateDailyChallenge, isDailyCompleted,
@@ -118,6 +118,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
   const tiles = liveTiles ?? generation.tiles;
   const minWords = generation.effectiveMinWords;
+  const submitMinLen = PLAYER_MIN_WORD_LEN;
   const minWordLen = generation.params.minWordLen;
 
   const validWords = useMemo(
@@ -247,19 +248,23 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
   const submitWord = useCallback(async (pathOverride?: number[]) => {
     const path = pathOverride ?? selection;
-    if (phase !== 'playing' || path.length < minWordLen || submittingRef.current) return;
+    if (phase !== 'playing' || path.length < submitMinLen || submittingRef.current) return;
     submittingRef.current = true;
+    await preloadFullDictionary();
     if (pathOverride) setSelection(pathOverride);
-    const word = path.map((i) => tiles[i]?.letter ?? '').join('').toUpperCase();
+    const pathLetters = path.map((i) => tiles[i]?.letter ?? '');
+    const word = pathLetters.join('').toUpperCase();
     const poolLetters = tiles.map((t) => t.letter);
-    const local = validateWordLocal(word, poolLetters, claimedRef.current, minWordLen);
+    const local = validateWordLocal(
+      word, poolLetters, claimedRef.current, submitMinLen, pathLetters,
+    );
     if (!local.ok) {
       setShakeWord(word);
       setStreak(0);
       playError();
       void haptic(ImpactStyle.Medium);
       schedule(() => setShakeWord(null), 400);
-      showToast(reasonMessage(local.reason, minWordLen));
+      showToast(reasonMessage(local.reason, submitMinLen));
       setSelection([]);
       submittingRef.current = false;
       return;
@@ -300,7 +305,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
     const server = await validateAndCreditWord(
       word, poolLetters, [...claimedRef.current].filter((w) => w !== word),
-      isDaily ? 0 : level, attemptId, streak, minWordLen,
+      isDaily ? 0 : level, attemptId, streak, submitMinLen, pathLetters,
     );
 
     if (!server.ok) {
@@ -310,7 +315,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       setShakeWord(word);
       playError();
       schedule(() => setShakeWord(null), 400);
-      showToast(reasonMessage(server.reason, minWordLen));
+      showToast(reasonMessage(server.reason, submitMinLen));
       submittingRef.current = false;
       return;
     }
@@ -378,7 +383,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       }
     }
     submittingRef.current = false;
-  }, [phase, selection, minWordLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
+  }, [phase, selection, submitMinLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, balance, animateBalance, creditPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
 
   const appendTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
@@ -536,6 +541,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     dailyBonusAwarded,
     minWords,
     minWordLen,
+    submitMinLen,
     slotRows: slots.rows,
     slotsFilled: slots.filledCount,
     extraWords: slots.extraWords,

@@ -35,6 +35,15 @@ describe('validateAndCreditWord', () => {
     expect(result.credited).toBe(false);
   });
 
+  it('accepts locally valid words when server reports pool mismatch', async () => {
+    invoke.mockResolvedValue({ data: { ok: false, reason: 'pool' }, error: null });
+    const result = await validateAndCreditWord(
+      'CAT', ['C', 'A', 'T', 'S'], [], 1, 'attempt-1', 0, 3, ['C', 'A', 'T'],
+    );
+    expect(result.ok).toBe(true);
+    expect(result.credited).toBe(false);
+  });
+
   it('rejects duplicate when server is authoritative', async () => {
     invoke.mockResolvedValue({ data: { ok: false, reason: 'duplicate' }, error: null });
     const result = await validateAndCreditWord(
