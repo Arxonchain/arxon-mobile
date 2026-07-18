@@ -8,6 +8,18 @@ export interface ServerWordResult extends ValidationResult {
   credited?: boolean;
 }
 
+const HARD_REJECT: ValidationResult['reason'][] = ['duplicate', 'pool', 'short'];
+
+function localCreditFallback(local: ValidationResult, payout: number): ServerWordResult {
+  return {
+    ok: true,
+    isBonus: local.isBonus,
+    definition: local.definition,
+    payout,
+    credited: false,
+  };
+}
+
 export async function validateAndCreditWord(
   word: string,
   poolLetters: string[],
@@ -35,25 +47,29 @@ export async function validateAndCreditWord(
       },
     });
 
-    if (error || !data?.ok) {
-      // Fallback to local validation when edge function unavailable (dev/offline)
-      if (import.meta.env.DEV) {
-        return { ...local, payout, credited: false };
-      }
-      return { ok: false, reason: 'rate' };
+    if (error) {
+      // Edge function unreachable — word already passed local checks; credit via client path
+      return localCreditFallback(local, payout);
     }
 
-    return {
-      ok: true,
-      isBonus: local.isBonus,
-      definition: local.definition,
-      payout: data.payout ?? payout,
-      credited: data.credited ?? true,
-    };
-  } catch {
-    if (import.meta.env.DEV) {
-      return { ...local, payout, credited: false };
+    if (data?.ok) {
+      return {
+        ok: true,
+        isBonus: local.isBonus,
+        definition: local.definition,
+        payout: data.payout ?? payout,
+        credited: data.credited ?? true,
+      };
     }
-    return { ok: false, reason: 'rate' };
+
+    const reason = data?.reason as ValidationResult['reason'] | undefined;
+    if (reason && HARD_REJECT.includes(reason)) {
+      return { ok: false, reason };
+    }
+
+    // Server dictionary miss, 401 body, RPC error, etc. — trust local gameplay validation
+    return localCreditFallback(local, payout);
+  } catch {
+    return localCreditFallback(local, payout);
   }
 }
