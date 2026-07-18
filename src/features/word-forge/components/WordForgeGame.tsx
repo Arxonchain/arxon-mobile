@@ -46,13 +46,11 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const reduced = prefersReducedMotion();
   const dailyDone = isDailyCompleted(loadForgeProgress(preview).dailyCompletedDate);
 
-  // Compact disc centered on the same axis as the word slots. Sized so the
-  // wheel plus the side booster rail (50px buttons + gap, mirrored to keep
-  // the wheel centered) always fits the viewport, even at ~360px wide.
+  // Wheel fills the centered column; hint/shuffle sit in a row below it.
   const wheelSize = useMemo(() => {
     const vw = typeof window !== 'undefined' ? window.innerWidth : 380;
-    const content = Math.min(vw, 440) - 28; // container max-width minus padding
-    return Math.round(Math.min(250, content - 2 * (50 + 14)));
+    const content = Math.min(vw, 440) - 28;
+    return Math.round(Math.min(272, content - 8));
   }, []);
 
   const updateSettings = useCallback((s: typeof settings) => {
@@ -113,10 +111,10 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     game.advanceOrRetry();
   }, [game, passed, navigate]);
 
-  const handleWheelRelease = useCallback(() => {
-    if (game.selection.length >= game.minWordLen) {
-      void game.submitWord();
-    } else if (game.selection.length > 0) {
+  const handleWheelRelease = useCallback((path: number[]) => {
+    if (path.length >= game.minWordLen) {
+      void game.submitWord(path);
+    } else if (path.length > 0) {
       game.clearSelection();
     }
   }, [game]);
@@ -152,8 +150,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
       <div style={{
         position: 'relative', zIndex: 2, height: '100%',
         display: 'flex', flexDirection: 'column',
-        padding: `${topPad} 14px max(10px, env(safe-area-inset-bottom))`,
-        paddingLeft: 'max(52px, calc(14px + env(safe-area-inset-left)))',
+        padding: `${topPad} max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left))`,
         maxWidth: 440, margin: '0 auto', overflow: 'hidden',
       }}>
         {/* ── Top bar: pause · sector · timer · balance ─────────────── */}
@@ -285,11 +282,10 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
           )}
         </div>
 
-        {/* ── Letter wheel, centered with the slot boxes — booster rail sits
-               clear of the disc on the right, vertically centered ────────── */}
+        {/* ── Letter wheel + boosters + utility dock (centered stack) ─ */}
         <div ref={game.boardRef} style={{
-          flexShrink: 0, position: 'relative', width: '100%', paddingBottom: 4,
-          display: 'flex', justifyContent: 'center',
+          flexShrink: 0, width: '100%', paddingBottom: 4,
+          display: 'flex', flexDirection: 'column', alignItems: 'center',
         }}>
           <LetterWheel
             tiles={game.tiles}
@@ -303,44 +299,41 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             onRelease={handleWheelRelease}
           />
           <div style={{
-            position: 'absolute', top: '50%', transform: 'translateY(-50%)',
-            left: `calc(50% + ${wheelSize / 2 + 14}px)`,
-            display: 'flex', flexDirection: 'column', gap: 12, zIndex: 6,
+            display: 'flex', justifyContent: 'center', gap: 14, marginTop: 10,
           }}>
             <GlossyIconButton
-              label="Use hint" caption="Hint" color="gold" size={50}
+              label="Use hint" caption="Hint" color="gold" size={46}
               badge={game.hintsLeft}
               disabled={game.hintsLeft <= 0 || phase !== 'playing'}
               onClick={game.useHint}
             >
-              <Lightbulb size={21} strokeWidth={2.8} />
+              <Lightbulb size={20} strokeWidth={2.8} />
             </GlossyIconButton>
             <GlossyIconButton
-              label="Shuffle letters" caption="Mix" color="cyan" size={50}
+              label="Shuffle letters" caption="Mix" color="cyan" size={46}
               badge={game.shufflesLeft}
               disabled={game.shufflesLeft <= 0 || phase !== 'playing'}
               onClick={game.shuffleTiles}
             >
-              <Shuffle size={21} strokeWidth={2.8} />
+              <Shuffle size={20} strokeWidth={2.8} />
             </GlossyIconButton>
           </div>
+          <ForgeArenaDock
+            dailyDone={dailyDone}
+            onStats={() => navigate('/word-forge/stats')}
+            onSettings={() => setSettingsOpen(true)}
+            onLeaderboard={() => navigate('/word-forge/leaderboard')}
+            onMap={() => navigate('/word-forge/map')}
+            onDaily={() => {
+              if (!game.isDaily) navigate('/word-forge?mode=daily');
+            }}
+            onRewards={() => {
+              setRewardsToast(true);
+              window.setTimeout(() => setRewardsToast(false), 2400);
+            }}
+          />
         </div>
       </div>
-
-      <ForgeArenaDock
-        dailyDone={dailyDone}
-        onStats={() => navigate('/word-forge/stats')}
-        onSettings={() => setSettingsOpen(true)}
-        onLeaderboard={() => navigate('/word-forge/leaderboard')}
-        onMap={() => navigate('/word-forge/map')}
-        onDaily={() => {
-          if (!game.isDaily) navigate('/word-forge?mode=daily');
-        }}
-        onRewards={() => {
-          setRewardsToast(true);
-          window.setTimeout(() => setRewardsToast(false), 2400);
-        }}
-      />
 
       {/* ── Feedback layers ─────────────────────────────────────────── */}
       {game.toast && (
