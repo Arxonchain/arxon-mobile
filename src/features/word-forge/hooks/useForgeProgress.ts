@@ -15,6 +15,8 @@ export interface ForgeProgress {
   dailyStreak: number;
   tutorialCompleted: boolean;
   unlockedSkins: number;
+  /** Hint-task claim keys → ISO timestamp */
+  hintTaskClaims: Record<string, string>;
 }
 
 const VERSION = 2;
@@ -35,6 +37,7 @@ const DEFAULT: ForgeProgress = {
   dailyStreak: 0,
   tutorialCompleted: false,
   unlockedSkins: 1,
+  hintTaskClaims: {},
 };
 
 function keyFor(preview: boolean): string {
@@ -63,6 +66,9 @@ function sanitize(raw: Partial<ForgeProgress>): ForgeProgress {
     dailyStreak: Math.max(0, Number(raw.dailyStreak) || 0),
     tutorialCompleted: Boolean(raw.tutorialCompleted),
     unlockedSkins: Math.max(1, Math.min(5, Number(raw.unlockedSkins) || 1)),
+    hintTaskClaims: typeof raw.hintTaskClaims === 'object' && raw.hintTaskClaims != null
+      ? (raw.hintTaskClaims as Record<string, string>)
+      : {},
   };
 }
 

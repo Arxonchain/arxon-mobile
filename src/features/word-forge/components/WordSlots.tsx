@@ -9,6 +9,8 @@ interface WordSlotsProps {
   skin: LevelTileSkin;
   hintWord?: string | null;
   celebrateWord?: string | null;
+  boxSize?: number;
+  rowGap?: number;
 }
 
 /**
@@ -16,15 +18,17 @@ interface WordSlotsProps {
  * forge. Box counts are locked at level start; found words fill the matching
  * row with letter pops.
  */
-export function WordSlots({ rows, extraCount, skin, hintWord, celebrateWord }: WordSlotsProps) {
+export function WordSlots({
+  rows, extraCount, skin, hintWord, celebrateWord, boxSize, rowGap = 7,
+}: WordSlotsProps) {
   const maxLen = Math.max(3, ...rows.map((r) => r.target.length));
-  const box = Math.max(22, Math.min(36, Math.floor(272 / maxLen) - 3));
+  const box = boxSize ?? Math.max(22, Math.min(36, Math.floor(272 / maxLen) - 3));
   const hint = hintWord?.toUpperCase() ?? null;
 
   return (
     <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7,
-      width: '100%', overflowY: 'auto', padding: '4px 0',
+      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: rowGap,
+      width: '100%', padding: '2px 0',
     }}>
       {rows.map((row, rowIdx) => {
         const filled = row.filledBy != null;

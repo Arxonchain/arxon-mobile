@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
@@ -8,8 +8,10 @@ import {
 } from '../audio/forgeAudio';
 import { FORGE_UI } from '../data/uiAssets';
 import { DAILY_BONUS_PAYOUT, isDailyCompleted } from '../engine/dailyChallenge';
+import { computeRoundStars } from '../engine/roundStars';
 import { loadForgeSettings, saveForgeSettings } from '../hooks/useForgeSettings';
 import { loadForgeProgress } from '../hooks/useForgeProgress';
+import { useArenaLayout } from '../hooks/useArenaLayout';
 import { PLAYER_MIN_WORD_LEN } from '../data/dictionary';
 import { useWordForgeGame, type ForgeGameMode } from '../hooks/useWordForgeGame';
 import { prefersReducedMotion } from '../design-system/forgeTheme';
@@ -20,6 +22,7 @@ import { ForgeFaqModal } from './ForgeFaqModal';
 import { ForgeSettingsPanel } from './ForgeSettingsPanel';
 import { ConfirmDialog, PauseOverlay } from './ForgeOverlays';
 import { GlossyIconButton, TimerRing, TreasureBackdrop } from './GlossyKit';
+import { HintRefillModal } from './HintRefillModal';
 import { LetterWheel } from './LetterWheel';
 import { RoundEndModal } from './LevelCompleteModal';
 import { TutorialOverlay } from './TutorialOverlay';
@@ -38,6 +41,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
   const [rewardsToast, setRewardsToast] = useState(false);
+  const [hintRefillOpen, setHintRefillOpen] = useState(false);
   const game = useWordForgeGame({ preview, mode });
   const { generation, phase } = game;
   const passed = game.slotsFilled >= game.minWords;
@@ -46,13 +50,12 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const audioUnlockedRef = useRef(false);
   const reduced = prefersReducedMotion();
   const dailyDone = isDailyCompleted(loadForgeProgress(preview).dailyCompletedDate);
-
-  // Wheel fills the centered column; hint/shuffle sit in a row below it.
-  const wheelSize = useMemo(() => {
-    const vw = typeof window !== 'undefined' ? window.innerWidth : 380;
-    const content = Math.min(vw, 440) - 28;
-    return Math.round(Math.min(272, content - 8));
-  }, []);
+  const maxWordLen = Math.max(3, ...game.slotRows.map((r) => r.target.length));
+  const layout = useArenaLayout({
+    slotCount: game.slotRows.length,
+    hasDailyStrip: game.isDaily,
+    maxWordLen,
+  });
 
   const updateSettings = useCallback((s: typeof settings) => {
     setSettings(s);
@@ -90,9 +93,10 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   }, [settings.music, phase]);
 
   const handleExit = useCallback(() => {
+    game.endSession();
     stopMusic();
     navigate(preview ? '/word-forge-preview' : '/games');
-  }, [navigate, preview]);
+  }, [navigate, preview, game]);
 
   const handleReplay = useCallback(() => {
     restoreMusic();
@@ -112,6 +116,20 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     game.advanceOrRetry();
   }, [game, passed, navigate]);
 
+  const handleEndGame = useCallback(() => {
+    game.endSession();
+    stopMusic();
+    navigate('/games');
+  }, [game, navigate]);
+
+  const handleHintPress = useCallback(() => {
+    if (game.hintsLeft <= 0) {
+      setHintRefillOpen(true);
+      return;
+    }
+    game.useHint();
+  }, [game]);
+
   const handleWheelRelease = useCallback((path: number[]) => {
     if (path.length >= PLAYER_MIN_WORD_LEN) {
       void game.submitWord(path);
@@ -121,7 +139,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   }, [game]);
 
   const timeRatio = generation.params.timerSeconds > 0 ? game.timeLeft / generation.params.timerSeconds : 0;
-  const stars = passed ? (timeRatio >= 0.5 ? 3 : timeRatio >= 0.22 ? 2 : 1) : 0;
+  const stars = computeRoundStars(passed, game.slotsFilled, game.minWords, timeRatio);
 
   const topPad = Capacitor.isNativePlatform()
     ? 'max(48px, env(safe-area-inset-top))'
@@ -154,8 +172,8 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         padding: `${topPad} max(14px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left))`,
         maxWidth: 440, margin: '0 auto', overflow: 'hidden',
       }}>
-        {/* ── Top bar: pause · sector · timer · balance ─────────────── */}
-        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+        {/* ── Top bar: pause · sector · timer · level balance ───────── */}
+        <header style={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: layout.compact ? 8 : 10 }}>
           <GlossyIconButton label="Pause game" color="slate" size={46} onClick={game.togglePause}>
             <Pause size={19} strokeWidth={3} />
           </GlossyIconButton>
@@ -198,14 +216,52 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
                 {game.displayBalance}
               </div>
               <div style={{ fontSize: 6.5, fontWeight: 800, letterSpacing: '0.2em', color: 'rgba(255,232,154,0.55)' }}>
-                ARX-P
+                THIS LEVEL
               </div>
             </div>
           </div>
         </header>
 
+        {/* ── Run total — cumulative ARX-P across all levels ─────────── */}
+        <div style={{
+          flexShrink: 0,
+          marginTop: layout.compact ? 6 : 8,
+          padding: layout.compact ? '5px 12px 6px' : '6px 14px 7px',
+          borderRadius: 12,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 10,
+          background: 'linear-gradient(90deg, rgba(255,217,61,0.12), rgba(79,216,235,0.08))',
+          border: '1px solid rgba(255,217,61,0.35)',
+          boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+            <img src={FORGE_UI.arxCoin} alt="" style={{
+              width: layout.compact ? 20 : 22, height: layout.compact ? 20 : 22, objectFit: 'contain',
+              filter: 'drop-shadow(0 0 6px rgba(140,180,255,0.55))',
+            }} />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 7, fontWeight: 900, letterSpacing: '0.2em', color: 'rgba(255,232,154,0.6)' }}>
+                RUN TOTAL
+              </div>
+              <div style={{ fontSize: layout.compact ? 15 : 17, fontWeight: 900, lineHeight: 1.05, color: '#ffd93d' }}>
+                {game.displaySessionTotal} <span style={{ fontSize: 9, opacity: 0.7 }}>ARX-P</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            <div style={{ fontSize: 7, fontWeight: 900, letterSpacing: '0.16em', color: 'rgba(79,216,235,0.55)' }}>
+              LEVEL EARNED
+            </div>
+            <div style={{ fontSize: layout.compact ? 12 : 13, fontWeight: 800, color: 'rgba(220,240,255,0.75)' }}>
+              +{game.displayBalance}
+            </div>
+          </div>
+        </div>
+
         {/* ── Progress + streak ─────────────────────────────────────── */}
-        <div style={{ flexShrink: 0, marginTop: 9 }}>
+        <div style={{ flexShrink: 0, marginTop: layout.compact ? 6 : 9 }}>
           <div style={{
             height: 8, borderRadius: 4, overflow: 'hidden',
             background: 'rgba(4,12,26,0.85)', border: '1px solid rgba(79,216,235,0.2)',
@@ -239,10 +295,18 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
 
         {game.isDaily && <DailyMissionStrip snapshot={game.missionSnapshot} />}
 
-        {/* ── Word slots (image-2 crossword boxes) ──────────────────── */}
+        {/* ── Word slots (scrollable when crowded) ─────────────────── */}
         <div style={{
-          flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          marginTop: 6,
+          flex: 1,
+          minHeight: 0,
+          maxHeight: layout.slotsMaxH,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginTop: layout.compact ? 4 : 6,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
           animation: !reduced && game.shakeWord ? 'wf-shake 0.35s ease' : undefined,
         }}>
           <WordSlots
@@ -251,12 +315,16 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             skin={game.skin}
             hintWord={game.hintReveal?.word ?? null}
             celebrateWord={game.celebrateWord}
+            boxSize={layout.boxSize}
+            rowGap={layout.slotGap}
           />
         </div>
 
         {/* ── Current word trace ────────────────────────────────────── */}
         <div style={{
-          flexShrink: 0, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
+          flexShrink: 0,
+          height: layout.compact ? 36 : 44,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
         }}>
           {game.selection.length === 0 ? (
             <span style={{
@@ -292,7 +360,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             tiles={game.tiles}
             selection={game.selection}
             skin={game.skin}
-            size={wheelSize}
+            size={layout.wheelSize}
             hintReveal={game.hintReveal}
             shuffleAnim={game.shuffleAnim}
             onStart={game.beginSelection}
@@ -300,13 +368,14 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
             onRelease={handleWheelRelease}
           />
           <div style={{
-            display: 'flex', justifyContent: 'center', gap: 14, marginTop: 10,
+            display: 'flex', justifyContent: 'center', gap: layout.compact ? 10 : 14,
+            marginTop: layout.compact ? 6 : 10,
           }}>
             <GlossyIconButton
               label="Use hint" caption="Hint" color="gold" size={46}
               badge={game.hintsLeft}
-              disabled={game.hintsLeft <= 0 || phase !== 'playing'}
-              onClick={game.useHint}
+              disabled={phase !== 'playing'}
+              onClick={handleHintPress}
             >
               <Lightbulb size={20} strokeWidth={2.8} />
             </GlossyIconButton>
@@ -408,6 +477,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         wordsFormed={game.slotsFilled}
         wordsRequired={game.minWords}
         balance={game.displayBalance}
+        sessionTotal={game.displaySessionTotal}
         stars={stars}
         newBest={game.newBest}
         isDaily={game.isDaily}
@@ -415,6 +485,17 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         dailyBonus={game.dailyBonusAwarded ? DAILY_BONUS_PAYOUT : 0}
         onReplay={handleReplay}
         onContinue={handleRoundContinue}
+        onEndGame={!passed ? handleEndGame : undefined}
+      />
+
+      <HintRefillModal
+        open={hintRefillOpen}
+        preview={preview}
+        onClose={() => setHintRefillOpen(false)}
+        onClaim={(reward, claimKey) => {
+          game.claimHintTask(reward, claimKey);
+          setHintRefillOpen(false);
+        }}
       />
 
       <ForgeFaqModal open={faqOpen} onClose={() => setFaqOpen(false)} />
