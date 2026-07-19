@@ -16,16 +16,19 @@ interface LevelCompleteModalProps {
   isDaily?: boolean;
   completionistBonus?: number;
   dailyBonus?: number;
+  sessionTotal?: number;
   onReplay: () => void;
   onContinue: () => void;
+  onEndGame?: () => void;
 }
 
 /** Image-4 style result card: ribbon, star rating, score, replay/next */
 export function LevelCompleteModal({
   open, passed, level, wordsFormed, wordsRequired, balance, stars, newBest,
-  isDaily, completionistBonus = 0, dailyBonus = 0, onReplay, onContinue,
+  isDaily, completionistBonus = 0, dailyBonus = 0, sessionTotal = 0,
+  onReplay, onContinue, onEndGame,
 }: LevelCompleteModalProps) {
-  const totalEarn = balance + completionistBonus + (passed && isDaily ? dailyBonus : 0);
+  const totalEarn = sessionTotal > 0 ? sessionTotal : balance + completionistBonus + (passed && isDaily ? dailyBonus : 0);
   const heading = isDaily ? 'Daily Challenge' : `Level ${level}`;
   const continueLabel = isDaily
     ? (passed ? 'Hub' : 'Retry')
@@ -46,7 +49,7 @@ export function LevelCompleteModal({
           }}
         >
           {/* Rotating celebration rays behind the card */}
-          {passed && (
+          {(passed || stars > 0) && (
             <div style={{
               position: 'absolute', width: 620, height: 620, borderRadius: '50%',
               background: 'conic-gradient(from 0deg, rgba(255,217,61,0.14) 0deg, transparent 24deg, rgba(255,217,61,0.14) 48deg, transparent 72deg, rgba(255,217,61,0.14) 96deg, transparent 120deg, rgba(255,217,61,0.14) 144deg, transparent 168deg, rgba(255,217,61,0.14) 192deg, transparent 216deg, rgba(255,217,61,0.14) 240deg, transparent 264deg, rgba(255,217,61,0.14) 288deg, transparent 312deg, rgba(255,217,61,0.14) 336deg, transparent 360deg)',
@@ -97,7 +100,7 @@ export function LevelCompleteModal({
               {/* Star rating */}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, margin: '14px 0 4px' }}>
                 {[1, 2, 3].map((s) => {
-                  const earned = passed && stars >= s;
+                  const earned = stars >= s;
                   const mid = s === 2;
                   const dim = mid ? 54 : 42;
                   return (
@@ -145,7 +148,7 @@ export function LevelCompleteModal({
                   }} />
                   <div style={{ textAlign: 'left' }}>
                     <div style={{ fontSize: 8.5, fontWeight: 900, letterSpacing: '0.2em', color: 'rgba(255,232,154,0.6)' }}>
-                      SESSION EARNINGS
+                      {sessionTotal > balance ? 'RUN TOTAL' : 'SESSION EARNINGS'}
                     </div>
                     <div style={{ fontSize: 26, fontWeight: 900, color: '#ffd93d', lineHeight: 1.05, textShadow: '0 0 16px rgba(255,217,61,0.45)' }}>
                       +{totalEarn} <span style={{ fontSize: 11, opacity: 0.7 }}>ARX-P</span>
@@ -160,7 +163,12 @@ export function LevelCompleteModal({
                   <span>{wordsFormed}/{wordsRequired} words</span>
                   {completionistBonus > 0 && <span style={{ color: '#7FE7C4' }}>+{completionistBonus} completionist</span>}
                   {passed && isDaily && dailyBonus > 0 && <span style={{ color: '#ffd93d' }}>+{dailyBonus} milestone</span>}
-                  {passed && isDaily && dailyBonus === 0 && <span style={{ color: 'rgba(200,230,255,0.45)' }}>Milestone missed</span>}
+                  {!passed && stars > 0 && (
+                    <span style={{ color: '#ffd93d' }}>{stars}★ effort bonus</span>
+                  )}
+                  {passed && isDaily && dailyBonus === 0 && (
+                    <span style={{ color: 'rgba(200,230,255,0.45)' }}>Milestone missed</span>
+                  )}
                 </div>
               </motion.div>
 
@@ -169,13 +177,23 @@ export function LevelCompleteModal({
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.74 }}
-                style={{ display: 'grid', gridTemplateColumns: passed && !isDaily ? '1fr 1.4fr' : '1fr', gap: 10, marginTop: 16 }}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: !passed && onEndGame ? '1fr 1fr' : passed && !isDaily ? '1fr 1.4fr' : '1fr',
+                  gap: 10,
+                  marginTop: 16,
+                }}
               >
                 {passed && !isDaily && (
                   <GlossyButton color="cyan" size="lg" onClick={onReplay}>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                       <RotateCcw size={15} strokeWidth={3} /> Replay
                     </span>
+                  </GlossyButton>
+                )}
+                {!passed && onEndGame && (
+                  <GlossyButton color="slate" size="lg" onClick={onEndGame}>
+                    End game
                   </GlossyButton>
                 )}
                 <GlossyButton color={passed ? 'green' : 'gold'} size="lg" onClick={onContinue}>

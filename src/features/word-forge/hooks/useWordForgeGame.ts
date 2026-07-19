@@ -22,6 +22,12 @@ import { validateWordLocal, reasonMessage } from '../engine/wordValidator';
 import { validateAndCreditWord } from '../engine/wordValidatorServer';
 import { mulberry32, shuffle as shuffleArr } from '../engine/seedHash';
 import { loadForgeProgress, saveForgeProgress } from './useForgeProgress';
+import { buildHintClaimsPatch } from '../engine/hintTasks';
+import {
+  clearForgeSessionTotal,
+  loadForgeSessionTotal,
+  saveForgeSessionTotal,
+} from './useForgeSessionTotal';
 import { clampCampaignLevel, isSectorUnlocked } from '../engine/sectorProgress';
 import { loadForgeSettings } from './useForgeSettings';
 import { useForgeCloudSync } from './useForgeCloudSync';
@@ -78,6 +84,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   );
   const [balance, setBalance] = useState(0);
   const [displayBalance, setDisplayBalance] = useState(0);
+  const [sessionTotal, setSessionTotal] = useState(() => loadForgeSessionTotal());
+  const [displaySessionTotal, setDisplaySessionTotal] = useState(() => loadForgeSessionTotal());
   const [foundWords, setFoundWords] = useState<FoundWord[]>([]);
   const [selection, setSelection] = useState<number[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -175,8 +183,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     setPhase('ended');
     playLevelFail();
     duckMusic();
-    persistMeta({ sessionHigh: Math.max(loadForgeProgress(preview).sessionHigh, balance) });
-  }, [roundEnded, balance, persistMeta, preview]);
+    persistMeta({ sessionHigh: Math.max(loadForgeProgress(preview).sessionHigh, sessionTotal, balance) });
+  }, [roundEnded, balance, sessionTotal, persistMeta, preview]);
 
   const { timeLeft, reset: resetTimer } = useRoundTimer({
     totalSeconds: generation.params.timerSeconds,
@@ -233,6 +241,12 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     if (delta === 0) return;
     setBalance((prev) => Math.max(0, prev + delta));
     setDisplayBalance((prev) => Math.max(0, prev + delta));
+    setSessionTotal((prev) => {
+      const next = Math.max(0, prev + delta);
+      saveForgeSessionTotal(next);
+      return next;
+    });
+    setDisplaySessionTotal((prev) => Math.max(0, prev + delta));
   }, []);
 
   const creditProfilePoints = useCallback(async (amount: number) => {
@@ -328,10 +342,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       if (server.credited === true) {
         void refreshPoints();
       } else {
-        const synced = await creditProfilePoints(credited);
-        if (!synced) {
-          showToast('Word saved — profile points syncing shortly');
-        }
+        void creditProfilePoints(credited);
       }
     }
 
@@ -465,6 +476,34 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     resetTimer(generation.params.timerSeconds);
   }, [persistMeta, resetTimer, generation.params.timerSeconds]);
 
+  const grantHints = useCallback((amount: number) => {
+    if (amount <= 0) return;
+    setHintsLeft((prev) => {
+      const next = Math.min(10, prev + amount);
+      persistMeta({ hintsLeft: next });
+      return next;
+    });
+    showToast(`+${amount} hint${amount > 1 ? 's' : ''} unlocked`, 1600);
+  }, [persistMeta, showToast]);
+
+  const claimHintTask = useCallback((reward: number, claimKey: string) => {
+    const prog = loadForgeProgress(preview);
+    persistMeta({ hintTaskClaims: buildHintClaimsPatch(prog.hintTaskClaims, claimKey) });
+    grantHints(reward);
+  }, [grantHints, persistMeta, preview]);
+
+  const finalizeSession = useCallback(() => {
+    const prog = loadForgeProgress(preview);
+    const runTotal = Math.max(sessionTotal, balance);
+    persistMeta({ sessionHigh: Math.max(prog.sessionHigh, runTotal) });
+    clearForgeSessionTotal();
+  }, [balance, persistMeta, preview, sessionTotal]);
+
+  const endSession = useCallback(() => {
+    finalizeSession();
+    restoreMusic();
+  }, [finalizeSession]);
+
   const togglePause = useCallback(() => {
     setPhase((p) => (p === 'playing' ? 'paused' : p === 'paused' ? 'playing' : p));
   }, []);
@@ -481,7 +520,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       const unlockedSkins = Math.min(5, Math.floor(next / 5) + 1);
       persistMeta({
         bestLevel: Math.max(prog.bestLevel, next),
-        sessionHigh: Math.max(prog.sessionHigh, balance),
+        sessionHigh: Math.max(prog.sessionHigh, sessionTotal, balance),
         currentLevel: next,
         hintsLeft: 3,
         shufflesLeft: 2,
@@ -492,13 +531,13 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       resetRound(next, true);
     } else {
       persistMeta({
-        sessionHigh: Math.max(prog.sessionHigh, balance),
+        sessionHigh: Math.max(prog.sessionHigh, sessionTotal, balance),
         hintsLeft: Math.min(3, hintsLeft + 1),
       });
       setHintsLeft((h) => Math.min(3, h + 1));
       resetRound(level, true);
     }
-  }, [slots.filledCount, generation.slotWords, level, balance, resetRound, persistMeta, preview, hintsLeft, isDaily]);
+  }, [slots.filledCount, generation.slotWords, level, balance, sessionTotal, resetRound, persistMeta, preview, hintsLeft, isDaily]);
 
   const unlockedSkinCount = loadForgeProgress(preview).unlockedSkins;
   const displayLevel = isDaily ? 'DAILY' : level;
@@ -524,6 +563,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     timeLeft,
     balance,
     displayBalance,
+    sessionTotal,
+    displaySessionTotal,
     foundWords,
     selection,
     currentWord,
@@ -564,6 +605,9 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     completeTutorial,
     togglePause,
     resetRound,
+    grantHints,
+    claimHintTask,
+    endSession,
     validCount: foundWords.filter((w) => !w.rejected).length,
     missionSnapshot,
     dailyMission: isDaily ? getDailyMission() : null,
