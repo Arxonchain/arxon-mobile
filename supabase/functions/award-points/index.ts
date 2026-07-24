@@ -64,7 +64,7 @@ Deno.serve(async (req) => {
     }
 
     // Validate type
-    if (!['mining', 'task', 'social', 'game'].includes(type)) {
+    if (!['mining', 'task', 'social', 'referral', 'game'].includes(type)) {
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid point type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

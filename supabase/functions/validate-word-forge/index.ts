@@ -5,13 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const BONUS = new Set([
-  'ARX','ARXP','HODL','FOMO','BULLISH','BEARISH','WHALE','NODE','LEDGER','WALLET','MINER','STAKE','YIELD',
-  'TOKEN','CHAIN','BLOCK','HASH','MINT','BURN','SWAP','POOL','FARM','APE','REKT','MOON','PUMP','DUMP','DIP',
-  'RUG','GAS','DEFI','DEX','CEX','KYC','DAO','NFT','LAYER','BRIDGE','VAULT','ORACLE','ALPHA','BETA','TGE',
-  'AIRDROP','LAMBO','NGMI','WAGMI','DYOR','SAFU',
-])
-
 function canForm(word: string, pool: string[]): boolean {
   const counts = new Map<string, number>()
   for (const l of pool) counts.set(l, (counts.get(l) ?? 0) + 1)
@@ -45,6 +38,7 @@ Deno.serve(async (req) => {
     const word = String(body.word ?? '').toUpperCase().trim()
     const poolLetters: string[] = (body.pool_letters ?? []).map((l: string) => l.toUpperCase())
     const claimed: string[] = body.claimed_words ?? []
+    const attemptId = String(body.attempt_id ?? 'default')
     const clientPayout = Math.min(Math.max(Math.ceil(Number(body.payout) || 0), 0), 500)
 
     if (word.length < 3) {
@@ -57,19 +51,39 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, reason: 'pool' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    // Bonus words always accepted; regular words require dictionary row or cached validation
-    const { data: dictRow } = await supabase
-      .from('word_forge_dictionary')
-      .select('word')
+    // Idempotency — already credited this word in this attempt
+    const { data: existingCredit } = await supabase
+      .from('word_forge_word_credits')
+      .select('payout')
+      .eq('user_id', user.id)
+      .eq('attempt_id', attemptId)
       .eq('word', word)
       .maybeSingle()
 
-    const isBonus = BONUS.has(word)
-    if (!isBonus && !dictRow) {
-      return new Response(JSON.stringify({ ok: false, reason: 'unknown' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    if (existingCredit) {
+      const { data: currentPoints } = await supabase
+        .from('user_points')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      return new Response(JSON.stringify({
+        ok: true,
+        payout: Number(existingCredit.payout),
+        credited: true,
+        userPoints: currentPoints,
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
-    const payout = clientPayout > 0 ? clientPayout : (isBonus ? 40 : 10)
+    const payout = clientPayout > 0 ? clientPayout : 10
+
+    const { error: insertErr } = await supabase
+      .from('word_forge_word_credits')
+      .insert({ user_id: user.id, attempt_id: attemptId, word, payout })
+
+    if (insertErr && insertErr.code !== '23505') {
+      return new Response(JSON.stringify({ ok: false, error: insertErr.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
 
     const { data: result, error: pointsError } = await supabase.rpc('increment_user_points', {
       p_user_id: user.id,
@@ -78,6 +92,13 @@ Deno.serve(async (req) => {
     })
 
     if (pointsError) {
+      await supabase
+        .from('word_forge_word_credits')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('attempt_id', attemptId)
+        .eq('word', word)
+
       return new Response(JSON.stringify({ ok: false, error: pointsError.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
