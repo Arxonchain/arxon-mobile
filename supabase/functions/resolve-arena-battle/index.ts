@@ -23,7 +23,38 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const authHeader = req.headers.get("authorization") ?? "";
+    const token = authHeader.replace("Bearer ", "");
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const isServiceRole = token === supabaseServiceKey;
+    let isAdmin = false;
+    if (!isServiceRole) {
+      if (!token) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+      if (authErr || !user) {
+        return new Response(JSON.stringify({ error: "Unauthorized" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data: roleRow } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", user.id)
+        .eq("role", "admin")
+        .maybeSingle();
+      isAdmin = !!roleRow;
+      if (!isAdmin) {
+        return new Response(JSON.stringify({ error: "Admin access required" }), {
+          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+    }
 
     const body = await req.json().catch(() => ({}));
     const manualWinner = body.winner_side;
@@ -89,6 +120,8 @@ serve(async (req) => {
         } else {
           if (sideAPower > sideBPower) winnerSide = "a";
           else if (sideBPower > sideAPower) winnerSide = "b";
+          else if (sideAPower === sideBPower && sideAPower > 0 && hasSideC) winnerSide = "c";
+          else if (sideAPower === sideBPower && sideAPower > 0) winnerSide = "none";
           else if (sideAPower > 0) winnerSide = "a";
         }
 
@@ -113,7 +146,7 @@ serve(async (req) => {
         const votes = allVotes || [];
         console.log(`Total votes: ${votes.length}`);
 
-        if (winnerSide && votes.length > 0) {
+        if (winnerSide && winnerSide !== "none" && votes.length > 0) {
           // DEDUP: Check if rewards already exist
           const { count: existingRewards } = await supabase
             .from("arena_earnings")
@@ -153,7 +186,6 @@ serve(async (req) => {
 
           // ─── DISTRIBUTE REWARDS TO WINNERS ───
           for (const { vote, weight } of winnerWeights) {
-            try {
               // Get win streak
               const { data: memberData } = await supabase
                 .from("arena_members")
@@ -164,42 +196,32 @@ serve(async (req) => {
               const currentStreak = (memberData?.current_win_streak || 0) + 1;
               const bestStreak = Math.max(currentStreak, memberData?.best_win_streak || 0);
 
-              // Streak bonus % (applied to NET PROFIT only)
               let streakBonusPercent = 0;
               if (currentStreak >= 10) streakBonusPercent = 100;
               else if (currentStreak >= 5) streakBonusPercent = 50;
               else if (currentStreak >= 3) streakBonusPercent = 25;
 
-              // Base reward = proportional share of TOTAL_POOL
               const baseReward = totalWeight > 0 ? (weight / totalWeight) * TOTAL_POOL : 0;
-
-              // Net profit = base reward minus original stake (can be 0 if pool is tiny)
               const netProfit = Math.max(0, baseReward - vote.power_spent);
-
-              // Streak bonus applies ONLY to net profit
               const streakBonus = Math.floor(netProfit * (streakBonusPercent / 100));
 
               let totalReward = Math.floor(baseReward + streakBonus);
 
-              // ─── HARD CAP: never exceed remaining pool ───
               const remainingPool = TOTAL_POOL - totalRewardsDistributed;
               if (totalReward > remainingPool) totalReward = Math.floor(remainingPool);
               if (totalReward < 0) totalReward = 0;
               totalRewardsDistributed += totalReward;
 
-              console.log(`Winner ${vote.user_id}: Stake=${vote.power_spent}, Base=${Math.floor(baseReward)}, NetProfit=${Math.floor(netProfit)}, StreakBonus=${streakBonus}, Total=${totalReward}`);
-
-              // Update member stats
               if (memberData) {
-                await supabase.from("arena_members").update({
+                const { error: memberErr } = await supabase.from("arena_members").update({
                   current_win_streak: currentStreak,
                   best_win_streak: bestStreak,
                   total_wins: (memberData.total_wins || 0) + 1,
                 }).eq("user_id", vote.user_id);
+                if (memberErr) throw new Error(`Member update failed: ${memberErr.message}`);
               }
 
-              // Record staking reward
-              await supabase.from("arena_staking_rewards").insert({
+              const { error: stakeErr } = await supabase.from("arena_staking_rewards").insert({
                 battle_id: battle.id,
                 user_id: vote.user_id,
                 original_stake: vote.power_spent,
@@ -209,9 +231,9 @@ serve(async (req) => {
                 total_reward: totalReward,
                 is_winner: true,
               });
+              if (stakeErr) throw new Error(`Staking reward insert failed: ${stakeErr.message}`);
 
-              // Record earnings
-              await supabase.from("arena_earnings").insert({
+              const { error: earnErr } = await supabase.from("arena_earnings").insert({
                 battle_id: battle.id,
                 user_id: vote.user_id,
                 stake_amount: vote.power_spent,
@@ -221,20 +243,20 @@ serve(async (req) => {
                 total_earned: totalReward,
                 is_winner: true,
               });
+              if (earnErr) throw new Error(`Earnings insert failed: ${earnErr.message}`);
 
-              // Credit points (500 cap per RPC call)
               let remainingReward = totalReward;
               while (remainingReward > 0) {
                 const increment = Math.min(remainingReward, 500);
-                await supabase.rpc("increment_user_points", {
+                const { error: rpcErr } = await supabase.rpc("increment_user_points", {
                   p_user_id: vote.user_id,
                   p_amount: increment,
-                  p_type: "mining",
+                  p_type: "arena",
                 });
-                remainingReward -= 500;
+                if (rpcErr) throw new Error(`Points credit failed: ${rpcErr.message}`);
+                remainingReward -= increment;
               }
 
-              // Award winner badge
               const streakText = currentStreak >= 3 ? ` 🔥 ${currentStreak}-Win Streak!` : "";
               await supabase.from("user_badges").insert({
                 user_id: vote.user_id,
@@ -244,7 +266,6 @@ serve(async (req) => {
                 battle_id: battle.id,
               });
 
-              // Extended boost (7 days)
               const boostExpiry = new Date();
               boostExpiry.setDate(boostExpiry.getDate() + 7);
               await supabase.from("arena_boosts").upsert({
@@ -253,10 +274,6 @@ serve(async (req) => {
                 boost_percentage: 25,
                 expires_at: boostExpiry.toISOString(),
               });
-
-            } catch (winnerErr) {
-              console.error(`Error processing winner ${vote.user_id}:`, winnerErr);
-            }
           }
 
           // Process losers

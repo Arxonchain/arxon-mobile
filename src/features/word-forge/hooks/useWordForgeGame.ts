@@ -3,6 +3,7 @@ import { Capacitor } from '@capacitor/core';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
+import { supabase } from '@/integrations/supabase/client';
 import {
   playBonus, playClear, playCoinCredit, playError, playHint, playLevelFail, playLevelWin,
   playShuffle, playStreak, playSubmit, playTap, duckMusic, restoreMusic,
@@ -72,7 +73,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   const { preview = false, mode = 'campaign' } = options;
   const isDaily = mode === 'daily';
   const { user } = useAuth();
-  const { addPoints, triggerConfetti, refreshPoints } = usePoints();
+  const { triggerConfetti, refreshPoints } = usePoints();
   const { push: pushCloud } = useForgeCloudSync(preview);
 
   const saved = useMemo(() => loadForgeProgress(preview), [preview]);
@@ -249,11 +250,6 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     setDisplaySessionTotal((prev) => Math.max(0, prev + delta));
   }, []);
 
-  const creditProfilePoints = useCallback(async (amount: number) => {
-    if (preview || amount <= 0) return true;
-    const result = await addPoints(amount, 'game');
-    return result.success;
-  }, [addPoints, preview]);
 
   const submitWord = useCallback(async (pathOverride?: number[]) => {
     const path = pathOverride ?? selection;
@@ -355,8 +351,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     if (!preview) {
       if (server.credited === true) {
         void refreshPoints();
-      } else {
-        void creditProfilePoints(credited);
+      } else if (server.syncPending) {
+        showToast('Word saved — syncing ARX-P when online', 2200);
       }
     }
 
@@ -394,7 +390,15 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
         const missionMet = dailyMissionBonusEligible(getDailyMission(), missionSnap);
         if (missionMet) {
           setDailyBonusAwarded(true);
-          void creditProfilePoints(DAILY_BONUS_PAYOUT);
+          void supabase.functions.invoke('complete-word-forge-daily', {
+            body: {
+              completion_date: dailySeed(),
+              mission_met: true,
+              daily_streak: prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1,
+            },
+          }).then(({ data, error }) => {
+            if (!error && data?.ok) void refreshPoints();
+          });
         }
         const yesterday = dailySeed(new Date(Date.now() - 86_400_000));
         const nextDailyStreak = prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1;
@@ -402,7 +406,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       }
     }
     submittingRef.current = false;
-  }, [phase, selection, submitMinLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, addToSessionBalance, creditProfilePoints, refreshPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
+  }, [phase, selection, submitMinLen, tiles, streak, spawnCoinFly, isDaily, level, attemptId, addToSessionBalance, refreshPoints, persistMeta, preview, foundWords, roundEnded, generation.formableCount, generation.slotWords, schedule, showToast, triggerConfetti, hintsLeft, timeLeft]);
 
   const appendTile = useCallback((index: number) => {
     if (phase !== 'playing') return;
@@ -491,11 +495,27 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     showToast(`+${amount} hint${amount > 1 ? 's' : ''} unlocked`, 1600);
   }, [persistMeta, showToast]);
 
-  const claimHintTask = useCallback((reward: number, claimKey: string) => {
-    const prog = loadForgeProgress(preview);
-    persistMeta({ hintTaskClaims: buildHintClaimsPatch(prog.hintTaskClaims, claimKey) });
-    grantHints(reward);
-  }, [grantHints, persistMeta, preview]);
+  const claimHintTask = useCallback((reward: number, claimKey: string, taskId: string) => {
+    if (preview) {
+      grantHints(reward);
+      return;
+    }
+    void supabase.functions.invoke('claim-word-forge-hint', {
+      body: { claim_key: claimKey, reward, task_id: taskId },
+    }).then(({ data, error }) => {
+      if (error || !data?.ok) {
+        showToast('Could not claim hint — try again', 1800);
+        return;
+      }
+      const prog = loadForgeProgress(false);
+      persistMeta({
+        hintTaskClaims: buildHintClaimsPatch(prog.hintTaskClaims, claimKey),
+        hintsLeft: data.hintsLeft ?? prog.hintsLeft + reward,
+      });
+      setHintsLeft(data.hintsLeft ?? Math.min(10, hintsLeft + reward));
+      showToast(`+${reward} hint${reward > 1 ? 's' : ''} unlocked`, 1600);
+    });
+  }, [grantHints, persistMeta, preview, showToast, hintsLeft]);
 
   const finalizeSession = useCallback(() => {
     const prog = loadForgeProgress(preview);
@@ -531,6 +551,18 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
         shufflesLeft: 2,
         unlockedSkins,
       });
+      if (!preview) {
+        void supabase.functions.invoke('sync-word-forge-progress', {
+          body: {
+            best_level: Math.max(prog.bestLevel, next),
+            current_level: next,
+            session_high: Math.max(prog.sessionHigh, sessionTotal, balance),
+            hints_left: 3,
+            shuffles_left: 2,
+            unlocked_skins: unlockedSkins,
+          },
+        });
+      }
       setHintsLeft(3);
       setShufflesLeft(2);
       resetRound(next, true);

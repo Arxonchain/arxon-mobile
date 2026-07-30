@@ -15,7 +15,7 @@ import { DailyMilestoneCard } from '@/features/word-forge/components/DailyMilest
 const INTRO_STEPS = [
   { n: '1', title: 'Swipe the wheel', body: 'Drag across letters on the forge disc to spell words.' },
   { n: '2', title: 'Fill the slots', body: 'Match words to the sector grid before the timer hits zero.' },
-  { n: '3', title: 'Stack ARX-P', body: 'Longer words, streaks, and bonus terms pay more points.' },
+  { n: '3', title: 'Stack ARX-P', body: 'Fill slot words before time runs out — streaks and long words pay more.' },
 ];
 
 export default function GamingHubPage() {

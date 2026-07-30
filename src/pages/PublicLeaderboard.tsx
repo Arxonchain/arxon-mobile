@@ -1,10 +1,12 @@
 import { memo } from "react";
+import { Link } from "react-router-dom";
 import { Clock, Zap, Trophy, TrendingUp, LogIn } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { useLeaderboard } from "@/hooks/useLeaderboard";
 import { usePoints } from "@/hooks/usePoints";
 import { useAuth } from "@/contexts/AuthContext";
+import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 import Header from "@/components/layout/Header";
 import AnimatedBackground from "@/components/layout/AnimatedBackground";
 
@@ -76,6 +78,11 @@ const PublicLeaderboard = () => {
       <main className="relative z-10 p-3 sm:p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
         <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
           <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">Mining Leaderboard</h1>
+          {WORD_FORGE_ENABLED && (
+            <p className="text-sm text-muted-foreground">
+              Word Forge ranks: <Link to="/word-forge/leaderboard" className="text-accent underline">Top Forgers</Link>
+            </p>
+          )}
 
           {/* User's own rank card - visible for logged-in users */}
           {user && points && (

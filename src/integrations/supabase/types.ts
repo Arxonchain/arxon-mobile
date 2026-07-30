@@ -1084,8 +1084,10 @@ export type Database = {
       }
       user_points: {
         Row: {
+          arena_points: number
           created_at: string
           daily_streak: number
+          game_points: number
           id: string
           last_checkin_date: string | null
           mining_points: number
@@ -1099,8 +1101,10 @@ export type Database = {
           x_post_boost_percentage: number
         }
         Insert: {
+          arena_points?: number
           created_at?: string
           daily_streak?: number
+          game_points?: number
           id?: string
           last_checkin_date?: string | null
           mining_points?: number
@@ -1114,8 +1118,10 @@ export type Database = {
           x_post_boost_percentage?: number
         }
         Update: {
+          arena_points?: number
           created_at?: string
           daily_streak?: number
+          game_points?: number
           id?: string
           last_checkin_date?: string | null
           mining_points?: number
@@ -1127,6 +1133,72 @@ export type Database = {
           updated_at?: string
           user_id?: string
           x_post_boost_percentage?: number
+        }
+        Relationships: []
+      }
+      word_forge_progress: {
+        Row: {
+          best_level: number
+          best_streak: number
+          current_level: number
+          daily_completed_date: string | null
+          daily_streak: number
+          hint_task_claims: Json
+          hints_left: number
+          longest_word: string
+          session_high: number
+          shuffles_left: number
+          total_words: number
+          tutorial_completed: boolean
+          unlocked_skins: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          best_level?: number
+          best_streak?: number
+          current_level?: number
+          daily_completed_date?: string | null
+          daily_streak?: number
+          hint_task_claims?: Json
+          hints_left?: number
+          longest_word?: string
+          session_high?: number
+          shuffles_left?: number
+          total_words?: number
+          tutorial_completed?: boolean
+          unlocked_skins?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          best_level?: number
+          best_streak?: number
+          current_level?: number
+          daily_completed_date?: string | null
+          daily_streak?: number
+          hint_task_claims?: Json
+          hints_left?: number
+          longest_word?: string
+          session_high?: number
+          shuffles_left?: number
+          total_words?: number
+          tutorial_completed?: boolean
+          unlocked_skins?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      word_forge_leaderboard: {
+        Row: {
+          avatar_url: string | null
+          best_level: number
+          best_streak: number
+          rank: number
+          total_words: number
+          user_id: string
+          username: string | null
         }
         Relationships: []
       }
@@ -1448,6 +1520,21 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      cast_arena_vote: {
+        Args: { p_amount: number; p_battle_id: string; p_side: string }
+        Returns: Database['public']['Tables']['arena_votes']['Row']
+      }
+      sync_word_forge_consumables: {
+        Args: {
+          p_daily_completed_date?: string | null
+          p_daily_streak?: number | null
+          p_hints_left?: number | null
+          p_shuffles_left?: number | null
+          p_tutorial_completed?: boolean | null
+          p_unlocked_skins?: number | null
+        }
+        Returns: Database['public']['Tables']['word_forge_progress']['Row']
       }
       increment_user_points: {
         Args: { p_amount: number; p_type: string; p_user_id: string }

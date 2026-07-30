@@ -95,11 +95,12 @@ export const useArenaMarkets = () => {
     try {
       const now = new Date().toISOString();
       
-      // Fetch all battles
+      // Fetch battles (paginate ended to reduce payload)
       const { data: allMarkets, error } = await supabase
         .from('arena_battles')
         .select('*')
-        .order('ends_at', { ascending: true });
+        .order('ends_at', { ascending: false })
+        .limit(200);
 
       if (error) throw error;
 
@@ -299,48 +300,37 @@ export const useArenaMarkets = () => {
     };
   }, []);
 
-  // Place a vote on a market
+  // Place a vote on a market (atomic server RPC)
   const placeVote = async (marketId: string, side: 'a' | 'b' | 'c', amount: number): Promise<boolean> => {
-    console.log('[Arena placeVote] START', { marketId, side, amount, userId: user?.id });
-    
     if (!user) {
-      console.log('[Arena placeVote] FAIL: no user');
       toast.error('Please sign in to cast your vote');
       return false;
     }
 
-    // Look in all market arrays - client state can be stale
     const market = liveMarkets.find(m => m.id === marketId)
       || upcomingMarkets.find(m => m.id === marketId)
       || endedMarkets.find(m => m.id === marketId);
 
     if (!market) {
-      console.log('[Arena placeVote] FAIL: market not found in any array', { 
-        liveCount: liveMarkets.length, upcomingCount: upcomingMarkets.length, endedCount: endedMarkets.length 
-      });
       toast.error('This market is not available for voting');
       return false;
     }
 
-    // Check timing based on real clock, not stale categorization
     const now = new Date();
     const startsAt = new Date(market.starts_at);
     const endsAt = new Date(market.ends_at);
 
     if (startsAt > now) {
-      console.log('[Arena placeVote] FAIL: not started yet', { startsAt: startsAt.toISOString(), now: now.toISOString() });
       toast.error('Voting has not started yet. Please wait until the market goes live.');
       return false;
     }
 
     if (endsAt < now || market.winner_side) {
-      console.log('[Arena placeVote] FAIL: market ended', { endsAt: endsAt.toISOString(), winner: market.winner_side });
       toast.error('This market has ended. Voting is closed.');
       return false;
     }
 
     if (!points || points.total_points < amount) {
-      console.log('[Arena placeVote] FAIL: insufficient points', { available: points?.total_points, needed: amount });
       toast.error(`Insufficient ARX-P points (have ${points?.total_points || 0}, need ${amount})`);
       return false;
     }
@@ -355,9 +345,7 @@ export const useArenaMarkets = () => {
       return false;
     }
 
-    // Check if user already has a position in this market
     if (userPositions.has(marketId)) {
-      console.log('[Arena placeVote] FAIL: already voted on this market');
       toast.error('You already voted on this prediction');
       return false;
     }
@@ -365,37 +353,24 @@ export const useArenaMarkets = () => {
     setVoting(true);
 
     try {
-      console.log('[Arena] Placing vote:', { marketId, side, amount, userId: user.id });
-      
-      const { data: voteData, error: voteError } = await supabase
-        .from('arena_votes')
-        .insert({
-          battle_id: marketId,
-          user_id: user.id,
-          side,
-          power_spent: amount,
-        })
-        .select()
-        .single();
+      const { error: voteError } = await supabase.rpc('cast_arena_vote', {
+        p_battle_id: marketId,
+        p_side: side,
+        p_amount: amount,
+      });
 
-      if (voteError) {
-        console.error('[Arena] Vote insert failed:', voteError);
-        throw voteError;
-      }
+      if (voteError) throw voteError;
 
-      console.log('[Arena] Vote inserted successfully:', voteData);
       toast.success('Vote cast successfully! +25% mining boost activated 🚀');
-      
-      // Refresh data
+
       await Promise.all([
         fetchMarkets(),
         fetchUserPositions(),
       ]);
 
       return true;
-    } catch (error: any) {
-      console.error('[Arena] Error casting vote:', error);
-      const msg = error?.message || error?.details || 'Failed to cast vote';
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : 'Failed to cast vote';
       toast.error(msg);
       return false;
     } finally {
@@ -434,8 +409,8 @@ export const useArenaMarkets = () => {
       }
     };
 
-    // Check every second for precise transitions
-    const interval = setInterval(checkMarketTransitions, 1000);
+    // Check every 15s for upcoming → live transitions (realtime handles most updates)
+    const interval = setInterval(checkMarketTransitions, 15000);
     
     return () => clearInterval(interval);
   }, [upcomingMarkets, fetchMarkets]);

@@ -158,7 +158,6 @@ const FingerprintScanner = ({
       setIsHolding(false);
       setTimeout(() => {
         // Use the ref to always call the LATEST callback, not a stale closure
-        console.log('[Fingerprint] Calling onVerified callback');
         onVerifiedRef.current(currentHash);
       }, 500);
     }, HOLD_DURATION);

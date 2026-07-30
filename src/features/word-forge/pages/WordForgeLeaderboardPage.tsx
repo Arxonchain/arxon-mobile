@@ -40,7 +40,7 @@ export default function WordForgeLeaderboardPage() {
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
-        .from('word_forge_leaderboard' as 'profiles')
+        .from('word_forge_leaderboard')
         .select('user_id, username, avatar_url, best_level, total_words, best_streak, rank')
         .order('rank', { ascending: true })
         .limit(50);
