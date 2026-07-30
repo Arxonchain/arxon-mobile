@@ -16,6 +16,7 @@ import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
 import { COMMUNITY_LINKS, DISCORD_ICON_PATH } from '@/lib/communityLinks';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
+import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -383,6 +384,12 @@ export default function MobileDashboard() {
   }, [user, isMining]);
 
   const quickItems = [
+    ...(WORD_FORGE_ENABLED ? [{
+      id:'word-forge', label:'Word Forge', path:'/word-forge',
+      col:'hsl(38 90% 55%)', bg:'hsl(38 90% 55%/0.12)', bd:'hsl(38 90% 55%/0.22)',
+      badge: 'BETA' as const,
+      icon:<><path d="M4 7h16M7 7v12a2 2 0 002 2h6a2 2 0 002-2V7"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,
+    }] : []),
     { id:'arena', label:'Arena', path:'/arena',
       col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.12)', bd:'hsl(255 50% 65%/0.22)',
       icon:<><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M9.5 17.5L21 6V3h-3L9.5 14.5"/></> },
@@ -638,6 +645,13 @@ export default function MobileDashboard() {
                       background:'hsl(215 25% 18%)',border:'1px solid hsl(215 22% 24%)',
                       fontSize:8,fontWeight:800,color:'hsl(215 14% 50%)'}}>
                       Soon
+                    </span>
+                  )}
+                  {'badge' in item && item.badge && (
+                    <span style={{position:'absolute',top:-4,right:-4,padding:'2px 6px',borderRadius:8,
+                      background:'hsl(195 70% 55%/0.15)',border:'1px solid hsl(195 70% 55%/0.35)',
+                      fontSize:8,fontWeight:800,color:'hsl(195 70% 62%)'}}>
+                      {item.badge}
                     </span>
                   )}
                   {item.id === 'tasks' && pendingTasksCount > 0 && (

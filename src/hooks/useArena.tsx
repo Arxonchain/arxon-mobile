@@ -236,9 +236,8 @@ export const useArena = () => {
         u.power   += Number(v.power_spent) || 0;
         u.battles += 1;
         u.biggest  = Math.max(u.biggest, Number(v.power_spent) || 0);
-        // check if this vote was a win
         const winner = winMap[v.battle_id];
-        if (winner) u.wins += 1; // simplified — a participated battle counts
+        if (winner && v.side === winner) u.wins += 1;
       });
 
       const userIds = Object.keys(userMap);
@@ -412,15 +411,11 @@ export const useArena = () => {
     setVoting(true);
 
     try {
-      // Cast vote - server-side trigger handles point validation and deduction atomically
-      const { error: voteError } = await supabase
-        .from('arena_votes')
-        .insert({
-          battle_id: battleId,
-          user_id: user.id,
-          side,
-          power_spent: powerAmount,
-        });
+      const { error: voteError } = await supabase.rpc('cast_arena_vote', {
+        p_battle_id: battleId,
+        p_side: side,
+        p_amount: powerAmount,
+      });
 
       if (voteError) throw voteError;
 

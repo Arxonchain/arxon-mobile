@@ -24,6 +24,7 @@ interface UserPoints {
   task_points: number;
   social_points: number;
   referral_points: number;
+  game_points: number;
   referral_bonus_percentage: number; // Boost from referrals only
   x_post_boost_percentage: number; // Boost from X post submissions (social yapping)
 }
@@ -32,7 +33,7 @@ type PointsContextType = {
   points: UserPoints | null;
   loading: boolean;
   rank: number | null;
-  addPoints: (amount: number, type: 'mining' | 'task' | 'social' | 'referral', sessionId?: string) => Promise<{ success: boolean; points?: number; error?: string }>;
+  addPoints: (amount: number, type: 'mining' | 'task' | 'social' | 'referral' | 'game', sessionId?: string) => Promise<{ success: boolean; points?: number; error?: string }>;
   refreshPoints: () => Promise<void>;
   triggerConfetti: () => void;
 };
@@ -158,7 +159,7 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
   const addPoints = useCallback(
     async (
       amount: number,
-      type: 'mining' | 'task' | 'social' | 'referral',
+      type: 'mining' | 'task' | 'social' | 'referral' | 'game',
       sessionId?: string
     ): Promise<{ success: boolean; points?: number; error?: string }> => {
       if (!user) return { success: false, error: 'Not authenticated' };
@@ -178,52 +179,24 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
         void calculateRank();
       };
 
-      const rpcFallback = async (reason?: string) => {
-        try {
-          // For mining, mark the session as credited before incrementing (idempotency guard)
-          if (type === 'mining' && sessionId) {
-            await supabase
-              .from('mining_sessions')
-              .update({ credited_at: new Date().toISOString() })
-              .eq('id', sessionId)
-              .is('credited_at', null);
-          }
-
-          // Use type assertion to avoid schema cache mismatch in self-hosted deployments
-          const { data, error } = await supabase.rpc('increment_user_points' as any, {
-            p_user_id: user.id,
-            p_amount: safeAmount,
-            p_type: type,
-          });
-
-          if (error) return { success: false, error: error.message || reason || 'Fallback failed' };
-          if (data) applyUserPoints(data);
-
-          if (safeAmount >= 10) triggerConfetti();
-          return { success: true, points: safeAmount };
-        } catch (err: any) {
-          return { success: false, error: err?.message || reason || 'Fallback failed' };
-        }
+      const invokeAward = async (attempt = 0): Promise<{ data: any; error: any }> => {
+        const { data, error } = await supabase.functions.invoke('award-points', {
+          body: { type, amount: safeAmount, session_id: sessionId },
+        });
+        if ((!error && data?.success) || attempt >= 2) return { data, error };
+        await new Promise((r) => setTimeout(r, 350 * (attempt + 1)));
+        return invokeAward(attempt + 1);
       };
 
       try {
-        // Primary path: secure backend function
-        const { data, error } = await supabase.functions.invoke('award-points', {
-          body: {
-            type,
-            amount: safeAmount,
-            session_id: sessionId,
-          },
-        });
+        const { data, error } = await invokeAward();
 
         if (error || !data?.success) {
-          // Instant fallback: direct RPC (keeps UI responsive if function is down)
-          const fallback = await rpcFallback(error?.message || data?.error);
-          if (fallback.success) return fallback;
-
+          // Client RPC is blocked for authenticated users — refresh in case server credited anyway
+          void fetchPoints();
           return {
             success: false,
-            error: fallback.error || error?.message || data?.error || 'Backend error',
+            error: error?.message || data?.error || 'Backend error',
           };
         }
 
@@ -246,16 +219,14 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
 
         return { success: true, points: awardedPoints };
       } catch (err: any) {
-        const fallback = await rpcFallback(err?.message);
-        if (fallback.success) return fallback;
-
+        void fetchPoints();
         return {
           success: false,
-          error: fallback.error || err?.message || 'Network error',
+          error: err?.message || 'Network error',
         };
       }
     },
-    [calculateRank, triggerConfetti, user]
+    [calculateRank, fetchPoints, triggerConfetti, user]
   );
 
   // Hydrate instantly from cache on login (so ARX-P shows immediately), then refresh in background

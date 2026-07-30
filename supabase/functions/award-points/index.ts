@@ -63,8 +63,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Validate type
-    if (!['mining', 'task', 'social'].includes(type)) {
+    // Validate type — game points must go through validate-word-forge / complete-word-forge-daily
+    if (type === 'game') {
+      return new Response(
+        JSON.stringify({ success: false, error: 'Game points must be awarded via Word Forge server validation' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!['mining', 'task', 'social', 'referral'].includes(type)) {
       return new Response(
         JSON.stringify({ success: false, error: 'Invalid point type' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

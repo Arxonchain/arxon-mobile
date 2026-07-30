@@ -111,8 +111,10 @@ Deno.serve(async (req) => {
           (arenaVotesData.data || []).reduce((s: number, r: any) => s + Number(r.power_spent || 0), 0)
         )
 
-        // Total correct balance = all credits - all debits
-        const totalCredits = rawMining + rawTask + rawCheckin + rawSocial + rawReferral + arenaCredits
+        // Total correct balance = all credits - all debits (+ game_points from Word Forge)
+        const rawGame = Math.floor(Number(current.game_points || 0))
+
+        const totalCredits = rawMining + rawTask + rawCheckin + rawSocial + rawReferral + arenaCredits + rawGame
         const totalDebits = arenaDebits
 
         // SAFETY: If user has NO source activity at all, skip them.
@@ -135,6 +137,7 @@ Deno.serve(async (req) => {
         let finalTask = rawTask + rawCheckin
         let finalReferral = rawReferral
         let finalSocial = Math.max(0, rawSocial + arenaNet)
+        const finalGame = rawGame
 
         // If arena net is deeply negative, it may eat into social. 
         // Spread remainder across other categories.
@@ -159,7 +162,7 @@ Deno.serve(async (req) => {
           }
         }
 
-        const finalTotal = finalMining + finalTask + finalSocial + finalReferral
+        const finalTotal = finalMining + finalTask + finalSocial + finalReferral + finalGame
         const storedTotal = Math.floor(Number(current.total_points || 0))
         const diff = finalTotal - storedTotal
 

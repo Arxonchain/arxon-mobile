@@ -17,17 +17,15 @@ export const useCountryDetection = () => {
       sessionStorage.setItem(sessionKey, "1");
 
       try {
-        const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-        await fetch(
-          `https://${projectId}.supabase.co/functions/v1/detect-country`,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const baseUrl = (import.meta.env.VITE_SUPABASE_URL ?? "").replace(/\/$/, "");
+        if (!baseUrl) return;
+        await fetch(`${baseUrl}/functions/v1/detect-country`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            "Content-Type": "application/json",
+          },
+        });
       } catch {
         // Silent fail - country detection is non-critical
       }

@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { usePoints } from '@/hooks/usePoints';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
-import { useAdmin } from '@/hooks/useAdmin';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChevronLeft, Crown, Trophy, AlertCircle } from 'lucide-react';

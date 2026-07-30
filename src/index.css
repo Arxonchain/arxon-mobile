@@ -1,4 +1,4 @@
-/* ── Creato Display (local, already in /public/fonts) ── */
+/* Creato Display (local) with Rajdhani fallback from Google Fonts */
 @font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Light.otf') format('opentype'); font-weight:300; font-display:swap; }
 @font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Regular.otf') format('opentype'); font-weight:400; font-display:swap; }
 @font-face { font-family:'Creato Display'; src:url('/fonts/CreatoDisplay-Medium.otf') format('opentype'); font-weight:500; font-display:swap; }
