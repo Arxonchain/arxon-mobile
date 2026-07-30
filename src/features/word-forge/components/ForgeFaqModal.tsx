@@ -3,9 +3,9 @@ import { GamePanel, GlossyButton, RibbonBanner } from './GlossyKit';
 
 const FAQ_ITEMS: { q: string; a: string }[] = [
   { q: 'How do I play?', a: 'Drag across the letters on the wheel to spell a word, then release to forge it. Longer words pay more ARX-P.' },
-  { q: 'How do I clear a sector?', a: 'Fill every word slot before the timer runs out. Bonus words beyond the slots still earn ARX-P.' },
+  { q: 'How do I clear a sector?', a: 'Fill every word slot before the timer runs out. Only words that fill an open slot earn ARX-P.' },
   { q: 'What are streaks?', a: 'Forge words back-to-back without a miss. 3 in a row pays 1.5x, 5 in a row pays 2x.' },
-  { q: 'What are bonus words?', a: 'Crypto-themed words marked with a gem. They pay 4x and show you their meaning.' },
+  { q: 'What are bonus words?', a: 'Crypto-themed words marked with a gem. They pay 4× when they fill an open slot row — extra words outside the boxes do not pay.' },
   { q: 'What do hints do?', a: 'A hint reveals the first and last letters of a hidden word. You get 3 per sector, refilled when you clear it.' },
   { q: 'Daily Milestone?', a: 'Each day brings a new goal — speed runs, long words, no-hint clears, and more. Hit today\'s milestone on the shared puzzle for +50 ARX-P.' },
   { q: 'Where do my points go?', a: 'ARX-P earned in the forge is credited to your Arxon balance automatically.' },

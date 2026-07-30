@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { payoutForWord } from './payoutCalculator';
 import type { ValidationResult } from './wordValidator';
+import { fillsAvailableSlot } from './slotAssignment';
 import { validateWordLocal } from './wordValidator';
 
 export interface ServerWordResult extends ValidationResult {
@@ -8,7 +9,7 @@ export interface ServerWordResult extends ValidationResult {
   credited?: boolean;
 }
 
-const HARD_REJECT: ValidationResult['reason'][] = ['duplicate', 'short'];
+const HARD_REJECT: ValidationResult['reason'][] = ['duplicate', 'short', 'noslot'];
 
 function localCreditFallback(local: ValidationResult, payout: number): ServerWordResult {
   return {
@@ -29,11 +30,16 @@ export async function validateAndCreditWord(
   streak: number,
   minWordLen: number,
   selectedLetters?: string[],
+  slotWords?: string[],
 ): Promise<ServerWordResult> {
   const local = validateWordLocal(
     word, poolLetters, new Set(claimed), minWordLen, selectedLetters,
   );
   if (!local.ok) return local;
+
+  if (slotWords?.length && !fillsAvailableSlot(word, slotWords, claimed)) {
+    return { ok: false, reason: 'noslot' };
+  }
 
   const payout = payoutForWord(word, streak + 1);
 
@@ -47,6 +53,7 @@ export async function validateAndCreditWord(
         attempt_id: attemptId,
         streak,
         payout,
+        slot_words: slotWords ?? [],
       },
     });
 

@@ -4,8 +4,6 @@ import type { SlotRowAssignment } from '../engine/slotAssignment';
 interface WordSlotsProps {
   /** Fixed slot rows for the round — shape never changes mid-round */
   rows: SlotRowAssignment[];
-  /** Valid found words that fit no slot (paid as bonus finds) */
-  extraCount: number;
   skin: LevelTileSkin;
   hintWord?: string | null;
   celebrateWord?: string | null;
@@ -19,7 +17,7 @@ interface WordSlotsProps {
  * row with letter pops.
  */
 export function WordSlots({
-  rows, extraCount, skin, hintWord, celebrateWord, boxSize, rowGap = 7,
+  rows, skin, hintWord, celebrateWord, boxSize, rowGap = 7,
 }: WordSlotsProps) {
   const maxLen = Math.max(3, ...rows.map((r) => r.target.length));
   const box = boxSize ?? Math.max(22, Math.min(36, Math.floor(272 / maxLen) - 3));
@@ -77,16 +75,6 @@ export function WordSlots({
           </div>
         );
       })}
-
-      {extraCount > 0 && (
-        <div style={{
-          marginTop: 3, padding: '4px 12px', borderRadius: 10,
-          background: 'rgba(255,217,61,0.12)', border: '1px solid rgba(255,217,61,0.4)',
-          fontSize: 10, fontWeight: 900, letterSpacing: '0.1em', color: '#ffd93d',
-        }}>
-          +{extraCount} BONUS {extraCount === 1 ? 'WORD' : 'WORDS'}
-        </div>
-      )}
 
       <style>{`
         @keyframes wf-row-pop { 0%{transform:scale(1)} 40%{transform:scale(1.12)} 100%{transform:scale(1)} }

@@ -3,7 +3,7 @@ import { mergeForgeProgress } from '../../hooks/useForgeProgress';
 import { levelParams } from '../difficultyCurve';
 import { payoutForWord, streakMultiplier } from '../payoutCalculator';
 import { generateLevel, canForm, poolCountMap } from '../poolGenerator';
-import { assignSlots } from '../slotAssignment';
+import { assignSlots, fillsAvailableSlot } from '../slotAssignment';
 import { validateWordLocal } from '../wordValidator';
 
 describe('mergeForgeProgress', () => {
@@ -102,11 +102,18 @@ describe('slotAssignment', () => {
     expect(r.rows[1].target.length).toBe(4);
   });
 
-  it('routes words that fit no slot to extras', () => {
+  it('routes words that fit no slot to extras (not rewarded)', () => {
     const r = assignSlots(slots, ['DOG', 'RAT', 'PLANETS']);
     expect(r.rows[0].filledBy).toBe('DOG');
     expect(r.extraWords).toEqual(['RAT', 'PLANETS']);
     expect(r.filledCount).toBe(1);
+    expect(fillsAvailableSlot('RAT', slots, ['DOG'])).toBe(false);
+    expect(fillsAvailableSlot('WISH', slots, ['DOG'])).toBe(true);
+  });
+
+  it('rejects words when all same-length slots are full', () => {
+    expect(fillsAvailableSlot('RAT', slots, ['DOG', 'FISH'])).toBe(false);
+    expect(fillsAvailableSlot('LUNCH', slots, ['DOG', 'FISH'])).toBe(true);
   });
 
   it('completes when all slots are filled regardless of extras', () => {

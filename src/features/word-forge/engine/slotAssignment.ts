@@ -7,9 +7,20 @@ export interface SlotRowAssignment {
 
 export interface SlotAssignmentResult {
   rows: SlotRowAssignment[];
-  /** Valid found words that didn't fit any slot — paid as bonus finds */
+  /** Found words that did not map to an open slot (not rewarded) */
   extraWords: string[];
   filledCount: number;
+}
+
+/** True when submitting this word would fill an currently empty slot row. */
+export function fillsAvailableSlot(
+  word: string,
+  slotWords: string[],
+  foundWords: string[],
+): boolean {
+  const before = assignSlots(slotWords, foundWords).filledCount;
+  const after = assignSlots(slotWords, [...foundWords, word.toUpperCase()]).filledCount;
+  return after > before;
 }
 
 /**
@@ -17,7 +28,7 @@ export interface SlotAssignmentResult {
  *
  * Slots never change shape: a found word fills the slot whose target matches
  * exactly, otherwise the first unfilled slot of the SAME length. Words that
- * fit no slot are extras (still paid, shown as bonus finds).
+ * fit no open slot are tracked as extras (not rewarded).
  */
 export function assignSlots(slotWords: string[], foundWords: string[]): SlotAssignmentResult {
   const rows: SlotRowAssignment[] = slotWords.map((target) => ({ target, filledBy: null }));
