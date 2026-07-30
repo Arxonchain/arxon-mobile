@@ -16,11 +16,12 @@ import { GamePanel, GlossyButton } from './GlossyKit';
 interface HintRefillModalProps {
   open: boolean;
   onClose: () => void;
-  onClaim: (reward: number, claimKey: string) => void;
+  onClaim: (reward: number, claimKey: string, taskId: string) => void;
   preview?: boolean;
+  dailyForgeDone?: boolean;
 }
 
-export function HintRefillModal({ open, onClose, onClaim, preview = false }: HintRefillModalProps) {
+export function HintRefillModal({ open, onClose, onClaim, preview = false, dailyForgeDone = false }: HintRefillModalProps) {
   const { user } = useAuth();
   const { points } = usePoints();
   const { stats, getReferralLink, refreshReferrals } = useReferrals(user);
@@ -32,10 +33,10 @@ export function HintRefillModal({ open, onClose, onClaim, preview = false }: Hin
     () => evaluateHintTasks(progress.hintTaskClaims, {
       referralCount: stats.totalReferrals,
       checkedInToday,
-      dailyForgeDone: false,
+      dailyForgeDone,
       dailyCompletedDate: progress.dailyCompletedDate,
     }),
-    [progress.hintTaskClaims, progress.dailyCompletedDate, stats.totalReferrals, checkedInToday],
+    [progress.hintTaskClaims, progress.dailyCompletedDate, stats.totalReferrals, checkedInToday, dailyForgeDone],
   );
 
   const handleShare = async (status: HintTaskStatus) => {
@@ -48,7 +49,7 @@ export function HintRefillModal({ open, onClose, onClaim, preview = false }: Hin
       } else {
         await navigator.clipboard.writeText(text);
       }
-      onClaim(status.task.reward, status.claimKey);
+      onClaim(status.task.reward, status.claimKey, status.task.id);
     } catch { /* user cancelled share */ }
   };
 

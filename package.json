@@ -8,6 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "build:word-forge": "vite build --mode word-forge",
+    "build:internal": "vite build --mode word-forge",
     "dev:word-forge": "vite --mode word-forge",
     "cap:sync:word-forge": "npm run build:word-forge && npx cap sync android",
     "cap:sync": "npx cap sync android",

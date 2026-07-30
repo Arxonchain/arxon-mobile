@@ -85,6 +85,14 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     return () => { void handler.then((h) => h.remove()); };
   }, [phase, navigate]);
 
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+    const sub = App.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive && game.phase === 'playing') game.togglePause();
+    });
+    return () => { void sub.then((h) => h.remove()); };
+  }, [game]);
+
   const onFirstInteract = useCallback(() => {
     if (audioUnlockedRef.current) return;
     audioUnlockedRef.current = true;
@@ -490,9 +498,10 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
       <HintRefillModal
         open={hintRefillOpen}
         preview={preview}
+        dailyForgeDone={game.isDaily && passed}
         onClose={() => setHintRefillOpen(false)}
-        onClaim={(reward, claimKey) => {
-          game.claimHintTask(reward, claimKey);
+        onClaim={(reward, claimKey, taskId) => {
+          game.claimHintTask(reward, claimKey, taskId);
           setHintRefillOpen(false);
         }}
       />

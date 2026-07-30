@@ -16,32 +16,32 @@ describe('validateAndCreditWord', () => {
     invoke.mockReset();
   });
 
-  it('accepts locally valid words when the edge function errors', async () => {
+  it('marks sync pending when the edge function errors', async () => {
     invoke.mockResolvedValue({ data: null, error: new Error('Function not found') });
     const result = await validateAndCreditWord(
       'CAT', ['C', 'A', 'T', 'S'], [], 1, 'attempt-1', 0, 3,
     );
     expect(result.ok).toBe(true);
     expect(result.credited).toBe(false);
+    expect(result.syncPending).toBe(true);
     expect(result.payout).toBeGreaterThan(0);
   });
 
-  it('accepts locally valid words when server dictionary misses', async () => {
+  it('rejects when server dictionary misses', async () => {
     invoke.mockResolvedValue({ data: { ok: false, reason: 'unknown' }, error: null });
     const result = await validateAndCreditWord(
       'CAT', ['C', 'A', 'T', 'S'], [], 1, 'attempt-1', 0, 3,
     );
-    expect(result.ok).toBe(true);
-    expect(result.credited).toBe(false);
+    expect(result.ok).toBe(false);
   });
 
-  it('accepts locally valid words when server reports pool mismatch', async () => {
+  it('rejects when server reports pool mismatch', async () => {
     invoke.mockResolvedValue({ data: { ok: false, reason: 'pool' }, error: null });
     const result = await validateAndCreditWord(
       'CAT', ['C', 'A', 'T', 'S'], [], 1, 'attempt-1', 0, 3, ['C', 'A', 'T'],
     );
-    expect(result.ok).toBe(true);
-    expect(result.credited).toBe(false);
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('pool');
   });
 
   it('rejects duplicate when server is authoritative', async () => {

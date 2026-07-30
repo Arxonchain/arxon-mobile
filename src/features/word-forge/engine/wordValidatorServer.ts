@@ -7,19 +7,11 @@ import { validateWordLocal } from './wordValidator';
 export interface ServerWordResult extends ValidationResult {
   payout?: number;
   credited?: boolean;
+  /** Server unreachable — word valid locally but profile not synced yet */
+  syncPending?: boolean;
 }
 
 const HARD_REJECT: ValidationResult['reason'][] = ['duplicate', 'short', 'noslot'];
-
-function localCreditFallback(local: ValidationResult, payout: number): ServerWordResult {
-  return {
-    ok: true,
-    isBonus: local.isBonus,
-    definition: local.definition,
-    payout,
-    credited: false,
-  };
-}
 
 export async function validateAndCreditWord(
   word: string,
@@ -52,14 +44,20 @@ export async function validateAndCreditWord(
         level,
         attempt_id: attemptId,
         streak,
-        payout,
         slot_words: slotWords ?? [],
+        longest_word_len: word.length,
       },
     });
 
     if (error) {
-      // Edge function unreachable — word already passed local checks; credit via client path
-      return localCreditFallback(local, payout);
+      return {
+        ok: true,
+        isBonus: local.isBonus,
+        definition: local.definition,
+        payout,
+        credited: false,
+        syncPending: true,
+      };
     }
 
     if (data?.ok) {
@@ -77,9 +75,19 @@ export async function validateAndCreditWord(
       return { ok: false, reason };
     }
 
-    // Server dictionary miss, 401 body, RPC error, etc. — trust local gameplay validation
-    return localCreditFallback(local, payout);
+    return {
+      ok: false,
+      reason: 'pool',
+      syncPending: false,
+    };
   } catch {
-    return localCreditFallback(local, payout);
+    return {
+      ok: true,
+      isBonus: local.isBonus,
+      definition: local.definition,
+      payout,
+      credited: false,
+      syncPending: true,
+    };
   }
 }

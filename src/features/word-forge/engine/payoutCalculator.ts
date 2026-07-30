@@ -19,8 +19,3 @@ export function payoutForWord(word: string, streak = 1): number {
   }
   return Math.ceil(BASE_PAYOUT * lengthBonus(word) * streakMultiplier(streak));
 }
-
-/** Completionist bonus when all formable words on board are found */
-export function completionistBonus(formableCount: number): number {
-  return Math.min(200, formableCount * 5);
-}

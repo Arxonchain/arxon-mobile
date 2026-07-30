@@ -102,13 +102,15 @@ export function progressFromCloud(row: Record<string, unknown>): ForgeProgress {
     dailyStreak: row.daily_streak as number,
     tutorialCompleted: row.tutorial_completed as boolean,
     unlockedSkins: row.unlocked_skins as number,
+    hintTaskClaims: typeof row.hint_task_claims === 'object' && row.hint_task_claims != null
+      ? (row.hint_task_claims as Record<string, string>)
+      : {},
   });
 }
 
 /** Merge local + cloud snapshots — bestLevel and cumulative stats win per-field. */
 export function mergeForgeProgress(local: ForgeProgress, cloud: ForgeProgress): ForgeProgress {
   const bestLevel = Math.max(local.bestLevel, cloud.bestLevel);
-  const source = local.bestLevel >= cloud.bestLevel ? local : cloud;
   const longestWord = local.longestWord.length >= cloud.longestWord.length ? local.longestWord : cloud.longestWord;
   let dailyCompletedDate = local.dailyCompletedDate;
   if (cloud.dailyCompletedDate && (!dailyCompletedDate || cloud.dailyCompletedDate > dailyCompletedDate)) {
@@ -125,8 +127,9 @@ export function mergeForgeProgress(local: ForgeProgress, cloud: ForgeProgress): 
     dailyCompletedDate,
     tutorialCompleted: local.tutorialCompleted || cloud.tutorialCompleted,
     unlockedSkins: Math.max(local.unlockedSkins, cloud.unlockedSkins),
-    hintsLeft: source.hintsLeft,
-    shufflesLeft: source.shufflesLeft,
+    hintsLeft: Math.max(local.hintsLeft, cloud.hintsLeft),
+    shufflesLeft: Math.max(local.shufflesLeft, cloud.shufflesLeft),
+    hintTaskClaims: { ...cloud.hintTaskClaims, ...local.hintTaskClaims },
   });
 }
 
