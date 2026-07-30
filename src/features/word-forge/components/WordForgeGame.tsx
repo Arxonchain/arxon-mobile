@@ -311,7 +311,6 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
         }}>
           <WordSlots
             rows={game.slotRows}
-            extraCount={game.extraWords.length}
             skin={game.skin}
             hintWord={game.hintReveal?.word ?? null}
             celebrateWord={game.celebrateWord}

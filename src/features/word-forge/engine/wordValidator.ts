@@ -4,7 +4,7 @@ import { canForm, poolCountMap } from './poolGenerator';
 
 export interface ValidationResult {
   ok: boolean;
-  reason?: 'short' | 'unknown' | 'pool' | 'duplicate' | 'rate';
+  reason?: 'short' | 'unknown' | 'pool' | 'duplicate' | 'rate' | 'noslot';
   isBonus?: boolean;
   definition?: string | null;
 }
@@ -45,6 +45,7 @@ export function reasonMessage(reason?: ValidationResult['reason'], minLen = PLAY
     case 'duplicate': return 'Already found';
     case 'pool': return 'Letters not in pool';
     case 'rate': return 'Could not verify — try again';
+    case 'noslot': return 'No open slot — fill the boxes first';
     default: return 'Invalid word';
   }
 }

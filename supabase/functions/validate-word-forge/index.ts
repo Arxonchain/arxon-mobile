@@ -16,6 +16,25 @@ function canForm(word: string, pool: string[]): boolean {
   return true
 }
 
+function fillsSlot(word: string, slotWords: string[], claimed: string[]): boolean {
+  const w = word.toUpperCase()
+  const before = assignSlots(slotWords, claimed).filledCount
+  const after = assignSlots(slotWords, [...claimed, w]).filledCount
+  return after > before
+}
+
+function assignSlots(slotWords: string[], foundWords: string[]): { filledCount: number } {
+  const rows = slotWords.map((target) => ({ target, filledBy: null as string | null }))
+  for (const raw of foundWords) {
+    const word = raw.toUpperCase()
+    const exact = rows.find((r) => !r.filledBy && r.target === word)
+    if (exact) { exact.filledBy = word; continue }
+    const sameLen = rows.find((r) => !r.filledBy && r.target.length === word.length)
+    if (sameLen) sameLen.filledBy = word
+  }
+  return { filledCount: rows.filter((r) => r.filledBy).length }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
@@ -38,6 +57,7 @@ Deno.serve(async (req) => {
     const word = String(body.word ?? '').toUpperCase().trim()
     const poolLetters: string[] = (body.pool_letters ?? []).map((l: string) => l.toUpperCase())
     const claimed: string[] = body.claimed_words ?? []
+    const slotWords: string[] = (body.slot_words ?? []).map((w: string) => w.toUpperCase())
     const attemptId = String(body.attempt_id ?? 'default')
     const clientPayout = Math.min(Math.max(Math.ceil(Number(body.payout) || 0), 0), 500)
 
@@ -49,6 +69,9 @@ Deno.serve(async (req) => {
     }
     if (!canForm(word, poolLetters)) {
       return new Response(JSON.stringify({ ok: false, reason: 'pool' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    if (slotWords.length > 0 && !fillsSlot(word, slotWords, claimed)) {
+      return new Response(JSON.stringify({ ok: false, reason: 'noslot' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     // Idempotency — already credited this word in this attempt

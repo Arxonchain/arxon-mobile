@@ -52,4 +52,13 @@ describe('validateAndCreditWord', () => {
     expect(result.ok).toBe(false);
     expect(result.reason).toBe('duplicate');
   });
+
+  it('rejects words that do not fill an open slot', async () => {
+    const result = await validateAndCreditWord(
+      'RAT', ['R', 'A', 'T', 'S'], ['DOG'], 1, 'attempt-1', 0, 3, undefined,
+      ['CAT', 'FISH'],
+    );
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('noslot');
+  });
 });

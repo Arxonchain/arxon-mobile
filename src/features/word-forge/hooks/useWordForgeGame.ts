@@ -15,9 +15,9 @@ import {
 } from '../engine/dailyChallenge';
 import { dailyMissionBonusEligible, getDailyMission, type MissionSnapshot } from '../engine/dailyMission';
 import { levelParams } from '../engine/difficultyCurve';
-import { completionistBonus, payoutForWord } from '../engine/payoutCalculator';
+import { payoutForWord } from '../engine/payoutCalculator';
 import { generateLevel, type LevelGeneration, type LetterTile } from '../engine/poolGenerator';
-import { assignSlots } from '../engine/slotAssignment';
+import { assignSlots, fillsAvailableSlot } from '../engine/slotAssignment';
 import { validateWordLocal, reasonMessage } from '../engine/wordValidator';
 import { validateAndCreditWord } from '../engine/wordValidatorServer';
 import { mulberry32, shuffle as shuffleArr } from '../engine/seedHash';
@@ -279,6 +279,19 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       return;
     }
 
+    const currentFound = foundWords.filter((w) => !w.rejected).map((w) => w.word);
+    if (!fillsAvailableSlot(word, generation.slotWords, currentFound)) {
+      setShakeWord(word);
+      setStreak(0);
+      playError();
+      void haptic(ImpactStyle.Medium);
+      schedule(() => setShakeWord(null), 400);
+      showToast(reasonMessage('noslot', submitMinLen));
+      setSelection([]);
+      submittingRef.current = false;
+      return;
+    }
+
     const nextStreak = streak + 1;
     maxStreakRef.current = Math.max(maxStreakRef.current, nextStreak);
     longestWordRef.current = Math.max(longestWordRef.current, word.length);
@@ -316,6 +329,7 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     const server = await validateAndCreditWord(
       word, poolLetters, [...claimedRef.current].filter((w) => w !== word),
       isDaily ? 0 : level, attemptId, streak, submitMinLen, pathLetters,
+      generation.slotWords,
     );
 
     if (!server.ok) {
@@ -366,15 +380,6 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       const prog2 = loadForgeProgress(preview);
       const isBest = !isDaily && level + 1 > prog2.bestLevel;
       setNewBest(isBest);
-
-      if (validCount >= generation.formableCount) {
-        const bonus = completionistBonus(generation.formableCount);
-        setCompletionistPayout(bonus);
-        if (bonus > 0) {
-          addToSessionBalance(bonus);
-          void creditProfilePoints(bonus);
-        }
-      }
 
       if (isDaily && !isDailyCompleted(prog2.dailyCompletedDate)) {
         const missionSnap: MissionSnapshot = {
