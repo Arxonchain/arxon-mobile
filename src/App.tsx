@@ -67,6 +67,13 @@ import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
+
+import {
+  DashboardV2, MiningV2, ArenaV2, LeaderboardV2, ProfileV2,
+  TasksV2, ReferralsV2, NexusV2, WalletV2, SettingsV2,
+  NotificationsV2, PointsHistoryV2, MobileBottomNavV2,
+} from "@/features/arxon-v2";
+import { ARXON_UI_V2_ENABLED } from "@/lib/uiFeature";
 import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 
 const GamingHubPage = WORD_FORGE_ENABLED
@@ -210,7 +217,7 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            <Route path="/"             element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
+            <Route path="/" element={user ? (ARXON_UI_V2_ENABLED ? <DashboardV2 /> : <MobileDashboard />) : <Navigate to="/auth" replace />} />
             {WORD_FORGE_ENABLED && GamingHubPage && (
               <Route path="/games" element={
                 <ProtectedRoute>
@@ -220,18 +227,18 @@ function AppRoutes() {
                 </ProtectedRoute>
               } />
             )}
-            <Route path="/mining"       element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
-            <Route path="/arena"        element={<MobileArena />} />
-            <Route path="/leaderboard"  element={<MobileLeaderboard />} />
-            <Route path="/nexus"        element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
-            <Route path="/profile"      element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
-            <Route path="/wallet"       element={<ProtectedRoute><MobileWallet /></ProtectedRoute>} />
+            <Route path="/mining"       element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <MiningV2 /> : <MobileMining />}</ProtectedRoute>} />
+            <Route path="/arena"        element={ARXON_UI_V2_ENABLED ? <ArenaV2 /> : <MobileArena />} />
+            <Route path="/leaderboard"  element={ARXON_UI_V2_ENABLED ? <LeaderboardV2 /> : <MobileLeaderboard />} />
+            <Route path="/nexus"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NexusV2 /> : <MobileNexus />}</ProtectedRoute>} />
+            <Route path="/profile"      element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <ProfileV2 /> : <MobileProfile />}</ProtectedRoute>} />
+            <Route path="/wallet"       element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <WalletV2 /> : <MobileWallet />}</ProtectedRoute>} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
-            <Route path="/tasks"        element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
-            <Route path="/referrals"    element={<ProtectedRoute><MobilePage><Referrals /></MobilePage></ProtectedRoute>} />
-            <Route path="/settings"     element={<ProtectedRoute><MobileSettings /></ProtectedRoute>} />
-            <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
-            <Route path="/points-history" element={<ProtectedRoute><MobilePage><PointsHistory /></MobilePage></ProtectedRoute>} />
+            <Route path="/tasks"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <TasksV2 /> : <MobilePage><Tasks /></MobilePage>}</ProtectedRoute>} />
+            <Route path="/referrals"    element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <ReferralsV2 /> : <MobilePage><Referrals /></MobilePage>}</ProtectedRoute>} />
+            <Route path="/settings"     element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <SettingsV2 /> : <MobileSettings />}</ProtectedRoute>} />
+            <Route path="/notifications" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NotificationsV2 /> : <Notifications />}</ProtectedRoute>} />
+            <Route path="/points-history" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <PointsHistoryV2 /> : <MobilePage><PointsHistory /></MobilePage>}</ProtectedRoute>} />
             {WORD_FORGE_ENABLED && WordForgePage && (
               <>
                 <Route path="/word-forge" element={
@@ -345,7 +352,7 @@ function AppRoutes() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
 
-      {isNative && <MobileBottomNav />}
+      {isNative && (ARXON_UI_V2_ENABLED ? <MobileBottomNavV2 /> : <MobileBottomNav />)}
     </>
   );
 }
