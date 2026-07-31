@@ -40,7 +40,7 @@ type PointsContextType = {
 
 const PointsContext = createContext<PointsContextType | undefined>(undefined);
 
-const pointsCacheKey = (userId: string) => `arxon:points:v5:${userId}`;
+const pointsCacheKey = (userId: string) => `arxon:points:v6:${userId}`;
 const rankCacheKey = (userId: string) => `arxon:rank:v3:${userId}`;
 const POINTS_CACHE_MAX_AGE_MS = 30_000;
 
@@ -115,6 +115,18 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
+      // Credit any mining sessions that failed to sync (server-side repair, no app update needed)
+      try {
+        const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
+        if (syncData?.success && syncData?.user_points) {
+          const synced = sanitizeUserPoints(syncData.user_points) as UserPoints;
+          setPoints(synced);
+          cacheSet(pointsCacheKey(user.id), synced);
+        }
+      } catch {
+        /* RPC may not exist on older DB — ignore */
+      }
+
       const { data: pointsData, error: pointsError } = await supabase
         .from('user_points')
         .select('*')

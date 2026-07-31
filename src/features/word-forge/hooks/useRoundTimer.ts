@@ -5,18 +5,22 @@ import { playTick } from '../audio/forgeAudio';
 
 interface UseRoundTimerOptions {
   totalSeconds: number;
+  /** Restore a saved countdown (resume) instead of full timer */
+  initialSeconds?: number | null;
   active: boolean;
   paused: boolean;
   onExpire: () => void;
 }
 
 /** Deadline-based timer — survives backgrounding and pauses correctly */
-export function useRoundTimer({ totalSeconds, active, paused, onExpire }: UseRoundTimerOptions) {
-  const [timeLeft, setTimeLeft] = useState(totalSeconds);
+export function useRoundTimer({ totalSeconds, initialSeconds, active, paused, onExpire }: UseRoundTimerOptions) {
+  const startSeconds = initialSeconds ?? totalSeconds;
+  const [timeLeft, setTimeLeft] = useState(startSeconds);
   const deadlineRef = useRef<number | null>(null);
-  const pausedRemainingRef = useRef(totalSeconds);
+  const pausedRemainingRef = useRef(startSeconds);
   const lastTickRef = useRef(-1);
   const onExpireRef = useRef(onExpire);
+  const skippedInitialReset = useRef(initialSeconds != null);
   onExpireRef.current = onExpire;
 
   const reset = useCallback((seconds: number) => {
@@ -27,6 +31,10 @@ export function useRoundTimer({ totalSeconds, active, paused, onExpire }: UseRou
   }, [active, paused]);
 
   useEffect(() => {
+    if (skippedInitialReset.current) {
+      skippedInitialReset.current = false;
+      return;
+    }
     reset(totalSeconds);
   }, [totalSeconds, reset]);
 

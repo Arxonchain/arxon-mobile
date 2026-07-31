@@ -34,28 +34,28 @@ export function useArenaLayout({ slotCount, hasDailyStrip, maxWordLen }: ArenaLa
     const dailyH = hasDailyStrip ? (compact ? 44 : 52) : 0;
     const traceH = compact ? 36 : 44;
     const boosterH = 46;
-    const dockH = compact ? 50 : 56;
-    const gaps = compact ? 28 : 38;
+    const dockH = 44;
+    const gaps = compact ? 22 : 30;
 
-    const fixedStack = headerH + progressH + dailyH + traceH + boosterH + dockH + gaps + 140;
-    const slotsBudget = Math.max(64, vh - fixedStack);
+    const fixedStack = headerH + progressH + dailyH + traceH + boosterH + dockH + gaps + 88;
+    const slotsBudget = Math.max(80, vh - fixedStack);
     const slotsMaxH = Math.min(
-      tight ? 110 : compact ? 140 : 200,
-      Math.max(64, slotsBudget * 0.42),
+      tight ? 160 : compact ? 200 : 260,
+      Math.max(80, slotsBudget * (slotCount >= 5 ? 0.58 : 0.48)),
     );
 
-    const wheelCap = tight ? 200 : compact ? 232 : 272;
-    const wheelFloor = tight ? 148 : 168;
+    const wheelCap = tight ? 188 : compact ? 220 : 256;
+    const wheelFloor = tight ? 132 : 152;
     const wheelFromHeight = vh - fixedStack - slotsMaxH - 24;
     const wheelSize = Math.round(
       Math.min(wheelCap, contentW - 8, Math.max(wheelFloor, wheelFromHeight)),
     );
 
     const boxSize = Math.max(
-      20,
-      Math.min(34, Math.floor((contentW - 16) / Math.max(3, maxWordLen)) - 3),
+      18,
+      Math.min(tight ? 28 : 32, Math.floor((contentW - 16) / Math.max(3, maxWordLen)) - 2),
     );
 
-    return { slotsMaxH, wheelSize, boxSize, compact, tight, slotGap: compact ? 5 : 7 };
+    return { slotsMaxH, wheelSize, boxSize, compact, tight, slotGap: compact ? 4 : 6 };
   }, [slotCount, hasDailyStrip, maxWordLen, vh, vw]);
 }

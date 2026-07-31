@@ -261,48 +261,22 @@ export const useMining = (options?: UseMiningOptions) => {
         let creditedPoints = 0;
         
         if (pointsToCredit > 0) {
-          // Attempt 1: Edge function
-          try {
-            const result = await addPoints(pointsToCredit, 'mining', id);
-            credited = result.success;
-            creditedPoints = result.points || pointsToCredit;
-          } catch (edgeError) {
-            console.warn('Edge function failed for endSession, will try direct RPC:', edgeError);
-          }
+          const result = await addPoints(pointsToCredit, 'mining', id);
+          credited = result.success;
+          creditedPoints = result.points || pointsToCredit;
 
-          // Attempt 2: Direct RPC fallback for INSTANT credit
-          if (!credited && user) {
-            try {
-              // Mark session as credited first
-              await supabase
-                .from('mining_sessions')
-                .update({ credited_at: new Date().toISOString() })
-                .eq('id', id)
-                .is('credited_at', null);
-
-              // Use RPC directly for instant credit (type assertion for self-hosted compatibility)
-              const { data: rpcResult, error: rpcError } = await supabase.rpc('increment_user_points' as any, {
-                p_user_id: user.id,
-                p_amount: pointsToCredit,
-                p_type: 'mining',
-              });
-
-              if (!rpcError && rpcResult) {
-                credited = true;
-                creditedPoints = pointsToCredit;
-              } else {
-                console.error('Direct RPC failed in endSession:', rpcError);
-              }
-            } catch (rpcError) {
-              console.error('Direct RPC fallback error in endSession:', rpcError);
+          if (!credited) {
+            const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
+            if (syncData?.success && Number(syncData.points ?? 0) > 0) {
+              credited = true;
+              creditedPoints = Number(syncData.points);
             }
           }
 
-          // INSTANT UI UPDATE: Refresh points immediately
           await refreshPoints();
-          
+
           if (!credited) {
-            console.error('All point crediting methods failed for session:', id);
+            console.error('Point crediting failed for session:', id, result);
           }
         }
 
@@ -324,7 +298,7 @@ export const useMining = (options?: UseMiningOptions) => {
         } else if (pointsToCredit > 0 && !credited) {
           toast({
             title: 'Session Ended',
-            description: 'Points will be credited automatically. Please refresh.',
+            description: 'Open the dashboard to sync your balance — points will appear shortly.',
             variant: 'default',
           });
         }
@@ -364,35 +338,23 @@ export const useMining = (options?: UseMiningOptions) => {
       if (!updated) return 0;
 
       if (finalPoints > 0 && user) {
-        // Try edge function first
         let credited = false;
         try {
           const result = await addPoints(finalPoints, 'mining', session.id);
           credited = result.success;
         } catch {
-          // Edge function failed, try direct RPC
+          /* award-points failed */
         }
 
-        // Fallback to direct RPC for instant credit
         if (!credited) {
           try {
-            await supabase
-              .from('mining_sessions')
-              .update({ credited_at: new Date().toISOString() })
-              .eq('id', session.id)
-              .is('credited_at', null);
-
-            await supabase.rpc('increment_user_points' as any, {
-              p_user_id: user.id,
-              p_amount: finalPoints,
-              p_type: 'mining',
-            });
-          } catch (rpcError) {
-            console.error('Direct RPC fallback error in finalizeSessionSilently:', rpcError);
+            const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
+            credited = syncData?.success === true && Number(syncData.points ?? 0) > 0;
+          } catch {
+            /* ignore */
           }
         }
 
-        // INSTANT UI UPDATE: Refresh points immediately
         await refreshPoints();
       }
 
@@ -760,48 +722,21 @@ export const useMining = (options?: UseMiningOptions) => {
         return;
       }
 
-      // Try edge function first, then fallback to direct RPC for instant credit
       let credited = false;
       let creditedPoints = 0;
-      
-      // Attempt 1: Edge function (secure, but may not be deployed on production)
-      try {
-        const result = await addPoints(pointsToClaim, 'mining', sessionId);
-        credited = result.success;
-        creditedPoints = result.points || pointsToClaim;
-      } catch (edgeError) {
-        console.warn('Edge function failed, will try direct RPC:', edgeError);
-      }
 
-      // Attempt 2: Direct RPC fallback for INSTANT credit (if edge function fails)
+      const result = await addPoints(pointsToClaim, 'mining', sessionId);
+      credited = result.success;
+      creditedPoints = result.points || pointsToClaim;
+
       if (!credited) {
-        try {
-          // Mark session as credited first
-          await supabase
-            .from('mining_sessions')
-            .update({ credited_at: new Date().toISOString() })
-            .eq('id', sessionId)
-            .is('credited_at', null);
-
-          // Use RPC directly for instant credit (type assertion for self-hosted compatibility)
-          const { data: rpcResult, error: rpcError } = await supabase.rpc('increment_user_points' as any, {
-            p_user_id: user.id,
-            p_amount: pointsToClaim,
-            p_type: 'mining',
-          });
-
-          if (!rpcError && rpcResult) {
-            credited = true;
-            creditedPoints = pointsToClaim;
-          } else {
-            console.error('Direct RPC failed:', rpcError);
-          }
-        } catch (rpcError) {
-          console.error('Direct RPC fallback error:', rpcError);
+        const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
+        if (syncData?.success && Number(syncData.points ?? 0) > 0) {
+          credited = true;
+          creditedPoints = Number(syncData.points);
         }
       }
 
-      // Show appropriate toast
       if (credited) {
         toast({
           title: 'Points Claimed! 🎉',
@@ -809,10 +744,10 @@ export const useMining = (options?: UseMiningOptions) => {
         });
         triggerConfetti();
       } else {
-        console.error('All point crediting methods failed for session:', sessionId);
+        console.error('Point crediting failed for session:', sessionId);
         toast({
           title: 'Claim Issue',
-          description: 'Points will be credited automatically. Please refresh.',
+          description: 'Open the dashboard to sync your balance — points will appear shortly.',
           variant: 'destructive',
         });
       }

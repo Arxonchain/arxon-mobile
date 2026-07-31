@@ -9,6 +9,7 @@ import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import {
   GamePanel, GlossyBackButton, GlossyButton, RibbonBanner, TreasureBackdrop,
 } from '@/features/word-forge/components/GlossyKit';
+import { forgeBackPath } from '@/features/word-forge/lib/forgeNavigation';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 
 interface ForgeLeaderRow {
@@ -66,7 +67,7 @@ export default function WordForgeLeaderboardPage() {
         maxWidth: 400, margin: '0 auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <GlossyBackButton onClick={() => navigate('/games')} />
+          <GlossyBackButton onClick={() => navigate(forgeBackPath())} />
           <img src={FORGE_UI.forgeLogo} alt="Arxon Word Forge" style={{
             width: 128, height: 'auto',
             filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.65))',

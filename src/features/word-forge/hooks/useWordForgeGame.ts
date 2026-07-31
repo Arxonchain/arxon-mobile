@@ -23,6 +23,12 @@ import { validateWordLocal, reasonMessage } from '../engine/wordValidator';
 import { validateAndCreditWord } from '../engine/wordValidatorServer';
 import { mulberry32, shuffle as shuffleArr } from '../engine/seedHash';
 import { loadForgeProgress, saveForgeProgress } from './useForgeProgress';
+import {
+  clearForgeActiveSession,
+  loadForgeActiveSession,
+  saveForgeActiveSession,
+} from './useForgeActiveSession';
+import { flushPendingWordCredits, queuePendingWordCredit } from './useForgePendingSync';
 import { buildHintClaimsPatch } from '../engine/hintTasks';
 import {
   clearForgeSessionTotal,
@@ -62,6 +68,7 @@ export type ForgeGameMode = 'campaign' | 'daily';
 interface UseWordForgeGameOptions {
   preview?: boolean;
   mode?: ForgeGameMode;
+  resume?: boolean;
 }
 
 async function haptic(style: ImpactStyle): Promise<void> {
@@ -70,47 +77,57 @@ async function haptic(style: ImpactStyle): Promise<void> {
 }
 
 export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
-  const { preview = false, mode = 'campaign' } = options;
+  const { preview = false, mode = 'campaign', resume = false } = options;
   const isDaily = mode === 'daily';
   const { user } = useAuth();
   const { triggerConfetti, refreshPoints } = usePoints();
   const { push: pushCloud } = useForgeCloudSync(preview);
 
   const saved = useMemo(() => loadForgeProgress(preview), [preview]);
+  const resumeSnap = useMemo(() => {
+    if (!resume || preview) return null;
+    const snap = loadForgeActiveSession();
+    if (!snap || snap.mode !== mode) return null;
+    return snap;
+  }, [resume, preview, mode]);
+
   const campaignStart = isDaily ? saved.currentLevel : clampCampaignLevel(saved.currentLevel, saved.bestLevel);
-  const [level, setLevel] = useState(campaignStart);
-  const [attemptId, setAttemptId] = useState(() => String(Date.now()));
-  const [phase, setPhase] = useState<RoundPhase>(
-    saved.tutorialCompleted || isDaily ? 'playing' : 'paused',
-  );
-  const [balance, setBalance] = useState(0);
-  const [displayBalance, setDisplayBalance] = useState(0);
-  const [sessionTotal, setSessionTotal] = useState(() => loadForgeSessionTotal());
-  const [displaySessionTotal, setDisplaySessionTotal] = useState(() => loadForgeSessionTotal());
-  const [foundWords, setFoundWords] = useState<FoundWord[]>([]);
+  const [level, setLevel] = useState(resumeSnap?.level ?? campaignStart);
+  const [attemptId, setAttemptId] = useState(() => resumeSnap?.attemptId ?? String(Date.now()));
+  const [phase, setPhase] = useState<RoundPhase>(() => {
+    if (resumeSnap) return resumeSnap.phase;
+    return saved.tutorialCompleted || isDaily ? 'playing' : 'paused';
+  });
+  const [balance, setBalance] = useState(resumeSnap?.balance ?? 0);
+  const [displayBalance, setDisplayBalance] = useState(resumeSnap?.balance ?? 0);
+  const initialRunTotal = resumeSnap?.sessionTotal ?? loadForgeSessionTotal();
+  const [sessionTotal, setSessionTotal] = useState(initialRunTotal);
+  const [displaySessionTotal, setDisplaySessionTotal] = useState(initialRunTotal);
+  const [foundWords, setFoundWords] = useState<FoundWord[]>(resumeSnap?.foundWords ?? []);
   const [selection, setSelection] = useState<number[]>([]);
   const [toast, setToast] = useState<string | null>(null);
   const [bonusPopup, setBonusPopup] = useState<string | null>(null);
   const [coinFlies, setCoinFlies] = useState<CoinFlyEvent[]>([]);
   const [shakeWord, setShakeWord] = useState<string | null>(null);
   const [celebrateWord, setCelebrateWord] = useState<string | null>(null);
-  const [streak, setStreak] = useState(0);
+  const [streak, setStreak] = useState(resumeSnap?.streak ?? 0);
   const [streakPopup, setStreakPopup] = useState<number | null>(null);
-  const [hintsLeft, setHintsLeft] = useState(saved.hintsLeft);
-  const [shufflesLeft, setShufflesLeft] = useState(saved.shufflesLeft);
+  const [hintsLeft, setHintsLeft] = useState(resumeSnap?.hintsLeft ?? saved.hintsLeft);
+  const [shufflesLeft, setShufflesLeft] = useState(resumeSnap?.shufflesLeft ?? saved.shufflesLeft);
   const [hintReveal, setHintReveal] = useState<HintReveal | null>(null);
-  const [liveTiles, setLiveTiles] = useState<LetterTile[] | null>(null);
+  const [liveTiles, setLiveTiles] = useState<LetterTile[] | null>(resumeSnap?.liveTiles ?? null);
   const [shuffleAnim, setShuffleAnim] = useState(false);
-  const [showTutorial, setShowTutorial] = useState(!saved.tutorialCompleted && !isDaily);
-  const [roundEnded, setRoundEnded] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(!saved.tutorialCompleted && !isDaily && !resumeSnap);
+  const [roundEnded, setRoundEnded] = useState(resumeSnap?.roundEnded ?? false);
   const [newBest, setNewBest] = useState(false);
   const [completionistPayout, setCompletionistPayout] = useState(0);
   const [dailyBonusAwarded, setDailyBonusAwarded] = useState(false);
 
-  const claimedRef = useRef(new Set<string>());
-  const hintsAtStartRef = useRef(hintsLeft);
-  const maxStreakRef = useRef(0);
-  const longestWordRef = useRef(0);
+  const claimedRef = useRef(new Set<string>(resumeSnap?.claimedWords ?? []));
+  const hintsAtStartRef = useRef(resumeSnap?.hintsAtStart ?? hintsLeft);
+  const maxStreakRef = useRef(resumeSnap?.maxStreak ?? 0);
+  const longestWordRef = useRef(resumeSnap?.longestWordLen ?? 0);
+  const restoredTimeLeftRef = useRef(resumeSnap?.timeLeft ?? null);
   const flyId = useRef(0);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const balanceRef = useRef<HTMLDivElement | null>(null);
@@ -157,6 +174,18 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
   // Warm up the full 192k-word validation dictionary (separate lazy chunk)
   useEffect(() => { void preloadFullDictionary(); }, []);
 
+  // Retry any offline word credits when back online
+  useEffect(() => {
+    if (preview) return;
+    const flush = () => { void flushPendingWordCredits(refreshPoints); };
+    flush();
+    window.addEventListener('online', flush);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') flush();
+    });
+    return () => window.removeEventListener('online', flush);
+  }, [preview, refreshPoints]);
+
   // Clamp tampered progress on campaign mount
   useEffect(() => {
     if (preview || isDaily) return;
@@ -189,10 +218,52 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
 
   const { timeLeft, reset: resetTimer } = useRoundTimer({
     totalSeconds: generation.params.timerSeconds,
+    initialSeconds: restoredTimeLeftRef.current,
     active: phase === 'playing',
     paused: phase === 'paused' || showTutorial,
     onExpire: onTimerExpire,
   });
+
+  const persistActiveSession = useCallback(() => {
+    if (preview || roundEnded) return;
+    saveForgeActiveSession({
+      mode,
+      level,
+      attemptId,
+      phase,
+      balance,
+      sessionTotal,
+      foundWords,
+      claimedWords: [...claimedRef.current],
+      streak,
+      hintsLeft,
+      shufflesLeft,
+      timeLeft,
+      timerTotal: generation.params.timerSeconds,
+      liveTiles,
+      roundEnded,
+      maxStreak: maxStreakRef.current,
+      longestWordLen: longestWordRef.current,
+      hintsAtStart: hintsAtStartRef.current,
+    });
+    const prog = loadForgeProgress(preview);
+    const runHigh = Math.max(sessionTotal, balance, prog.sessionHigh);
+    if (runHigh > prog.sessionHigh) {
+      saveForgeProgress({ sessionHigh: runHigh }, preview);
+      if (!preview) void pushCloud({ sessionHigh: runHigh });
+    }
+  }, [
+    preview, roundEnded, mode, level, attemptId, phase, balance, sessionTotal,
+    foundWords, streak, hintsLeft, shufflesLeft, timeLeft, generation.params.timerSeconds,
+    liveTiles, pushCloud,
+  ]);
+
+  useEffect(() => {
+    if (preview || phase === 'ended') return;
+    persistActiveSession();
+    const id = window.setInterval(persistActiveSession, 2500);
+    return () => window.clearInterval(id);
+  }, [preview, phase, persistActiveSession]);
 
   const resetRound = useCallback((nextLevel: number, newAttempt: boolean) => {
     const prog = loadForgeProgress(preview);
@@ -204,7 +275,10 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       setLevel(playLevel);
       persistMeta({ currentLevel: playLevel });
     }
-    if (newAttempt) setAttemptId(String(Date.now()));
+    if (newAttempt) {
+      clearForgeActiveSession();
+      setAttemptId(String(Date.now()));
+    }
     setPhase(showTutorial ? 'paused' : 'playing');
     resetTimer(params.timerSeconds);
     setBalance(0);
@@ -352,7 +426,17 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
       if (server.credited === true) {
         void refreshPoints();
       } else if (server.syncPending) {
-        showToast('Word saved — syncing ARX-P when online', 2200);
+        queuePendingWordCredit({
+          word,
+          poolLetters,
+          claimed: [...claimedRef.current].filter((w) => w !== word),
+          level: isDaily ? 0 : level,
+          attemptId,
+          streak,
+          minWordLen: submitMinLen,
+          slotWords: generation.slotWords,
+        });
+        void flushPendingWordCredits(refreshPoints);
       }
     }
 
@@ -521,11 +605,17 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     const prog = loadForgeProgress(preview);
     const runTotal = Math.max(sessionTotal, balance);
     persistMeta({ sessionHigh: Math.max(prog.sessionHigh, runTotal) });
-    clearForgeSessionTotal();
   }, [balance, persistMeta, preview, sessionTotal]);
 
-  const endSession = useCallback(() => {
+  const leaveRun = useCallback(() => {
     finalizeSession();
+    restoreMusic();
+  }, [finalizeSession]);
+
+  const abandonRun = useCallback(() => {
+    finalizeSession();
+    clearForgeActiveSession();
+    clearForgeSessionTotal();
     restoreMusic();
   }, [finalizeSession]);
 
@@ -644,7 +734,9 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     resetRound,
     grantHints,
     claimHintTask,
-    endSession,
+    leaveRun,
+    abandonRun,
+    persistActiveSession,
     validCount: foundWords.filter((w) => !w.rejected).length,
     missionSnapshot,
     dailyMission: isDaily ? getDailyMission() : null,

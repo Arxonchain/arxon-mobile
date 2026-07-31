@@ -31,9 +31,10 @@ import { WordSlots } from './WordSlots';
 interface WordForgeGameProps {
   preview?: boolean;
   mode?: ForgeGameMode;
+  resume?: boolean;
 }
 
-export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeGameProps) {
+export function WordForgeGame({ preview = false, mode = 'campaign', resume = false }: WordForgeGameProps) {
   const navigate = useNavigate();
   const [settings, setSettings] = useState(loadForgeSettings);
   const [tutorialStep, setTutorialStep] = useState(0);
@@ -42,7 +43,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   const [faqOpen, setFaqOpen] = useState(false);
   const [rewardsToast, setRewardsToast] = useState(false);
   const [hintRefillOpen, setHintRefillOpen] = useState(false);
-  const game = useWordForgeGame({ preview, mode });
+  const game = useWordForgeGame({ preview, mode, resume });
   const { generation, phase } = game;
   const passed = game.slotsFilled >= game.minWords;
   const urgent = game.timeLeft <= 10 && phase === 'playing';
@@ -100,8 +101,14 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
     if (settings.music && phase === 'playing') void startMusic();
   }, [settings.music, phase]);
 
+  const leaveTo = useCallback((path: string) => {
+    game.persistActiveSession();
+    navigate(path);
+  }, [game, navigate]);
+
   const handleExit = useCallback(() => {
-    game.endSession();
+    game.persistActiveSession();
+    game.leaveRun();
     stopMusic();
     navigate(preview ? '/word-forge-preview' : '/games');
   }, [navigate, preview, game]);
@@ -125,7 +132,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
   }, [game, passed, navigate]);
 
   const handleEndGame = useCallback(() => {
-    game.endSession();
+    game.abandonRun();
     stopMusic();
     navigate('/games');
   }, [game, navigate]);
@@ -309,12 +316,14 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
           minHeight: 0,
           maxHeight: layout.slotsMaxH,
           display: 'flex',
-          alignItems: 'center',
+          alignItems: game.slotRows.length >= 5 ? 'flex-start' : 'center',
           justifyContent: 'center',
           marginTop: layout.compact ? 4 : 6,
           overflowY: 'auto',
           overflowX: 'hidden',
           WebkitOverflowScrolling: 'touch',
+          paddingTop: game.slotRows.length >= 5 ? 4 : 0,
+          paddingBottom: game.slotRows.length >= 5 ? 8 : 0,
           animation: !reduced && game.shakeWord ? 'wf-shake 0.35s ease' : undefined,
         }}>
           <WordSlots
@@ -397,12 +406,12 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
           </div>
           <ForgeArenaDock
             dailyDone={dailyDone}
-            onStats={() => navigate('/word-forge/stats')}
+            onStats={() => leaveTo('/word-forge/stats')}
             onSettings={() => setSettingsOpen(true)}
-            onLeaderboard={() => navigate('/word-forge/leaderboard')}
-            onMap={() => navigate('/word-forge/map')}
+            onLeaderboard={() => leaveTo('/word-forge/leaderboard')}
+            onMap={() => leaveTo('/word-forge/map')}
             onDaily={() => {
-              if (!game.isDaily) navigate('/word-forge?mode=daily');
+              if (!game.isDaily) leaveTo('/word-forge?mode=daily');
             }}
             onRewards={() => {
               setRewardsToast(true);
@@ -470,7 +479,7 @@ export function WordForgeGame({ preview = false, mode = 'campaign' }: WordForgeG
       <ConfirmDialog
         open={exitConfirm}
         title="Leave Sector?"
-        message="Your current run progress will be lost."
+        message="Your run total is saved. Leave now and resume anytime from the game hub."
         confirmLabel="Leave"
         cancelLabel="Stay"
         onConfirm={handleExit}

@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import CampaignBanner from '@/components/CampaignBanner';
+import { DashboardActivityCarousel } from '@/components/mobile/DashboardActivityCarousel';
 import MobileRewardAlerts from '@/components/mobile/MobileRewardAlerts';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -384,12 +384,6 @@ export default function MobileDashboard() {
   }, [user, isMining]);
 
   const quickItems = [
-    ...(WORD_FORGE_ENABLED ? [{
-      id:'word-forge', label:'Word Forge', path:'/word-forge',
-      col:'hsl(38 90% 55%)', bg:'hsl(38 90% 55%/0.12)', bd:'hsl(38 90% 55%/0.22)',
-      badge: 'BETA' as const,
-      icon:<><path d="M4 7h16M7 7v12a2 2 0 002 2h6a2 2 0 002-2V7"/><path d="M9 7V5a2 2 0 012-2h2a2 2 0 012 2v2"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/></>,
-    }] : []),
     { id:'arena', label:'Arena', path:'/arena',
       col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.12)', bd:'hsl(255 50% 65%/0.22)',
       icon:<><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M9.5 17.5L21 6V3h-3L9.5 14.5"/></> },
@@ -487,9 +481,9 @@ export default function MobileDashboard() {
           </div>
         </motion.div>
 
-        {/* ── Campaign Banner ── */}
+        {/* ── Activity carousel (Word Forge, Arena, Tasks) ── */}
         <div style={{padding:'14px 20px 0'}}>
-          <CampaignBanner />
+          <DashboardActivityCarousel />
         </div>
 
         <MobileRewardAlerts />

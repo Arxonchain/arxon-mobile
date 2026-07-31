@@ -1,10 +1,18 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Flame, HelpCircle, Lock, Sparkles } from 'lucide-react';
+import { Flame, HelpCircle, Lock, Play, Sparkles } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { frontierLevel } from '@/features/word-forge/engine/sectorProgress';
+import {
+  clearForgeActiveSession,
+  hasActiveForgeSession,
+} from '@/features/word-forge/hooks/useForgeActiveSession';
 import { loadForgeProgress, saveForgeProgress } from '@/features/word-forge/hooks/useForgeProgress';
+import {
+  clearForgeSessionTotal,
+  loadForgeSessionTotal,
+} from '@/features/word-forge/hooks/useForgeSessionTotal';
 import { isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
@@ -23,14 +31,23 @@ export default function GamingHubPage() {
   const progress = loadForgeProgress();
   const dailyDone = isDailyCompleted(progress.dailyCompletedDate);
   const [faqOpen, setFaqOpen] = useState(false);
+  const runTotal = useMemo(() => loadForgeSessionTotal(), []);
+  const canResume = hasActiveForgeSession();
 
   const startCampaign = useCallback(() => {
+    clearForgeActiveSession();
+    clearForgeSessionTotal();
     const next = frontierLevel(progress);
     saveForgeProgress({ currentLevel: next });
     navigate('/word-forge');
   }, [navigate, progress]);
 
+  const resumeGame = useCallback(() => {
+    navigate('/word-forge?resume=1');
+  }, [navigate]);
+
   const startDaily = useCallback(() => {
+    clearForgeActiveSession();
     navigate('/word-forge?mode=daily');
   }, [navigate]);
 
@@ -134,16 +151,31 @@ export default function GamingHubPage() {
               ))}
             </div>
 
-            <div style={{ marginTop: 18 }}>
+            <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {canResume && (
+                <GlossyButton size="xl" color="cyan" onClick={resumeGame}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    <Play size={18} strokeWidth={3} fill="currentColor" /> Resume Game
+                  </span>
+                </GlossyButton>
+              )}
               <GlossyButton
                 size="xl"
                 color="gold"
                 disabled={!WORD_FORGE_ENABLED}
                 onClick={startCampaign}
               >
-                Play Campaign
+                {canResume ? 'New Campaign Run' : 'Play Campaign'}
               </GlossyButton>
             </div>
+            {(runTotal > 0 || progress.sessionHigh > 0) && (
+              <p style={{
+                margin: '10px 0 0', textAlign: 'center', fontSize: 11, fontWeight: 700,
+                color: 'rgba(255,232,154,0.85)',
+              }}>
+                Run total: {Math.max(runTotal, progress.sessionHigh)} ARX-P
+              </p>
+            )}
             <p style={{
               margin: '8px 0 0', textAlign: 'center', fontSize: 10.5, fontWeight: 800,
               letterSpacing: '0.14em', color: 'rgba(255,232,154,0.8)', textTransform: 'uppercase',
