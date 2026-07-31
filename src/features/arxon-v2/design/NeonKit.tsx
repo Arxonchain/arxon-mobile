@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import { neon, neonShadow } from './neonTokens';
 
-/** Space nebula page shell — Word Forge banner aesthetic */
+/** Space nebula page shell — meshy creamy Word Forge aesthetic */
 export function NeonPage({ children, padBottom = 100 }: { children: ReactNode; padBottom?: number }) {
   return (
     <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden', paddingBottom: padBottom, fontFamily: neon.font, background: neon.deep }}>
@@ -12,16 +12,25 @@ export function NeonPage({ children, padBottom = 100 }: { children: ReactNode; p
           position: 'absolute', inset: -20,
           backgroundImage: `url(${FORGE_UI.discoveryBg})`,
           backgroundSize: 'cover', backgroundPosition: 'center',
-          filter: 'brightness(0.45) saturate(1.2)',
-          transform: 'scale(1.05)',
+          filter: 'brightness(0.42) saturate(1.25) blur(0.5px)',
+          transform: 'scale(1.08)',
         }} />
         <div style={{
           position: 'absolute', inset: 0,
           background: `
-            radial-gradient(ellipse 90% 60% at 50% -10%, rgba(79,216,235,0.12), transparent),
-            radial-gradient(ellipse 50% 40% at 90% 20%, rgba(168,85,247,0.08), transparent),
-            linear-gradient(180deg, rgba(2,6,14,0.3) 0%, rgba(2,6,14,0.92) 85%)
+            radial-gradient(ellipse 100% 70% at 50% -5%, rgba(79,216,235,0.14), transparent 55%),
+            radial-gradient(ellipse 60% 50% at 85% 15%, rgba(168,85,247,0.1), transparent 50%),
+            radial-gradient(ellipse 40% 35% at 10% 60%, rgba(127,231,196,0.06), transparent 45%),
+            linear-gradient(180deg, rgba(2,6,14,0.25) 0%, rgba(2,6,14,0.94) 88%)
           `,
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0, opacity: 0.4,
+          backgroundImage: `
+            radial-gradient(circle at 25% 25%, rgba(255,255,255,0.03) 1px, transparent 1px),
+            radial-gradient(circle at 75% 75%, rgba(79,216,235,0.04) 1px, transparent 1px)
+          `,
+          backgroundSize: '32px 32px, 48px 48px',
         }} />
       </div>
       <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>

@@ -1,30 +1,30 @@
 /**
- * Full neon dashboard — Word Forge banner aesthetic app-wide.
- * Uses the original DashboardActivityCarousel + GlossyKit + space backdrop.
+ * Full neon dashboard — creamy mesh aesthetic with glass balance + staggered explore flow.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Bell, Pickaxe, Swords, Target, Users, Send, Wallet, Trophy, Zap } from 'lucide-react';
+import { Bell, Target, Users, Send, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { useProfile } from '@/hooks/useProfile';
-import { useMiningStatus } from '@/hooks/useMiningStatus';
+import { useMining } from '@/hooks/useMining';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { useRealtimePoints } from '@/hooks/useRealtimePoints';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
-import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import { DashboardActivityCarousel } from '@/components/mobile/DashboardActivityCarousel';
+import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import MobileRewardAlerts from '@/components/mobile/MobileRewardAlerts';
+import { GlossyIconButton } from '@/features/word-forge/components/GlossyKit';
 import {
-  GlossyButton, GlossyIconButton, GamePanel, RibbonBanner,
-} from '@/features/word-forge/components/GlossyKit';
-import {
-  NeonPage, NeonPanel, NeonChip, NeonActionTile, NeonSectionTitle, NeonActivityRow, NeonEyebrow,
+  NeonPage, NeonPanel, NeonSectionTitle, NeonActivityRow, NeonEyebrow,
 } from '@/features/arxon-v2/design/NeonKit';
+import {
+  BalanceGlassCard, ExploreStaggerFlow, MiningPillWidget,
+  buildWeekDaysFromAmounts, mockPreviewWeekDays, type DayEarning,
+} from '@/features/arxon-v2/components/DashboardWidgets';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 
 function relTime(iso: string) {
@@ -35,11 +35,17 @@ function relTime(iso: string) {
   return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
+function localDateKey(d: Date) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 const fadeUp = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { duration: 0.45 } } };
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.07 } } };
 
 export interface DashboardNeonProps {
-  /** Browser preview — mock data, always show Word Forge carousel slide */
   preview?: boolean;
 }
 
@@ -48,50 +54,95 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   const navigate = useNavigate();
   const { points, rank } = usePoints();
   const { profile } = useProfile();
-  const { isMining } = useMiningStatus();
+  const mining = useMining({ tickMs: 1000 });
   const { unread: notifUnread } = useInAppNotifications();
   useRealtimePoints();
 
+  const [previewMining, setPreviewMining] = useState(false);
+  const [previewEarn, setPreviewEarn] = useState(0);
+  const [previewRemain, setPreviewRemain] = useState(8 * 3600);
+
+  const isMiningLive = preview ? previewMining : mining.isMining;
+  const miningEarn = preview ? previewEarn : mining.earnedPoints;
+  const miningRemain = preview ? previewRemain : mining.remainingTime;
+
   const [todayPts, setTodayPts] = useState(preview ? 420 : 0);
   const [weekPts, setWeekPts] = useState(preview ? 2840 : 0);
+  const [prevWeekPts, setPrevWeekPts] = useState(preview ? 2240 : 0);
   const [liveEarn, setLiveEarn] = useState(preview ? 127.5 : 0);
+  const [liveTodayBoost, setLiveTodayBoost] = useState(0);
   const [recentActivity, setRecentActivity] = useState<any[]>(preview ? [
     { label: 'Mining session', sub: '2h ago', val: '+127', accent: neon.teal },
     { label: 'Task completed', sub: '5h ago', val: '+5000', accent: neon.gold },
     { label: 'Arena win', sub: '1d ago', val: '+2400', accent: neon.purple },
   ] : []);
   const [pendingTasks, setPendingTasks] = useState(preview ? 3 : 0);
-  const [liveArenaCount, setLiveArenaCount] = useState(preview ? 2 : 0);
   const [dashBattles, setDashBattles] = useState<any[]>([]);
-  const [weekChart, setWeekChart] = useState<number[]>(preview ? [0.2, 0.35, 0.5, 0.4, 0.65, 0.8, 1] : [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]);
+  const [weekDays, setWeekDays] = useState<DayEarning[]>(preview ? mockPreviewWeekDays() : buildWeekDaysFromAmounts([0, 0, 0, 0, 0, 0, 0]));
 
   const totalPts = preview ? 34766 : Math.round(points?.total_points ?? 0);
   const username = preview ? 'Arxon Miner' : (profile?.username || user?.email?.split('@')[0] || 'Miner');
   const streak = preview ? 12 : (points?.daily_streak ?? 0);
   const userRank = preview ? 42 : rank;
 
+  const weekDelta = weekPts - prevWeekPts;
+  const weekDeltaPct = prevWeekPts > 0 ? (weekDelta / prevWeekPts) * 100 : weekPts > 0 ? 100 : 0;
+
   const go = (path: string) => { if (!preview) navigate(path); };
 
   const fetchActivityData = useCallback(async () => {
     if (preview || !user) return;
     const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const week = new Date(now.getTime() - 7 * 86400000).toISOString().split('T')[0];
-    const [{ data: td }, { data: wk }] = await Promise.all([
-      supabase.from('mining_sessions').select('arx_mined, started_at').eq('user_id', user.id).gte('started_at', today),
-      supabase.from('mining_sessions').select('arx_mined, started_at').eq('user_id', user.id).gte('started_at', week),
-    ]);
-    setTodayPts(td?.reduce((s, r) => s + Number(r.arx_mined || 0), 0) ?? 0);
-    setWeekPts(wk?.reduce((s, r) => s + Number(r.arx_mined || 0), 0) ?? 0);
-    const weekDays = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(now); d.setDate(d.getDate() - (6 - i)); return d.toISOString().split('T')[0];
+    const weekStart = new Date(now);
+    weekStart.setDate(weekStart.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+    const prevWeekStart = new Date(weekStart);
+    prevWeekStart.setDate(prevWeekStart.getDate() - 7);
+    const prevWeekEnd = new Date(weekStart);
+
+    const weekDayKeys = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - (6 - i));
+      return localDateKey(d);
     });
-    const dayTotals = weekDays.map((day) => (wk || []).filter((s) => String(s.started_at).startsWith(day)).reduce((sum, r) => sum + Number(r.arx_mined || 0), 0));
-    const maxDay = Math.max(...dayTotals, 1);
-    setWeekChart(dayTotals.map((v) => Math.max(0.08, v / maxDay)));
-    const { data: ledgerRows } = await supabase.from('points_ledger' as any).select('amount,description,created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(4);
+
+    const [{ data: ledgerWeek }, { data: ledgerPrev }] = await Promise.all([
+      supabase.from('points_ledger' as any)
+        .select('amount, created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', weekStart.toISOString())
+        .gt('amount', 0),
+      supabase.from('points_ledger' as any)
+        .select('amount, created_at')
+        .eq('user_id', user.id)
+        .gte('created_at', prevWeekStart.toISOString())
+        .lt('created_at', prevWeekEnd.toISOString())
+        .gt('amount', 0),
+    ]);
+
+    const sumByDay = (rows: any[] | null, keys: string[]) => {
+      const map = Object.fromEntries(keys.map((k) => [k, 0]));
+      (rows || []).forEach((row) => {
+        const key = localDateKey(new Date(row.created_at));
+        if (key in map) map[key] += Number(row.amount || 0);
+      });
+      return keys.map((k) => map[k]);
+    };
+
+    const dayAmounts = sumByDay(ledgerWeek, weekDayKeys);
+    setWeekDays(buildWeekDaysFromAmounts(dayAmounts, now));
+    setTodayPts(dayAmounts[6] ?? 0);
+    setWeekPts(dayAmounts.reduce((s, v) => s + v, 0));
+    setPrevWeekPts((ledgerPrev || []).reduce((s, r) => s + Number(r.amount || 0), 0));
+
+    const { data: ledgerRows } = await supabase.from('points_ledger' as any)
+      .select('amount,description,created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(4);
     setRecentActivity((ledgerRows || []).map((row: any) => ({
-      label: row.description, sub: relTime(row.created_at),
+      label: row.description,
+      sub: relTime(row.created_at),
       val: `${Number(row.amount) > 0 ? '+' : ''}${Math.round(Number(row.amount)).toLocaleString()}`,
       accent: Number(row.amount) > 0 ? neon.teal : '#ff6b4a',
     })));
@@ -100,14 +151,28 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   const fetchDashBattles = useCallback(async () => {
     if (preview) return;
     const now = Date.now();
-    const { data } = await supabase.from('arena_battles').select('id, title, banner_image, side_a_name, side_b_name, side_a_power, side_b_power, starts_at, ends_at, is_active, winner_side').order('created_at', { ascending: false }).limit(10);
+    const { data } = await supabase.from('arena_battles')
+      .select('id, title, banner_image, side_a_name, side_b_name, side_a_power, side_b_power, starts_at, ends_at, is_active, winner_side')
+      .order('created_at', { ascending: false })
+      .limit(10);
     const rows = data || [];
     const live = rows.filter((b) => new Date(b.starts_at).getTime() <= now && new Date(b.ends_at).getTime() > now && !b.winner_side);
-    setLiveArenaCount(live.length);
     setDashBattles(live.slice(0, 4));
   }, [preview]);
 
   useEffect(() => { fetchActivityData(); fetchDashBattles(); }, [fetchActivityData, fetchDashBattles]);
+
+  useEffect(() => {
+    if (preview || !user) return;
+    const channel = supabase
+      .channel(`dash-ledger-${user.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'points_ledger', filter: `user_id=eq.${user.id}` }, () => {
+        void fetchActivityData();
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [user, preview, fetchActivityData]);
+
   useEffect(() => {
     if (preview || !user) return;
     (async () => {
@@ -121,31 +186,133 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   }, [user, preview]);
 
   useEffect(() => {
-    if (preview || !user || !isMining) { if (!preview) setLiveEarn(0); return; }
-    const sync = async () => {
-      const { data } = await supabase.from('mining_sessions').select('started_at, arx_mined').eq('user_id', user.id).eq('is_active', true).order('started_at', { ascending: false }).limit(1).maybeSingle();
-      if (!data) return;
-      const elapsed = Math.min(Math.floor((Date.now() - new Date(data.started_at).getTime()) / 1000), 8 * 3600);
-      setLiveEarn(Math.max(Number(data.arx_mined || 0), Math.min(480, (elapsed / 3600) * 10)));
-    };
-    sync();
-    const t = setInterval(sync, 5000);
+    if (preview || !user || !mining.isMining) {
+      if (!preview) { setLiveEarn(0); setLiveTodayBoost(0); }
+      return;
+    }
+    setLiveEarn(mining.earnedPoints);
+    setLiveTodayBoost(Math.max(0, mining.earnedPoints - Math.floor(mining.earnedPoints)));
+    const t = setInterval(() => {
+      setLiveEarn(mining.earnedPoints);
+    }, 4000);
     return () => clearInterval(t);
-  }, [user, isMining, preview]);
+  }, [user, mining.isMining, mining.earnedPoints, preview]);
 
-  const quickActions = [
-    { label: 'Mine', icon: <Pickaxe size={22} strokeWidth={2.2} />, color: 'cyan' as const, path: '/mining', badge: isMining || preview ? 'LIVE' : null },
-    { label: 'Arena', icon: <Swords size={22} strokeWidth={2.2} />, color: 'gold' as const, path: '/arena', badge: liveArenaCount > 0 ? String(liveArenaCount) : null },
-    ...(WORD_FORGE_ENABLED || preview ? [{ label: 'Play', icon: <Zap size={22} strokeWidth={2.2} />, color: 'green' as const, path: '/games', badge: 'NEW' as string | null }] : []),
-    { label: 'Tasks', icon: <Target size={22} strokeWidth={2.2} />, color: 'cyan' as const, path: '/tasks', badge: pendingTasks > 0 ? String(pendingTasks) : null },
-    { label: 'Refer', icon: <Users size={22} strokeWidth={2.2} />, color: 'gold' as const, path: '/referrals', badge: null },
-    { label: 'Nexus', icon: <Send size={22} strokeWidth={2.2} />, color: 'green' as const, path: '/nexus', badge: null },
-  ];
+  useEffect(() => {
+    if (!preview || !previewMining) return;
+    const t = setInterval(() => {
+      setPreviewEarn((e) => e + 0.08);
+      setPreviewRemain((r) => Math.max(0, r - 1));
+    }, 1000);
+    return () => clearInterval(t);
+  }, [preview, previewMining]);
+
+  const handleMiningToggle = useCallback(async () => {
+    if (preview) {
+      setPreviewMining((m) => {
+        if (m) {
+          setPreviewEarn(0);
+          setPreviewRemain(8 * 3600);
+        }
+        return !m;
+      });
+      return;
+    }
+    if (!user) return;
+    if (mining.sessionMaxed) await mining.claimPoints();
+    else if (mining.isMining) await mining.stopMining();
+    else await mining.startMining();
+  }, [preview, previewMining, user, mining]);
+
+  const exploreItems = useMemo(() => [
+    {
+      eyebrow: 'Missions', title: 'Daily Tasks', cta: 'View Tasks', accent: neon.gold, path: '/tasks', align: 'left' as const,
+      badge: pendingTasks > 0 ? `${pendingTasks} new` : undefined,
+      icon3d: (
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: 'linear-gradient(145deg, rgba(255,201,60,0.28), rgba(255,201,60,0.06))',
+          border: '1px solid rgba(255,201,60,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 20px rgba(255,201,60,0.2), inset 0 1px 0 rgba(255,255,255,0.12)',
+        }}>
+          <Target size={22} color={neon.gold} strokeWidth={1.8} />
+        </div>
+      ),
+    },
+    {
+      eyebrow: 'Rankings', title: 'Leaderboard', cta: 'View Ranks', accent: neon.gold, path: '/leaderboard', align: 'right' as const,
+      badge: userRank ? `#${userRank}` : undefined,
+      icon3d: (
+        <div style={{
+          width: 56, height: 56, borderRadius: 14, overflow: 'hidden',
+          background: 'linear-gradient(145deg, rgba(255,201,60,0.28), rgba(255,201,60,0.06))',
+          border: '1px solid rgba(255,201,60,0.4)',
+          boxShadow: '0 0 20px rgba(255,201,60,0.2), inset 0 1px 0 rgba(255,255,255,0.12)',
+        }}>
+          <img
+            src={FORGE_UI.leaderboardKing}
+            alt=""
+            style={{
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              objectPosition: 'center 42%',
+              display: 'block',
+            }}
+          />
+        </div>
+      ),
+    },
+    {
+      eyebrow: 'Web3', title: 'Wallet', cta: 'Open Wallet', accent: neon.cyan, path: '/wallet', align: 'left' as const,
+      badge: 'SOON',
+      icon3d: (
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: 'linear-gradient(145deg, rgba(79,216,235,0.25), rgba(79,216,235,0.05))',
+          border: '1px solid rgba(79,216,235,0.35)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 20px rgba(79,216,235,0.2), inset 0 1px 0 rgba(255,255,255,0.12)',
+        }}>
+          <Wallet size={22} color={neon.cyan} strokeWidth={1.8} />
+        </div>
+      ),
+    },
+    {
+      eyebrow: 'Community', title: 'Referrals', cta: 'Invite Friends', accent: neon.teal, path: '/referrals', align: 'right' as const,
+      icon3d: (
+        <div style={{
+          width: 48, height: 48, borderRadius: '50%',
+          background: 'linear-gradient(145deg, rgba(127,231,196,0.3), rgba(127,231,196,0.06))',
+          border: '1px solid rgba(127,231,196,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 18px rgba(127,231,196,0.18)',
+        }}>
+          <Users size={22} color={neon.teal} strokeWidth={1.8} />
+        </div>
+      ),
+    },
+    {
+      eyebrow: 'Transfer', title: 'Nexus', cta: 'Send ARX-P', accent: neon.purple, path: '/nexus', align: 'left' as const,
+      icon3d: (
+        <div style={{
+          width: 48, height: 48, borderRadius: 14,
+          background: 'linear-gradient(145deg, rgba(168,85,247,0.28), rgba(168,85,247,0.06))',
+          border: '1px solid rgba(168,85,247,0.4)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          boxShadow: '0 0 18px rgba(168,85,247,0.18)',
+          transform: 'rotate(-6deg)',
+        }}>
+          <Send size={20} color={neon.purple} strokeWidth={1.8} />
+        </div>
+      ),
+    },
+  ], [pendingTasks, userRank]);
 
   return (
     <NeonPage>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        {/* Header */}
         <motion.div variants={fadeUp} style={{ padding: '52px 20px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <NeonEyebrow>Arxon Protocol</NeonEyebrow>
@@ -161,88 +328,51 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
           </div>
         </motion.div>
 
-        {/* Carousel — exact component you liked */}
         <motion.div variants={fadeUp} style={{ padding: '16px 20px 0' }}>
           <DashboardActivityCarousel forceShowWordForge={preview || WORD_FORGE_ENABLED} />
         </motion.div>
 
         {!preview && <MobileRewardAlerts />}
 
-        {/* Balance panel */}
         <motion.div variants={fadeUp} style={{ padding: '20px 20px 0' }}>
-          <GamePanel style={{ paddingTop: 36 }}>
-            <RibbonBanner color="cyan">Your Balance</RibbonBanner>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginTop: 8 }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-                  <span style={{ fontSize: 38, fontWeight: 900, color: neon.text, letterSpacing: '-2px', textShadow: `0 0 24px ${neon.cyanGlow}` }}>
-                    {totalPts.toLocaleString()}
-                  </span>
-                  <span style={{ fontSize: 13, fontWeight: 800, color: neon.cyan }}>ARX-P</span>
-                </div>
-                {userRank && (
-                  <p style={{ margin: '6px 0 0', fontSize: 10, fontWeight: 700, color: neon.textMuted }}>
-                    Global rank <span style={{ color: neon.gold }}>#{userRank}</span>
-                  </p>
-                )}
-              </div>
-              <img src={FORGE_UI.arxCoin} alt="" style={{ width: 72, height: 72, filter: 'drop-shadow(0 0 16px rgba(79,216,235,0.5))' }} />
-            </div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
-              <NeonChip label="Today" value={`+${Math.round(todayPts).toLocaleString()}`} accent={neon.cyan} />
-              <NeonChip label="Week" value={`+${Math.round(weekPts).toLocaleString()}`} accent={neon.teal} />
-              <NeonChip label="Streak" value={`${streak}d`} accent={neon.gold} />
-            </div>
-            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 4, height: 32, marginTop: 14 }}>
-              {weekChart.map((h, i) => (
-                <div key={i} style={{
-                  flex: 1, borderRadius: '4px 4px 0 0', height: `${h * 100}%`,
-                  background: i === 6 ? `linear-gradient(to top, ${neon.cyan}, ${neon.teal})` : `${neon.cyan}22`,
-                  boxShadow: i === 6 ? `0 0 12px ${neon.cyanGlow}` : undefined,
-                }} />
-              ))}
-            </div>
-          </GamePanel>
+          <BalanceGlassCard
+            balance={totalPts}
+            weekDelta={weekDelta}
+            weekDeltaPct={weekDeltaPct}
+            rank={userRank}
+            weekDays={weekDays}
+            todayPts={todayPts}
+            weekPts={weekPts}
+            streak={streak}
+            liveTodayBoost={preview ? (previewMining ? previewEarn % 1 : 0) : liveTodayBoost}
+            isMiningLive={isMiningLive}
+          />
         </motion.div>
 
-        {(isMining || preview) && (
-          <motion.div variants={fadeUp} style={{ padding: '14px 20px 0' }}>
-            <NeonPanel glow={neon.teal} onClick={() => go('/mining')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div style={{ width: 10, height: 10, borderRadius: '50%', background: neon.teal, boxShadow: `0 0 12px ${neon.teal}`, animation: 'pulse 1.2s infinite' }} />
-                <div>
-                  <p style={{ margin: 0, fontSize: 14, fontWeight: 900, color: neon.teal }}>Mining Live</p>
-                  <p style={{ margin: '2px 0 0', fontSize: 10, color: neon.textMuted }}>{liveEarn.toFixed(2)} ARX-P earned · tap to manage</p>
-                </div>
-              </div>
-            </NeonPanel>
-          </motion.div>
-        )}
-
-        {/* Glossy quick actions — new interaction model */}
-        <motion.div variants={fadeUp} style={{ padding: '22px 20px 0' }}>
-          <NeonSectionTitle title="Command Center" />
-          <div style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 6 }} className="scrollbar-none">
-            {quickActions.map((a) => (
-              <GlossyIconButton key={a.label} label={a.label} caption={a.label} color={a.color} size={64} badge={a.badge} onClick={() => go(a.path)}>
-                {a.icon}
-              </GlossyIconButton>
-            ))}
-          </div>
+        <motion.div variants={fadeUp} style={{ padding: '10px 20px 0' }}>
+          <MiningPillWidget
+            isMining={isMiningLive}
+            earnedPoints={miningEarn}
+            remainingSeconds={miningRemain}
+            pointsPerHour={preview ? 11.5 : mining.pointsPerHour}
+            boostPercentage={preview ? 15 : mining.totalBoostPercentage}
+            onToggle={handleMiningToggle}
+            loading={preview ? false : mining.loading}
+            sessionMaxed={preview ? false : mining.sessionMaxed}
+          />
         </motion.div>
 
-        {/* Explore tiles — carousel texture */}
-        <motion.div variants={fadeUp} style={{ padding: '8px 0 0' }}>
-          <div style={{ padding: '0 20px' }}><NeonSectionTitle title="Explore" /></div>
-          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '0 20px' }} className="scrollbar-none">
-            <NeonActionTile title="Word Forge" subtitle="Spell. Stack. Survive." accent={neon.gold} image={FORGE_UI.dashboardBanner} badge="GAME" onClick={() => go('/games')} />
-            <NeonActionTile title="Arena Battles" subtitle="Stake & win pools" accent={neon.purple} onClick={() => go('/arena')} badge={liveArenaCount > 0 ? `${liveArenaCount} LIVE` : undefined} />
-            <NeonActionTile title="Leaderboard" subtitle="Climb the ranks" accent={neon.gold} onClick={() => go('/leaderboard')} />
-            <NeonActionTile title="Wallet" subtitle="Web3 coming soon" accent={neon.cyan} onClick={() => go('/wallet')} badge="SOON" />
-          </div>
+        {/* Explore — compact zigzag path like reference */}
+        <motion.div variants={fadeUp} style={{ padding: '20px 16px 0' }}>
+          <NeonSectionTitle title="Explore" />
+          <ExploreStaggerFlow
+            items={exploreItems.map((item) => ({
+              ...item,
+              onClick: () => go(item.path),
+            }))}
+          />
         </motion.div>
 
-        {/* Live battles */}
         {(dashBattles.length > 0 || preview) && (
           <motion.div variants={fadeUp} style={{ padding: '22px 20px 0' }}>
             <NeonSectionTitle title="Live Battles" action="All" onAction={() => go('/arena')} />
@@ -265,7 +395,6 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
           </motion.div>
         )}
 
-        {/* Activity */}
         <motion.div variants={fadeUp} style={{ padding: '22px 20px 0' }}>
           <NeonSectionTitle title="Recent Activity" action="History" onAction={() => go('/points-history')} />
           {recentActivity.map((it, i) => (
@@ -273,14 +402,9 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
           ))}
         </motion.div>
 
-        {/* Primary CTA */}
-        <motion.div variants={fadeUp} style={{ padding: '20px 20px 0' }}>
-          <GlossyButton color="gold" size="lg" onClick={() => go('/mining')}>Start Mining Session</GlossyButton>
-        </motion.div>
-
         {preview && (
           <p style={{ textAlign: 'center', padding: '24px 20px', fontSize: 10, color: neon.textMuted, letterSpacing: '0.1em' }}>
-            UI PREVIEW · NEON DASHBOARD v3
+            UI PREVIEW · NEON DASHBOARD v5
           </p>
         )}
       </motion.div>

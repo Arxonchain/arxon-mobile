@@ -2,6 +2,8 @@ import { motion, type HTMLMotionProps } from 'framer-motion';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { type CSSProperties, type ReactNode } from 'react';
 import { v2 } from './tokens';
+import { NeonPage } from './NeonKit';
+import { neon } from './neonTokens';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -25,19 +27,9 @@ export function V2Page({
   style?: CSSProperties;
 }) {
   return (
-    <div
-      style={{
-        minHeight: '100vh',
-        background: v2.gradient.mesh,
-        paddingBottom: padBottom,
-        fontFamily: v2.font,
-        position: 'relative',
-        overflowX: 'hidden',
-        ...style,
-      }}
-    >
-      {children}
-    </div>
+    <NeonPage padBottom={padBottom}>
+      <div style={{ fontFamily: neon.font, ...style }}>{children}</div>
+    </NeonPage>
   );
 }
 
@@ -74,8 +66,8 @@ export function V2Header({
       )}
       {(title || subtitle) && (
         <div style={{ textAlign: 'center', flex: 1, padding: '0 8px' }}>
-          {title && <h1 style={{ fontSize: large ? 22 : 16, fontWeight: 800, color: v2.brand.steelBright, letterSpacing: '-0.3px', margin: 0 }}>{title}</h1>}
-          {subtitle && <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 4, marginBottom: 0 }}>{subtitle}</p>}
+          {title && <h1 style={{ fontSize: large ? 22 : 16, fontWeight: 800, color: neon.text, letterSpacing: '-0.3px', margin: 0 }}>{title}</h1>}
+          {subtitle && <p style={{ fontSize: 10, color: neon.textMuted, marginTop: 4, marginBottom: 0 }}>{subtitle}</p>}
         </div>
       )}
       {right ?? <div style={{ width: 40 }} />}
@@ -104,7 +96,7 @@ export function V2WelcomeHeader({
         <V2LogoMark size={44} />
         <div>
           <V2Eyebrow>Welcome back</V2Eyebrow>
-          <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: v2.brand.steelBright, letterSpacing: '-0.3px' }}>{username}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: neon.text, letterSpacing: '-0.3px' }}>{username}</p>
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -150,7 +142,7 @@ export function V2LogoMark({ size = 44 }: { size?: number }) {
   );
 }
 
-export function V2Eyebrow({ children, accent = v2.brand.steel, icon }: { children: ReactNode; accent?: string; icon?: ReactNode }) {
+export function V2Eyebrow({ children, accent = neon.cyan, icon }: { children: ReactNode; accent?: string; icon?: ReactNode }) {
   return (
     <p style={{ margin: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase', color: accent, display: 'flex', alignItems: 'center', gap: 6 }}>
       {icon}{children}
@@ -159,11 +151,11 @@ export function V2Eyebrow({ children, accent = v2.brand.steel, icon }: { childre
 }
 
 export function V2Title({ children, size = 22 }: { children: ReactNode; size?: number }) {
-  return <h2 style={{ margin: '6px 0 0', fontSize: size, fontWeight: 800, letterSpacing: '-0.3px', color: v2.brand.steelBright, lineHeight: 1.1 }}>{children}</h2>;
+  return <h2 style={{ margin: '6px 0 0', fontSize: size, fontWeight: 800, letterSpacing: '-0.3px', color: neon.text, lineHeight: 1.1 }}>{children}</h2>;
 }
 
 export function V2Subtitle({ children, maxWidth = '85%' }: { children: ReactNode; maxWidth?: string }) {
-  return <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, maxWidth, color: 'hsl(215 20% 78%)', fontWeight: 500 }}>{children}</p>;
+  return <p style={{ margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, maxWidth, color: neon.textMuted, fontWeight: 500 }}>{children}</p>;
 }
 
 export function V2HeroCard({
@@ -213,7 +205,7 @@ export function V2ButtonGhost({ children, onClick, accent = v2.brand.steel, full
 export function V2Card({ children, accent, onClick, padding = '16px 18px', style }: { children: ReactNode; accent?: string; onClick?: () => void; padding?: string; style?: CSSProperties }) {
   return (
     <motion.div whileTap={onClick ? { scale: 0.98 } : undefined} onClick={onClick}
-      style={{ borderRadius: v2.radius.lg, padding, background: 'linear-gradient(160deg, hsl(225 25% 10% / 0.78), hsl(225 30% 6% / 0.56))', backdropFilter: 'blur(24px)', border: `1px solid ${accent ? `${accent}33` : 'hsl(215 20% 16% / 0.28)'}`, boxShadow: accent ? v2.shadow(accent, 0.12) : undefined, cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden', ...style }}>
+      style={{ borderRadius: v2.radius.lg, padding, background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${accent ? `${accent}32` : 'rgba(255,255,255,0.08)'}`, boxShadow: accent ? `0 8px 32px -8px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.06)` : 'inset 0 1px 0 rgba(255,255,255,0.06)', cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden', ...style }}>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, hsl(215 40% 82% / 0.12), transparent)', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
     </motion.div>
@@ -239,11 +231,11 @@ export function V2SectionHeader({ title, action, onAction, badge }: { title: str
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: v2.brand.steelBright, margin: 0 }}>{title}</p>
+        <p style={{ fontSize: 15, fontWeight: 800, color: neon.text, margin: 0 }}>{title}</p>
         {badge && <span style={{ fontSize: 9, fontWeight: 700, color: v2.accent.mining, background: `${v2.accent.mining}18`, border: `1px solid ${v2.accent.mining}40`, borderRadius: 10, padding: '2px 8px' }}>{badge}</span>}
       </div>
       {action && onAction && (
-        <button type="button" onClick={onAction} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: v2.brand.steel, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: v2.font }}>
+        <button type="button" onClick={onAction} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: neon.cyan, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: neon.font }}>
           {action} <ChevronRight size={13} />
         </button>
       )}
@@ -292,8 +284,8 @@ export function V2ListRow({ icon, iconAccent = v2.brand.steel, title, subtitle, 
       <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
         <div style={{ width: 42, height: 42, borderRadius: v2.radius.sm, background: `${iconAccent}14`, border: `1px solid ${iconAccent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: iconAccent }}>{icon}</div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>{title}</p>
-          {subtitle && <p style={{ fontSize: 10, color: v2.brand.muted, margin: '3px 0 0' }}>{subtitle}</p>}
+          <p style={{ fontSize: 13, fontWeight: 700, color: neon.text, margin: 0 }}>{title}</p>
+          {subtitle && <p style={{ fontSize: 10, color: neon.textMuted, margin: '3px 0 0' }}>{subtitle}</p>}
         </div>
         {value && <div style={{ textAlign: 'right' }}><p style={{ fontSize: 14, fontWeight: 800, color: iconAccent, margin: 0 }}>{value}</p>{valueLabel && <p style={{ fontSize: 9, color: v2.brand.muted, margin: '2px 0 0' }}>{valueLabel}</p>}</div>}
       </div>
@@ -341,7 +333,7 @@ export function V2MenuRow({ icon: Icon, label, sub, accent, onClick, badge }: { 
     <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onClick}
       style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', marginBottom: 8, borderRadius: v2.radius.lg, border: `1px solid ${accent}22`, background: `linear-gradient(135deg, ${accent}08, transparent)`, cursor: 'pointer', textAlign: 'left', fontFamily: v2.font }}>
       <div style={{ width: 42, height: 42, borderRadius: v2.radius.sm, background: `${accent}18`, border: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={18} color={accent} /></div>
-      <div style={{ flex: 1, minWidth: 0 }}><p style={{ fontSize: 14, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>{label}</p>{sub && <p style={{ fontSize: 10, color: v2.brand.muted, margin: '2px 0 0' }}>{sub}</p>}</div>
+      <div style={{ flex: 1, minWidth: 0 }}><p style={{ fontSize: 14, fontWeight: 700, color: neon.text, margin: 0 }}>{label}</p>{sub && <p style={{ fontSize: 10, color: neon.textMuted, margin: '2px 0 0' }}>{sub}</p>}</div>
       {badge && <span style={{ fontSize: 8, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: `${accent}22`, color: accent }}>{badge}</span>}
       <ChevronRight size={16} color={v2.brand.muted} />
     </motion.button>
@@ -364,7 +356,7 @@ export function V2LiveBanner({ title, subtitle, accent = v2.accent.mining, onCli
 
 const iconBtnStyle: CSSProperties = {
   width: 40, height: 40, borderRadius: 14,
-  background: 'linear-gradient(160deg, hsl(225 25% 10% / 0.78), hsl(225 30% 6% / 0.56))',
-  border: '1px solid hsl(215 20% 16% / 0.28)',
+  background: 'rgba(255,255,255,0.04)',
+  border: '1px solid rgba(255,255,255,0.08)',
   display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
 };

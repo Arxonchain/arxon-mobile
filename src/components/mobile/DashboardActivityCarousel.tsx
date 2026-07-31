@@ -15,6 +15,8 @@ interface Slide {
   cta: string;
   path: string;
   accent: string;
+  /** Image-only banner: hide text overlay, show CTA only */
+  imageOnly?: boolean;
 }
 
 const WORD_FORGE_SLIDE: Slide = {
@@ -22,10 +24,11 @@ const WORD_FORGE_SLIDE: Slide = {
   image: FORGE_UI.dashboardBanner,
   eyebrow: 'New Game Mode',
   title: 'Word Forge',
-  subtitle: 'Spell. Stack. Survive. Earn ARX-P in the sci-fi word arena.',
+  subtitle: '',
   cta: 'Go to Game',
   path: '/games',
   accent: 'hsl(38 90% 55%)',
+  imageOnly: true,
 };
 
 const SLIDES: Slide[] = [
@@ -111,46 +114,56 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
           <div style={{
             position: 'absolute', inset: 0,
             background: slide.image
-              ? 'linear-gradient(90deg, rgba(4,8,18,0.92) 0%, rgba(4,8,18,0.55) 55%, rgba(4,8,18,0.25) 100%)'
+              ? slide.imageOnly
+                ? 'linear-gradient(180deg, transparent 40%, rgba(4,8,18,0.75) 100%)'
+                : 'linear-gradient(90deg, rgba(4,8,18,0.92) 0%, rgba(4,8,18,0.55) 55%, rgba(4,8,18,0.25) 100%)'
               : 'linear-gradient(180deg, transparent, rgba(0,0,0,0.35))',
           }} />
           <div style={{
             position: 'relative', zIndex: 1,
-            padding: '18px 18px 16px',
+            padding: slide.imageOnly ? '18px 18px 16px' : '18px 18px 16px',
             display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-            minHeight: 168,
+            minHeight: slide.imageOnly ? 180 : 168,
+            alignItems: slide.imageOnly ? 'stretch' : undefined,
           }}>
-            <p style={{
-              margin: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
-              textTransform: 'uppercase', color: slide.accent,
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}>
-              {slide.id === 'word-forge' ? <Sparkles size={11} /> : slide.id === 'arena' ? <Swords size={11} /> : <Sparkles size={11} />}
-              {slide.eyebrow}
-            </p>
-            <h2 style={{
-              margin: '6px 0 0', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px',
-              color: 'hsl(215 20% 96%)', lineHeight: 1.1,
-            }}>
-              {slide.title}
-            </h2>
-            <p style={{
-              margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, maxWidth: '72%',
-              color: 'hsl(215 20% 78%)', fontWeight: 500,
-            }}>
-              {slide.subtitle}
-            </p>
+            {!slide.imageOnly && (
+              <>
+                <p style={{
+                  margin: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
+                  textTransform: 'uppercase', color: slide.accent,
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}>
+                  {slide.id === 'word-forge' ? <Sparkles size={11} /> : slide.id === 'arena' ? <Swords size={11} /> : <Sparkles size={11} />}
+                  {slide.eyebrow}
+                </p>
+                <h2 style={{
+                  margin: '6px 0 0', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px',
+                  color: 'hsl(215 20% 96%)', lineHeight: 1.1,
+                }}>
+                  {slide.title}
+                </h2>
+                {slide.subtitle && (
+                  <p style={{
+                    margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, maxWidth: '72%',
+                    color: 'hsl(215 20% 78%)', fontWeight: 500,
+                  }}>
+                    {slide.subtitle}
+                  </p>
+                )}
+              </>
+            )}
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
               onClick={() => navigate(slide.path)}
               style={{
-                marginTop: 14, alignSelf: 'flex-start',
+                marginTop: slide.imageOnly ? 0 : 14,
+                alignSelf: slide.imageOnly ? 'center' : 'flex-start',
                 display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '10px 18px', borderRadius: 14, border: 'none', cursor: 'pointer',
+                padding: '12px 22px', borderRadius: 14, border: 'none', cursor: 'pointer',
                 background: `linear-gradient(135deg, ${slide.accent}, hsl(38 80% 45%))`,
                 color: 'hsl(225 30% 6%)', fontSize: 13, fontWeight: 800,
-                boxShadow: `0 6px 20px ${slide.accent}44`,
+                boxShadow: `0 6px 20px ${slide.accent}44, inset 0 1px 0 rgba(255,255,255,0.35)`,
               }}
             >
               {slide.cta}

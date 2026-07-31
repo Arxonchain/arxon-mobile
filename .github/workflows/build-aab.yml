@@ -37,6 +37,8 @@ jobs:
 
       - name: Sync Capacitor
         run: npx cap sync android
+        env:
+          CAPACITOR_BUNDLE_LOCAL: 'true'
 
       - name: Decode keystore from secret
         run: |

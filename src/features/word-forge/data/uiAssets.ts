@@ -1,15 +1,19 @@
 import discoveryBg from '@/assets/word-forge/ui/discovery-bg.png';
 import arxCoin from '@/assets/word-forge/ui/arx-coin-3d.png';
+import arxCoinStack from '@/assets/word-forge/ui/arx-coin-stack-clean.png';
 import forgeLogo from '@/assets/word-forge/ui/forge-logo.png';
 import treasureBg from '@/assets/word-forge/ui/treasure-bg.png';
 import dashboardBanner from '@/assets/word-forge/ui/dashboard-banner.png';
+import leaderboardKing from '@/assets/word-forge/ui/leaderboard-king.png';
 
 export const FORGE_UI = {
   discoveryBg,
   arxCoin,
+  arxCoinStack,
   forgeLogo,
   treasureBg,
   dashboardBanner,
+  leaderboardKing,
 } as const;
 
 export interface LevelTileSkin {

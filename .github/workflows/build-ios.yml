@@ -32,6 +32,8 @@ jobs:
 
       - name: Sync Capacitor
         run: npx cap sync ios
+        env:
+          CAPACITOR_BUNDLE_LOCAL: 'true'
 
       - name: Build iOS unsigned
         run: |
