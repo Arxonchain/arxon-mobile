@@ -26,6 +26,9 @@ jobs:
 
       - name: Build web app
         run: npm run build:internal
+        env:
+          VITE_WORD_FORGE_ENABLED: 'true'
+          VITE_ARXON_UI_V2: 'true'
 
       - name: Install Capacitor
         run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/push-notifications

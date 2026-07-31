@@ -73,6 +73,7 @@ import {
   TasksV2, ReferralsV2, NexusV2, WalletV2, SettingsV2,
   NotificationsV2, PointsHistoryV2, MobileBottomNavV2,
 } from "@/features/arxon-v2";
+import DashboardPreviewPage from "@/features/arxon-v2/preview/DashboardPreviewPage";
 import { ARXON_UI_V2_ENABLED } from "@/lib/uiFeature";
 import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 
@@ -190,6 +191,7 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/litepaper"      element={<Litepaper />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
+        <Route path="/ui-preview/dashboard" element={<DashboardPreviewPage />} />
         <Route path="/word-forge-preview" element={
           <Suspense fallback={<Spinner />}>
             <WordForgePreviewPage />

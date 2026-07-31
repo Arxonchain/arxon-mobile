@@ -17,17 +17,19 @@ interface Slide {
   accent: string;
 }
 
+const WORD_FORGE_SLIDE: Slide = {
+  id: 'word-forge',
+  image: FORGE_UI.dashboardBanner,
+  eyebrow: 'New Game Mode',
+  title: 'Word Forge',
+  subtitle: 'Spell. Stack. Survive. Earn ARX-P in the sci-fi word arena.',
+  cta: 'Go to Game',
+  path: '/games',
+  accent: 'hsl(38 90% 55%)',
+};
+
 const SLIDES: Slide[] = [
-  ...(WORD_FORGE_ENABLED ? [{
-    id: 'word-forge',
-    image: FORGE_UI.dashboardBanner,
-    eyebrow: 'New Game Mode',
-    title: 'Word Forge',
-    subtitle: 'Spell. Stack. Survive. Earn ARX-P in the sci-fi word arena.',
-    cta: 'Go to Game',
-    path: '/games',
-    accent: 'hsl(38 90% 55%)',
-  }] : []),
+  ...(WORD_FORGE_ENABLED ? [WORD_FORGE_SLIDE] : []),
   {
     id: 'arena',
     gradient: 'linear-gradient(135deg, hsl(255 45% 22%), hsl(280 50% 18%), hsl(225 35% 10%))',
@@ -52,10 +54,12 @@ const SLIDES: Slide[] = [
 
 const ROTATE_MS = 5500;
 
-export function DashboardActivityCarousel() {
+export function DashboardActivityCarousel({ forceShowWordForge = false }: { forceShowWordForge?: boolean } = {}) {
   const navigate = useNavigate();
   const [index, setIndex] = useState(0);
-  const slides = SLIDES;
+  const slides = forceShowWordForge && !WORD_FORGE_ENABLED
+    ? [WORD_FORGE_SLIDE, ...SLIDES.filter((s) => s.id !== 'word-forge')]
+    : SLIDES;
   const count = slides.length;
 
   const next = useCallback(() => {

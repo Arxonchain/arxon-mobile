@@ -16,6 +16,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build:internal
+        env:
+          VITE_WORD_FORGE_ENABLED: 'true'
+          VITE_ARXON_UI_V2: 'true'
       - uses: actions/setup-java@v3
         with:
           distribution: 'temurin'
@@ -57,6 +60,9 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: npm run build:internal
+        env:
+          VITE_WORD_FORGE_ENABLED: 'true'
+          VITE_ARXON_UI_V2: 'true'
       - run: npm install @capacitor/cli
       - run: npx cap add ios || true
       - run: npx cap sync ios
