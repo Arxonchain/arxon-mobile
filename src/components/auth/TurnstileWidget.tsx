@@ -3,6 +3,10 @@
  *
  * Uses explicit rendering + visible managed widget so Capacitor WebViews and locked-down
  * networks get a clear checkbox/challenge instead of a silent interaction-only failure.
+ *
+ * Script load follows Cloudflare's explicit-render guidance:
+ *   api.js?render=explicit  — no async/defer; wait for script.onload, then call render().
+ * Do not call turnstile.ready() with an async/defer script tag (Cloudflare warns and can fail).
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TURNSTILE_SITE_KEY, isTurnstileConfigured } from '@/lib/turnstile';
@@ -13,7 +17,6 @@ declare global {
       render: (container: HTMLElement | string, options: TurnstileRenderOptions) => string;
       remove: (widgetId: string) => void;
       reset: (widgetId?: string) => void;
-      ready?: (cb: () => void) => void;
     };
   }
 }
@@ -34,6 +37,29 @@ interface TurnstileRenderOptions {
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 let scriptLoadPromise: Promise<void> | null = null;
 
+/** Poll briefly until window.turnstile.render is available after script load. */
+function waitForTurnstileApi(): Promise<void> {
+  if (window.turnstile?.render) return Promise.resolve();
+
+  return new Promise<void>((resolve, reject) => {
+    let tries = 0;
+    const id = window.setInterval(() => {
+      tries += 1;
+      if (window.turnstile?.render) {
+        window.clearInterval(id);
+        resolve();
+      } else if (tries > 40) {
+        window.clearInterval(id);
+        reject(new Error('Turnstile API failed to initialize'));
+      }
+    }, 50);
+  });
+}
+
+/**
+ * Load Turnstile api.js without async/defer, then wait until turnstile.render is available.
+ * We gate on script.onload + API presence — never turnstile.ready() with async scripts.
+ */
 function loadTurnstileScript(): Promise<void> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('Turnstile requires a browser environment'));
@@ -42,65 +68,47 @@ function loadTurnstileScript(): Promise<void> {
   if (scriptLoadPromise) return scriptLoadPromise;
 
   scriptLoadPromise = new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(`script[src="${SCRIPT_SRC}"]`);
+    const onReady = () => {
+      waitForTurnstileApi().then(resolve).catch((err) => {
+        scriptLoadPromise = null;
+        reject(err);
+      });
+    };
+    const onFail = () => {
+      scriptLoadPromise = null;
+      reject(new Error('Failed to load Turnstile script'));
+    };
+
+    const existing = document.querySelector<HTMLScriptElement>(
+      'script[src^="https://challenges.cloudflare.com/turnstile/v0/api.js"]',
+    );
     if (existing) {
       if (window.turnstile?.render) {
         resolve();
         return;
       }
-      existing.addEventListener('load', () => resolve(), { once: true });
-      existing.addEventListener(
-        'error',
-        () => {
-          scriptLoadPromise = null;
-          reject(new Error('Failed to load Turnstile script'));
-        },
-        { once: true },
-      );
+      // Already finished loading in a prior attempt.
+      if (existing.dataset.turnstileLoaded === '1') {
+        onReady();
+        return;
+      }
+      existing.addEventListener('load', onReady, { once: true });
+      existing.addEventListener('error', onFail, { once: true });
       return;
     }
 
     const script = document.createElement('script');
     script.src = SCRIPT_SRC;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => resolve();
-    script.onerror = () => {
-      scriptLoadPromise = null;
-      reject(new Error('Failed to load Turnstile script'));
+    // Intentionally NO async/defer — coordinate via onload before render().
+    script.onload = () => {
+      script.dataset.turnstileLoaded = '1';
+      onReady();
     };
+    script.onerror = onFail;
     document.head.appendChild(script);
   });
 
   return scriptLoadPromise;
-}
-
-function whenTurnstileReady(): Promise<void> {
-  return loadTurnstileScript().then(
-    () =>
-      new Promise<void>((resolve, reject) => {
-        if (window.turnstile?.render) {
-          if (typeof window.turnstile.ready === 'function') {
-            window.turnstile.ready(() => resolve());
-          } else {
-            resolve();
-          }
-          return;
-        }
-        // Script tagged loaded but API not ready yet — brief poll.
-        let tries = 0;
-        const id = window.setInterval(() => {
-          tries += 1;
-          if (window.turnstile?.render) {
-            window.clearInterval(id);
-            resolve();
-          } else if (tries > 40) {
-            window.clearInterval(id);
-            reject(new Error('Turnstile API failed to initialize'));
-          }
-        }, 50);
-      }),
-  );
 }
 
 export { isTurnstileConfigured, TURNSTILE_SITE_KEY };
@@ -145,7 +153,7 @@ export function TurnstileWidget({
     if (!TURNSTILE_SITE_KEY) return;
     let cancelled = false;
 
-    whenTurnstileReady()
+    loadTurnstileScript()
       .then(() => {
         if (cancelled || !window.turnstile || !containerRef.current) return;
 
