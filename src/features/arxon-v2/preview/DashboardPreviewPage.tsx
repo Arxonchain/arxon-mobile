@@ -1,6 +1,7 @@
-import DashboardNeon from '../pages/DashboardNeon';
+import { Navigate } from 'react-router-dom';
+import { APP_PREVIEW_BASE } from './AppPreviewContext';
 
-/** Standalone browser preview — no auth required */
+/** Legacy alias — redirects to full app preview. */
 export default function DashboardPreviewPage() {
-  return <DashboardNeon preview />;
+  return <Navigate to={APP_PREVIEW_BASE} replace />;
 }

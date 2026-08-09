@@ -326,7 +326,7 @@ export const usePushNotifications = () => {
             await sendServerPush(
               '⏰ Mining Session Ending Soon',
               'Your mining session ends in 10 minutes. Get ready to claim!',
-              { url: '/mining', tag: 'mining-warning' },
+              { url: '/', tag: 'mining-warning' },
             );
           }
         }
@@ -338,7 +338,7 @@ export const usePushNotifications = () => {
             await sendServerPush(
               '🎉 Mining Complete!',
               'Your 8-hour session is done. Claim your ARX-P now!',
-              { url: '/mining', tag: 'mining-complete' },
+              { url: '/', tag: 'mining-complete' },
             );
           }
         }

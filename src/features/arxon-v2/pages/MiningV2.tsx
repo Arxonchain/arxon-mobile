@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Copy, Zap } from 'lucide-react';
 import { useMining } from '@/hooks/useMining';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,7 @@ import { MiningPillWidget } from '../components/DashboardWidgets';
 import { NeonPanel, NeonEyebrow } from '../design/NeonKit';
 import { neon } from '../design/neonTokens';
 import { V2Page, V2Header, V2Button, V2ButtonGhost, fadeUp, stagger } from '../design/Kit';
+import { APP_PREVIEW_BASE } from '../preview/AppPreviewContext';
 
 const MAX_HOURS = 8;
 const MIN_CLAIM_ARX = 10;
@@ -23,60 +24,86 @@ function fmtTime(s: number) {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(ss).padStart(2, '0')}`;
 }
 
-export default function MiningV2() {
+export default function MiningV2({ preview = false }: { preview?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { points, rank } = usePoints();
   const { profile } = useProfile();
   const [showAuth, setShowAuth] = useState(false);
 
-  const {
-    isMining,
-    earnedPoints,
-    elapsedTime: elapsedSeconds,
-    remainingTime,
-    pointsPerHour,
-    totalBoostPercentage: boostPercentage,
-    startMining,
-    stopMining,
-    claimPoints,
-    sessionMaxed,
-    isStarting,
-    isStopping,
-    isClaiming,
-    loading,
-  } = useMining({ tickMs: 1000 });
+  const [previewMining, setPreviewMining] = useState(false);
+  const [previewEarn, setPreviewEarn] = useState(127.4);
+  const [previewElapsed, setPreviewElapsed] = useState(3720);
+  const [previewRemain, setPreviewRemain] = useState(6 * 3600 + 2280);
 
-  const totalPoints = Math.round(points?.total_points ?? 0);
-  const referralCode = profile?.referral_code;
+  const mining = useMining({ tickMs: 1000 });
+
+  const isMining = preview ? previewMining : mining.isMining;
+  const earnedPoints = preview ? previewEarn : mining.earnedPoints;
+  const elapsedSeconds = preview ? previewElapsed : mining.elapsedTime;
+  const remainingTime = preview ? previewRemain : mining.remainingTime;
+  const pointsPerHour = preview ? 11.5 : mining.pointsPerHour;
+  const boostPercentage = preview ? 15 : mining.totalBoostPercentage;
+  const sessionMaxed = preview ? false : mining.sessionMaxed;
+  const loading = preview ? false : mining.loading;
+  const isStarting = preview ? false : mining.isStarting;
+  const isStopping = preview ? false : mining.isStopping;
+  const isClaiming = preview ? false : mining.isClaiming;
+
+  const totalPoints = preview ? 34766 : Math.round(points?.total_points ?? 0);
+  const displayRank = preview ? 42 : rank;
+  const referralCode = preview ? 'ARXON42' : profile?.referral_code;
   const progress = Math.min((elapsedSeconds / (MAX_HOURS * 3600)) * 100, 100);
   const claimable = Math.floor(earnedPoints);
   const canClaim = isMining && claimable >= MIN_CLAIM_ARX;
   const claimProgress =
     isMining && claimable < MIN_CLAIM_ARX ? `${MIN_CLAIM_ARX - claimable} more ARX-P to claim` : null;
 
+  useEffect(() => {
+    if (!preview || !previewMining) return;
+    const id = window.setInterval(() => {
+      setPreviewEarn((e) => e + 11.5 / 3600);
+      setPreviewElapsed((s) => s + 1);
+      setPreviewRemain((s) => Math.max(0, s - 1));
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [preview, previewMining]);
+
   const handleMiningToggle = useCallback(async () => {
+    if (preview) {
+      setPreviewMining((m) => !m);
+      return;
+    }
     if (!user) {
       setShowAuth(true);
       return;
     }
-    if (sessionMaxed) await claimPoints();
-    else if (isMining) await stopMining();
-    else await startMining();
-  }, [user, sessionMaxed, isMining, claimPoints, stopMining, startMining]);
+    if (sessionMaxed) await mining.claimPoints();
+    else if (isMining) await mining.stopMining();
+    else await mining.startMining();
+  }, [preview, user, sessionMaxed, isMining, mining]);
 
   const handleClaim = async () => {
+    if (preview) {
+      toast({ title: 'Preview', description: 'Claim simulated in preview mode' });
+      return;
+    }
     if (!user) {
       setShowAuth(true);
       return;
     }
-    if (earnedPoints >= MIN_CLAIM_ARX) await claimPoints();
+    if (earnedPoints >= MIN_CLAIM_ARX) await mining.claimPoints();
   };
 
   const copyRef = async () => {
     if (!referralCode) return;
     await navigator.clipboard.writeText(referralCode);
     toast({ title: 'Copied!', description: 'Referral code copied to clipboard' });
+  };
+
+  const goBack = () => {
+    if (preview) navigate(APP_PREVIEW_BASE);
+    else navigate(-1);
   };
 
   const statusBadge = (
@@ -97,7 +124,7 @@ export default function MiningV2() {
 
   return (
     <V2Page>
-      <V2Header title="Mining" subtitle="Live session dashboard" onBack={() => navigate(-1)} right={statusBadge} />
+      <V2Header title="Mining" subtitle="Live session dashboard" onBack={goBack} right={statusBadge} />
 
       <motion.div variants={stagger} initial="hidden" animate="show" style={{ padding: '0 20px' }}>
         <motion.div variants={fadeUp} style={{ marginTop: 14 }}>
@@ -110,9 +137,9 @@ export default function MiningV2() {
                   <span style={{ fontSize: 12, color: neon.cyan, marginLeft: 6 }}>ARX-P</span>
                 </p>
               </div>
-              {rank && (
+              {displayRank && (
                 <span style={{ fontSize: 10, fontWeight: 800, color: neon.gold, padding: '4px 10px', borderRadius: 20, background: 'rgba(255,201,60,0.12)', border: '1px solid rgba(255,201,60,0.3)' }}>
-                  #{rank}
+                  #{displayRank}
                 </span>
               )}
             </div>
@@ -210,7 +237,7 @@ export default function MiningV2() {
         )}
       </motion.div>
 
-      <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
+      {!preview && <AuthDialog open={showAuth} onOpenChange={setShowAuth} />}
     </V2Page>
   );
 }

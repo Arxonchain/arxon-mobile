@@ -2,34 +2,9 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import {
-  Copy,
-  Check,
-  Shield,
-  Bell,
-  BookOpen,
-  Settings,
-  LogOut,
-  ListChecks,
-  Users,
-  Wallet,
-  Camera,
-  LayoutDashboard,
-  Trophy,
-  History,
-  Scale,
-  User2,
-  CalendarDays,
-  FileDown,
-  Globe,
-  Zap,
-  Receipt,
-  Upload,
-  Link2,
-  BarChart3,
-  Megaphone,
-  RotateCcw,
-  Coins,
-  type LucideIcon,
+  Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks, Users, Wallet, Camera,
+  LayoutDashboard, Trophy, History, Scale, User2, CalendarDays, FileDown, Globe, Zap, Receipt,
+  Upload, Link2, BarChart3, Megaphone, RotateCcw, Coins, Send, Flame, type LucideIcon,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
@@ -39,78 +14,74 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
-import { v2 } from '../design/tokens';
+import { V2Page, V2ButtonGhost, fadeUp, stagger } from '../design/Kit';
+import { neon } from '../design/neonTokens';
 import {
-  V2Page,
-  V2Header,
-  V2BalanceHero,
-  V2MenuRow,
-  V2Card,
-  V2Eyebrow,
-  V2ButtonGhost,
-  fadeUp,
-  stagger,
-} from '../design/Kit';
+  NeonScreenHeader,
+  NeonGlassCard,
+  NeonCompactBalance,
+  NeonMenuRow,
+  NeonMenuGroup,
+  NeonSectionLabel,
+} from '../design/NeonSecondaryUI';
 
-function Toggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
+const ACTIVITY_TEXT = '#b8eff8';
+
+function NeonToggle({ on, onToggle, accent = neon.teal }: { on: boolean; onToggle: () => void; accent?: string }) {
   return (
     <div
       onClick={onToggle}
+      role="switch"
+      aria-checked={on}
       style={{
-        width: 50,
-        height: 28,
-        borderRadius: 14,
-        cursor: 'pointer',
-        position: 'relative',
-        flexShrink: 0,
-        transition: 'all 0.25s',
-        background: on ? `${v2.accent.success}40` : v2.brand.raised,
-        border: `1px solid ${on ? `${v2.accent.success}73` : v2.brand.border}`,
+        width: 44, height: 24, borderRadius: 12, cursor: 'pointer', position: 'relative', flexShrink: 0,
+        background: on ? `${accent}35` : 'rgba(255,255,255,0.06)',
+        border: `1px solid ${on ? `${accent}55` : 'rgba(255,255,255,0.08)'}`,
+        transition: 'all 0.22s',
       }}
     >
-      <div
-        style={{
-          position: 'absolute',
-          top: 3,
-          left: on ? 25 : 3,
-          width: 20,
-          height: 20,
-          borderRadius: '50%',
-          background: on ? v2.accent.mining : v2.brand.muted,
-          transition: 'all 0.25s',
-          boxShadow: on ? `0 0 12px ${v2.accent.mining}8c` : 'none',
-        }}
-      />
+      <div style={{
+        position: 'absolute', top: 3, left: on ? 23 : 3, width: 16, height: 16, borderRadius: '50%',
+        background: on ? accent : 'rgba(184,239,248,0.35)',
+        transition: 'all 0.22s',
+        boxShadow: on ? `0 0 10px ${accent}88` : 'none',
+      }} />
     </div>
   );
 }
 
+const QUICK: { Icon: LucideIcon; label: string; path: string; accent: string }[] = [
+  { Icon: Trophy, label: 'Rankings', path: '/leaderboard', accent: neon.gold },
+  { Icon: ListChecks, label: 'Tasks', path: '/tasks', accent: neon.teal },
+  { Icon: Send, label: 'Nexus', path: '/nexus', accent: neon.cyan },
+];
+
 const MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string }[] = [
-  { Icon: Receipt, label: 'Points History', sub: 'All credits & deductions', path: '/points-history', accent: v2.accent.gold },
-  { Icon: Users, label: 'Referrals', sub: 'Earn 100 ARX-P per friend', path: '/referrals', accent: v2.accent.mining },
-  { Icon: Wallet, label: 'Wallet', sub: 'Connect your Web3 wallet', path: '/wallet', accent: v2.brand.steel },
-  { Icon: Shield, label: 'Security', sub: 'Password & account security', path: '/settings?tab=security', accent: v2.brand.steelLight },
-  { Icon: BookOpen, label: 'Litepaper', sub: 'Guides & documentation', path: '/litepaper', accent: v2.brand.mutedSoft },
-  { Icon: Settings, label: 'App Settings', sub: 'Notifications & display', path: '/settings', accent: v2.brand.muted },
+  { Icon: Receipt, label: 'Points History', sub: 'Credits & deductions', path: '/points-history', accent: neon.gold },
+  { Icon: Users, label: 'Referrals', sub: '100 ARX-P per friend', path: '/referrals', accent: neon.teal },
+  { Icon: Wallet, label: 'Wallet', sub: 'Connect Web3 wallet', path: '/wallet', accent: neon.cyan },
+  { Icon: Shield, label: 'Security', sub: 'Password & account', path: '/settings?tab=security', accent: neon.purple },
+  { Icon: BookOpen, label: 'Litepaper', sub: 'Guides & docs', path: '/litepaper', accent: 'rgba(184,239,248,0.6)' },
+  { Icon: Settings, label: 'App Settings', sub: 'Notifications & display', path: '/settings', accent: 'rgba(184,239,248,0.45)' },
 ];
 
 const ADMIN_MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string }[] = [
-  { Icon: LayoutDashboard, label: 'Dashboard', sub: 'Platform overview & stats', path: '/admin', accent: v2.brand.steel },
-  { Icon: BarChart3, label: 'Analytics', sub: 'Deep platform metrics', path: '/admin/analytics', accent: v2.accent.cyan },
-  { Icon: User2, label: 'Users & Miners', sub: 'Manage all users', path: '/admin/users', accent: v2.accent.mining },
-  { Icon: ListChecks, label: 'Task Manager', sub: 'Add & manage tasks', path: '/admin/tasks', accent: v2.accent.cyan },
-  { Icon: Trophy, label: 'Arena Markets', sub: 'Create & manage battles', path: '/admin/arena', accent: v2.accent.arena },
-  { Icon: History, label: 'Battle History', sub: 'Resolved arena battles', path: '/admin/battle-history', accent: v2.accent.gold },
-  { Icon: Link2, label: 'Referral Manager', sub: 'Link & manage referrals', path: '/admin/referrals', accent: v2.accent.mining },
-  { Icon: RotateCcw, label: 'Referral Recovery', sub: 'Bulk recover missed referrals', path: '/admin/referral-recovery', accent: v2.accent.gold },
-  { Icon: CalendarDays, label: 'Daily Signups', sub: 'Signup analytics', path: '/admin/signups', accent: v2.brand.steel },
-  { Icon: Zap, label: 'Mining Controls', sub: 'Mining, claiming & broadcast', path: '/admin/controls', accent: v2.accent.gold },
-  { Icon: Megaphone, label: 'Announcements', sub: 'Create & manage broadcasts', path: '/admin/announcements', accent: v2.accent.arena },
-  { Icon: Scale, label: 'Reconciliation', sub: 'Audit & restore points', path: '/admin/reconciliation', accent: v2.accent.mining },
-  { Icon: Coins, label: '$ARX Claims', sub: 'Monitor token claims', path: '/admin/claims', accent: v2.accent.gold },
-  { Icon: FileDown, label: 'Export Filter', sub: 'Export user data CSV', path: '/admin/export-filter', accent: v2.brand.mutedSoft },
-  { Icon: Upload, label: 'Import Users', sub: 'Bulk import legacy users', path: '/admin/import-users', accent: v2.brand.mutedSoft },
-  { Icon: Globe, label: 'Global Map', sub: 'Worldwide miner activity', path: '/admin/global-map', accent: v2.accent.mining },
+  { Icon: LayoutDashboard, label: 'Dashboard', sub: 'Platform overview', path: '/admin', accent: neon.cyan },
+  { Icon: BarChart3, label: 'Analytics', sub: 'Deep metrics', path: '/admin/analytics', accent: neon.teal },
+  { Icon: User2, label: 'Users & Miners', sub: 'Manage users', path: '/admin/users', accent: neon.teal },
+  { Icon: ListChecks, label: 'Task Manager', sub: 'Add & manage tasks', path: '/admin/tasks', accent: neon.cyan },
+  { Icon: Trophy, label: 'Arena Markets', sub: 'Create battles', path: '/admin/arena', accent: neon.purple },
+  { Icon: History, label: 'Battle History', sub: 'Resolved battles', path: '/admin/battle-history', accent: neon.gold },
+  { Icon: Link2, label: 'Referral Manager', sub: 'Manage referrals', path: '/admin/referrals', accent: neon.teal },
+  { Icon: RotateCcw, label: 'Referral Recovery', sub: 'Bulk recovery', path: '/admin/referral-recovery', accent: neon.gold },
+  { Icon: CalendarDays, label: 'Daily Signups', sub: 'Signup analytics', path: '/admin/signups', accent: neon.cyan },
+  { Icon: Zap, label: 'Mining Controls', sub: 'Mining & broadcast', path: '/admin/controls', accent: neon.gold },
+  { Icon: Megaphone, label: 'Announcements', sub: 'Broadcasts', path: '/admin/announcements', accent: neon.purple },
+  { Icon: Scale, label: 'Reconciliation', sub: 'Audit points', path: '/admin/reconciliation', accent: neon.teal },
+  { Icon: Coins, label: '$ARX Claims', sub: 'Token claims', path: '/admin/claims', accent: neon.gold },
+  { Icon: FileDown, label: 'Export Filter', sub: 'Export CSV', path: '/admin/export-filter', accent: 'rgba(184,239,248,0.5)' },
+  { Icon: Upload, label: 'Import Users', sub: 'Bulk import', path: '/admin/import-users', accent: 'rgba(184,239,248,0.5)' },
+  { Icon: Globe, label: 'Global Map', sub: 'Miner activity', path: '/admin/global-map', accent: neon.teal },
 ];
 
 export default function ProfileV2() {
@@ -141,20 +112,13 @@ export default function ProfileV2() {
   const saveXHandle = async () => {
     const handleToSave = xHandle.replace('@', '').trim();
     if (handleToSave && !/^[A-Za-z0-9_]{1,15}$/.test(handleToSave)) {
-      toast({
-        title: 'Invalid X handle',
-        description: 'Handle must be 1-15 characters: letters, numbers, underscores only.',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid X handle', description: '1–15 chars: letters, numbers, underscores.', variant: 'destructive' });
       return;
     }
     if (!user) return;
     setSavingX(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ x_handle: handleToSave || null } as { x_handle: string | null })
-        .eq('user_id', user.id);
+      const { error } = await supabase.from('profiles').update({ x_handle: handleToSave || null } as { x_handle: string | null }).eq('user_id', user.id);
       if (error) throw error;
       await refetchProfile();
       setEditingX(false);
@@ -178,11 +142,11 @@ export default function ProfileV2() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) {
-      toast({ title: 'Invalid file', description: 'Please select an image file (JPG, PNG, etc.)', variant: 'destructive' });
+      toast({ title: 'Invalid file', description: 'Select JPG, PNG, etc.', variant: 'destructive' });
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Please select an image smaller than 2MB', variant: 'destructive' });
+      toast({ title: 'File too large', description: 'Max 2MB', variant: 'destructive' });
       return;
     }
     if (!user) return;
@@ -192,16 +156,11 @@ export default function ProfileV2() {
       const filePath = `${user.id}/${user.id}-${Date.now()}.${ext}`;
       const { error: upErr } = await supabase.storage.from('avatars').upload(filePath, file, { upsert: true, contentType: file.type });
       if (upErr) throw upErr;
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from('avatars').getPublicUrl(filePath);
-      const { error: dbErr } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl, updated_at: new Date().toISOString() })
-        .eq('user_id', user.id);
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
+      const { error: dbErr } = await supabase.from('profiles').update({ avatar_url: publicUrl, updated_at: new Date().toISOString() }).eq('user_id', user.id);
       if (dbErr) throw dbErr;
       await refetchProfile();
-      toast({ title: 'Profile updated!', description: 'Avatar saved successfully' });
+      toast({ title: 'Profile updated!', description: 'Avatar saved' });
     } catch (err: unknown) {
       toast({ title: 'Upload failed', description: err instanceof Error ? err.message : 'Upload failed', variant: 'destructive' });
     } finally {
@@ -214,264 +173,173 @@ export default function ProfileV2() {
     <V2Page>
       <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
 
-      <V2Header
-        title="Profile"
-        subtitle="Account settings"
-        onBack={() => navigate(-1)}
+      <NeonScreenHeader
+        eyebrow="You"
+        title={username}
+        subtitle={user?.email ?? 'Account & preferences'}
         right={<InAppNotificationBell />}
       />
 
-      <motion.div variants={stagger} initial="hidden" animate="show" style={{ padding: '0 20px' }}>
-        {/* Avatar + identity */}
-        <motion.div variants={fadeUp} style={{ marginTop: 18 }}>
-          <V2Card accent={v2.brand.glow} padding="22px 20px 0">
-            <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginBottom: 20 }}>
+      <motion.div variants={stagger} initial="hidden" animate="show" style={{ padding: '0 16px 20px' }}>
+        {/* Identity strip */}
+        <motion.div variants={fadeUp} style={{ marginBottom: 12 }}>
+          <NeonGlassCard accent={neon.cyan} padding="12px 12px">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ position: 'relative', flexShrink: 0 }}>
                 <div
                   style={{
-                    width: 82,
-                    height: 82,
-                    borderRadius: 24,
-                    overflow: 'hidden',
-                    border: `2px solid ${v2.brand.steel}38`,
-                    boxShadow: `0 8px 28px ${v2.brand.glow}26`,
-                    cursor: 'pointer',
+                    width: 64, height: 64, borderRadius: 18, overflow: 'hidden',
+                    border: `1.5px solid ${neon.cyan}40`, boxShadow: `0 0 20px ${neon.cyan}18`, cursor: 'pointer',
                   }}
                   onClick={() => fileRef.current?.click()}
                 >
                   {avatarUrl ? (
                     <img src={avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : (
-                    <div
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        background: v2.gradient.steel,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 800,
-                        fontSize: 30,
-                        color: v2.brand.steelBright,
-                      }}
-                    >
+                    <div style={{
+                      width: '100%', height: '100%',
+                      background: `linear-gradient(135deg, ${neon.cyan}22, ${neon.purple}18)`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontWeight: 800, fontSize: 24, color: neon.cyan,
+                    }}>
                       {username[0]?.toUpperCase()}
                     </div>
                   )}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: `${v2.brand.deep}80`,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      opacity: uploading ? 1 : 0,
-                      transition: 'opacity 0.2s',
-                    }}
-                  >
+                  <div style={{
+                    position: 'absolute', inset: 0, background: 'rgba(2,6,14,0.65)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    opacity: uploading ? 1 : 0, transition: 'opacity 0.2s',
+                  }}>
                     {uploading ? (
-                      <div
-                        style={{
-                          width: 20,
-                          height: 20,
-                          borderRadius: '50%',
-                          border: `2px solid ${v2.brand.steel}4d`,
-                          borderTopColor: v2.brand.steel,
-                          animation: 'spin 1s linear infinite',
-                        }}
-                      />
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${neon.cyan}44`, borderTopColor: neon.cyan, animation: 'spin 1s linear infinite' }} />
                     ) : (
-                      <Camera size={18} color="white" />
+                      <Camera size={16} color={ACTIVITY_TEXT} />
                     )}
                   </div>
                 </div>
                 <div
                   onClick={() => fileRef.current?.click()}
                   style={{
-                    position: 'absolute',
-                    bottom: -2,
-                    right: -2,
-                    width: 24,
-                    height: 24,
-                    borderRadius: 8,
-                    background: v2.brand.steel,
-                    border: `2px solid ${v2.brand.deep}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    cursor: 'pointer',
+                    position: 'absolute', bottom: -2, right: -2, width: 22, height: 22, borderRadius: 8,
+                    background: neon.cyan, border: `2px solid ${neon.deep}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
                   }}
                 >
-                  <Camera size={11} color={v2.brand.deep} />
+                  <Camera size={10} color={neon.deep} />
                 </div>
                 <input ref={fileRef} type="file" accept="image/*" onChange={handleAvatarChange} style={{ display: 'none' }} />
               </div>
 
               <div style={{ flex: 1, minWidth: 0 }}>
-                <h2
-                  style={{
-                    fontSize: 22,
-                    fontWeight: 800,
-                    color: v2.brand.steelBright,
-                    letterSpacing: '-0.3px',
-                    margin: 0,
-                  }}
-                >
-                  {username}
-                </h2>
-                <p style={{ fontSize: 11, color: v2.brand.muted, marginTop: 4 }}>{user?.email}</p>
-                <div style={{ display: 'flex', gap: 7, marginTop: 10, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                   {rank && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: v2.accent.gold,
-                        background: `${v2.accent.gold}1a`,
-                        border: `1px solid ${v2.accent.gold}40`,
-                        borderRadius: 20,
-                        padding: '4px 10px',
-                      }}
-                    >
-                      Rank #{rank}
+                    <span style={{ fontSize: 9, fontWeight: 800, color: neon.gold, background: `${neon.gold}18`, border: `1px solid ${neon.gold}35`, borderRadius: 16, padding: '3px 8px' }}>
+                      #{rank}
                     </span>
                   )}
-                  <span
-                    style={{
-                      fontSize: 10,
-                      fontWeight: 800,
-                      color: v2.accent.mining,
-                      background: `${v2.accent.mining}1a`,
-                      border: `1px solid ${v2.accent.mining}38`,
-                      borderRadius: 20,
-                      padding: '4px 10px',
-                    }}
-                  >
-                    🔥 {streak}d Streak
+                  <span style={{ fontSize: 9, fontWeight: 800, color: neon.teal, background: `${neon.teal}15`, border: `1px solid ${neon.teal}30`, borderRadius: 16, padding: '3px 8px', display: 'flex', alignItems: 'center', gap: 3 }}>
+                    <Flame size={10} /> {streak}d
                   </span>
                   {isAdmin && (
-                    <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 800,
-                        color: v2.accent.arena,
-                        background: `${v2.accent.arena}1f`,
-                        border: `1px solid ${v2.accent.arena}4d`,
-                        borderRadius: 20,
-                        padding: '4px 10px',
-                      }}
-                    >
-                      ⚡ Admin
+                    <span style={{ fontSize: 9, fontWeight: 800, color: neon.purple, background: `${neon.purple}18`, border: `1px solid ${neon.purple}35`, borderRadius: 16, padding: '3px 8px' }}>
+                      Admin
                     </span>
                   )}
                 </div>
+                <p style={{ margin: '6px 0 0', fontSize: 10, fontWeight: 400, color: 'rgba(184,239,248,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user?.email}
+                </p>
               </div>
             </div>
-          </V2Card>
+          </NeonGlassCard>
         </motion.div>
 
-        {/* Stats hero */}
-        <motion.div variants={fadeUp} style={{ marginTop: 12 }}>
-          <V2BalanceHero
+        {/* Balance */}
+        <motion.div variants={fadeUp} style={{ marginBottom: 12 }}>
+          <NeonCompactBalance
             balance={totalPts}
             rank={rank}
             stats={[
-              { label: 'Streak', value: `${streak}d`, accent: v2.accent.gold },
-              { label: 'Rank', value: rank ? `#${rank}` : '—', accent: v2.accent.gold },
-              { label: 'ARX-P', value: totalPts.toLocaleString(), accent: v2.brand.steelLight },
+              { label: 'Streak', value: `${streak}d`, accent: neon.gold },
+              { label: 'Rank', value: rank ? `#${rank}` : '—', accent: neon.gold },
+              { label: 'Today', value: totalPts > 0 ? 'Active' : '—', accent: neon.teal },
             ]}
           />
         </motion.div>
 
-        {/* Referral code */}
-        {profile?.referral_code && (
-          <motion.div variants={fadeUp} style={{ marginTop: 14 }}>
-            <V2Card accent={v2.accent.gold} padding="18px 20px">
-              <V2Eyebrow accent={v2.accent.gold}>Your Referral Code</V2Eyebrow>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginTop: 10 }}>
-                <div>
-                  <p
-                    style={{
-                      fontSize: 22,
-                      fontWeight: 800,
-                      color: v2.accent.gold,
-                      letterSpacing: '0.06em',
-                      fontFamily: 'monospace',
-                      margin: 0,
-                    }}
-                  >
-                    {profile.referral_code}
-                  </p>
-                  <p style={{ fontSize: 11, color: `${v2.accent.gold}80`, marginTop: 5 }}>Share & earn 100 ARX-P per friend</p>
+        {/* Quick links */}
+        <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {QUICK.map((q) => (
+              <motion.button
+                key={q.path}
+                type="button"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => navigate(q.path)}
+                style={{
+                  flex: 1, padding: '10px 6px', borderRadius: 14, border: `1px solid ${q.accent}28`,
+                  background: `linear-gradient(155deg, ${q.accent}10 0%, rgba(6,12,24,0.9) 100%)`,
+                  cursor: 'pointer', fontFamily: neon.font, textAlign: 'center',
+                  boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 0 12px ${q.accent}08`,
+                }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: 9, margin: '0 auto 5px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  background: `${q.accent}18`, border: `1px solid ${q.accent}35`, color: q.accent,
+                }}>
+                  <q.Icon size={14} strokeWidth={2.2} />
                 </div>
+                <span style={{ fontSize: 9, fontWeight: 700, color: ACTIVITY_TEXT }}>{q.label}</span>
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+
+        {/* Referral */}
+        {profile?.referral_code && (
+          <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+            <NeonGlassCard accent={neon.gold} padding="12px 14px">
+              <p style={{ margin: 0, fontSize: 8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: `${neon.gold}99` }}>
+                Referral Code
+              </p>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8 }}>
+                <p style={{ margin: 0, fontSize: 20, fontWeight: 900, color: neon.gold, letterSpacing: '0.08em', fontFamily: 'monospace' }}>
+                  {profile.referral_code}
+                </p>
                 <motion.button
                   type="button"
                   whileTap={{ scale: 0.9 }}
                   onClick={copyRef}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '10px 18px',
-                    borderRadius: 14,
-                    flexShrink: 0,
-                    background: `${v2.accent.gold}26`,
-                    border: `1px solid ${v2.accent.gold}4d`,
-                    color: v2.accent.gold,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    cursor: 'pointer',
-                    fontFamily: v2.font,
+                    display: 'flex', alignItems: 'center', gap: 5, padding: '8px 12px', borderRadius: 11, flexShrink: 0,
+                    background: `${neon.gold}18`, border: `1px solid ${neon.gold}40`, color: neon.gold,
+                    fontSize: 10, fontWeight: 800, cursor: 'pointer', fontFamily: neon.font,
                   }}
                 >
-                  {copied ? (
-                    <>
-                      <Check size={14} /> Copied!
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} /> Copy
-                    </>
-                  )}
+                  {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
                 </motion.button>
               </div>
-            </V2Card>
+              <p style={{ margin: '6px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>Share & earn 100 ARX-P per friend</p>
+            </NeonGlassCard>
           </motion.div>
         )}
 
         {/* X handle */}
-        <motion.div variants={fadeUp} style={{ marginTop: 20 }}>
-          <V2Card padding="16px 18px" accent={v2.brand.steel}>
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                marginBottom: editingX ? 12 : 0,
-              }}
-            >
+        <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+          <NeonGlassCard accent={neon.cyan} padding="12px 14px">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: editingX ? 10 : 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 11,
-                    background: v2.brand.raised,
-                    border: `1px solid ${v2.brand.border}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill={v2.brand.steelBright}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 10, background: `${neon.cyan}12`, border: `1px solid ${neon.cyan}28`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill={ACTIVITY_TEXT}>
                     <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.733-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
                   </svg>
                 </div>
                 <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>X (Twitter)</p>
-                  <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 1 }}>
+                  <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: ACTIVITY_TEXT }}>X (Twitter)</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>
                     {profileXHandle ? `@${profileXHandle}` : 'Not linked'}
                   </p>
                 </div>
@@ -480,48 +348,27 @@ export default function ProfileV2() {
                 type="button"
                 onClick={() => setEditingX((e) => !e)}
                 style={{
-                  padding: '6px 14px',
-                  borderRadius: 12,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  background: editingX ? v2.brand.raised : `${v2.brand.steel}1f`,
-                  border: `1px solid ${editingX ? v2.brand.border : `${v2.brand.steel}40`}`,
-                  color: editingX ? v2.brand.mutedSoft : v2.brand.steel,
-                  cursor: 'pointer',
-                  fontFamily: v2.font,
+                  padding: '5px 12px', borderRadius: 10, fontSize: 10, fontWeight: 800,
+                  background: editingX ? 'rgba(255,255,255,0.06)' : `${neon.cyan}15`,
+                  border: `1px solid ${editingX ? 'rgba(255,255,255,0.1)' : `${neon.cyan}35`}`,
+                  color: editingX ? 'rgba(184,239,248,0.5)' : neon.cyan, cursor: 'pointer', fontFamily: neon.font,
                 }}
               >
                 {editingX ? 'Cancel' : profileXHandle ? 'Edit' : 'Link'}
               </button>
             </div>
             {editingX && (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <div
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
-                    background: v2.brand.raised,
-                    border: `1px solid ${v2.brand.border}`,
-                    borderRadius: 12,
-                    padding: '10px 14px',
-                  }}
-                >
-                  <span style={{ fontSize: 14, fontWeight: 800, color: v2.brand.steel }}>@</span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <div style={{
+                  flex: 1, display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 11, padding: '8px 10px',
+                }}>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: neon.cyan }}>@</span>
                   <input
                     value={xHandle}
                     onChange={(e) => setXHandle(e.target.value)}
                     placeholder="yourhandle"
-                    style={{
-                      flex: 1,
-                      background: 'none',
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: 14,
-                      color: v2.brand.steelBright,
-                      fontFamily: v2.font,
-                    }}
+                    style={{ flex: 1, background: 'none', border: 'none', outline: 'none', fontSize: 12, color: ACTIVITY_TEXT, fontFamily: neon.font }}
                   />
                 </div>
                 <button
@@ -529,50 +376,21 @@ export default function ProfileV2() {
                   onClick={saveXHandle}
                   disabled={savingX}
                   style={{
-                    padding: '10px 16px',
-                    borderRadius: 12,
-                    fontSize: 12,
-                    fontWeight: 800,
-                    background: v2.brand.steel,
-                    border: 'none',
-                    color: v2.brand.deep,
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    fontFamily: v2.font,
+                    padding: '8px 14px', borderRadius: 11, fontSize: 11, fontWeight: 800,
+                    background: neon.cyan, border: 'none', color: neon.deep, cursor: 'pointer', fontFamily: neon.font,
                   }}
                 >
                   {savingX ? '…' : 'Save'}
                 </button>
               </div>
             )}
-          </V2Card>
+          </NeonGlassCard>
         </motion.div>
 
-        {/* Admin section */}
-        {isAdmin && (
-          <motion.div variants={fadeUp} style={{ marginTop: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-              <div style={{ flex: 1, height: 1, background: `${v2.accent.arena}33` }} />
-              <V2Eyebrow accent={v2.accent.arena}>Admin Control Panel</V2Eyebrow>
-              <div style={{ flex: 1, height: 1, background: `${v2.accent.arena}33` }} />
-            </div>
-            {ADMIN_MENU.map((item) => (
-              <V2MenuRow
-                key={item.path}
-                icon={item.Icon}
-                label={item.label}
-                sub={item.sub}
-                accent={item.accent}
-                onClick={() => navigate(item.path)}
-              />
-            ))}
-          </motion.div>
-        )}
-
-        {/* Push notifications */}
-        <motion.div variants={fadeUp} style={{ marginTop: 24 }}>
-          <V2Eyebrow accent={v2.brand.muted}>Notifications</V2Eyebrow>
-          <div style={{ marginTop: 12 }}>
+        {/* Notifications */}
+        <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+          <NeonSectionLabel>Notifications</NeonSectionLabel>
+          <NeonGlassCard accent={neon.cyan} padding="8px 10px">
             {[
               {
                 label: 'Push Notifications',
@@ -583,89 +401,62 @@ export default function ProfileV2() {
                   if (enabling) {
                     const ok = await requestPermission();
                     if (!ok) {
-                      toast({
-                        title: 'Notifications blocked',
-                        description: 'Enable in Settings → Apps → Arxon → Notifications',
-                        variant: 'destructive',
-                      });
+                      toast({ title: 'Notifications blocked', description: 'Enable in device settings', variant: 'destructive' });
                       return;
                     }
                   }
-                  const next = enabling;
-                  updatePushPrefs({
-                    ...pushPrefs,
-                    arenaLive: next,
-                    arenaResults: next,
-                    rewardUpdates: next,
-                    adminAnnouncements: next,
-                  });
+                  updatePushPrefs({ ...pushPrefs, arenaLive: enabling, arenaResults: enabling, rewardUpdates: enabling, adminAnnouncements: enabling });
                 },
               },
               {
                 label: 'Mining Alerts',
-                sub: 'Session ending & claim reminders',
+                sub: 'Session & claim reminders',
                 on: pushPrefs.miningAlerts && pushPrefs.claimNotifications,
                 toggle: () => {
                   const next = !(pushPrefs.miningAlerts && pushPrefs.claimNotifications);
-                  updatePushPrefs({
-                    ...pushPrefs,
-                    miningAlerts: next,
-                    claimNotifications: next,
-                  });
+                  updatePushPrefs({ ...pushPrefs, miningAlerts: next, claimNotifications: next });
                 },
               },
             ].map((item) => (
-              <V2Card key={item.label} padding="14px 16px" style={{ marginBottom: 8 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div
-                      style={{
-                        width: 38,
-                        height: 38,
-                        borderRadius: 13,
-                        background: v2.brand.raised,
-                        border: `1px solid ${v2.brand.border}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        flexShrink: 0,
-                      }}
-                    >
-                      <Bell size={16} color={v2.brand.mutedSoft} />
-                    </div>
-                    <div>
-                      <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>{item.label}</p>
-                      <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 2 }}>{item.sub}</p>
-                    </div>
+              <div key={item.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 4px', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 10, background: `${neon.cyan}12`, border: `1px solid ${neon.cyan}25`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Bell size={14} color={neon.cyan} />
                   </div>
-                  <Toggle on={item.on} onToggle={item.toggle} />
+                  <div>
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 600, color: ACTIVITY_TEXT }}>{item.label}</p>
+                    <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>{item.sub}</p>
+                  </div>
                 </div>
-              </V2Card>
+                <NeonToggle on={item.on} onToggle={item.toggle} />
+              </div>
             ))}
-          </div>
+          </NeonGlassCard>
         </motion.div>
 
         {/* Account menu */}
-        <motion.div variants={fadeUp} style={{ marginTop: 24 }}>
-          <V2Eyebrow accent={v2.brand.muted}>Account</V2Eyebrow>
-          <div style={{ marginTop: 12 }}>
+        <motion.div variants={fadeUp}>
+          <NeonMenuGroup title="Account">
             {MENU.map((item) => (
-              <V2MenuRow
-                key={item.path}
-                icon={item.Icon}
-                label={item.label}
-                sub={item.sub}
-                accent={item.accent}
-                onClick={() => navigate(item.path)}
-              />
+              <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
             ))}
-          </div>
+          </NeonMenuGroup>
         </motion.div>
 
-        {/* Sign out */}
-        <motion.div variants={fadeUp} style={{ marginTop: 12, marginBottom: 24 }}>
-          <V2ButtonGhost onClick={() => signOut?.()} accent={v2.accent.danger} fullWidth>
-            <LogOut size={16} style={{ marginRight: 4 }} />
+        {/* Admin */}
+        {isAdmin && (
+          <motion.div variants={fadeUp} style={{ marginTop: 4 }}>
+            <NeonMenuGroup title="Admin">
+              {ADMIN_MENU.map((item) => (
+                <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
+              ))}
+            </NeonMenuGroup>
+          </motion.div>
+        )}
+
+        <motion.div variants={fadeUp} style={{ marginTop: 8 }}>
+          <V2ButtonGhost onClick={() => signOut?.()} accent="#f87171" fullWidth>
+            <LogOut size={15} style={{ marginRight: 4 }} />
             Sign Out
           </V2ButtonGhost>
         </motion.div>

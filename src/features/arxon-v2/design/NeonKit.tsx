@@ -2,12 +2,44 @@ import { type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import { neon, neonShadow } from './neonTokens';
+import { useIsAppPreview } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { useMobileNav } from '@/contexts/MobileNavContext';
+import { mobileScrollPadding, mobileScrollPaddingNavHidden } from '@/lib/mobileLayout';
 
 /** Space nebula page shell — meshy creamy Word Forge aesthetic */
-export function NeonPage({ children, padBottom = 100 }: { children: ReactNode; padBottom?: number }) {
+export function NeonPage({
+  children,
+  padBottom,
+}: {
+  children: ReactNode;
+  /** Override bottom scroll inset. Omit for auto nav clearance; pass 0 to disable. */
+  padBottom?: number | string;
+}) {
+  const contained = useIsAppPreview();
+  const { hideNav } = useMobileNav();
+
+  const resolvedPadBottom = (() => {
+    if (padBottom !== undefined) return padBottom;
+    return hideNav ? mobileScrollPaddingNavHidden() : mobileScrollPadding();
+  })();
+
   return (
-    <div style={{ minHeight: '100vh', position: 'relative', overflow: 'hidden', paddingBottom: padBottom, fontFamily: neon.font, background: neon.deep }}>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+    <div style={{
+      minHeight: contained ? '100%' : '100vh',
+      position: 'relative',
+      overflowX: 'hidden',
+      paddingBottom: resolvedPadBottom,
+      fontFamily: neon.font,
+      background: neon.deep,
+      touchAction: 'pan-y',
+      overscrollBehaviorY: 'contain',
+    }}>
+      <div style={{
+        position: contained ? 'absolute' : 'fixed',
+        inset: 0,
+        zIndex: 0,
+        pointerEvents: 'none',
+      }}>
         <div style={{
           position: 'absolute', inset: -20,
           backgroundImage: `url(${FORGE_UI.discoveryBg})`,
@@ -119,10 +151,20 @@ export function NeonActionTile({
   );
 }
 
-export function NeonSectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+export function NeonSectionTitle({ title, action, onAction, badge }: { title: string; action?: string; onAction?: () => void; badge?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-      <p style={{ margin: 0, fontSize: 13, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: neon.text, textShadow: `0 0 20px ${neon.cyanGlow}` }}>{title}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: neon.text, textShadow: `0 0 20px ${neon.cyanGlow}` }}>{title}</p>
+        {badge && (
+          <span style={{
+            fontSize: 8, fontWeight: 800, padding: '2px 8px', borderRadius: 8,
+            background: 'rgba(255,68,68,0.15)', border: '1px solid rgba(255,100,100,0.35)', color: '#ff8888',
+          }}>
+            {badge}
+          </span>
+        )}
+      </div>
       {action && onAction && (
         <button type="button" onClick={onAction} style={{ background: 'none', border: 'none', color: neon.cyan, fontSize: 11, fontWeight: 800, cursor: 'pointer', fontFamily: neon.font }}>{action} →</button>
       )}

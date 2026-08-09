@@ -5,6 +5,9 @@ import forgeLogo from '@/assets/word-forge/ui/forge-logo.png';
 import treasureBg from '@/assets/word-forge/ui/treasure-bg.png';
 import dashboardBanner from '@/assets/word-forge/ui/dashboard-banner.png';
 import leaderboardKing from '@/assets/word-forge/ui/leaderboard-king.png';
+import bannerWordForge from '@/assets/word-forge/ui/banner-word-forge-clean.png';
+import bannerTasks from '@/assets/word-forge/ui/banner-tasks-clean.png';
+import bannerArena from '@/assets/word-forge/ui/banner-arena-clean.png';
 
 export const FORGE_UI = {
   discoveryBg,
@@ -14,6 +17,9 @@ export const FORGE_UI = {
   treasureBg,
   dashboardBanner,
   leaderboardKing,
+  bannerWordForge,
+  bannerTasks,
+  bannerArena,
 } as const;
 
 export interface LevelTileSkin {

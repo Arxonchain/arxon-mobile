@@ -1,23 +1,27 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bell, X, Check, CheckCheck, Zap, Trophy, MessageSquare, TrendingUp, Gift } from 'lucide-react';
-import { useInAppNotifications, AppNotification } from '@/hooks/useInAppNotifications';
+import { Bell, X, CheckCheck, Zap, Trophy, MessageSquare, TrendingUp, Gift } from 'lucide-react';
+import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { NeonHeaderIconButton } from '@/features/arxon-v2/design/NeonSecondaryUI';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
+
+const ACTIVITY_TEXT = '#b8eff8';
 
 function relTime(iso: string) {
   const d = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (d < 60) return 'now';
-  if (d < 3600) return `${Math.floor(d/60)}m ago`;
-  if (d < 86400) return `${Math.floor(d/3600)}h ago`;
-  return new Date(iso).toLocaleDateString([], { month:'short', day:'numeric' });
+  if (d < 3600) return `${Math.floor(d / 60)}m ago`;
+  if (d < 86400) return `${Math.floor(d / 3600)}h ago`;
+  return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 function typeIcon(type: string) {
-  if (type.includes('mining'))    return { icon: Zap,          col: 'hsl(38 55% 52%)' };
-  if (type.includes('arena'))     return { icon: Trophy,       col: 'hsl(255 50% 65%)' };
-  if (type.includes('chat'))      return { icon: MessageSquare,col: 'hsl(155 45% 50%)' };
-  if (type.includes('nexus'))     return { icon: TrendingUp,   col: 'hsl(155 45% 50%)' };
-  if (type.includes('reward'))    return { icon: Gift,         col: 'hsl(38 55% 52%)' };
-  return { icon: Bell, col: 'hsl(215 35% 62%)' };
+  if (type.includes('mining')) return { icon: Zap, col: neon.gold };
+  if (type.includes('arena')) return { icon: Trophy, col: neon.purple };
+  if (type.includes('chat')) return { icon: MessageSquare, col: neon.teal };
+  if (type.includes('nexus')) return { icon: TrendingUp, col: neon.teal };
+  if (type.includes('reward')) return { icon: Gift, col: neon.gold };
+  return { icon: Bell, col: neon.cyan };
 }
 
 export default function InAppNotificationBell() {
@@ -30,138 +34,160 @@ export default function InAppNotificationBell() {
 
   return (
     <>
-      {/* Bell button */}
-      <button onClick={openDrawer}
-        style={{position:'relative',width:40,height:40,borderRadius:14,
-          background:'hsl(215 25% 11%)',border:'1px solid hsl(215 22% 18%)',
-          display:'flex',alignItems:'center',justifyContent:'center',
-          cursor:'pointer',outline:'none'}}>
-        <Bell size={17} color="hsl(215 25% 52%)"/>
-        {unread > 0 && (
-          // FIX BUG-14: Proper badge that shows count up to 99+, no overflow
-          <div style={{
-            position:'absolute', top:4, right:4,
-            minWidth: unread > 9 ? 16 : 14,
-            height: unread > 9 ? 16 : 14,
-            borderRadius: unread > 9 ? 8 : '50%',
-            background:'hsl(0 60% 56%)',
-            border:'1.5px solid hsl(225 30% 3%)',
-            boxShadow:'0 0 8px hsl(0 60% 56%/0.6)',
-            display:'flex',alignItems:'center',justifyContent:'center',
-            padding: unread > 9 ? '0 3px' : 0,
-          }}>
-            {unread > 0 && (
-              <span style={{fontSize:8,fontWeight:800,color:'white',lineHeight:1}}>
-                {unread > 99 ? '99+' : unread > 9 ? unread : ''}
-              </span>
-            )}
-          </div>
-        )}
-      </button>
+      <NeonHeaderIconButton
+        label="Notifications"
+        accent={neon.cyan}
+        badge={unread || null}
+        onClick={openDrawer}
+      >
+        <Bell size={17} strokeWidth={2.2} />
+      </NeonHeaderIconButton>
 
-      {/* Drawer overlay */}
       <AnimatePresence>
         {open && (
           <>
-            <motion.div initial={{opacity:0}} animate={{opacity:1}} exit={{opacity:0}}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               onClick={closeDrawer}
-              style={{position:'fixed',inset:0,zIndex:900,background:'rgba(0,0,0,0.5)'}}/>
+              style={{ position: 'fixed', inset: 0, zIndex: 900, background: 'rgba(2,6,14,0.72)', backdropFilter: 'blur(4px)' }}
+            />
 
             <motion.div
-              initial={{y:'100%'}} animate={{y:0}} exit={{y:'100%'}}
-              transition={{type:'spring',stiffness:340,damping:36}}
-              style={{position:'fixed',left:0,right:0,bottom:0,zIndex:901,
-                background:'hsl(225 28% 6%)',borderRadius:'24px 24px 0 0',
-                border:'1px solid hsl(215 22% 14%)',
-                maxHeight:'80vh',display:'flex',flexDirection:'column',
-                fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
-
-              {/* Handle */}
-              <div style={{display:'flex',justifyContent:'center',paddingTop:10,paddingBottom:4}}>
-                <div style={{width:36,height:4,borderRadius:2,background:'hsl(215 22% 20%)'}}/>
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ type: 'spring', stiffness: 340, damping: 36 }}
+              style={{
+                position: 'fixed',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                zIndex: 901,
+                background: 'linear-gradient(180deg, rgba(12,28,48,0.98) 0%, rgba(6,10,22,0.99) 100%)',
+                borderRadius: '22px 22px 0 0',
+                border: `1px solid ${neon.cyan}28`,
+                borderBottom: 'none',
+                boxShadow: `0 -8px 40px rgba(0,0,0,0.5), 0 0 32px ${neon.cyan}08`,
+                maxHeight: '80vh',
+                display: 'flex',
+                flexDirection: 'column',
+                fontFamily: neon.font,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 10, paddingBottom: 4 }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, background: `${neon.cyan}35` }} />
               </div>
 
-              {/* Header */}
-              <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
-                padding:'8px 20px 12px'}}>
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                padding: '8px 16px 12px',
+              }}>
                 <div>
-                  <h2 style={{fontSize:17,fontWeight:700,color:'hsl(215 20% 93%)'}}>Notifications</h2>
+                  <p style={{
+                    margin: 0, fontSize: 9, fontWeight: 800, letterSpacing: '0.16em',
+                    textTransform: 'uppercase', color: neon.cyan,
+                  }}>
+                    Inbox
+                  </p>
+                  <h2 style={{ margin: '4px 0 0', fontSize: 18, fontWeight: 900, color: neon.text }}>Notifications</h2>
                   {unread > 0 && (
-                    <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>
+                    <p style={{ fontSize: 10, color: 'rgba(184,239,248,0.5)', marginTop: 3 }}>
                       {unread} unread
                     </p>
                   )}
                 </div>
-                <div style={{display:'flex',gap:8}}>
+                <div style={{ display: 'flex', gap: 6 }}>
                   {unread > 0 && (
-                    <button onClick={readAll}
-                      style={{display:'flex',alignItems:'center',gap:5,padding:'6px 12px',
-                        borderRadius:12,background:'hsl(215 25% 12%)',
-                        border:'1px solid hsl(215 22% 18%)',cursor:'pointer',outline:'none'}}>
-                      <CheckCheck size={13} color="hsl(215 35% 62%)"/>
-                      <span style={{fontSize:11,fontWeight:600,color:'hsl(215 35% 62%)'}}>
-                        Mark all read
-                      </span>
-                    </button>
+                    <motion.button
+                      type="button"
+                      whileTap={{ scale: 0.92 }}
+                      onClick={readAll}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 5, padding: '7px 11px',
+                        borderRadius: 11,
+                        background: `${neon.cyan}12`,
+                        border: `1px solid ${neon.cyan}30`,
+                        cursor: 'pointer',
+                        fontFamily: neon.font,
+                      }}
+                    >
+                      <CheckCheck size={13} color={neon.cyan} />
+                      <span style={{ fontSize: 10, fontWeight: 700, color: ACTIVITY_TEXT }}>Read all</span>
+                    </motion.button>
                   )}
-                  <button onClick={closeDrawer}
-                    style={{width:34,height:34,borderRadius:11,background:'hsl(215 25% 12%)',
-                      border:'1px solid hsl(215 22% 18%)',display:'flex',alignItems:'center',
-                      justifyContent:'center',cursor:'pointer',outline:'none'}}>
-                    <X size={15} color="hsl(215 18% 45%)"/>
-                  </button>
+                  <NeonHeaderIconButton label="Close" accent="rgba(184,239,248,0.45)" size={34} onClick={closeDrawer}>
+                    <X size={15} strokeWidth={2.5} />
+                  </NeonHeaderIconButton>
                 </div>
               </div>
 
-              {/* List */}
-              <div style={{overflowY:'auto',flex:1,padding:'0 16px 24px'}}>
+              <div style={{ overflowY: 'auto', flex: 1, padding: '0 14px 24px' }}>
                 {notifications.length === 0 ? (
-                  <div style={{textAlign:'center',padding:'40px 0'}}>
-                    <Bell size={40} color="hsl(215 14% 25%)" style={{margin:'0 auto 12px'}}/>
-                    <p style={{fontSize:15,fontWeight:700,color:'hsl(215 14% 38%)',marginBottom:6}}>
+                  <div style={{ textAlign: 'center', padding: '36px 0' }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 14, margin: '0 auto 12px',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: `${neon.cyan}10`, border: `1px solid ${neon.cyan}25`,
+                    }}>
+                      <Bell size={22} color={neon.cyan} style={{ opacity: 0.6 }} />
+                    </div>
+                    <p style={{ fontSize: 14, fontWeight: 800, color: ACTIVITY_TEXT, marginBottom: 6 }}>
                       No notifications yet
                     </p>
-                    <p style={{fontSize:12,color:'hsl(215 14% 28%)'}}>
-                      You'll get notified about mining, arena battles, and more
+                    <p style={{ fontSize: 11, color: 'rgba(184,239,248,0.45)', lineHeight: 1.5, margin: 0 }}>
+                      Mining, arena battles, rewards & more
                     </p>
                   </div>
-                ) : notifications.map(n => {
+                ) : notifications.map((n) => {
                   const { icon: Icon, col } = typeIcon(n.type);
                   return (
-                    <motion.div key={n.id}
-                      initial={{opacity:0,x:-10}} animate={{opacity:1,x:0}}
+                    <motion.div
+                      key={n.id}
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
                       onClick={() => markRead(n.id)}
-                      style={{display:'flex',alignItems:'flex-start',gap:12,
-                        padding:'13px 14px',borderRadius:18,marginBottom:8,cursor:'pointer',
-                        background: n.read ? 'hsl(225 22% 7%)' : 'hsl(215 26% 10%)',
-                        border:`1px solid ${n.read ? 'hsl(215 20% 12%)' : `${col}22`}`}}>
-                      <div style={{width:40,height:40,borderRadius:13,flexShrink:0,
-                        background:`${col}14`,border:`1px solid ${col}28`,
-                        display:'flex',alignItems:'center',justifyContent:'center'}}>
-                        <Icon size={17} color={col}/>
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 11,
+                        padding: '11px 12px', borderRadius: 14, marginBottom: 6, cursor: 'pointer',
+                        background: n.read ? 'rgba(255,255,255,0.02)' : `${col}0a`,
+                        border: `1px solid ${n.read ? 'rgba(255,255,255,0.05)' : `${col}28`}`,
+                      }}
+                    >
+                      <div style={{
+                        width: 34, height: 34, borderRadius: 11, flexShrink: 0,
+                        background: `${col}14`, border: `1px solid ${col}30`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center', color: col,
+                      }}>
+                        <Icon size={15} strokeWidth={2.2} />
                       </div>
-                      <div style={{flex:1,minWidth:0}}>
-                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:3}}>
-                          <p style={{fontSize:13,fontWeight:n.read?600:700,
-                            color: n.read ? 'hsl(215 18% 70%)' : 'hsl(215 18% 90%)'}}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 2 }}>
+                          <p style={{
+                            margin: 0, fontSize: 12, fontWeight: n.read ? 600 : 700,
+                            color: n.read ? 'rgba(184,239,248,0.65)' : ACTIVITY_TEXT,
+                          }}>
                             {n.title}
                           </p>
-                          <span style={{fontSize:9,color:'hsl(215 14% 32%)',flexShrink:0,marginLeft:8}}>
+                          <span style={{ fontSize: 9, color: 'rgba(184,239,248,0.35)', flexShrink: 0, marginLeft: 8 }}>
                             {relTime(n.created_at)}
                           </span>
                         </div>
-                        <p style={{fontSize:11,color:'hsl(215 14% 45%)',lineHeight:1.45}}>
+                        <p style={{ margin: 0, fontSize: 10, color: 'rgba(184,239,248,0.5)', lineHeight: 1.45 }}>
                           {n.message}
                         </p>
                         {n.amount !== 0 && n.amount && (
-                          <p style={{fontSize:11,fontWeight:700,color:col,marginTop:4}}>
+                          <p style={{ fontSize: 11, fontWeight: 800, color: col, marginTop: 4 }}>
                             {n.amount > 0 ? '+' : ''}{n.amount.toLocaleString()} ARX-P
                           </p>
                         )}
                       </div>
                       {!n.read && (
-                        <div style={{width:8,height:8,borderRadius:'50%',background:col,
-                          flexShrink:0,marginTop:4,boxShadow:`0 0 6px ${col}/0.5`}}/>
+                        <div style={{
+                          width: 7, height: 7, borderRadius: '50%', background: col, flexShrink: 0,
+                          marginTop: 4, boxShadow: `0 0 8px ${col}88`,
+                        }} />
                       )}
                     </motion.div>
                   );

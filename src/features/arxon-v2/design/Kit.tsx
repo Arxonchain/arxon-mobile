@@ -4,6 +4,34 @@ import { type CSSProperties, type ReactNode } from 'react';
 import { v2 } from './tokens';
 import { NeonPage } from './NeonKit';
 import { neon } from './neonTokens';
+import { useMobileNav } from '@/contexts/MobileNavContext';
+import { mobileScrollPadding, mobileScrollPaddingNavHidden } from '@/lib/mobileLayout';
+import {
+  NeonScreenHeader,
+  NeonCompactBalance,
+  NeonMenuRow,
+  NeonCompactTabs,
+  NeonListRow,
+  NeonSectionLabel,
+  NeonGlassCard,
+} from './NeonSecondaryUI';
+
+export {
+  NeonScreenHeader,
+  NeonGlassCard,
+  NeonCompactBalance,
+  NeonMenuRow,
+  NeonMenuGroup,
+  NeonCompactTabs,
+  NeonRankBanner,
+  NeonListRow,
+  NeonSectionLabel,
+  NeonHeaderIconButton,
+  NeonHeaderAvatar,
+  NeonHeaderActions,
+  neonFadeUp,
+  neonStagger,
+} from './NeonSecondaryUI';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 18 },
@@ -19,16 +47,34 @@ export { fadeUp, stagger };
 
 export function V2Page({
   children,
-  padBottom = 100,
+  padBottom,
   style,
 }: {
   children: ReactNode;
-  padBottom?: number;
+  /** Omit for auto bottom nav clearance; pass 0 to disable. */
+  padBottom?: number | string;
   style?: CSSProperties;
 }) {
+  const { hideNav } = useMobileNav();
+  const bottomInset = (() => {
+    if (padBottom !== undefined) return padBottom;
+    return hideNav ? mobileScrollPaddingNavHidden() : mobileScrollPadding();
+  })();
+
   return (
-    <NeonPage padBottom={padBottom}>
-      <div style={{ fontFamily: neon.font, ...style }}>{children}</div>
+    <NeonPage padBottom={0}>
+      <div
+        style={{
+          fontFamily: neon.font,
+          paddingBottom: bottomInset,
+          boxSizing: 'border-box',
+          touchAction: 'pan-y',
+          overscrollBehaviorY: 'contain',
+          ...style,
+        }}
+      >
+        {children}
+      </div>
     </NeonPage>
   );
 }
@@ -38,40 +84,25 @@ export function V2Header({
   subtitle,
   onBack,
   right,
-  large,
+  large: _large,
+  eyebrow,
 }: {
   title?: string;
   subtitle?: string;
   onBack?: () => void;
   right?: ReactNode;
   large?: boolean;
+  eyebrow?: string;
 }) {
+  if (!title) return null;
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: large ? '52px 20px 8px' : '52px 20px 0',
-      }}
-    >
-      {onBack ? (
-        <motion.button type="button" whileTap={{ scale: 0.9 }} onClick={onBack} style={iconBtnStyle}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={v2.brand.steelLight} strokeWidth="2.2" strokeLinecap="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </motion.button>
-      ) : (
-        <div style={{ width: 40 }} />
-      )}
-      {(title || subtitle) && (
-        <div style={{ textAlign: 'center', flex: 1, padding: '0 8px' }}>
-          {title && <h1 style={{ fontSize: large ? 22 : 16, fontWeight: 800, color: neon.text, letterSpacing: '-0.3px', margin: 0 }}>{title}</h1>}
-          {subtitle && <p style={{ fontSize: 10, color: neon.textMuted, marginTop: 4, marginBottom: 0 }}>{subtitle}</p>}
-        </div>
-      )}
-      {right ?? <div style={{ width: 40 }} />}
-    </div>
+    <NeonScreenHeader
+      eyebrow={eyebrow}
+      title={title}
+      subtitle={subtitle}
+      onBack={onBack}
+      right={right}
+    />
   );
 }
 
@@ -202,13 +233,11 @@ export function V2ButtonGhost({ children, onClick, accent = v2.brand.steel, full
   );
 }
 
-export function V2Card({ children, accent, onClick, padding = '16px 18px', style }: { children: ReactNode; accent?: string; onClick?: () => void; padding?: string; style?: CSSProperties }) {
+export function V2Card({ children, accent = neon.cyan, onClick, padding = '14px 14px', style }: { children: ReactNode; accent?: string; onClick?: () => void; padding?: string; style?: CSSProperties }) {
   return (
-    <motion.div whileTap={onClick ? { scale: 0.98 } : undefined} onClick={onClick}
-      style={{ borderRadius: v2.radius.lg, padding, background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${accent ? `${accent}32` : 'rgba(255,255,255,0.08)'}`, boxShadow: accent ? `0 8px 32px -8px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.06)` : 'inset 0 1px 0 rgba(255,255,255,0.06)', cursor: onClick ? 'pointer' : 'default', position: 'relative', overflow: 'hidden', ...style }}>
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, hsl(215 40% 82% / 0.12), transparent)', pointerEvents: 'none' }} />
-      <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
-    </motion.div>
+    <NeonGlassCard accent={accent} onClick={onClick} padding={padding} style={style}>
+      {children}
+    </NeonGlassCard>
   );
 }
 
@@ -229,33 +258,21 @@ export function V2DiscoverCard({ eyebrow, title, subtitle, accent, gradient, onC
 
 export function V2SectionHeader({ title, action, onAction, badge }: { title: string; action?: string; onAction?: () => void; badge?: string }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <p style={{ fontSize: 15, fontWeight: 800, color: neon.text, margin: 0 }}>{title}</p>
-        {badge && <span style={{ fontSize: 9, fontWeight: 700, color: v2.accent.mining, background: `${v2.accent.mining}18`, border: `1px solid ${v2.accent.mining}40`, borderRadius: 10, padding: '2px 8px' }}>{badge}</span>}
-      </div>
-      {action && onAction && (
-        <button type="button" onClick={onAction} style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 11, color: neon.cyan, fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: neon.font }}>
-          {action} <ChevronRight size={13} />
-        </button>
-      )}
+    <div style={{ marginBottom: badge ? 10 : 0 }}>
+      <NeonSectionLabel action={action} onAction={onAction}>
+        {title}{badge ? ` · ${badge}` : ''}
+      </NeonSectionLabel>
     </div>
   );
 }
 
 export function V2Tabs<T extends string>({ tabs, active, onChange }: { tabs: { id: T; label: string; count?: number }[]; active: T; onChange: (id: T) => void }) {
   return (
-    <div style={{ display: 'flex', gap: 6, padding: '4px', borderRadius: v2.radius.md, background: `${v2.brand.raised}88`, border: `1px solid ${v2.brand.border}` }}>
-      {tabs.map((t) => {
-        const isOn = t.id === active;
-        return (
-          <button key={t.id} type="button" onClick={() => onChange(t.id)}
-            style={{ flex: 1, padding: '10px 8px', borderRadius: v2.radius.sm, border: 'none', cursor: 'pointer', fontFamily: v2.font, fontSize: 11, fontWeight: 700, background: isOn ? `${v2.brand.steel}22` : 'transparent', color: isOn ? v2.brand.steelLight : v2.brand.muted, boxShadow: isOn ? `0 0 0 1px ${v2.brand.steel}44` : 'none' }}>
-            {t.label}{t.count !== undefined && <span style={{ marginLeft: 4, opacity: 0.7, fontSize: 9 }}>({t.count})</span>}
-          </button>
-        );
-      })}
-    </div>
+    <NeonCompactTabs
+      tabs={tabs.map((t) => ({ id: t.id, label: t.count !== undefined ? `${t.label} (${t.count})` : t.label }))}
+      active={active}
+      onChange={onChange}
+    />
   );
 }
 
@@ -278,18 +295,22 @@ export function V2Pills<T extends string>({ items, active, onChange }: { items: 
   );
 }
 
-export function V2ListRow({ icon, iconAccent = v2.brand.steel, title, subtitle, value, valueLabel, onClick }: { icon: ReactNode; iconAccent?: string; title: string; subtitle?: string; value?: string; valueLabel?: string; onClick?: () => void }) {
+export function V2ListRow({ icon, iconAccent = neon.cyan, title, subtitle, value, valueLabel, onClick }: { icon: ReactNode; iconAccent?: string; title: string; subtitle?: string; value?: string; valueLabel?: string; onClick?: () => void }) {
+  if (!value) {
+    return (
+      <NeonListRow icon={icon} accent={iconAccent} title={title} subtitle={subtitle} value="—" onClick={onClick} />
+    );
+  }
   return (
-    <V2Card onClick={onClick} padding="14px 16px" accent={iconAccent} style={{ marginBottom: 10 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-        <div style={{ width: 42, height: 42, borderRadius: v2.radius.sm, background: `${iconAccent}14`, border: `1px solid ${iconAccent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: iconAccent }}>{icon}</div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 700, color: neon.text, margin: 0 }}>{title}</p>
-          {subtitle && <p style={{ fontSize: 10, color: neon.textMuted, margin: '3px 0 0' }}>{subtitle}</p>}
-        </div>
-        {value && <div style={{ textAlign: 'right' }}><p style={{ fontSize: 14, fontWeight: 800, color: iconAccent, margin: 0 }}>{value}</p>{valueLabel && <p style={{ fontSize: 9, color: v2.brand.muted, margin: '2px 0 0' }}>{valueLabel}</p>}</div>}
-      </div>
-    </V2Card>
+    <NeonListRow
+      icon={icon}
+      accent={iconAccent}
+      title={title}
+      subtitle={subtitle}
+      value={value}
+      valueLabel={valueLabel}
+      onClick={onClick}
+    />
   );
 }
 
@@ -306,38 +327,19 @@ export function V2StatGrid({ stats }: { stats: { label: string; value: string; a
   );
 }
 
-export function V2BalanceHero({ balance, rank, stats, children }: { balance: number; rank?: number | null; stats: { label: string; value: string; accent?: string }[]; children?: ReactNode }) {
+export function V2BalanceHero({ balance, rank, stats, children, label }: { balance: number; rank?: number | null; stats: { label: string; value: string; accent?: string }[]; children?: ReactNode; label?: string }) {
   return (
-    <V2Card padding="22px 20px" accent={v2.brand.glow} style={{ background: v2.gradient.hero, border: `1px solid ${v2.brand.steel}33` }}>
-      <div style={{ display: 'flex', alignItems: 'stretch', gap: 12 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-            <V2Eyebrow accent={v2.brand.steelLight}>ARX-P Balance</V2Eyebrow>
-            {rank && <div style={{ display: 'flex', alignItems: 'center', gap: 4, background: `${v2.brand.steel}18`, border: `1px solid ${v2.brand.steel}33`, borderRadius: 20, padding: '3px 10px' }}><div style={{ width: 5, height: 5, borderRadius: '50%', background: v2.brand.steel }} /><span style={{ color: v2.brand.steelLight, fontSize: 10, fontWeight: 800 }}>#{rank}</span></div>}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 7, marginBottom: 4 }}>
-            <span style={{ fontSize: 40, fontWeight: 800, letterSpacing: '-2px', color: v2.brand.steelBright, lineHeight: 1, opacity: balance === 0 ? 0.4 : 1 }}>{balance === 0 ? '···' : balance.toLocaleString()}</span>
-            <span style={{ fontSize: 14, fontWeight: 700, color: v2.brand.steel }}>ARX-P</span>
-          </div>
-          <p style={{ fontSize: 9, color: v2.brand.muted, marginBottom: 16 }}>Your total mining rewards</p>
-          <V2StatGrid stats={stats} />
-        </div>
-        {children}
+    <div style={{ display: 'flex', alignItems: 'stretch', gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <NeonCompactBalance balance={balance} rank={rank} stats={stats} label={label} />
       </div>
-    </V2Card>
+      {children}
+    </div>
   );
 }
 
 export function V2MenuRow({ icon: Icon, label, sub, accent, onClick, badge }: { icon: LucideIcon; label: string; sub?: string; accent: string; onClick: () => void; badge?: string }) {
-  return (
-    <motion.button type="button" whileTap={{ scale: 0.98 }} onClick={onClick}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', marginBottom: 8, borderRadius: v2.radius.lg, border: `1px solid ${accent}22`, background: `linear-gradient(135deg, ${accent}08, transparent)`, cursor: 'pointer', textAlign: 'left', fontFamily: v2.font }}>
-      <div style={{ width: 42, height: 42, borderRadius: v2.radius.sm, background: `${accent}18`, border: `1px solid ${accent}33`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon size={18} color={accent} /></div>
-      <div style={{ flex: 1, minWidth: 0 }}><p style={{ fontSize: 14, fontWeight: 700, color: neon.text, margin: 0 }}>{label}</p>{sub && <p style={{ fontSize: 10, color: neon.textMuted, margin: '2px 0 0' }}>{sub}</p>}</div>
-      {badge && <span style={{ fontSize: 8, fontWeight: 800, padding: '3px 8px', borderRadius: 8, background: `${accent}22`, color: accent }}>{badge}</span>}
-      <ChevronRight size={16} color={v2.brand.muted} />
-    </motion.button>
-  );
+  return <NeonMenuRow icon={Icon} label={label} sub={sub} accent={accent} onClick={onClick} badge={badge} />;
 }
 
 export function V2LiveBanner({ title, subtitle, accent = v2.accent.mining, onClick }: { title: string; subtitle: string; accent?: string; onClick: () => void }) {

@@ -34,6 +34,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   nexus_bonus: 'Nexus Bonus',
   restoration: 'Restored',
   game: 'Game',
+  dice_stake: 'Dice Stake',
+  dice_win: 'Dice Win',
+  dice_free_roll: 'Dice Free Roll',
+  dice_refund: 'Dice Refund',
 };
 
 function relTime(iso: string) {
@@ -118,9 +122,9 @@ export default function PointsHistoryV2() {
             transition: ptr.pullDistance === 0 && !ptr.isRefreshing ? 'transform 0.2s ease' : 'none',
           }}
         >
-          <V2Header title="Points History" onBack={() => navigate(-1)} />
+          <V2Header eyebrow="Account" title="Points History" subtitle="Credits & deductions" onBack={() => navigate(-1)} />
 
-          <div style={{ padding: '8px 20px 0' }}>
+          <div style={{ padding: '0 16px 0' }}>
             <motion.p variants={fadeUp} style={{ fontSize: 12, color: v2.brand.mutedSoft, marginBottom: 16, lineHeight: 1.5 }}>
               Every ARX-P added or removed from your balance — tasks, mining, arena, Nexus, and restorations.
             </motion.p>

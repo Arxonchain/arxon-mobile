@@ -1,1487 +1,409 @@
-import { useState, useEffect, useCallback } from 'react';
+/**
+ * Arena — game hub dashboard. Pick Prediction Market, Word Forge, or Dice Roll.
+ */
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { ChevronRight, Dices, Lock, Sparkles, Swords, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useArena, type ArenaBattle, type BattleHistoryEntry } from '@/hooks/useArena';
-import { useArenaMarkets } from '@/hooks/useArenaMarkets';
-import { useArenaMembership } from '@/hooks/useArenaMembership';
 import { usePoints } from '@/hooks/usePoints';
-import AuthDialog from '@/components/auth/AuthDialog';
-import ArenaOnboarding from '@/components/arena/ArenaOnboarding';
-import { toast } from '@/hooks/use-toast';
-import { useMobileNav } from '@/contexts/MobileNavContext';
-import { getArenaPoolStats } from '@/lib/arenaPoolStats';
-import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
-import {
-  V2Page,
-  V2Header,
-  V2HeroCard,
-  V2Card,
-  V2Button,
-  V2ButtonGhost,
-  V2Tabs,
-  V2Pills,
-  V2SectionHeader,
-  V2Eyebrow,
-  V2StatGrid,
-  fadeUp,
-} from '../design/Kit';
-import { v2 } from '../design/tokens';
+import { supabase } from '@/integrations/supabase/client';
+import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
+import { mobileTopPadding, mobileScrollPadding } from '@/lib/mobileLayout';
+import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
+import arenaBattleground from '@/assets/arxon-v2/arena-battleground.png';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
+import { NeonEyebrow } from '@/features/arxon-v2/design/NeonKit';
+import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 
-const CSS = `
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
-.pulse{animation:pulse 1.2s ease-in-out infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
-`;
+const fadeUp = {
+  hidden: { opacity: 0, y: 22 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] } },
+};
+const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.1, delayChildren: 0.08 } } };
 
-type ArenaSide = 'a' | 'b' | 'c';
-type Tab = 'battles' | 'leaderboard' | 'my-stakes';
-type BattleFilter = 'live' | 'upcoming' | 'ended';
+const GLASS = {
+  bg: 'linear-gradient(145deg, rgba(12,32,58,0.72) 0%, rgba(6,14,28,0.82) 100%)',
+  border: 'rgba(79,216,235,0.22)',
+  blur: 'blur(18px)',
+};
 
-const ARENA = v2.accent.arena;
-const ALPHA = 'hsl(195 80% 50%)';
-const OMEGA = 'hsl(255 60% 65%)';
-
-function getPoolStats(battle: Parameters<typeof getArenaPoolStats>[0]) {
-  return getArenaPoolStats(battle);
+interface GameCardProps {
+  id: string;
+  eyebrow: string;
+  title: string;
+  tagline: string;
+  description: string;
+  cta: string;
+  accent: string;
+  banner?: string;
+  icon: ReactNode;
+  badge?: string;
+  badgeLive?: boolean;
+  locked?: boolean;
+  soon?: boolean;
+  onClick?: () => void;
+  delay?: number;
 }
 
-function sideName(
-  battle: { side_a_name: string; side_b_name: string; side_c_name?: string | null },
-  side: ArenaSide,
-) {
-  if (side === 'a') return battle.side_a_name;
-  if (side === 'c') return battle.side_c_name || 'Draw';
-  return battle.side_b_name;
-}
-
-function useTimer(endsAt: string | null, active: boolean) {
-  const [str, setStr] = useState('');
-  useEffect(() => {
-    if (!active || !endsAt) return;
-    const tick = () => {
-      const diff = Math.max(0, new Date(endsAt).getTime() - Date.now());
-      const h = Math.floor(diff / 3600000);
-      const m = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-      const s = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-      setStr(h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [endsAt, active]);
-  return str;
-}
-
-function StatusBadge({
-  isActive,
-  isEnded,
-  concluded,
-  userVoted,
-  userWon,
-  timer,
-}: {
-  isActive?: boolean;
-  isEnded?: boolean;
-  concluded: boolean;
-  userVoted?: boolean;
-  userWon?: boolean;
-  timer: string;
-}) {
-  if (isActive) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          background: `${v2.accent.danger}18`,
-          border: `1px solid ${v2.accent.danger}38`,
-          borderRadius: 20,
-          padding: '3px 9px',
-        }}
-      >
-        <div className="pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: v2.accent.danger }} />
-        <span style={{ fontSize: 9, fontWeight: 700, color: v2.accent.danger }}>LIVE · {timer}</span>
-      </div>
-    );
-  }
-  if (concluded) {
-    return (
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          padding: '3px 9px',
-          borderRadius: 20,
-          color: userWon ? v2.accent.success : v2.brand.mutedSoft,
-          background: userWon ? `${v2.accent.success}18` : v2.brand.raised,
-          border: `1px solid ${userWon ? `${v2.accent.success}38` : v2.brand.border}`,
-        }}
-      >
-        {userVoted ? (userWon ? '🏆 Won' : '💧 Lost') : 'Ended'}
-      </div>
-    );
-  }
-  if (!isEnded) {
-    return (
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          padding: '3px 9px',
-          borderRadius: 20,
-          color: v2.brand.steel,
-          background: `${v2.brand.steel}12`,
-          border: `1px solid ${v2.brand.steel}33`,
-        }}
-      >
-        Upcoming
-      </div>
-    );
-  }
-  return (
-    <div
-      style={{
-        fontSize: 9,
-        fontWeight: 700,
-        padding: '3px 9px',
-        borderRadius: 20,
-        color: v2.accent.danger,
-        background: `${v2.accent.danger}18`,
-        border: `1px solid ${v2.accent.danger}40`,
-      }}
-    >
-      Ended
-    </div>
-  );
-}
-
-function SidePool({
-  name,
-  pct,
-  isWinner,
-  align = 'left',
-}: {
-  name: string;
-  pct: number;
-  isWinner: boolean;
-  align?: 'left' | 'center';
-}) {
-  return (
-    <div
-      style={{
-        padding: '10px 12px',
-        borderRadius: v2.radius.sm,
-        background: isWinner ? `${v2.accent.gold}14` : `${v2.brand.raised}88`,
-        border: `1.5px solid ${isWinner ? `${v2.accent.gold}55` : `${v2.brand.steel}22`}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3,
-        alignItems: align === 'center' ? 'center' : 'stretch',
-      }}
-    >
-      <p
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: v2.brand.steelLight,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          lineHeight: 1.3,
-          textAlign: align,
-        }}
-      >
-        {name}
-      </p>
-      <p
-        style={{
-          fontSize: 15,
-          fontWeight: 900,
-          color: isWinner ? v2.accent.gold : v2.brand.steelLight,
-          lineHeight: 1,
-        }}
-      >
-        {pct}%
-      </p>
-      {isWinner && <span style={{ fontSize: 9, fontWeight: 700, color: v2.accent.gold }}>👑 Winner</span>}
-    </div>
-  );
-}
-
-function BattleCard({
-  battle,
-  isActive,
-  isEnded,
-  userVoted,
-  userWon,
+function GameBattleCard({
+  eyebrow,
+  title,
+  tagline,
+  description,
+  cta,
+  accent,
+  banner,
+  icon,
+  badge,
+  badgeLive,
+  locked,
+  soon,
   onClick,
-}: {
-  battle: ArenaBattle | BattleHistoryEntry;
-  isActive?: boolean;
-  isEnded?: boolean;
-  userVoted?: boolean;
-  userWon?: boolean;
-  onClick: () => void;
-}) {
-  const timer = useTimer(battle.ends_at, !!isActive);
-  const { total: totalPow, pctA, pctB, pctC, hasSideC } = getPoolStats(battle);
-  const concluded = (isEnded || !isActive) && battle.winner_side;
-  const totalVoters = (battle as ArenaBattle & { total_participants?: number }).total_participants ?? 0;
-  const banner = (battle as ArenaBattle & { banner_image?: string }).banner_image;
-
-  const accent = concluded && userWon ? v2.accent.success : isActive ? ARENA : v2.brand.steel;
-
+}: GameCardProps) {
   return (
-    <V2Card
-      accent={accent}
-      onClick={onClick}
-      padding="0"
+    <motion.button
+      type="button"
+      variants={fadeUp}
+      whileTap={locked ? undefined : { scale: 0.985 }}
+      onClick={locked ? undefined : onClick}
+      disabled={locked}
       style={{
-        marginBottom: 12,
-        background: concluded && userWon ? `linear-gradient(160deg, ${v2.accent.success}10, hsl(225 30% 6% / 0.56))` : undefined,
-        boxShadow: isActive ? v2.shadow(ARENA, 0.18) : accent ? v2.shadow(accent, 0.1) : undefined,
+        width: '100%',
+        position: 'relative',
+        borderRadius: 22,
+        overflow: 'hidden',
+        padding: 0,
+        border: `1px solid ${locked ? 'rgba(255,255,255,0.08)' : `${accent}40`}`,
+        background: GLASS.bg,
+        backdropFilter: GLASS.blur,
+        WebkitBackdropFilter: GLASS.blur,
+        boxShadow: locked
+          ? '0 8px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.04)'
+          : `0 14px 40px rgba(0,0,0,0.45), 0 0 32px ${accent}12, inset 0 1px 0 rgba(255,255,255,0.08)`,
+        cursor: locked ? 'default' : 'pointer',
+        textAlign: 'left',
+        fontFamily: neon.font,
+        opacity: locked ? 0.72 : 1,
       }}
     >
-      {isActive && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 2,
-            background: `linear-gradient(90deg, transparent, ${ARENA}88, transparent)`,
-            zIndex: 2,
-          }}
-        />
+      {/* Spotlight beam */}
+      {!locked && (
+        <div style={{
+          position: 'absolute', top: -40, left: '20%', width: '60%', height: 120,
+          background: `radial-gradient(ellipse, ${accent}18 0%, transparent 70%)`,
+          pointerEvents: 'none',
+        }} />
       )}
 
-      {banner && (
-        <div style={{ height: 90, overflow: 'hidden', position: 'relative' }}>
-          <img
-            src={banner}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).parentElement!.style.display = 'none';
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: `linear-gradient(to bottom, transparent 35%, ${v2.brand.deep}bb)`,
-            }}
-          />
-        </div>
-      )}
+      {/* Octagon ring hint */}
+      <div style={{
+        position: 'absolute', inset: 8, borderRadius: 16,
+        border: `1px dashed ${locked ? 'rgba(255,255,255,0.06)' : `${accent}20`}`,
+        pointerEvents: 'none',
+      }} />
 
-      <div style={{ padding: '14px 16px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-            <p
-              style={{
-                fontSize: 13,
-                fontWeight: 800,
-                color: v2.brand.steelBright,
-                letterSpacing: '-0.2px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                margin: 0,
-              }}
-            >
-              {battle.title}
-            </p>
-            {battle.description && (
-              <p
-                style={{
-                  fontSize: 10,
-                  color: v2.brand.muted,
-                  marginTop: 3,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {battle.description}
-              </p>
-            )}
-            <MobileAIPredictionBadge
-              sideAProbability={(battle as ArenaBattle & { ai_side_a_probability?: number }).ai_side_a_probability}
-              sideBProbability={(battle as ArenaBattle & { ai_side_b_probability?: number }).ai_side_b_probability}
-              sideAName={battle.side_a_name}
-              sideBName={battle.side_b_name}
-              confidence={(battle as ArenaBattle & { ai_confidence?: number }).ai_confidence}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <StatusBadge
-              isActive={isActive}
-              isEnded={isEnded}
-              concluded={!!concluded}
-              userVoted={userVoted}
-              userWon={userWon}
-              timer={timer}
-            />
-            <ChevronRight size={14} color={v2.brand.muted} style={{ marginLeft: 6 }} />
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: hasSideC ? '1fr 1fr 1fr' : '1fr 32px 1fr',
-            gap: 8,
-            alignItems: 'stretch',
-            marginBottom: 10,
-          }}
-        >
-          <SidePool name={battle.side_a_name} pct={pctA} isWinner={battle.winner_side === 'a'} />
-          {hasSideC ? (
-            <SidePool
-              name={battle.side_c_name || 'Draw'}
-              pct={pctC}
-              isWinner={battle.winner_side === 'c'}
-              align="center"
-            />
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 9,
-                  background: `${ARENA}14`,
-                  border: `1px solid ${ARENA}33`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <span style={{ fontSize: 8, fontWeight: 900, color: ARENA }}>VS</span>
+      <div style={{ display: 'flex', minHeight: 148, position: 'relative' }}>
+        <div style={{
+          flex: 1, minWidth: 0, padding: '18px 16px 16px',
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          zIndex: 2,
+        }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: 10, flexShrink: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: `${accent}16`, border: `1px solid ${accent}35`, color: accent,
+              }}>
+                {icon}
               </div>
-            </div>
-          )}
-          <SidePool name={battle.side_b_name} pct={pctB} isWinner={battle.winner_side === 'b'} />
-        </div>
-
-        <div
-          style={{
-            height: 4,
-            borderRadius: 2,
-            background: v2.brand.raised,
-            overflow: 'hidden',
-            marginBottom: 8,
-          }}
-        >
-          <div
-            style={{
-              height: '100%',
-              borderRadius: 2,
-              width: `${pctA}%`,
-              background: `linear-gradient(90deg, ${v2.brand.steel}, ${ARENA})`,
-              transition: 'width 0.5s ease',
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 9, color: v2.brand.muted }}>
-            {totalPow.toLocaleString()} ARX-P · {totalVoters} voter{totalVoters !== 1 ? 's' : ''}
-          </span>
-          <span style={{ fontSize: 9, color: v2.brand.muted }}>
-            {new Date(isActive ? battle.ends_at : battle.starts_at).toLocaleDateString()}
-          </span>
-        </div>
-      </div>
-    </V2Card>
-  );
-}
-
-function BattleDetailSide({
-  name,
-  pct,
-  power,
-  side,
-  activeSide,
-  winnerSide,
-  isActive,
-  existingVote,
-  onSelect,
-}: {
-  name: string;
-  pct: number;
-  power: number;
-  side: ArenaSide;
-  activeSide: ArenaSide | null;
-  winnerSide: string | null;
-  isActive?: boolean;
-  existingVote: ArenaSide | null;
-  onSelect: (s: ArenaSide) => void;
-}) {
-  const selected = activeSide === side;
-  const won = winnerSide === side;
-  return (
-    <motion.div
-      whileTap={{ scale: 0.97 }}
-      onClick={() => isActive && !existingVote && onSelect(side)}
-      style={{
-        borderRadius: v2.radius.sm,
-        padding: '16px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: 10,
-        cursor: isActive && !existingVote ? 'pointer' : 'default',
-        background: selected ? `${ARENA}18` : `${v2.brand.raised}88`,
-        border: `2px solid ${selected ? `${ARENA}66` : won ? `${v2.accent.gold}55` : `${v2.brand.steel}22`}`,
-      }}
-    >
-      <p style={{ fontSize: 12, fontWeight: 700, color: v2.brand.steelLight, textAlign: 'center', margin: 0 }}>{name}</p>
-      <div
-        style={{
-          fontSize: 24,
-          fontWeight: 800,
-          color: won ? v2.accent.gold : selected ? ARENA : v2.brand.steelBright,
-        }}
-      >
-        {pct}%
-      </div>
-      <p style={{ fontSize: 10, color: v2.brand.muted, textAlign: 'center', margin: 0 }}>{power.toLocaleString()} ARX-P</p>
-      {won && <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.gold }}>👑 Winner</div>}
-      {selected && isActive && <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.success }}>✓ Your pick</div>}
-    </motion.div>
-  );
-}
-
-function BattleDetail({
-  battle,
-  isActive,
-  battleUserVote,
-  battleParticipants,
-  loadingParticipants,
-  voting,
-  castVote,
-  available,
-  onClose,
-}: {
-  battle: ArenaBattle | BattleHistoryEntry;
-  isActive?: boolean;
-  battleUserVote: { side?: ArenaSide; power_spent?: number } | null;
-  battleParticipants: {
-    user_id: string;
-    power_spent: number;
-    username?: string;
-    avatar_url?: string;
-  }[];
-  loadingParticipants?: boolean;
-  voting: boolean;
-  castVote: (id: string, side: ArenaSide, amt: number) => Promise<boolean>;
-  available: number;
-  onClose: () => void;
-}) {
-  const timer = useTimer(battle.ends_at, !!isActive);
-  const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle);
-  const existingVote = (battleUserVote?.side ?? null) as ArenaSide | null;
-  const [localSide, setLocalSide] = useState<ArenaSide | null>(null);
-  const [stakeAmt, setStakeAmt] = useState('');
-  const activeSide = existingVote ?? localSide;
-  const banner = (battle as ArenaBattle & { banner_image?: string }).banner_image;
-
-  const handleVote = async () => {
-    if (!activeSide) return;
-    const amt = parseInt(stakeAmt);
-    if (isNaN(amt) || amt < 1000) {
-      toast({ title: 'Minimum stake', description: 'Minimum 1,000 ARX-P required', variant: 'destructive' });
-      return;
-    }
-    if (amt > available) {
-      toast({ title: 'Insufficient balance', description: 'Not enough ARX-P to stake', variant: 'destructive' });
-      return;
-    }
-    const ok = await castVote(battle.id, activeSide, amt);
-    if (ok) {
-      setStakeAmt('');
-      setLocalSide(null);
-    }
-  };
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: v2.brand.deep,
-        zIndex: 300,
-        overflowY: 'auto',
-        fontFamily: v2.font,
-      }}
-    >
-      <style>{CSS}</style>
-      <V2Page padBottom={100} style={{ minHeight: '100%', background: v2.gradient.mesh }}>
-        <V2Header
-          title={battle.title}
-          subtitle={isActive ? `⏱ ${timer} remaining` : undefined}
-          onBack={onClose}
-        />
-
-        <div style={{ padding: '8px 20px 0' }}>
-          <V2Card
-            accent={isActive ? ARENA : v2.brand.steel}
-            padding="0"
-            style={{
-              marginBottom: 14,
-              background: isActive ? v2.gradient.arena : undefined,
-              boxShadow: isActive ? v2.shadow(ARENA, 0.2) : undefined,
-            }}
-          >
-            {isActive && (
-              <div
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 2,
-                  background: `linear-gradient(90deg, transparent, ${ARENA}, transparent)`,
-                  zIndex: 2,
-                }}
-              />
-            )}
-
-            <div style={{ padding: banner ? 0 : '20px 18px 18px' }}>
-              {banner && (
-                <div style={{ height: 100, overflow: 'hidden', position: 'relative', borderRadius: `${v2.radius.lg}px ${v2.radius.lg}px 0 0` }}>
-                  <img src={banner} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  <div
-                    style={{
-                      position: 'absolute',
-                      inset: 0,
-                      background: `linear-gradient(to bottom, transparent 30%, ${v2.brand.deep}ee)`,
-                    }}
-                  />
-                </div>
+              {badge && (
+                <span style={{
+                  fontSize: 8, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase',
+                  padding: '3px 8px', borderRadius: 8,
+                  color: badgeLive ? '#fff' : accent,
+                  background: badgeLive ? 'rgba(220,38,38,0.85)' : `${accent}14`,
+                  border: `1px solid ${badgeLive ? 'rgba(255,100,100,0.4)' : `${accent}30`}`,
+                  boxShadow: badgeLive ? '0 0 12px rgba(255,68,68,0.35)' : undefined,
+                }}>
+                  {badgeLive && (
+                    <span style={{
+                      display: 'inline-block', width: 5, height: 5, borderRadius: '50%',
+                      background: '#fff', marginRight: 4, verticalAlign: 'middle',
+                      animation: 'arenaPulse 1.2s ease-in-out infinite',
+                    }} />
+                  )}
+                  {badge}
+                </span>
               )}
-
-              <div style={{ padding: banner ? '14px 18px 18px' : 0 }}>
-                {battle.description && (
-                  <p style={{ fontSize: 12, color: v2.brand.mutedSoft, marginBottom: 14, textAlign: 'center' }}>{battle.description}</p>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}>
-                  <MobileAIPredictionBadge
-                    sideAProbability={(battle as ArenaBattle & { ai_side_a_probability?: number }).ai_side_a_probability}
-                    sideBProbability={(battle as ArenaBattle & { ai_side_b_probability?: number }).ai_side_b_probability}
-                    sideAName={battle.side_a_name}
-                    sideBName={battle.side_b_name}
-                    confidence={(battle as ArenaBattle & { ai_confidence?: number }).ai_confidence}
-                  />
-                </div>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 40px 1fr',
-                    gap: 10,
-                    alignItems: 'stretch',
-                    marginBottom: 14,
-                  }}
-                >
-                  <BattleDetailSide
-                    name={battle.side_a_name}
-                    pct={pctA}
-                    power={battle.side_a_power}
-                    side="a"
-                    activeSide={activeSide}
-                    winnerSide={battle.winner_side}
-                    isActive={isActive}
-                    existingVote={existingVote}
-                    onSelect={setLocalSide}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontWeight: 900, fontSize: 12, color: ARENA }}>VS</div>
-                  </div>
-                  <BattleDetailSide
-                    name={battle.side_b_name}
-                    pct={pctB}
-                    power={battle.side_b_power}
-                    side="b"
-                    activeSide={activeSide}
-                    winnerSide={battle.winner_side}
-                    isActive={isActive}
-                    existingVote={existingVote}
-                    onSelect={setLocalSide}
-                  />
-                </div>
-
-                {hasSideC && (
-                  <motion.div
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => isActive && !existingVote && setLocalSide('c')}
-                    style={{
-                      borderRadius: v2.radius.sm,
-                      padding: '14px 16px',
-                      marginBottom: 14,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: isActive && !existingVote ? 'pointer' : 'default',
-                      background: activeSide === 'c' ? `${ARENA}18` : `${v2.brand.raised}88`,
-                      border: `2px solid ${activeSide === 'c' ? `${ARENA}66` : battle.winner_side === 'c' ? `${v2.accent.gold}55` : `${v2.brand.steel}22`}`,
-                    }}
-                  >
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: v2.brand.steelLight, margin: 0 }}>{battle.side_c_name}</p>
-                      <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 2 }}>{powC.toLocaleString()} ARX-P</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div
-                        style={{
-                          fontSize: 22,
-                          fontWeight: 800,
-                          color:
-                            battle.winner_side === 'c'
-                              ? v2.accent.gold
-                              : activeSide === 'c'
-                                ? ARENA
-                                : v2.brand.steelBright,
-                        }}
-                      >
-                        {pctC}%
-                      </div>
-                      {battle.winner_side === 'c' && (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.gold }}>👑 Winner</div>
-                      )}
-                      {activeSide === 'c' && isActive && (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.success }}>✓ Your pick</div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-
-                <div
-                  style={{
-                    height: 5,
-                    borderRadius: 3,
-                    background: v2.brand.raised,
-                    overflow: 'hidden',
-                    marginBottom: 8,
-                  }}
-                >
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${pctA}%` }}
-                    transition={{ duration: 0.8, ease: 'easeOut' }}
-                    style={{
-                      height: '100%',
-                      borderRadius: 3,
-                      background: `linear-gradient(90deg, ${v2.brand.steel}, ${ARENA})`,
-                    }}
-                  />
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: v2.brand.muted }}>
-                  <span>Total: {totalPow.toLocaleString()} ARX-P staked</span>
-                  <span>{battleParticipants.length} stakers</span>
-                </div>
-              </div>
+              {soon && (
+                <span style={{
+                  fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+                  padding: '3px 8px', borderRadius: 8, color: neon.textMuted,
+                  background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)',
+                }}>
+                  Coming Soon
+                </span>
+              )}
             </div>
-          </V2Card>
 
-          <V2Card accent={v2.brand.steel} padding="16px 18px" style={{ marginBottom: 14 }}>
-            <V2StatGrid
-              stats={[
-                { label: 'Pool A', value: battle.side_a_power.toLocaleString(), accent: v2.brand.steel },
-                { label: 'Stakers', value: String(battleParticipants.length), accent: v2.accent.mining },
-                { label: 'Pool B', value: battle.side_b_power.toLocaleString(), accent: ARENA },
-              ]}
-            />
-          </V2Card>
+            <p style={{
+              margin: 0, fontSize: 8, fontWeight: 700, letterSpacing: '0.14em',
+              textTransform: 'uppercase', color: `${accent}cc`,
+            }}>
+              {eyebrow}
+            </p>
+            <h3 style={{
+              margin: '4px 0 0', fontSize: 17, fontWeight: 800, color: neon.text,
+              lineHeight: 1.15, letterSpacing: '-0.02em',
+            }}>
+              {title}
+            </h3>
+            <p style={{
+              margin: '5px 0 0', fontSize: 11, fontWeight: 600, color: accent,
+              opacity: 0.9,
+            }}>
+              {tagline}
+            </p>
+            <p style={{
+              margin: '8px 0 0', fontSize: 10, fontWeight: 400, lineHeight: 1.45,
+              color: 'rgba(184,239,248,0.65)', maxWidth: 200,
+            }}>
+              {description}
+            </p>
+          </div>
 
-          {isActive && !existingVote && (
-            <V2Card accent={ARENA} padding="18px" style={{ marginBottom: 14 }}>
-              <V2Eyebrow accent={ARENA}>
-                Stake ARX-P · {activeSide ? `backing ${sideName(battle, activeSide)}` : 'select a side above'}
-              </V2Eyebrow>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 10,
-                  background: v2.brand.surface,
-                  border: `1px solid ${v2.brand.border}`,
-                  borderRadius: v2.radius.sm,
-                  padding: '14px 16px',
-                  marginTop: 12,
-                  marginBottom: 10,
-                }}
-              >
-                <input
-                  type="number"
-                  value={stakeAmt}
-                  onChange={(e) => setStakeAmt(e.target.value)}
-                  placeholder="1,000"
-                  style={{
-                    flex: 1,
-                    background: 'none',
-                    border: 'none',
-                    outline: 'none',
-                    fontSize: 22,
-                    fontWeight: 700,
-                    color: v2.brand.steelBright,
-                    fontFamily: v2.font,
-                  }}
-                />
-                <span style={{ fontSize: 13, fontWeight: 600, color: v2.brand.steel }}>ARX-P</span>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 14 }}>
-                {(
-                  [
-                    ['1K', '1000'],
-                    ['5K', '5000'],
-                    ['10K', '10000'],
-                    ['Max', String(available)],
-                  ] as const
-                ).map(([l, v]) => (
-                  <button
-                    key={l}
-                    type="button"
-                    onClick={() => setStakeAmt(v)}
-                    style={{
-                      padding: '8px',
-                      borderRadius: 11,
-                      background: v2.brand.raised,
-                      border: `1px solid ${v2.brand.border}`,
-                      color: v2.brand.steel,
-                      fontSize: 12,
-                      fontWeight: 700,
-                      cursor: 'pointer',
-                      outline: 'none',
-                      fontFamily: v2.font,
-                    }}
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-              <V2Button
-                accent={ARENA}
-                fullWidth
-                disabled={voting || !activeSide || !stakeAmt}
-                onClick={handleVote}
-                style={{
-                  background: activeSide && stakeAmt ? `linear-gradient(135deg, ${ARENA}, ${v2.accent.purple})` : undefined,
-                }}
-              >
-                {voting ? 'Staking…' : activeSide ? `Stake on ${sideName(battle, activeSide)}` : '← Select a side above first'}
-              </V2Button>
-              <p style={{ fontSize: 9, color: v2.brand.muted, marginTop: 10, textAlign: 'center', marginBottom: 0 }}>
-                Min 1,000 · Max 100,000 ARX-P · Winners earn from the losing pool
-              </p>
-            </V2Card>
-          )}
-
-          {existingVote && isActive && (
-            <V2Card accent={v2.accent.success} padding="14px 16px" style={{ marginBottom: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: 12,
-                    background: `${v2.accent.success}18`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 18,
-                    flexShrink: 0,
-                  }}
-                >
-                  ✓
-                </div>
-                <div>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: v2.accent.success, margin: 0 }}>
-                    Staked {battleUserVote?.power_spent?.toLocaleString()} ARX-P
-                  </p>
-                  <p style={{ fontSize: 11, color: `${v2.accent.success}99`, marginTop: 2, marginBottom: 0 }}>
-                    On {sideName(battle, existingVote)} · Awaiting results
-                  </p>
-                </div>
-              </div>
-            </V2Card>
-          )}
-
-          {loadingParticipants && (
-            <>
-              <V2SectionHeader title="Live Stakers" />
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: 52,
-                    borderRadius: v2.radius.sm,
-                    marginBottom: 8,
-                    background: v2.brand.raised,
-                    opacity: 1 - i * 0.2,
-                  }}
-                />
-              ))}
-            </>
-          )}
-
-          {!loadingParticipants && battleParticipants.length > 0 && (
-            <>
-              <V2SectionHeader title={`Live Stakers (${battleParticipants.length})`} />
-              {battleParticipants.slice(0, 8).map((p) => (
-                <V2Card key={p.user_id} accent={v2.brand.steel} padding="10px 14px" style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 10,
-                        background: v2.brand.raised,
-                        border: `1px solid ${v2.brand.border}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: v2.brand.steel,
-                        flexShrink: 0,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {p.avatar_url ? (
-                        <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        p.username?.[0]?.toUpperCase() || '?'
-                      )}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: v2.brand.steelLight, margin: 0 }}>{p.username || 'Miner'}</p>
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: ARENA }}>{p.power_spent.toLocaleString()} ARX-P</span>
-                  </div>
-                </V2Card>
-              ))}
-            </>
-          )}
+          <div style={{
+            marginTop: 14, display: 'inline-flex', alignItems: 'center', gap: 6,
+            alignSelf: 'flex-start', padding: '8px 14px', borderRadius: 12,
+            background: locked ? 'rgba(255,255,255,0.04)' : `${accent}18`,
+            border: `1px solid ${locked ? 'rgba(255,255,255,0.1)' : `${accent}40`}`,
+            color: locked ? neon.textMuted : accent,
+            fontSize: 10, fontWeight: 800, letterSpacing: '0.06em',
+          }}>
+            {locked ? <Lock size={12} strokeWidth={2.5} /> : null}
+            {cta}
+            {!locked && <ChevronRight size={14} strokeWidth={2.5} />}
+          </div>
         </div>
-      </V2Page>
-    </motion.div>
-  );
-}
 
-function PlayerRow({
-  entry,
-  rank,
-  color,
-  isMe,
-  fmt,
-}: {
-  entry: {
-    user_id: string;
-    username?: string;
-    avatar_url?: string;
-    total_staked?: number;
-    total_power_staked?: number;
-    total_wins?: number;
-    total_battles?: number;
-  };
-  rank: number;
-  color: string;
-  isMe: boolean;
-  fmt: (n: number) => string;
-}) {
-  const medals = ['🥇', '🥈', '🥉'];
-  const wins = Number(entry.total_wins) || 0;
-  const battles = Number(entry.total_battles) || 0;
-  const losses = Math.max(0, battles - wins);
-
-  return (
-    <V2Card accent={color} padding="10px 14px" style={{ marginBottom: 8, background: isMe ? `${color}10` : undefined }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 9,
-            flexShrink: 0,
-            background: `${color}18`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: rank <= 3 ? 14 : 10,
-            fontWeight: 800,
-            color,
-          }}
-        >
-          {rank <= 3 ? medals[rank - 1] : rank}
-        </div>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            overflow: 'hidden',
-            flexShrink: 0,
-            background: `${color}18`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 12,
-            fontWeight: 700,
-            color,
-            border: `1.5px solid ${color}40`,
-          }}
-        >
-          {entry.avatar_url ? (
+        {banner && (
+          <div style={{
+            width: 130, flexShrink: 0, position: 'relative', overflow: 'hidden',
+          }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              background: `linear-gradient(90deg, rgba(6,14,28,0.95) 0%, transparent 45%)`,
+              zIndex: 1,
+            }} />
             <img
-              src={entry.avatar_url}
+              src={banner}
               alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
+              style={{
+                position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
+                height: '115%', width: 'auto', maxWidth: 'none', objectFit: 'cover',
+                filter: locked ? 'grayscale(0.6) brightness(0.5)' : 'saturate(1.1)',
               }}
             />
-          ) : (
-            entry.username?.[0]?.toUpperCase() || '?'
-          )}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: isMe ? color : v2.brand.steelLight,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              margin: 0,
-            }}
-          >
-            {entry.username || 'Miner'}
-            {isMe ? ' (You)' : ''}
-          </p>
-          <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 1, marginBottom: 0 }}>
-            <span style={{ color: v2.accent.success }}>{wins}W</span> / <span style={{ color: v2.accent.danger }}>{losses}L</span>
-          </p>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 800, color, margin: 0 }}>
-            {fmt(Number(entry.total_staked || entry.total_power_staked) || 0)}
-          </p>
-          <p style={{ fontSize: 9, color: v2.brand.muted, margin: '2px 0 0' }}>ARX-P Staked</p>
-        </div>
-      </div>
-    </V2Card>
-  );
-}
-
-function LeaderboardTab({
-  leaderboard,
-  loading,
-  currentUserId,
-}: {
-  leaderboard: {
-    user_id: string;
-    club?: string;
-    username?: string;
-    avatar_url?: string;
-    total_staked?: number;
-    total_power_staked?: number;
-    total_wins?: number;
-    total_battles?: number;
-  }[];
-  loading: boolean;
-  currentUserId?: string;
-}) {
-  const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
-
-  const fmt = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-    return n.toLocaleString();
-  };
-
-  const getScore = (e: (typeof leaderboard)[0]) => Number(e.total_staked || e.total_power_staked || 0);
-
-  const alphaTeam = leaderboard.filter((e) => e.club === 'alpha').sort((a, b) => getScore(b) - getScore(a));
-  const omegaTeam = leaderboard.filter((e) => e.club === 'omega').sort((a, b) => getScore(b) - getScore(a));
-  const hasClubData = leaderboard.some((e) => e.club === 'alpha' || e.club === 'omega');
-  const allPlayers = [...leaderboard].sort((a, b) => getScore(b) - getScore(a));
-
-  const alphaStaked = alphaTeam.reduce((s, e) => s + getScore(e), 0);
-  const omegaStaked = omegaTeam.reduce((s, e) => s + getScore(e), 0);
-  const alphaWins = alphaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0);
-  const omegaWins = omegaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0);
-
-  if (loading) {
-    return (
-      <div style={{ padding: '12px 0' }}>
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            style={{
-              height: 60,
-              borderRadius: v2.radius.lg,
-              background: v2.brand.raised,
-              marginBottom: 8,
-              opacity: 1 - i * 0.15,
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (!hasClubData) {
-    return (
-      <div>
-        <p style={{ fontSize: 11, color: v2.brand.muted, marginBottom: 12, textAlign: 'center' }}>Overall Rankings</p>
-        {allPlayers.length === 0 ? (
-          <V2Card padding="40px 20px">
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: v2.brand.mutedSoft, marginBottom: 4 }}>No rankings yet</p>
-              <p style={{ fontSize: 12, color: v2.brand.muted }}>Participate in battles to appear here</p>
-            </div>
-          </V2Card>
-        ) : (
-          allPlayers.map((e, i) => (
-            <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
-          ))
+          </div>
         )}
       </div>
-    );
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        {(
-          [
-            { label: 'Team Alpha', count: alphaTeam.length, staked: alphaStaked, wins: alphaWins, col: ALPHA, team: 'alpha' as const },
-            { label: 'Team Omega', count: omegaTeam.length, staked: omegaStaked, wins: omegaWins, col: OMEGA, team: 'omega' as const },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.team}
-            type="button"
-            onClick={() => setActiveTeam(t.team)}
-            style={{
-              flex: 1,
-              padding: '12px 14px',
-              borderRadius: v2.radius.lg,
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              fontFamily: v2.font,
-              background: activeTeam === t.team ? `${t.col}15` : v2.brand.surface,
-              boxShadow: activeTeam === t.team ? `0 0 0 1.5px ${t.col}50` : `0 0 0 1px ${v2.brand.border}`,
-              transition: 'all 0.18s',
-            }}
-          >
-            <p style={{ fontSize: 11, fontWeight: 800, color: t.col, marginBottom: 4, marginTop: 0 }}>{t.label}</p>
-            <p style={{ fontSize: 16, fontWeight: 900, color: v2.brand.steelBright, margin: 0 }}>{fmt(t.staked)}</p>
-            <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 2, marginBottom: 0 }}>
-              {t.count} members · {t.wins}W
-            </p>
-          </button>
-        ))}
-      </div>
-      {(activeTeam === 'alpha' ? alphaTeam : omegaTeam).length === 0 ? (
-        <V2Card padding="32px 20px">
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: v2.brand.mutedSoft, margin: 0 }}>No {activeTeam} members yet</p>
-            <p style={{ fontSize: 12, color: v2.brand.muted, marginTop: 4, marginBottom: 0 }}>
-              Join {activeTeam} team in Arena to appear here
-            </p>
-          </div>
-        </V2Card>
-      ) : (
-        (activeTeam === 'alpha' ? alphaTeam : omegaTeam).map((e, i) => (
-          <PlayerRow
-            key={e.user_id}
-            entry={e}
-            rank={i + 1}
-            color={activeTeam === 'alpha' ? ALPHA : OMEGA}
-            isMe={e.user_id === currentUserId}
-            fmt={fmt}
-          />
-        ))
-      )}
-    </div>
+    </motion.button>
   );
 }
 
-function EmptyState({ emoji, title, subtitle }: { emoji: string; title: string; subtitle: string }) {
+function ArenaBattlegroundShell({ children }: { children: ReactNode }) {
+  const contained = useIsAppPreview();
   return (
-    <V2Card accent={ARENA} padding="40px 20px">
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>{emoji}</div>
-        <p style={{ fontSize: 15, fontWeight: 800, color: v2.brand.steelLight, marginBottom: 6 }}>{title}</p>
-        <p style={{ fontSize: 12, color: v2.brand.muted, margin: 0 }}>{subtitle}</p>
+    <div style={{
+      minHeight: contained ? '100%' : '100vh',
+      position: 'relative',
+      overflow: 'hidden',
+      paddingBottom: mobileScrollPadding(),
+      fontFamily: neon.font,
+      background: '#02060e',
+    }}>
+      <div style={{ position: contained ? 'absolute' : 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+        <div style={{
+          position: 'absolute', inset: -30,
+          backgroundImage: `url(${arenaBattleground})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center 35%',
+          filter: 'brightness(0.55) saturate(1.15)',
+          transform: 'scale(1.05)',
+        }} />
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: `
+            radial-gradient(ellipse 90% 55% at 50% 0%, rgba(79,216,235,0.2) 0%, transparent 55%),
+            radial-gradient(ellipse 70% 40% at 50% 100%, rgba(6,14,28,0.95) 0%, transparent 60%),
+            linear-gradient(180deg, rgba(2,6,14,0.35) 0%, rgba(2,6,14,0.88) 55%, rgba(2,6,14,0.97) 100%)
+          `,
+        }} />
+        <div style={{
+          position: 'absolute', top: 0, left: '50%', transform: 'translateX(-50%)',
+          width: '80%', height: 280,
+          background: 'radial-gradient(ellipse, rgba(79,216,235,0.12) 0%, transparent 70%)',
+          filter: 'blur(24px)',
+        }} />
       </div>
-    </V2Card>
-  );
-}
-
-function LiveIndicator({ liveCt, upcomingCt }: { liveCt: number; upcomingCt: number }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 5,
-        background: liveCt > 0 ? `${v2.accent.danger}18` : v2.brand.raised,
-        border: liveCt > 0 ? `1px solid ${v2.accent.danger}38` : `1px solid ${v2.brand.border}`,
-        borderRadius: 20,
-        padding: '6px 12px',
-        minWidth: 40,
-        justifyContent: 'center',
-      }}
-    >
-      {liveCt > 0 ? (
-        <>
-          <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: v2.accent.danger }} />
-          <span style={{ fontSize: 10, fontWeight: 700, color: v2.accent.danger }}>LIVE</span>
-        </>
-      ) : (
-        <span style={{ fontSize: 10, fontWeight: 600, color: v2.brand.muted }}>
-          {upcomingCt > 0 ? `${upcomingCt} soon` : '—'}
-        </span>
-      )}
+      <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+      <style>{'@keyframes arenaPulse{0%,100%{opacity:1}50%{opacity:.4}}'}</style>
     </div>
   );
 }
 
 export default function ArenaV2() {
-  const { user } = useAuth();
   const navigate = useNavigate();
+  const preview = useIsAppPreview();
+  const { user } = useAuth();
   const { points } = usePoints();
-  const { leaderboard, battleHistory, loading } = useArena();
-  const {
-    earningsLeaderboard,
-    liveMarkets,
-    upcomingMarkets,
-    endedMarkets,
-    userPositions,
-    loading: lbLoading,
-    voting: marketsVoting,
-    placeVote,
-  } = useArenaMarkets();
-  const { membership, loading: memLoading, registering, registerMembership } = useArenaMembership();
+  const [liveBattles, setLiveBattles] = useState(0);
 
-  const fullLeaderboard = earningsLeaderboard?.length ? earningsLeaderboard : leaderboard;
-
-  const [showAuth, setShowAuth] = useState(false);
-  const [tab, setTab] = useState<Tab>('battles');
-  const [battleFilter, setBattleFilter] = useState<BattleFilter>('live');
-  const [selectedBattle, setSelectedBattle] = useState<(ArenaBattle | BattleHistoryEntry) | null>(null);
-  const [endedVisible, setEndedVisible] = useState(10);
-  const [isBattleActive, setIsBattleActive] = useState(false);
-  const { setHideNav } = useMobileNav();
-  const [battleParticipants, setBattleParticipants] = useState<
-    { user_id: string; power_spent: number; username?: string; avatar_url?: string }[]
-  >([]);
-  const [loadingParticipants, setLoadingParticipants] = useState(false);
-
-  const available = Math.round(points?.total_points ?? 0);
+  const go = useCallback((path: string) => {
+    navigate(preview ? toPreviewPath(path) : path);
+  }, [navigate, preview]);
 
   useEffect(() => {
-    setHideNav(!!selectedBattle);
-    return () => setHideNav(false);
-  }, [selectedBattle, setHideNav]);
-
-  const openBattle = useCallback(async (battle: ArenaBattle | BattleHistoryEntry, active: boolean) => {
-    setSelectedBattle(battle);
-    setIsBattleActive(active);
-    setBattleParticipants([]);
-    setLoadingParticipants(true);
-    try {
-      const { data } = await (await import('@/integrations/supabase/client')).supabase.rpc('get_arena_participation' as never, {
-        p_battle_id: battle.id,
+    const fetchLive = async () => {
+      const now = Date.now();
+      const { data } = await supabase.from('arena_battles')
+        .select('starts_at, ends_at, winner_side')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      const live = (data || []).filter((b) => {
+        const started = new Date(b.starts_at).getTime() <= now;
+        const notEnded = new Date(b.ends_at).getTime() > now;
+        return started && notEnded && !b.winner_side;
       });
-      setBattleParticipants(
-        ((data || []) as { user_id: string; power_spent: number; username?: string; avatar_url?: string }[]).map((item) => ({
-          user_id: item.user_id,
-          power_spent: item.power_spent,
-          username: item.username,
-          avatar_url: item.avatar_url,
-        })),
-      );
-    } catch {
-      setBattleParticipants([]);
-    } finally {
-      setLoadingParticipants(false);
-    }
+      setLiveBattles(live.length);
+    };
+    void fetchLive();
+    const channel = supabase
+      .channel('arena-hub-live')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_battles' }, () => { void fetchLive(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
-  const castVoteForBattle = useCallback(
-    async (battleId: string, side: ArenaSide, amount: number): Promise<boolean> => {
-      const ok = await placeVote(battleId, side, amount);
-      if (ok) {
-        try {
-          const { data } = await (await import('@/integrations/supabase/client')).supabase.rpc('get_arena_participation' as never, {
-            p_battle_id: battleId,
-          });
-          setBattleParticipants(
-            ((data || []) as { user_id: string; power_spent: number; username?: string; avatar_url?: string }[]).map((item) => ({
-              user_id: item.user_id,
-              power_spent: item.power_spent,
-              username: item.username,
-              avatar_url: item.avatar_url,
-            })),
-          );
-        } catch {
-          /* refresh optional */
-        }
-      }
-      return ok;
-    },
-    [placeVote],
-  );
-
-  if (!user) {
-    return (
-      <V2Page style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px' }}>
-        <style>{CSS}</style>
-        <motion.div variants={fadeUp} initial="hidden" animate="show" style={{ width: '100%', maxWidth: 360 }}>
-          <V2HeroCard
-            eyebrow="Prediction Arena"
-            title="Stake. Predict. Earn."
-            subtitle="Stake ARX-P on battle outcomes and earn from the winning pool"
-            cta="Sign In to Enter"
-            onCta={() => setShowAuth(true)}
-            accent={ARENA}
-            gradient={v2.gradient.arena}
-            icon={<span style={{ fontSize: 12 }}>⚔️</span>}
-          />
-        </motion.div>
-        <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
-      </V2Page>
-    );
-  }
-
-  if (memLoading || loading) {
-    return (
-      <V2Page style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <style>{CSS}</style>
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: '50%',
-            border: `3px solid ${ARENA}33`,
-            borderTopColor: ARENA,
-            animation: 'spin 1s linear infinite',
-          }}
-        />
-      </V2Page>
-    );
-  }
-
-  if (!membership) {
-    return (
-      <V2Page>
-        <style>{CSS}</style>
-        <ArenaOnboarding onComplete={registerMembership} isLoading={registering} />
-      </V2Page>
-    );
-  }
-
-  const seenIds = new Set((battleHistory as BattleHistoryEntry[]).map((b) => b.id));
-  const allHistory: (ArenaBattle | BattleHistoryEntry)[] = [
-    ...(battleHistory as BattleHistoryEntry[]),
-    ...liveMarkets.filter((m) => !seenIds.has(m.id)),
-    ...upcomingMarkets.filter((m) => !seenIds.has(m.id)),
-    ...endedMarkets.filter((m) => !seenIds.has(m.id)),
-  ];
-
-  const now = new Date();
-  const liveList = allHistory.filter((b) => {
-    const s = new Date(b.starts_at);
-    const e = new Date(b.ends_at);
-    return s <= now && e > now && (b.is_active ?? true) && !b.winner_side;
-  });
-  const upcomingList = allHistory.filter((b) => new Date(b.starts_at) > now && !b.winner_side);
-  const endedList = allHistory.filter((b) => b.winner_side || new Date(b.ends_at) <= now);
-
-  const liveCt = liveList.length;
-  const upcomingCt = upcomingList.length;
-  const endedCt = endedList.length;
-
-  const myStakes = (() => {
-    const byId = new Map<string, BattleHistoryEntry | ArenaBattle>();
-    for (const b of battleHistory as BattleHistoryEntry[]) {
-      if (b.user_participated) byId.set(b.id, b);
-    }
-    for (const b of allHistory) {
-      if (userPositions.has(b.id)) byId.set(b.id, b);
-    }
-    return Array.from(byId.values());
-  })();
-
-  const featuredLive = liveList[0];
+  const balance = Math.round(points?.total_points ?? (preview ? 34766 : 0));
+  const gamesAvailable = (WORD_FORGE_ENABLED ? 1 : 0) + 2; // prediction + word forge + dice roll
 
   return (
-    <V2Page>
-      <style>{CSS}</style>
+    <ArenaBattlegroundShell>
+      <motion.div variants={stagger} initial="hidden" animate="show" style={{ padding: '0 18px' }}>
+        {/* Header */}
+        <motion.div variants={fadeUp} style={{ padding: `${mobileTopPadding()} 4px 20px` }}>
+          <NeonEyebrow color={neon.cyan}>Arxon Game Arena</NeonEyebrow>
+          <h1 style={{
+            margin: '8px 0 0', fontSize: 28, fontWeight: 900, color: neon.text,
+            lineHeight: 1.1, letterSpacing: '-0.03em',
+            textShadow: '0 0 40px rgba(79,216,235,0.25)',
+          }}>
+            Choose Your<br />Battleground
+          </h1>
+          <p style={{
+            margin: '10px 0 0', fontSize: 12, fontWeight: 400, lineHeight: 1.5,
+            color: 'rgba(184,239,248,0.7)', maxWidth: 300,
+          }}>
+            Stake, spell, and roll your way to ARX-P. Pick a game mode and enter the ring.
+          </p>
+        </motion.div>
 
-      <AnimatePresence>
-        {selectedBattle && (
-          <BattleDetail
-            key={selectedBattle.id}
-            battle={selectedBattle}
-            isActive={isBattleActive}
-            battleUserVote={userPositions.get(selectedBattle.id) ?? null}
-            battleParticipants={battleParticipants}
-            loadingParticipants={loadingParticipants}
-            voting={marketsVoting}
-            castVote={castVoteForBattle}
-            available={available}
-            onClose={() => {
-              setSelectedBattle(null);
-              setBattleParticipants([]);
-            }}
-          />
-        )}
-      </AnimatePresence>
-
-      <V2Header
-        title="Arena"
-        subtitle={`Team ${membership.club.toUpperCase()} · ${available.toLocaleString()} ARX-P`}
-        onBack={() => navigate(-1)}
-        right={<LiveIndicator liveCt={liveCt} upcomingCt={upcomingCt} />}
-        large
-      />
-
-      <div style={{ padding: '0 20px' }}>
-        {featuredLive && tab === 'battles' && battleFilter === 'live' && (
-          <motion.div variants={fadeUp} initial="hidden" animate="show" style={{ marginBottom: 18 }}>
-            <V2HeroCard
-              eyebrow="Live Battle"
-              title={featuredLive.title}
-              subtitle={`${featuredLive.side_a_name} vs ${featuredLive.side_b_name}`}
-              cta="Enter Battle"
-              onCta={() => openBattle(featuredLive, true)}
-              accent={ARENA}
-              gradient={v2.gradient.arena}
-              image={(featuredLive as ArenaBattle & { banner_image?: string }).banner_image}
-              compact
-            />
-          </motion.div>
-        )}
-
-        <V2Tabs
-          tabs={[
-            { id: 'battles' as Tab, label: 'Battles' },
-            { id: 'leaderboard' as Tab, label: 'Leaderboard' },
-            { id: 'my-stakes' as Tab, label: 'My Stakes', count: myStakes.length || undefined },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
-      </div>
-
-      <div style={{ padding: '16px 20px 0' }}>
-        {tab === 'battles' && (
-          <>
-            <V2Pills
-              items={[
-                { id: 'live' as BattleFilter, label: 'Live', count: liveCt, dot: true, accent: v2.accent.danger },
-                { id: 'upcoming' as BattleFilter, label: 'Upcoming', count: upcomingCt, accent: v2.brand.steel },
-                { id: 'ended' as BattleFilter, label: 'Ended', count: endedCt, accent: v2.brand.mutedSoft },
-              ]}
-              active={battleFilter}
-              onChange={setBattleFilter}
-            />
-
-            {battleFilter === 'live' &&
-              (liveCt === 0 ? (
-                <EmptyState emoji="🔴" title="No live battles right now" subtitle="Check Upcoming for battles starting soon" />
-              ) : (
-                liveList.map((b) => (
-                  <BattleCard
-                    key={b.id}
-                    battle={b}
-                    isActive
-                    userVoted={!!userPositions.get(b.id)}
-                    userWon={false}
-                    onClick={() => openBattle(b, true)}
-                  />
-                ))
-              ))}
-
-            {battleFilter === 'upcoming' &&
-              (upcomingCt === 0 ? (
-                <EmptyState emoji="🕐" title="No upcoming battles scheduled" subtitle="New battles will appear here when scheduled" />
-              ) : (
-                upcomingList.map((b) => (
-                  <BattleCard
-                    key={b.id}
-                    battle={b}
-                    isActive={false}
-                    userVoted={!!userPositions.get(b.id)}
-                    userWon={false}
-                    onClick={() => openBattle(b, false)}
-                  />
-                ))
-              ))}
-
-            {battleFilter === 'ended' &&
-              (endedCt === 0 ? (
-                <EmptyState emoji="🏁" title="No ended battles yet" subtitle="Results will appear here once battles conclude" />
-              ) : (
-                <>
-                  {endedList.slice(0, endedVisible).map((b) => (
-                    <BattleCard
-                      key={b.id}
-                      battle={b}
-                      isEnded
-                      userVoted={!!userPositions.get(b.id)}
-                      userWon={userPositions.get(b.id)?.side === b.winner_side}
-                      onClick={() => openBattle(b, false)}
-                    />
-                  ))}
-                  {endedCt > endedVisible && (
-                    <V2ButtonGhost fullWidth accent={ARENA} onClick={() => setEndedVisible((v) => v + 10)}>
-                      Load more ({endedCt - endedVisible} remaining)
-                    </V2ButtonGhost>
-                  )}
-                </>
-              ))}
-          </>
-        )}
-
-        {tab === 'leaderboard' && (
-          <LeaderboardTab leaderboard={fullLeaderboard} loading={loading || lbLoading} currentUserId={user?.id} />
-        )}
-
-        {tab === 'my-stakes' &&
-          (myStakes.length === 0 ? (
-            <EmptyState emoji="🎯" title="No stakes yet" subtitle="Stake ARX-P on a battle to see your history" />
-          ) : (
-            myStakes.map((b) => (
-              <BattleCard
-                key={b.id}
-                battle={b}
-                userVoted={!!userPositions.get(b.id)}
-                userWon={userPositions.get(b.id)?.side === b.winner_side}
-                onClick={() => openBattle(b, false)}
-              />
-            ))
+        {/* Stats strip */}
+        <motion.div variants={fadeUp} style={{
+          display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 22,
+        }}>
+          {[
+            { label: 'Live Battles', value: liveBattles > 0 ? String(liveBattles) : '—', accent: liveBattles > 0 ? '#ff6b6b' : neon.cyan },
+            { label: 'Your ARX-P', value: balance.toLocaleString(), accent: neon.teal },
+            { label: 'Games', value: `${gamesAvailable}+`, accent: neon.purple },
+          ].map((s) => (
+            <div key={s.label} style={{
+              borderRadius: 14, padding: '10px 8px', textAlign: 'center',
+              background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)',
+              border: `1px solid ${GLASS.border}`,
+            }}>
+              <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: s.accent, fontVariantNumeric: 'tabular-nums' }}>
+                {s.value}
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 8, fontWeight: 600, letterSpacing: '0.06em', color: 'rgba(184,239,248,0.55)' }}>
+                {s.label}
+              </p>
+            </div>
           ))}
-      </div>
+        </motion.div>
 
-      <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
-    </V2Page>
+        {/* Game cards */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <GameBattleCard
+            id="prediction"
+            eyebrow="Game 01"
+            title="Prediction Market"
+            tagline="Stake. Predict. Earn."
+            description="Back battle outcomes with ARX-P. Winners take the pool."
+            cta="Enter Market"
+            accent={neon.purple}
+            banner={FORGE_UI.bannerArena}
+            icon={<TrendingUp size={16} strokeWidth={2.2} />}
+            badge={liveBattles > 0 ? `${liveBattles} LIVE` : undefined}
+            badgeLive={liveBattles > 0}
+            onClick={() => go('/arena/prediction-market')}
+          />
+
+          {WORD_FORGE_ENABLED && (
+            <GameBattleCard
+              id="word-forge"
+              eyebrow="Game 02"
+              title="Word Forge"
+              tagline="Spell. Stack. Survive."
+              description="Swipe the forge wheel, fill sector slots, and stack ARX-P before time runs out."
+              cta="Play Forge"
+              accent={neon.gold}
+              banner={FORGE_UI.bannerWordForge}
+              icon={<Sparkles size={16} strokeWidth={2.2} />}
+              badge="HOT"
+              onClick={() => go('/word-forge')}
+            />
+          )}
+
+          <GameBattleCard
+            id="dice-roll"
+            eyebrow="Game 03"
+            title="Dice Roll"
+            tagline="Roll. Risk. Reward."
+            description="Free daily rolls, plus best-of-3 dice duels against the house for real ARX-P stakes."
+            cta="Roll the Dice"
+            accent={neon.cyan}
+            icon={<Dices size={16} strokeWidth={2.2} />}
+            badge="NEW"
+            onClick={() => go('/arena/dice')}
+          />
+        </div>
+
+        {/* Footer hint */}
+        <motion.div variants={fadeUp} style={{
+          marginTop: 24, padding: '16px 14px', borderRadius: 16, textAlign: 'center',
+          background: 'rgba(79,216,235,0.06)', border: '1px dashed rgba(79,216,235,0.2)',
+        }}>
+          <Swords size={18} color={neon.cyan} style={{ marginBottom: 8, opacity: 0.7 }} />
+          <p style={{ margin: 0, fontSize: 11, fontWeight: 500, color: 'rgba(184,239,248,0.65)', lineHeight: 1.5 }}>
+            {user
+              ? 'More games drop soon. Mine ARX-P daily to stay battle-ready.'
+              : 'Sign in to play and track your stakes across all game modes.'}
+          </p>
+          {!user && (
+            <button type="button" onClick={() => go('/auth')} style={{
+              marginTop: 12, padding: '9px 18px', borderRadius: 11, border: 'none', cursor: 'pointer',
+              background: `linear-gradient(135deg, ${neon.cyan}, ${neon.teal})`,
+              color: '#02060e', fontSize: 10, fontWeight: 800, fontFamily: neon.font,
+            }}>
+              Sign In to Play
+            </button>
+          )}
+        </motion.div>
+      </motion.div>
+    </ArenaBattlegroundShell>
   );
 }

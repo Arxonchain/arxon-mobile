@@ -1,15 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { Lock, Zap, Gift } from 'lucide-react';
 import { COMMUNITY_LINKS } from '@/lib/communityLinks';
 import {
   V2Page, V2Header, V2Card, V2HeroCard, V2ListRow, fadeUp, stagger,
 } from '../design/Kit';
 import { v2 } from '../design/tokens';
+import { neon } from '../design/neonTokens';
 
 const FEATURES = [
-  { icon: '🔐', label: 'Secure On-Chain Transfers', sub: 'Your keys, your coins. Always.' },
-  { icon: '⚡', label: 'Instant ARX Withdrawals', sub: 'Bridge directly to mainnet' },
-  { icon: '🎁', label: 'Exclusive Holder Rewards', sub: 'NFT & token airdrops for holders' },
+  { Icon: Lock, label: 'Secure On-Chain Transfers', sub: 'Your keys, your coins. Always.', accent: neon.cyan },
+  { Icon: Zap, label: 'Instant ARX Withdrawals', sub: 'Bridge directly to mainnet', accent: neon.teal },
+  { Icon: Gift, label: 'Exclusive Holder Rewards', sub: 'NFT & token airdrops for holders', accent: neon.gold },
 ];
 
 export default function WalletV2() {
@@ -18,10 +20,10 @@ export default function WalletV2() {
   return (
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header title="Wallet" subtitle="Connect & manage your Web3 wallet" onBack={() => navigate(-1)} large />
+        <V2Header eyebrow="Wallet" title="Web3 Connect" subtitle="Connect & manage your wallet" onBack={() => navigate(-1)} />
 
-        <div style={{ padding: '0 20px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <motion.div variants={fadeUp} style={{ position: 'relative', width: 156, height: 156, margin: '24px 0 32px' }}>
+        <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <motion.div variants={fadeUp} style={{ position: 'relative', width: 130, height: 130, margin: '16px 0 24px' }}>
             <svg style={{ position: 'absolute', inset: 0, animation: 'spinSlow 14s linear infinite' }} width="156" height="156" viewBox="0 0 156 156">
               <circle cx="78" cy="78" r="72" fill="none" stroke={`${v2.brand.steel}12`} strokeWidth="1" />
               <circle cx="78" cy="78" r="72" fill="none" stroke={`${v2.brand.steel}45`} strokeWidth="1.5" strokeDasharray="38 414" strokeLinecap="round" />
@@ -59,8 +61,8 @@ export default function WalletV2() {
             {FEATURES.map((f) => (
               <V2ListRow
                 key={f.label}
-                icon={<span style={{ fontSize: 20 }}>{f.icon}</span>}
-                iconAccent={v2.brand.steel}
+                icon={<f.Icon size={16} strokeWidth={2.2} />}
+                iconAccent={f.accent}
                 title={f.label}
                 subtitle={f.sub}
               />

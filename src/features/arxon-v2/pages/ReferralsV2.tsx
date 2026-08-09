@@ -63,9 +63,9 @@ export default function ReferralsV2() {
   return (
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header title="Referrals" onBack={() => navigate('/')} />
+        <V2Header eyebrow="Earn" title="Referrals" subtitle="Invite friends, earn ARX-P" onBack={() => navigate('/')} />
 
-        <div style={{ padding: '8px 20px 0' }}>
+        <div style={{ padding: '0 16px 0' }}>
           <motion.div variants={fadeUp} style={{ marginBottom: 16 }}>
             <V2HeroCard
               eyebrow="Refer & Earn"

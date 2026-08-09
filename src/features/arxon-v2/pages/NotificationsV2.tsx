@@ -41,8 +41,8 @@ export default function NotificationsV2() {
     const { icon, accent } = getIconInfo(selectedNotif.type);
     return (
       <V2Page>
-        <V2Header title="Notification" onBack={() => setSelectedNotif(null)} />
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '0 20px' }}>
+        <V2Header eyebrow="Inbox" title="Notification" onBack={() => setSelectedNotif(null)} />
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '0 16px' }}>
           <div style={{
             width: 56, height: 56, borderRadius: v2.radius.md,
             background: `${accent}18`, border: `1.5px solid ${accent}44`,
@@ -72,7 +72,9 @@ export default function NotificationsV2() {
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
         <V2Header
+          eyebrow="Inbox"
           title="Notifications"
+          subtitle="Arena, rewards & updates"
           onBack={() => navigate(-1)}
           right={hasUnread ? (
             <motion.button

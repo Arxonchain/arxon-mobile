@@ -43,9 +43,9 @@ export default function SettingsV2() {
   return (
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header title="Settings" subtitle="Notifications & security" onBack={() => navigate(-1)} large />
+        <V2Header eyebrow="Settings" title="Preferences" subtitle="Notifications & security" onBack={() => navigate(-1)} />
 
-        <div style={{ padding: '0 20px' }}>
+        <div style={{ padding: '0 16px' }}>
           <motion.div variants={fadeUp} style={{ marginBottom: 18 }}>
             <V2Tabs
               tabs={[

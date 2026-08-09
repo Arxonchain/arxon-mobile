@@ -141,9 +141,9 @@ export default function NexusV2() {
   return (
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header title="Nexus" subtitle="Send & receive ARX-P" onBack={() => navigate(-1)} />
+        <V2Header eyebrow="Transfer" title="Nexus" subtitle="Send & receive ARX-P" onBack={() => navigate(-1)} />
 
-        <div style={{ padding: '8px 20px 0' }}>
+        <div style={{ padding: '0 16px 0' }}>
           <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
             <V2Card accent={v2.accent.mining} padding="20px">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>

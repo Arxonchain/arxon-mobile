@@ -2,6 +2,7 @@
 export { default as DashboardV2 } from './pages/DashboardV2';
 export { default as MiningV2 } from './pages/MiningV2';
 export { default as ArenaV2 } from './pages/ArenaV2';
+export { default as PredictionMarketV2 } from './pages/PredictionMarketV2';
 export { default as LeaderboardV2 } from './pages/LeaderboardV2';
 export { default as ProfileV2 } from './pages/ProfileV2';
 export { default as TasksV2 } from './pages/TasksV2';
@@ -11,4 +12,10 @@ export { default as WalletV2 } from './pages/WalletV2';
 export { default as SettingsV2 } from './pages/SettingsV2';
 export { default as NotificationsV2 } from './pages/NotificationsV2';
 export { default as PointsHistoryV2 } from './pages/PointsHistoryV2';
+export { default as DiceHubV2 } from './pages/DiceHubV2';
+export { default as DiceMatchV2 } from './pages/DiceMatchV2';
+export { default as DiceDuelLobbyV2 } from './pages/DiceDuelLobbyV2';
+export { default as DiceDuelMatchV2 } from './pages/DiceDuelMatchV2';
+export { default as DiceRumbleLobbyV2 } from './pages/DiceRumbleLobbyV2';
+export { default as DiceRumbleMatchV2 } from './pages/DiceRumbleMatchV2';
 export { default as MobileBottomNavV2 } from './layout/MobileBottomNavV2';

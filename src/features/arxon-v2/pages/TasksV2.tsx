@@ -165,7 +165,6 @@ export default function TasksV2() {
   return (
     <V2Page
       style={{ minHeight: '100vh', overflowY: 'auto', position: 'relative' }}
-      padBottom={100}
     >
       <div
         ref={ptr.scrollRef}
@@ -184,9 +183,9 @@ export default function TasksV2() {
             transition: ptr.pullDistance === 0 && !ptr.isRefreshing ? 'transform 0.2s ease' : 'none',
           }}
         >
-          <V2Header title="Tasks" onBack={() => navigate('/')} />
+          <V2Header eyebrow="Rewards" title="Tasks" subtitle="Complete & earn ARX-P" onBack={() => navigate('/')} />
 
-          <div style={{ padding: '8px 20px 0' }}>
+          <div style={{ padding: '0 16px 0' }}>
             <motion.div variants={fadeUp} style={{ marginBottom: 16 }}>
               <V2Card accent={v2.accent.mining} padding="16px 18px">
                 <V2StatGrid stats={[

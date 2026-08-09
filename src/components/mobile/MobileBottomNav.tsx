@@ -2,7 +2,6 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileNav } from '@/contexts/MobileNavContext';
-import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 
 const HomeIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -63,29 +62,23 @@ const ProfileIcon = (a: boolean) => (
   </svg>
 );
 
+const WalletIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path d="M4 7a2 2 0 012-2h12a2 2 0 012 2v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7z"
+      fill={a?'hsl(190 85% 55%/0.15)':'none'} stroke={a?'hsl(190 85% 55%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
+    <path d="M16 12h4M18 10.5v3" stroke={a?'hsl(190 85% 55%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
+  </svg>
+);
+
 const BASE_TABS = [
   { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
-  { to:'/mining',     id:'mining',      label:'Mining',      icon:MiningIcon,      col:'hsl(155 45% 50%)', dot:'hsl(155 55% 55%)' },
   { to:'/arena',      id:'arena',       label:'Arena',       icon:ArenaIcon,       col:'hsl(255 50% 65%)', dot:'hsl(255 55% 70%)' },
-  { to:'/leaderboard',id:'leaderboard', label:'Ranks',       icon:LeaderboardIcon, col:'hsl(38 55% 52%)',  dot:'hsl(38 60% 58%)'  },
+  { to:'/wallet',     id:'wallet',      label:'Wallet',      icon:WalletIcon,      col:'hsl(190 85% 55%)', dot:'hsl(190 90% 60%)' },
   { to:'/profile',    id:'profile',     label:'Profile',     icon:ProfileIcon,     col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
 ];
 
-const PLAY_TAB = {
-  to:'/games', id:'games', label:'Play', icon:PlayIcon,
-  col:'hsl(190 85% 55%)', dot:'hsl(190 90% 60%)',
-};
-
 function buildTabs() {
-  if (!WORD_FORGE_ENABLED) return BASE_TABS;
-  // Replace Ranks with Play — ranks still on dashboard
-  return [
-    BASE_TABS[0],
-    BASE_TABS[1],
-    BASE_TABS[2],
-    PLAY_TAB,
-    BASE_TABS[4],
-  ];
+  return BASE_TABS;
 }
 
 export default function MobileBottomNav() {

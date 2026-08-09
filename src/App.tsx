@@ -69,11 +69,20 @@ import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 
 import {
-  DashboardV2, MiningV2, ArenaV2, LeaderboardV2, ProfileV2,
+  DashboardV2, ArenaV2, PredictionMarketV2, LeaderboardV2, ProfileV2,
   TasksV2, ReferralsV2, NexusV2, WalletV2, SettingsV2,
-  NotificationsV2, PointsHistoryV2, MobileBottomNavV2,
+  NotificationsV2, PointsHistoryV2, DiceHubV2, DiceMatchV2,
+  DiceDuelLobbyV2, DiceDuelMatchV2, DiceRumbleLobbyV2, DiceRumbleMatchV2,
+  MobileBottomNavV2,
 } from "@/features/arxon-v2";
-import DashboardPreviewPage from "@/features/arxon-v2/preview/DashboardPreviewPage";
+import AppPreviewShell, { PreviewSpinner } from "@/features/arxon-v2/preview/AppPreviewShell";
+import {
+  PreviewWordForgePage,
+  PreviewForgeStatsPage,
+  PreviewSectorMapPage,
+  PreviewWordForgeLeaderboardPage,
+} from "@/features/arxon-v2/preview/previewLazyPages";
+import DashboardNeon from "@/features/arxon-v2/pages/DashboardNeon";
 import { ARXON_UI_V2_ENABLED } from "@/lib/uiFeature";
 import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 
@@ -191,7 +200,65 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/litepaper"      element={<Litepaper />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
-        <Route path="/ui-preview/dashboard" element={<DashboardPreviewPage />} />
+        <Route path="/ui-preview" element={<AppPreviewShell />}>
+          <Route index element={<DashboardNeon preview />} />
+          <Route path="mining" element={<Navigate to="/ui-preview" replace />} />
+          <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
+          <Route path="arena/dice" element={<DiceHubV2 />} />
+          <Route path="arena/dice/house" element={<DiceMatchV2 />} />
+          <Route path="arena/dice/duel" element={<DiceDuelLobbyV2 />} />
+          <Route path="arena/dice/duel/:matchId" element={<DiceDuelMatchV2 />} />
+          <Route path="arena/dice/rumble" element={<DiceRumbleLobbyV2 />} />
+          <Route path="arena/dice/rumble/:matchId" element={<DiceRumbleMatchV2 />} />
+          <Route path="arena" element={<ArenaV2 />} />
+          <Route path="leaderboard" element={<LeaderboardV2 />} />
+          <Route path="profile" element={<ProfileV2 />} />
+          <Route path="tasks" element={<TasksV2 />} />
+          <Route path="referrals" element={<ReferralsV2 />} />
+          <Route path="nexus" element={<NexusV2 />} />
+          <Route path="wallet" element={<WalletV2 />} />
+          <Route path="settings" element={<SettingsV2 />} />
+          <Route path="notifications" element={<NotificationsV2 />} />
+          <Route path="points-history" element={<PointsHistoryV2 />} />
+          {WORD_FORGE_ENABLED && GamingHubPage && (
+            <Route path="games" element={
+              <Suspense fallback={<PreviewSpinner />}>
+                <GamingHubPage />
+              </Suspense>
+            } />
+          )}
+          {WORD_FORGE_ENABLED && PreviewWordForgePage && (
+            <>
+              <Route path="word-forge" element={
+                <Suspense fallback={<PreviewSpinner />}>
+                  <PreviewWordForgePage />
+                </Suspense>
+              } />
+              {PreviewForgeStatsPage && (
+                <Route path="word-forge/stats" element={
+                  <Suspense fallback={<PreviewSpinner />}>
+                    <PreviewForgeStatsPage />
+                  </Suspense>
+                } />
+              )}
+              {PreviewSectorMapPage && (
+                <Route path="word-forge/map" element={
+                  <Suspense fallback={<PreviewSpinner />}>
+                    <PreviewSectorMapPage />
+                  </Suspense>
+                } />
+              )}
+              {PreviewWordForgeLeaderboardPage && (
+                <Route path="word-forge/leaderboard" element={
+                  <Suspense fallback={<PreviewSpinner />}>
+                    <PreviewWordForgeLeaderboardPage />
+                  </Suspense>
+                } />
+              )}
+            </>
+          )}
+          <Route path="dashboard" element={<Navigate to="/ui-preview" replace />} />
+        </Route>
         <Route path="/word-forge-preview" element={
           <Suspense fallback={<Spinner />}>
             <WordForgePreviewPage />
@@ -229,7 +296,14 @@ function AppRoutes() {
                 </ProtectedRoute>
               } />
             )}
-            <Route path="/mining"       element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <MiningV2 /> : <MobileMining />}</ProtectedRoute>} />
+            <Route path="/mining" element={<Navigate to="/" replace />} />
+            <Route path="/arena/prediction-market" element={ARXON_UI_V2_ENABLED ? <PredictionMarketV2 /> : <MobileArena />} />
+            <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceHubV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/duel" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceDuelLobbyV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/duel/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceDuelMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/rumble" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceRumbleLobbyV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/rumble/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceRumbleMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             <Route path="/arena"        element={ARXON_UI_V2_ENABLED ? <ArenaV2 /> : <MobileArena />} />
             <Route path="/leaderboard"  element={ARXON_UI_V2_ENABLED ? <LeaderboardV2 /> : <MobileLeaderboard />} />
             <Route path="/nexus"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NexusV2 /> : <MobileNexus />}</ProtectedRoute>} />

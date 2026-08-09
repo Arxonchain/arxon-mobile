@@ -1,64 +1,150 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Sparkles, Swords } from 'lucide-react';
+import { ChevronRight, Sparkles, Swords, Target } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
 
 interface Slide {
   id: string;
-  image?: string;
-  gradient?: string;
+  gradient: string;
   eyebrow: string;
   title: string;
   subtitle: string;
   cta: string;
   path: string;
   accent: string;
-  /** Image-only banner: hide text overlay, show CTA only */
-  imageOnly?: boolean;
+  heroImage: string;
+  /** How the right-side art is composited */
+  heroMode?: 'cutout' | 'arena-blend';
+  /** Cutout hero dimensions (px) */
+  heroSize?: number;
+  icon?: 'sparkles' | 'swords' | 'target';
 }
 
 const WORD_FORGE_SLIDE: Slide = {
   id: 'word-forge',
-  image: FORGE_UI.dashboardBanner,
-  eyebrow: 'New Game Mode',
+  gradient: 'linear-gradient(125deg, rgba(6,28,48,0.98) 0%, rgba(4,18,36,0.96) 52%, rgba(8,32,52,0.88) 100%)',
+  eyebrow: 'Word Game',
   title: 'Word Forge',
-  subtitle: '',
-  cta: 'Go to Game',
-  path: '/games',
-  accent: 'hsl(38 90% 55%)',
-  imageOnly: true,
+  subtitle: 'Connect letters. Earn ARX-P.',
+  cta: 'Play Now',
+  path: '/arena',
+  accent: neon.cyan,
+  heroImage: FORGE_UI.bannerWordForge,
+  heroMode: 'cutout',
+  heroSize: 158,
+  icon: 'sparkles',
 };
 
 const SLIDES: Slide[] = [
   ...(WORD_FORGE_ENABLED ? [WORD_FORGE_SLIDE] : []),
   {
     id: 'arena',
-    gradient: 'linear-gradient(135deg, hsl(255 45% 22%), hsl(280 50% 18%), hsl(225 35% 10%))',
-    eyebrow: 'Live Now',
-    title: 'Arena Battles',
-    subtitle: 'Stake ARX-P on predictions. Win pools when your side takes the sector.',
+    gradient: 'linear-gradient(125deg, rgba(28,8,36,0.98) 0%, rgba(18,6,28,0.96) 45%, rgba(8,4,18,0.94) 100%)',
+    eyebrow: 'Live Battles',
+    title: 'Game Arena',
+    subtitle: 'Pick your battleground.',
     cta: 'Enter Arena',
     path: '/arena',
-    accent: 'hsl(255 55% 68%)',
+    accent: neon.purple,
+    heroImage: FORGE_UI.bannerArena,
+    heroMode: 'arena-blend',
+    icon: 'swords',
   },
   {
     id: 'tasks',
-    gradient: 'linear-gradient(135deg, hsl(155 40% 18%), hsl(175 45% 14%), hsl(225 35% 10%))',
+    gradient: 'linear-gradient(125deg, rgba(8,32,28,0.98) 0%, rgba(6,22,20,0.96) 52%, rgba(4,14,18,0.94) 100%)',
     eyebrow: 'Daily Rewards',
-    title: 'Complete Tasks',
-    subtitle: 'Check in, post on X, and finish missions to boost your mining rate.',
+    title: 'Tasks',
+    subtitle: 'Complete missions. Boost mining.',
     cta: 'View Tasks',
     path: '/tasks',
-    accent: 'hsl(155 50% 52%)',
+    accent: neon.teal,
+    heroImage: FORGE_UI.bannerTasks,
+    heroMode: 'cutout',
+    icon: 'target',
   },
 ];
 
 const ROTATE_MS = 5500;
 
+function SlideIcon({ type, color }: { type?: Slide['icon']; color: string }) {
+  if (type === 'swords') return <Swords size={10} strokeWidth={2.2} color={color} />;
+  if (type === 'target') return <Target size={10} strokeWidth={2.2} color={color} />;
+  return <Sparkles size={10} strokeWidth={2.2} color={color} />;
+}
+
+function HeroArt({ slide }: { slide: Slide }) {
+  if (slide.heroMode === 'arena-blend') {
+    return (
+      <>
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: `radial-gradient(ellipse 80% 90% at 88% 50%, rgba(220,38,38,0.35) 0%, rgba(168,85,247,0.12) 35%, transparent 68%)`,
+        }} />
+        <img
+          src={slide.heroImage}
+          alt=""
+          aria-hidden
+          style={{
+            position: 'absolute', right: 0, top: 0, bottom: 0, width: '58%', height: '100%',
+            objectFit: 'cover', objectPosition: 'center 55%',
+            opacity: 0.92,
+            WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.35) 18%, black 42%)',
+            maskImage: 'linear-gradient(90deg, transparent 0%, rgba(0,0,0,0.35) 18%, black 42%)',
+          }}
+        />
+        <div style={{
+          position: 'absolute', right: 0, top: 0, bottom: 0, width: '58%', pointerEvents: 'none',
+          background: 'linear-gradient(90deg, rgba(4,8,18,0.92) 0%, rgba(4,8,18,0.25) 38%, transparent 72%)',
+        }} />
+        <div style={{
+          position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+          width: 6, height: 6, borderRadius: '50%', background: '#ff4444',
+          boxShadow: '0 0 12px #ff4444, 0 0 24px rgba(255,68,68,0.5)',
+          animation: 'arenaPulse 1.4s ease-in-out infinite',
+        }} />
+        <style>{'@keyframes arenaPulse{0%,100%{opacity:1;transform:translateY(-50%) scale(1)}50%{opacity:.5;transform:translateY(-50%) scale(1.3)}}'}</style>
+      </>
+    );
+  }
+
+  return (
+    <>
+      {slide.id === 'word-forge' && (
+        <div style={{
+          position: 'absolute', right: -6, top: '50%', transform: 'translateY(-46%)',
+          width: slide.heroSize ?? 108, height: slide.heroSize ?? 108, borderRadius: '50%',
+          background: `radial-gradient(circle, ${slide.accent}33 0%, transparent 68%)`,
+          pointerEvents: 'none',
+        }} />
+      )}
+      <img
+        src={slide.heroImage}
+        alt=""
+        aria-hidden
+        style={{
+          position: 'absolute',
+          right: slide.id === 'word-forge' ? -10 : 4,
+          bottom: slide.id === 'word-forge' ? -14 : -2,
+          width: slide.heroSize ?? 108,
+          height: slide.heroSize ?? 108,
+          objectFit: 'contain',
+          objectPosition: 'bottom right',
+          filter: `drop-shadow(0 10px 28px ${slide.accent}66)`,
+          pointerEvents: 'none',
+        }}
+      />
+    </>
+  );
+}
+
 export function DashboardActivityCarousel({ forceShowWordForge = false }: { forceShowWordForge?: boolean } = {}) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const routePrefix = location.pathname.startsWith('/ui-preview') ? '/ui-preview' : '';
   const [index, setIndex] = useState(0);
   const slides = forceShowWordForge && !WORD_FORGE_ENABLED
     ? [WORD_FORGE_SLIDE, ...SLIDES.filter((s) => s.id !== 'word-forge')]
@@ -85,98 +171,73 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
       <AnimatePresence mode="wait">
         <motion.div
           key={slide.id}
-          initial={{ opacity: 0, x: 24 }}
+          initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -24 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.32, ease: 'easeOut' }}
           style={{
-            borderRadius: 22,
+            borderRadius: 20,
             overflow: 'hidden',
-            border: `1px solid ${slide.accent}33`,
-            boxShadow: `0 16px 40px -12px ${slide.accent}22, 0 4px 20px rgba(0,0,0,0.35)`,
-            background: slide.gradient ?? 'hsl(225 30% 8%)',
+            border: `1px solid ${slide.accent}30`,
+            boxShadow: `0 12px 32px -10px ${slide.accent}28, 0 4px 16px rgba(0,0,0,0.4)`,
+            background: slide.gradient,
             position: 'relative',
-            minHeight: 168,
+            minHeight: slide.id === 'word-forge' ? 136 : 128,
           }}
         >
-          {slide.image && (
-            <img
-              src={slide.image}
-              alt=""
-              aria-hidden
-              style={{
-                position: 'absolute', inset: 0, width: '100%', height: '100%',
-                objectFit: 'cover', objectPosition: 'center',
-                opacity: 0.92,
-              }}
-            />
-          )}
+          <HeroArt slide={slide} />
+
           <div style={{
-            position: 'absolute', inset: 0,
-            background: slide.image
-              ? slide.imageOnly
-                ? 'linear-gradient(180deg, transparent 40%, rgba(4,8,18,0.75) 100%)'
-                : 'linear-gradient(90deg, rgba(4,8,18,0.92) 0%, rgba(4,8,18,0.55) 55%, rgba(4,8,18,0.25) 100%)'
-              : 'linear-gradient(180deg, transparent, rgba(0,0,0,0.35))',
-          }} />
-          <div style={{
-            position: 'relative', zIndex: 1,
-            padding: slide.imageOnly ? '18px 18px 16px' : '18px 18px 16px',
-            display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
-            minHeight: slide.imageOnly ? 180 : 168,
-            alignItems: slide.imageOnly ? 'stretch' : undefined,
+            position: 'relative', zIndex: 2,
+            padding: '14px 14px 13px',
+            maxWidth: slide.heroMode === 'arena-blend' ? '58%' : '62%',
+            display: 'flex', flexDirection: 'column', justifyContent: 'center',
+            minHeight: slide.id === 'word-forge' ? 136 : 128,
           }}>
-            {!slide.imageOnly && (
-              <>
-                <p style={{
-                  margin: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.2em',
-                  textTransform: 'uppercase', color: slide.accent,
-                  display: 'flex', alignItems: 'center', gap: 6,
-                }}>
-                  {slide.id === 'word-forge' ? <Sparkles size={11} /> : slide.id === 'arena' ? <Swords size={11} /> : <Sparkles size={11} />}
-                  {slide.eyebrow}
-                </p>
-                <h2 style={{
-                  margin: '6px 0 0', fontSize: 22, fontWeight: 800, letterSpacing: '-0.3px',
-                  color: 'hsl(215 20% 96%)', lineHeight: 1.1,
-                }}>
-                  {slide.title}
-                </h2>
-                {slide.subtitle && (
-                  <p style={{
-                    margin: '8px 0 0', fontSize: 12, lineHeight: 1.45, maxWidth: '72%',
-                    color: 'hsl(215 20% 78%)', fontWeight: 500,
-                  }}>
-                    {slide.subtitle}
-                  </p>
-                )}
-              </>
-            )}
+            <p style={{
+              margin: 0, fontSize: 8, fontWeight: 800, letterSpacing: '0.2em',
+              textTransform: 'uppercase', color: slide.accent,
+              display: 'flex', alignItems: 'center', gap: 5,
+            }}>
+              <SlideIcon type={slide.icon} color={slide.accent} />
+              {slide.eyebrow}
+            </p>
+            <h2 style={{
+              margin: '4px 0 0', fontSize: 18, fontWeight: 900, letterSpacing: '-0.4px',
+              color: neon.text, lineHeight: 1.05,
+            }}>
+              {slide.title}
+            </h2>
+            <p style={{
+              margin: '4px 0 0', fontSize: 10, lineHeight: 1.35, maxWidth: '95%',
+              color: neon.textMuted, fontWeight: 500,
+            }}>
+              {slide.subtitle}
+            </p>
             <motion.button
               type="button"
               whileTap={{ scale: 0.97 }}
-              onClick={() => navigate(slide.path)}
+              onClick={() => navigate(`${routePrefix}${slide.path}`)}
               style={{
-                marginTop: slide.imageOnly ? 0 : 14,
-                alignSelf: slide.imageOnly ? 'center' : 'flex-start',
-                display: 'inline-flex', alignItems: 'center', gap: 8,
-                padding: '12px 22px', borderRadius: 14, border: 'none', cursor: 'pointer',
-                background: `linear-gradient(135deg, ${slide.accent}, hsl(38 80% 45%))`,
-                color: 'hsl(225 30% 6%)', fontSize: 13, fontWeight: 800,
-                boxShadow: `0 6px 20px ${slide.accent}44, inset 0 1px 0 rgba(255,255,255,0.35)`,
+                marginTop: 10,
+                alignSelf: 'flex-start',
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '8px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                background: `linear-gradient(135deg, ${slide.accent}, rgba(79,216,235,0.75))`,
+                color: '#061018', fontSize: 10, fontWeight: 900, letterSpacing: '0.04em',
+                boxShadow: `0 4px 16px ${slide.accent}44, inset 0 1px 0 rgba(255,255,255,0.35)`,
+                fontFamily: neon.font,
               }}
             >
               {slide.cta}
-              <ChevronRight size={16} strokeWidth={3} />
+              <ChevronRight size={13} strokeWidth={3} />
             </motion.button>
           </div>
         </motion.div>
       </AnimatePresence>
 
       {count > 1 && (
-        <div style={{
-          display: 'flex', justifyContent: 'center', gap: 6, marginTop: 10,
-        }}>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginTop: 8 }}>
           {slides.map((s, i) => (
             <button
               key={s.id}
@@ -184,8 +245,8 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
               aria-label={`Show ${s.title}`}
               onClick={() => setIndex(i)}
               style={{
-                width: i === index ? 18 : 7, height: 7, borderRadius: 99, border: 'none', padding: 0,
-                background: i === index ? slide.accent : 'hsl(215 25% 28%)',
+                width: i === index ? 16 : 6, height: 6, borderRadius: 99, border: 'none', padding: 0,
+                background: i === index ? slide.accent : 'rgba(232,252,255,0.18)',
                 transition: 'all 0.25s ease', cursor: 'pointer',
               }}
             />
