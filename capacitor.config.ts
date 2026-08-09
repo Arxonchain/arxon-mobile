@@ -9,6 +9,17 @@ const REMOTE_URL = 'https://arxon-mobile.pages.dev';
  */
 const bundleLocal = process.env.CAPACITOR_BUNDLE_LOCAL === 'true';
 
+/** Domains the WebView may navigate / frame for auth + Turnstile challenges. */
+const ALLOW_NAVIGATION = [
+  'challenges.cloudflare.com',
+  '*.challenges.cloudflare.com',
+  '*.cloudflare.com',
+  'arxon-mobile.pages.dev',
+  'arxonchain.xyz',
+  'www.arxonchain.xyz',
+  '*.supabase.co',
+];
+
 const config: CapacitorConfig = {
   appId: 'xyz.arxonchain.app',
   appName: 'Arxon',
@@ -19,26 +30,14 @@ const config: CapacitorConfig = {
         androidScheme: 'https',
         hostname: 'localhost',
         cleartext: false,
-        allowNavigation: [
-          'challenges.cloudflare.com',
-          '*.challenges.cloudflare.com',
-          'arxon-mobile.pages.dev',
-          '*.supabase.co',
-        ],
+        allowNavigation: ALLOW_NAVIGATION,
       }
     : {
         // OTA loads https://arxon-mobile.pages.dev — that hostname must be on the Turnstile allowlist.
         androidScheme: 'https',
         url: REMOTE_URL,
         cleartext: false,
-        allowNavigation: [
-          'challenges.cloudflare.com',
-          '*.challenges.cloudflare.com',
-          'arxon-mobile.pages.dev',
-          'arxonchain.xyz',
-          'www.arxonchain.xyz',
-          '*.supabase.co',
-        ],
+        allowNavigation: ALLOW_NAVIGATION,
       },
   plugins: {
     SplashScreen: {

@@ -18,7 +18,20 @@ export function isTurnstileConfigured(): boolean {
   return TURNSTILE_SITE_KEY.length > 0;
 }
 
-/** Origins that must be listed on the Turnstile widget hostname allowlist. */
+/**
+ * Hostnames that MUST be listed on the Turnstile widget Hostname Management allowlist.
+ *
+ * Capacitor OTA loads the UI from https://arxon-mobile.pages.dev — that exact hostname
+ * must be present (adding only arxonchain.xyz is not enough).
+ *
+ * `localhost` is required for CAPACITOR_BUNDLE_LOCAL store builds (WebView origin
+ * https://localhost). Wildcards are NOT supported in Turnstile hostname fields.
+ *
+ * Steps (Cloudflare Dashboard):
+ * 1. Turnstile → select the widget matching this sitekey
+ * 2. Settings → Hostname Management → Add Hostnames
+ * 3. Add each entry below (no https://, no path)
+ */
 export const TURNSTILE_REQUIRED_HOSTNAMES = [
   'arxonchain.xyz',
   'www.arxonchain.xyz',

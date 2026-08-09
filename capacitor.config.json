@@ -3,7 +3,18 @@
   "appName": "Arxon",
   "webDir": "dist",
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "https",
+    "url": "https://arxon-mobile.pages.dev",
+    "cleartext": false,
+    "allowNavigation": [
+      "challenges.cloudflare.com",
+      "*.challenges.cloudflare.com",
+      "*.cloudflare.com",
+      "arxon-mobile.pages.dev",
+      "arxonchain.xyz",
+      "www.arxonchain.xyz",
+      "*.supabase.co"
+    ]
   },
   "plugins": {
     "SplashScreen": {
@@ -18,6 +29,10 @@
     },
     "PushNotifications": {
       "presentationOptions": ["badge", "sound", "alert"]
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_arxon",
+      "iconColor": "#6B9FD4"
     }
   }
 }

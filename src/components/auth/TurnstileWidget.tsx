@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TURNSTILE_SITE_KEY, isTurnstileConfigured } from '@/lib/turnstile';
+import { turnstileErrorMessage } from '@/lib/turnstileErrors';
 
 declare global {
   interface Window {
@@ -179,16 +180,12 @@ export function TurnstileWidget({
           'timeout-callback': () => {
             onExpireRef.current?.();
             setFailed(true);
-            setFailReason('Verification timed out. Tap Retry, then complete the check again.');
+            setFailReason(turnstileErrorMessage('timeout'));
             onErrorRef.current?.('timeout');
           },
           'error-callback': (errorCode) => {
             setFailed(true);
-            setFailReason(
-              errorCode
-                ? `Verification failed (${errorCode}). Check your connection, disable VPN if needed, then Retry.`
-                : 'Verification failed. Check your connection, then Retry.',
-            );
+            setFailReason(turnstileErrorMessage(errorCode));
             onErrorRef.current?.(errorCode);
           },
         });
@@ -197,10 +194,10 @@ export function TurnstileWidget({
         if (cancelled) return;
         scriptLoadPromise = null;
         setFailed(true);
+        // Script/iframe fetch failures are almost always carrier/DNS blocks of challenges.cloudflare.com
+        const networkMsg = turnstileErrorMessage('script_load_failed');
         setFailReason(
-          err instanceof Error
-            ? `${err.message}. challenges.cloudflare.com may be blocked on this network.`
-            : 'Verification widget failed to load. challenges.cloudflare.com may be blocked on this network.',
+          err instanceof Error ? `${err.message}. ${networkMsg}` : networkMsg,
         );
         onErrorRef.current?.('script_load_failed');
       });
@@ -225,9 +222,12 @@ export function TurnstileWidget({
       <div ref={containerRef} className="flex min-h-[65px] justify-center" />
       {failed && (
         <div className="mt-2 space-y-2 text-center">
-          <p className="text-xs text-destructive">
-            {failReason ||
-              'Verification widget failed to load — please check your connection and try again.'}
+          <p className="text-xs text-destructive whitespace-pre-wrap">
+            {failReason || turnstileErrorMessage()}
+          </p>
+          <p className="text-[11px] text-muted-foreground leading-snug">
+            Login requires Cloudflare Turnstile. If your carrier blocks challenges.cloudflare.com,
+            switch to Wi‑Fi — captcha cannot be skipped while Supabase Attack Protection is on.
           </p>
           <button
             type="button"
