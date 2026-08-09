@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, Users } from 'lucide-react';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
+import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
 
 // FIX BUG-23 + BUG-25 + BUG-28:
 // - This is the ONLY auth page used in routes (AuthPage.tsx). Auth.tsx is dead.
@@ -29,8 +30,10 @@ export default function AuthPage() {
   const [referralCode,    setReferralCode]    = useState('');
   const [showPassword,    setShowPassword]    = useState(false);
   const [loading,         setLoading]         = useState(false);
+  const [captchaToken,    setCaptchaToken]    = useState<string | null>(null);
 
   const { signIn, signUp, resetPassword } = useAuth();
+  const captchaRequired = isTurnstileConfigured();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -86,7 +89,7 @@ export default function AuthPage() {
           } catch {}
         }
 
-        const { error } = await signUp(email, password, ref || undefined);
+        const { error } = await signUp(email, password, ref || undefined, captchaToken || undefined);
         if (error) throw error;
 
         // If session exists immediately (auto-confirm on), apply referral now
@@ -99,7 +102,7 @@ export default function AuthPage() {
         setMode('signin');
 
       } else if (mode === 'signin') {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email, password, captchaToken || undefined);
         if (error) throw error;
         navigate('/');
 
@@ -120,6 +123,8 @@ export default function AuthPage() {
       });
     } finally {
       setLoading(false);
+      // Turnstile tokens are single-use — clear it so the widget can refresh for the next attempt.
+      setCaptchaToken(null);
     }
   };
 
@@ -246,6 +251,16 @@ export default function AuthPage() {
               </div>
             )}
 
+            {/* Bot protection — invisible unless Cloudflare flags the request as risky. */}
+            {mode !== 'forgot' && (
+              <TurnstileWidget
+                key={mode}
+                action={mode}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken(null)}
+              />
+            )}
+
             {/* Forgot password link */}
             {mode === 'signin' && (
               <button
@@ -261,10 +276,16 @@ export default function AuthPage() {
             <Button
               type="submit"
               className="w-full btn-mining btn-glow"
-              disabled={loading || (mode === 'signup' && !!confirmPassword && password !== confirmPassword)}
+              disabled={
+                loading ||
+                (mode === 'signup' && !!confirmPassword && password !== confirmPassword) ||
+                (mode !== 'forgot' && captchaRequired && !captchaToken)
+              }
             >
               {loading
                 ? 'Please wait...'
+                : mode !== 'forgot' && captchaRequired && !captchaToken
+                ? 'Verifying…'
                 : mode === 'signin'
                 ? 'Sign In'
                 : mode === 'signup'

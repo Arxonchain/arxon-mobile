@@ -65,7 +65,8 @@ export async function signUpWithFallback(
   supabase: SupabaseClient,
   email: string,
   password: string,
-  referralCode?: string  // FIX: pass referral code so it's stored in auth metadata
+  referralCode?: string,  // FIX: pass referral code so it's stored in auth metadata
+  captchaToken?: string   // Cloudflare Turnstile token, forwarded to GoTrue's captcha check
 ): Promise<SignUpResult> {
   const normalizedEmail = email.trim().toLowerCase();
   const generation = ++signupGeneration;
@@ -118,6 +119,7 @@ export async function signUpWithFallback(
       // This persists PERMANENTLY in auth.users.raw_user_meta_data
       // Our DB trigger reads it to create the referral row automatically
       data: referralCode ? { referral_code: referralCode.trim().toUpperCase() } : undefined,
+      captchaToken,
     },
   });
 

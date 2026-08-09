@@ -8,8 +8,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, referralCode?: string) => Promise<{ error: Error | null; user: User | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, referralCode?: string, captchaToken?: string) => Promise<{ error: Error | null; user: User | null }>;
+  signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
@@ -145,16 +145,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     })();
   }, [session?.user?.id]);
 
-  const signUp = async (email: string, password: string, referralCode?: string) => {
-    return signUpWithFallback(supabase, email, password, referralCode);
+  const signUp = async (email: string, password: string, referralCode?: string, captchaToken?: string) => {
+    return signUpWithFallback(supabase, email, password, referralCode, captchaToken);
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, captchaToken?: string) => {
     try {
       const { error } = await withTimeout(
         supabase.auth.signInWithPassword({
           email: email.trim(),
           password,
+          options: captchaToken ? { captchaToken } : undefined,
         }),
         15_000,
         'Connection timed out. The server may be busy - please try again.'

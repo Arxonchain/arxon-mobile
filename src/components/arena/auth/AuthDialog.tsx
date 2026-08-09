@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { validatePassword } from "@/lib/passwordValidation";
 import PasswordStrengthMeter from "@/components/auth/PasswordStrengthMeter";
 import { getPasswordResetRedirectUrl } from "@/lib/auth/getRedirectUrl";
+import { TurnstileWidget, isTurnstileConfigured } from "@/components/auth/TurnstileWidget";
 
 interface AuthDialogProps {
   open: boolean;
@@ -26,6 +27,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
   const [referralCode, setReferralCode] = useState(initialReferralCode);
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRequired = isTurnstileConfigured();
 
   // NOTE: Avoid automatic retries for signup/signin requests because we can't truly cancel
   // the underlying request, which can lead to multiple in-flight auth calls under load.
@@ -159,7 +162,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
 
     try {
       if (mode === "signin") {
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email, password, captchaToken || undefined);
         if (error) {
           const msg = error.message?.toLowerCase() || '';
           let description = error.message;
@@ -186,7 +189,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
         }
       } else {
         const codeToUse = referralCode.trim();
-        const { error, user: newUser } = await signUp(email, password);
+        const { error, user: newUser } = await signUp(email, password, undefined, captchaToken || undefined);
 
         if (error) {
           const msg = error.message?.toLowerCase() || '';
@@ -256,6 +259,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       });
     } finally {
       setLoading(false);
+      // Turnstile tokens are single-use — clear it so the widget can refresh for the next attempt.
+      setCaptchaToken(null);
     }
   };
 
@@ -470,15 +475,28 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
                 </div>
               )}
 
+              {/* Bot protection — invisible unless Cloudflare flags the request as risky. */}
+              <TurnstileWidget
+                key={mode}
+                action={mode}
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken(null)}
+              />
+
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-5 group"
-                disabled={loading}
+                disabled={loading || (captchaRequired && !captchaToken)}
               >
                 {loading ? (
                   <div className="flex items-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span>{mode === "signup" ? "Creating account..." : "Signing in..."}</span>
+                  </div>
+                ) : captchaRequired && !captchaToken ? (
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Verifying…</span>
                   </div>
                 ) : (
                   <>

@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Shield } from "lucide-react";
 import { checkUserIsAdmin } from "@/lib/adminAuth";
+import { TurnstileWidget, isTurnstileConfigured } from "@/components/auth/TurnstileWidget";
 
 const AdminLogin = () => {
   const [email, setEmail] = useState("");
@@ -14,8 +15,10 @@ const AdminLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const captchaRequired = isTurnstileConfigured();
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -34,6 +37,7 @@ const AdminLogin = () => {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
+        options: captchaToken ? { captchaToken } : undefined,
       });
 
       if (authError) throw authError;
@@ -61,6 +65,8 @@ const AdminLogin = () => {
       });
     } finally {
       setLoading(false);
+      // Turnstile tokens are single-use — clear it so the widget can refresh for the next attempt.
+      setCaptchaToken(null);
     }
   };
 
@@ -125,8 +131,11 @@ const AdminLogin = () => {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
+            {/* Bot protection — invisible unless Cloudflare flags the request as risky. */}
+            <TurnstileWidget action="admin-signin" onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+
+            <Button type="submit" className="w-full" disabled={loading || (captchaRequired && !captchaToken)}>
+              {loading ? "Signing in..." : captchaRequired && !captchaToken ? "Verifying…" : "Sign In"}
             </Button>
           </form>
 
