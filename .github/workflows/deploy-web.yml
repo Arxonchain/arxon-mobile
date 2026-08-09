@@ -24,16 +24,54 @@ jobs:
           cache: npm
 
       - name: Verify Cloudflare secrets
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+          set -euo pipefail
+
+          # Trim whitespace/newlines from pasted secrets (common cause of auth 10000).
+          TOKEN="$(printf '%s' "${CLOUDFLARE_API_TOKEN:-}" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+          ACCOUNT_ID="$(printf '%s' "${CLOUDFLARE_ACCOUNT_ID:-}" | tr -d '\r\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+
+          if [ -z "$TOKEN" ]; then
             echo "::error::CLOUDFLARE_API_TOKEN secret is missing. Create a token with Account → Cloudflare Pages → Edit and set it in repo secrets."
             exit 1
           fi
-          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+          if [ -z "$ACCOUNT_ID" ]; then
             echo "::error::CLOUDFLARE_ACCOUNT_ID secret is missing."
             exit 1
           fi
-          echo "Cloudflare secrets are present."
+
+          echo "::add-mask::$TOKEN"
+          echo "Token length: ${#TOKEN} (first4=$(printf '%s' "$TOKEN" | cut -c1-4))"
+          echo "Account ID length: ${#ACCOUNT_ID}"
+
+          VERIFY="$(curl -sS -H "Authorization: Bearer ${TOKEN}" \
+            "https://api.cloudflare.com/client/v4/user/tokens/verify" || true)"
+          echo "Token verify response: $(printf '%s' "$VERIFY" | head -c 400)"
+
+          if ! printf '%s' "$VERIFY" | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'; then
+            echo "::error::CLOUDFLARE_API_TOKEN failed /user/tokens/verify. Re-create the API token and re-paste into GitHub Secrets with no quotes/spaces/newlines. Do not use a Global API Key."
+            exit 1
+          fi
+
+          PROJECT="$(curl -sS -H "Authorization: Bearer ${TOKEN}" \
+            "https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/pages/projects/arxon-mobile" || true)"
+          echo "Pages project probe (truncated): $(printf '%s' "$PROJECT" | head -c 500)"
+
+          if ! printf '%s' "$PROJECT" | grep -Eq '"success"[[:space:]]*:[[:space:]]*true'; then
+            echo "::error::Token cannot access Pages project arxon-mobile under the given CLOUDFLARE_ACCOUNT_ID (Cloudflare API auth/permission failure, often code 10000)."
+            echo "::error::Fix: dash.cloudflare.com/profile/api-tokens → Create Token → template 'Edit Cloudflare Pages' (Account → Cloudflare Pages → Edit). Account Resources must Include the account that owns Workers & Pages → arxon-mobile. Then update GitHub secret CLOUDFLARE_API_TOKEN and re-run."
+            echo "::notice::Git-connected Cloudflare Pages can still deploy on push even when this Action fails — check Deployments in the CF Pages project."
+            exit 1
+          fi
+
+          echo "Cloudflare secrets look valid for Pages project arxon-mobile."
+          {
+            echo "CLOUDFLARE_API_TOKEN=$TOKEN"
+            echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID"
+          } >> "$GITHUB_ENV"
 
       - name: Install and build
         run: |
@@ -43,10 +81,9 @@ jobs:
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           # Pin wrangler; older action defaults have been flaky on Pages uploads.
           wranglerVersion: '4.28.0'
           command: pages deploy dist --project-name=arxon-mobile --branch=main --commit-dirty=true
-          # Surface wrangler stderr in the job summary on failure.
           quiet: false
