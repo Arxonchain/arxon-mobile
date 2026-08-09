@@ -67,6 +67,7 @@ export default function TasksV2() {
     try {
       const { data, error } = await supabase
         .from('tasks').select('*').eq('is_active', true)
+        .order('created_at', { ascending: false })
         .order('points_reward', { ascending: false });
       if (!error && data) setTasks(data);
     } catch (err) {

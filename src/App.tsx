@@ -296,7 +296,18 @@ function AppRoutes() {
                 </ProtectedRoute>
               } />
             )}
-            <Route path="/mining" element={<Navigate to="/" replace />} />
+            {/*
+              Public OTA / classic Play Store (npm run build): VITE_ARXON_UI_V2 unset → keep /mining.
+              New-main redesign (npm run build:internal / .env.word-forge): VITE_ARXON_UI_V2=true → hide mining page until a new store upload ships.
+            */}
+            <Route
+              path="/mining"
+              element={
+                ARXON_UI_V2_ENABLED
+                  ? <Navigate to="/" replace />
+                  : <ProtectedRoute><MobileMining /></ProtectedRoute>
+              }
+            />
             <Route path="/arena/prediction-market" element={ARXON_UI_V2_ENABLED ? <PredictionMarketV2 /> : <MobileArena />} />
             <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceHubV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />

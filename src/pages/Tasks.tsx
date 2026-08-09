@@ -84,10 +84,13 @@ export default function Tasks() {
 
   const fetchTasks = useCallback(async () => {
     try {
+      // Public OTA + admin Task Manager: any is_active row is visible immediately (no app version gate).
+      // Newest first within the same reward so freshly added tasks surface at the top.
       const { data, error } = await supabase
         .from('tasks')
         .select('*')
         .eq('is_active', true)
+        .order('created_at', { ascending: false })
         .order('points_reward', { ascending: false });
       if (!error && data) setTasks(data);
     } catch (err) {
