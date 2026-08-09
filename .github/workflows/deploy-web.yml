@@ -23,6 +23,18 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Verify Cloudflare secrets
+        run: |
+          if [ -z "${{ secrets.CLOUDFLARE_API_TOKEN }}" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN secret is missing. Create a token with Account → Cloudflare Pages → Edit and set it in repo secrets."
+            exit 1
+          fi
+          if [ -z "${{ secrets.CLOUDFLARE_ACCOUNT_ID }}" ]; then
+            echo "::error::CLOUDFLARE_ACCOUNT_ID secret is missing."
+            exit 1
+          fi
+          echo "Cloudflare secrets are present."
+
       - name: Install and build
         run: |
           npm ci
@@ -33,4 +45,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=arxon-mobile --commit-dirty=true
+          # Pin wrangler; older action defaults have been flaky on Pages uploads.
+          wranglerVersion: '4.28.0'
+          command: pages deploy dist --project-name=arxon-mobile --branch=main --commit-dirty=true
+          # Surface wrangler stderr in the job summary on failure.
+          quiet: false
