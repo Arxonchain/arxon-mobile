@@ -49,11 +49,21 @@
 
 @layer base {
   * { @apply border-border; box-sizing:border-box; }
+  html {
+    height:100%;
+    -webkit-text-size-adjust:100%;
+    touch-action:manipulation;
+  }
   body {
     @apply bg-background text-foreground antialiased;
     font-family:'Creato Display',-apple-system,system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
     -moz-osx-font-smoothing:grayscale;
+    min-height:100%;
+    overscroll-behavior-y:none;
+  }
+  #root {
+    min-height:100%;
   }
   ::-webkit-scrollbar { display:none; width:0; }
   .scrollbar-none { scrollbar-width:none; -ms-overflow-style:none; }

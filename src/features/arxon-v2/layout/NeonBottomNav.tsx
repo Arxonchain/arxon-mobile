@@ -7,33 +7,34 @@ import type { NavTab } from './navTabs';
 const NAV_CSS = `
 @keyframes navShimmer {
   0% { transform: translateX(-120%); opacity: 0; }
-  15% { opacity: 0.45; }
+  20% { opacity: 0.55; }
   100% { transform: translateX(220%); opacity: 0; }
 }
 @keyframes navIconGlow {
-  0%, 100% { filter: drop-shadow(0 0 4px var(--nav-accent-glow)); }
-  50% { filter: drop-shadow(0 0 8px var(--nav-accent-glow)); }
+  0%, 100% { filter: drop-shadow(0 0 3px var(--nav-accent-glow)); }
+  50% { filter: drop-shadow(0 0 7px var(--nav-accent-glow)); }
 }
 `;
 
-const spring = { type: 'spring' as const, stiffness: 480, damping: 36, mass: 0.75 };
+const spring = { type: 'spring' as const, stiffness: 460, damping: 34, mass: 0.78 };
 
 function NavIconSlot({ active, accent, children }: { active: boolean; accent: string; children: ReactNode }) {
   return (
     <motion.div
-      animate={active ? { scale: 1.06, y: -1 } : { scale: 1, y: 0 }}
-      whileTap={{ scale: 0.88 }}
+      animate={active ? { scale: 1.05, y: -0.5 } : { scale: 1, y: 0 }}
+      whileTap={{ scale: 0.9 }}
       transition={spring}
       style={{
         position: 'relative',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        width: 28,
-        height: 28,
-        borderRadius: 10,
-        ['--nav-accent-glow' as string]: `${accent}88`,
-        animation: active ? 'navIconGlow 2.6s ease-in-out infinite' : undefined,
+        width: 26,
+        height: 26,
+        borderRadius: 9,
+        touchAction: 'manipulation',
+        ['--nav-accent-glow' as string]: `${accent}77`,
+        animation: active ? 'navIconGlow 2.8s ease-in-out infinite' : undefined,
       }}
     >
       {active && (
@@ -42,14 +43,14 @@ function NavIconSlot({ active, accent, children }: { active: boolean; accent: st
           animate={{ opacity: 1, scale: 1 }}
           style={{
             position: 'absolute',
-            inset: 1,
-            borderRadius: 9,
-            background: `radial-gradient(circle, ${accent}24 0%, transparent 70%)`,
+            inset: -1,
+            borderRadius: 10,
+            background: `radial-gradient(circle, ${accent}28 0%, transparent 68%)`,
           }}
           transition={spring}
         />
       )}
-      <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex' }}>{children}</div>
     </motion.div>
   );
 }
@@ -76,11 +77,13 @@ function NavTabLink({
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 1,
-        padding: '2px 0 3px',
+        justifyContent: 'center',
+        gap: 3,
+        padding: '6px 2px 5px',
         textDecoration: 'none',
         position: 'relative',
         WebkitTapHighlightColor: 'transparent',
+        touchAction: 'manipulation',
       }}
     >
       {isActive && (
@@ -89,11 +92,11 @@ function NavTabLink({
           transition={spring}
           style={{
             position: 'absolute',
-            inset: '0 2px',
-            borderRadius: 14,
-            background: `linear-gradient(145deg, ${accent}20 0%, ${accent}08 100%)`,
-            border: `1px solid ${accent}38`,
-            boxShadow: `0 2px 12px ${accent}22, inset 0 1px 0 rgba(255,255,255,0.08)`,
+            inset: '3px 5px',
+            borderRadius: 16,
+            background: `linear-gradient(160deg, ${accent}22 0%, ${accent}0A 100%)`,
+            border: `1px solid ${accent}40`,
+            boxShadow: `0 4px 14px ${accent}1A, inset 0 1px 0 rgba(255,255,255,0.1)`,
           }}
         />
       )}
@@ -103,18 +106,18 @@ function NavTabLink({
       </NavIconSlot>
 
       <motion.span
-        animate={isActive ? { opacity: 1 } : { opacity: 0.5 }}
-        transition={{ duration: 0.18 }}
+        animate={isActive ? { opacity: 1 } : { opacity: 0.48 }}
+        transition={{ duration: 0.16 }}
         style={{
           position: 'relative',
           zIndex: 1,
-          fontSize: 7,
+          fontSize: 9,
           fontWeight: isActive ? 800 : 600,
-          letterSpacing: '0.07em',
+          letterSpacing: '0.04em',
           textTransform: 'uppercase',
-          color: isActive ? accent : 'rgba(232,252,255,0.4)',
+          color: isActive ? accent : 'rgba(232,252,255,0.42)',
           fontFamily: neon.font,
-          lineHeight: 1,
+          lineHeight: 1.1,
         }}
       >
         {label}
@@ -143,20 +146,25 @@ export default function NeonBottomNav({
         left: 0,
         right: 0,
         zIndex: 200,
-        paddingBottom: 'max(6px, env(safe-area-inset-bottom, 0px))',
+        padding: '0 14px max(12px, env(safe-area-inset-bottom, 0px))',
         pointerEvents: 'none',
       }}>
-        <div style={{ margin: '0 10px 0', pointerEvents: 'auto' }}>
+        <div style={{ pointerEvents: 'auto' }}>
           <div style={{
             position: 'relative',
-            borderRadius: 20,
-            padding: '3px 2px',
+            borderRadius: 26,
+            padding: '4px 4px',
             overflow: 'hidden',
-            background: 'linear-gradient(165deg, rgba(12,28,48,0.92) 0%, rgba(6,10,22,0.94) 100%)',
-            backdropFilter: 'blur(20px) saturate(1.35)',
-            WebkitBackdropFilter: 'blur(20px) saturate(1.35)',
-            border: '1px solid rgba(79,216,235,0.18)',
-            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 24px rgba(79,216,235,0.06), inset 0 1px 0 rgba(255,255,255,0.08)',
+            background: 'linear-gradient(165deg, rgba(14,30,52,0.94) 0%, rgba(6,12,24,0.96) 100%)',
+            backdropFilter: 'blur(28px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(28px) saturate(1.4)',
+            border: '1px solid rgba(79,216,235,0.22)',
+            boxShadow: [
+              '0 10px 36px rgba(0,0,0,0.55)',
+              '0 2px 12px rgba(79,216,235,0.08)',
+              'inset 0 1px 0 rgba(255,255,255,0.1)',
+              'inset 0 -1px 0 rgba(0,0,0,0.35)',
+            ].join(', '),
           }}>
             <div style={{
               position: 'absolute',
@@ -170,14 +178,14 @@ export default function NeonBottomNav({
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                width: '35%',
+                width: '40%',
                 height: '100%',
-                background: 'linear-gradient(90deg, transparent, rgba(79,216,235,0.5), transparent)',
-                animation: 'navShimmer 5s ease-in-out infinite',
+                background: 'linear-gradient(90deg, transparent, rgba(79,216,235,0.55), transparent)',
+                animation: 'navShimmer 5.5s ease-in-out infinite',
               }} />
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', position: 'relative', zIndex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'stretch', position: 'relative', zIndex: 1, minHeight: 52 }}>
               {tabs.map((tab) => (
                 <NavTabLink
                   key={tab.to}

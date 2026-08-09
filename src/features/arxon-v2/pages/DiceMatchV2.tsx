@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, ChevronLeft, Crown, SkipForward, User, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
-import { mobileTopPadding, mobileScrollPaddingNavHidden } from '@/lib/mobileLayout';
+import { mobileTopPadding, mobileScrollPaddingNavHidden, mobilePageScrollRoot } from '@/lib/mobileLayout';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { neon } from '../design/neonTokens';
 import { DicePair } from '@/features/dice/components/DiceFace';
@@ -144,14 +144,11 @@ export default function DiceMatchV2() {
 
   return (
     <div style={{
-      minHeight: '100vh',
-      position: 'relative',
-      overflowX: 'hidden',
+      ...mobilePageScrollRoot(false),
       paddingBottom: mobileScrollPaddingNavHidden(),
       fontFamily: neon.font,
       background: neon.deep,
-      touchAction: 'pan-y',
-      overscrollBehaviorY: 'contain',
+      boxSizing: 'border-box',
     }}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
         <div style={{

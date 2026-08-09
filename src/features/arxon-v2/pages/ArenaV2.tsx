@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { supabase } from '@/integrations/supabase/client';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
-import { mobileTopPadding, mobileScrollPadding } from '@/lib/mobileLayout';
+import { mobileTopPadding, mobileScrollPadding, mobilePageScrollRoot } from '@/lib/mobileLayout';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import arenaBattleground from '@/assets/arxon-v2/arena-battleground.png';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
@@ -217,12 +217,11 @@ function ArenaBattlegroundShell({ children }: { children: ReactNode }) {
   const contained = useIsAppPreview();
   return (
     <div style={{
-      minHeight: contained ? '100%' : '100vh',
-      position: 'relative',
-      overflow: 'hidden',
+      ...mobilePageScrollRoot(contained),
       paddingBottom: mobileScrollPadding(),
       fontFamily: neon.font,
       background: '#02060e',
+      boxSizing: 'border-box',
     }}>
       <div style={{ position: contained ? 'absolute' : 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
         <div style={{

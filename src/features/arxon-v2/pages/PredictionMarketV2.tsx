@@ -520,7 +520,8 @@ function BattleDetail({
         inset: 0,
         background: v2.brand.deep,
         zIndex: 300,
-        overflowY: 'auto',
+        // NeonPage (via V2Page) owns the scrollport — avoid nested overflow-y here.
+        overflow: 'hidden',
         fontFamily: v2.font,
       }}
     >

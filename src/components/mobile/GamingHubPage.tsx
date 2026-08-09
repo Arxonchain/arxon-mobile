@@ -14,7 +14,7 @@ import {
   loadForgeSessionTotal,
 } from '@/features/word-forge/hooks/useForgeSessionTotal';
 import { isDailyCompleted } from '@/features/word-forge/engine/dailyChallenge';
-import { mobileScrollPadding } from '@/lib/mobileLayout';
+import { mobileScrollPadding, mobilePageScrollRoot } from '@/lib/mobileLayout';
 import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import { GamePanel, GlossyButton, GlossyIconButton, TreasureBackdrop } from '@/features/word-forge/components/GlossyKit';
 import { ForgeFaqModal } from '@/features/word-forge/components/ForgeFaqModal';
@@ -53,10 +53,11 @@ export default function GamingHubPage() {
 
   return (
     <div style={{
-      minHeight: '100vh', position: 'relative', overflow: 'hidden',
+      ...mobilePageScrollRoot(false),
       fontFamily: "'Creato Display', 'Rajdhani', system-ui, sans-serif",
       paddingBottom: mobileScrollPadding(),
       background: '#04070f',
+      boxSizing: 'border-box',
     }}>
       <TreasureBackdrop blur={7} brightness={0.72} />
 

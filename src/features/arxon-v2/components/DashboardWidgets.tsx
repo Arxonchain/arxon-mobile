@@ -156,7 +156,7 @@ function WeekEarningsChart({
 
   return (
     <div
-      style={{ position: 'relative', touchAction: 'none', userSelect: 'none' }}
+      style={{ position: 'relative', touchAction: 'pan-y', userSelect: 'none' }}
       onPointerUp={() => setScrubbing(false)}
       onPointerLeave={() => { if (!scrubbing) setActiveIdx(null); }}
     >

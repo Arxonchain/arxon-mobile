@@ -165,7 +165,7 @@ export default function TasksV2() {
 
   return (
     <V2Page
-      style={{ minHeight: '100vh', overflowY: 'auto', position: 'relative' }}
+      style={{ position: 'relative' }}
     >
       <div
         ref={ptr.scrollRef}

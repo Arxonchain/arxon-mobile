@@ -68,8 +68,8 @@ export function V2Page({
           fontFamily: neon.font,
           paddingBottom: bottomInset,
           boxSizing: 'border-box',
+          // NeonPage owns the scrollport; keep pan-y so nested tappables don't steal swipes.
           touchAction: 'pan-y',
-          overscrollBehaviorY: 'contain',
           ...style,
         }}
       >

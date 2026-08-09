@@ -105,7 +105,7 @@ export default function PointsHistoryV2() {
   const ptr = usePullToRefresh(fetchHistory);
 
   return (
-    <V2Page style={{ minHeight: '100vh', overflowY: 'auto', position: 'relative' }}>
+    <V2Page style={{ position: 'relative' }}>
       <div
         ref={ptr.scrollRef}
         onTouchStart={ptr.onTouchStart}

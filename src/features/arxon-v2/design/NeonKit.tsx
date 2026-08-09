@@ -4,7 +4,11 @@ import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
 import { neon, neonShadow } from './neonTokens';
 import { useIsAppPreview } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { useMobileNav } from '@/contexts/MobileNavContext';
-import { mobileScrollPadding, mobileScrollPaddingNavHidden } from '@/lib/mobileLayout';
+import {
+  mobilePageScrollRoot,
+  mobileScrollPadding,
+  mobileScrollPaddingNavHidden,
+} from '@/lib/mobileLayout';
 
 /** Space nebula page shell — meshy creamy Word Forge aesthetic */
 export function NeonPage({
@@ -25,14 +29,11 @@ export function NeonPage({
 
   return (
     <div style={{
-      minHeight: contained ? '100%' : '100vh',
-      position: 'relative',
-      overflowX: 'hidden',
+      ...mobilePageScrollRoot(contained),
       paddingBottom: resolvedPadBottom,
       fontFamily: neon.font,
       background: neon.deep,
-      touchAction: 'pan-y',
-      overscrollBehaviorY: 'contain',
+      boxSizing: 'border-box',
     }}>
       <div style={{
         position: contained ? 'absolute' : 'fixed',

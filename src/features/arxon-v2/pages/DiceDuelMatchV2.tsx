@@ -6,7 +6,7 @@ import { ChevronLeft, Crown, User, X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
-import { mobileTopPadding, mobileScrollPaddingNavHidden } from '@/lib/mobileLayout';
+import { mobileTopPadding, mobileScrollPaddingNavHidden, mobilePageScrollRoot } from '@/lib/mobileLayout';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { toast } from '@/hooks/use-toast';
 import { neon } from '../design/neonTokens';
@@ -120,9 +120,11 @@ export default function DiceDuelMatchV2() {
 
   return (
     <div style={{
-      minHeight: '100vh', position: 'relative', overflowX: 'hidden',
-      paddingBottom: mobileScrollPaddingNavHidden(), fontFamily: neon.font, background: neon.deep,
-      touchAction: 'pan-y', overscrollBehaviorY: 'contain',
+      ...mobilePageScrollRoot(false),
+      paddingBottom: mobileScrollPaddingNavHidden(),
+      fontFamily: neon.font,
+      background: neon.deep,
+      boxSizing: 'border-box',
     }}>
       <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
         <div style={{
