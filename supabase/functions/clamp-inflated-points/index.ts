@@ -90,9 +90,21 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const { dryRun = true, threshold = 1.5, batchSize = 100 } = body
+    const { dryRun = true, confirm = false, threshold = 1.5, batchSize = 100 } = body
 
-    console.log(`Clamp request: dryRun=${dryRun}, threshold=${threshold}, batchSize=${batchSize}`)
+    // Hard safety: never apply mass reductions without an explicit confirm flag.
+    // Silent LEAST caps in validate_user_points_integrity previously wiped balances;
+    // this admin tool must not become another unattended mass-cut path.
+    if (!dryRun && confirm !== true) {
+      return new Response(
+        JSON.stringify({
+          error: 'Refusing non-dry-run clamp without confirm=true. Pass { dryRun: false, confirm: true } only after reviewing a dry-run.',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`Clamp request: dryRun=${dryRun}, confirm=${confirm}, threshold=${threshold}, batchSize=${batchSize}`)
 
     // Find all users with inflated points
     // We use a ratio threshold: if mining_points > (finalized_mined * threshold), it's suspicious
