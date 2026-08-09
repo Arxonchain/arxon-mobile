@@ -54,6 +54,16 @@ export default function AuthPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (mode !== 'forgot' && captchaRequired && !captchaToken) {
+      toast({
+        title: 'Security check required',
+        description: 'Complete the verification below (or tap Retry), then try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -251,13 +261,14 @@ export default function AuthPage() {
               </div>
             )}
 
-            {/* Bot protection — invisible unless Cloudflare flags the request as risky. */}
+            {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
             {mode !== 'forgot' && (
               <TurnstileWidget
                 key={mode}
                 action={mode}
                 onVerify={setCaptchaToken}
                 onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
               />
             )}
 
@@ -285,7 +296,7 @@ export default function AuthPage() {
               {loading
                 ? 'Please wait...'
                 : mode !== 'forgot' && captchaRequired && !captchaToken
-                ? 'Verifying…'
+                ? 'Complete security check'
                 : mode === 'signin'
                 ? 'Sign In'
                 : mode === 'signup'

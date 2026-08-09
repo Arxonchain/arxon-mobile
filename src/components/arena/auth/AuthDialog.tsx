@@ -158,6 +158,15 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       }
     }
 
+    if (captchaRequired && !captchaToken) {
+      toast({
+        title: "Security check required",
+        description: "Complete the verification below (or tap Retry), then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -475,12 +484,13 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
                 </div>
               )}
 
-              {/* Bot protection — invisible unless Cloudflare flags the request as risky. */}
+              {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
               <TurnstileWidget
                 key={mode}
                 action={mode}
                 onVerify={setCaptchaToken}
                 onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
               />
 
               <Button
@@ -494,10 +504,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
                     <span>{mode === "signup" ? "Creating account..." : "Signing in..."}</span>
                   </div>
                 ) : captchaRequired && !captchaToken ? (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>Verifying…</span>
-                  </div>
+                  <span>Complete security check</span>
                 ) : (
                   <>
                     {mode === "signin" ? "Start Mining" : "Create Account"}

@@ -131,11 +131,15 @@ const AdminLogin = () => {
               </div>
             </div>
 
-            {/* Bot protection — invisible unless Cloudflare flags the request as risky. */}
-            <TurnstileWidget action="admin-signin" onVerify={setCaptchaToken} onExpire={() => setCaptchaToken(null)} />
+            <TurnstileWidget
+              action="admin-signin"
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
 
             <Button type="submit" className="w-full" disabled={loading || (captchaRequired && !captchaToken)}>
-              {loading ? "Signing in..." : captchaRequired && !captchaToken ? "Verifying…" : "Sign In"}
+              {loading ? "Signing in..." : captchaRequired && !captchaToken ? "Complete security check" : "Sign In"}
             </Button>
           </form>
 

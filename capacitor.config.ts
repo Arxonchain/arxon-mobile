@@ -15,13 +15,30 @@ const config: CapacitorConfig = {
   webDir: 'dist',
   server: bundleLocal
     ? {
+        // Bundled WebView origin is https://localhost — add `localhost` in Turnstile hostnames.
         androidScheme: 'https',
+        hostname: 'localhost',
         cleartext: false,
+        allowNavigation: [
+          'challenges.cloudflare.com',
+          '*.challenges.cloudflare.com',
+          'arxon-mobile.pages.dev',
+          '*.supabase.co',
+        ],
       }
     : {
+        // OTA loads https://arxon-mobile.pages.dev — that hostname must be on the Turnstile allowlist.
         androidScheme: 'https',
         url: REMOTE_URL,
         cleartext: false,
+        allowNavigation: [
+          'challenges.cloudflare.com',
+          '*.challenges.cloudflare.com',
+          'arxon-mobile.pages.dev',
+          'arxonchain.xyz',
+          'www.arxonchain.xyz',
+          '*.supabase.co',
+        ],
       },
   plugins: {
     SplashScreen: {
