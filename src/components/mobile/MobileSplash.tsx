@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import v2FlowBg from '@/assets/v2-flow-bg.jpg';
 import { ARXON_UI_V2_ENABLED } from '@/lib/uiFeature';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
 
 interface Props { isAppReady: boolean; onFinish: () => void; }
 
@@ -59,16 +60,12 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.65, ease: 'easeInOut' }}
           style={{
-            position: 'fixed', inset: 0, zIndex: 9999, background: '#02060e',
+            position: 'fixed', inset: 0, zIndex: 9999, background: neon.deep,
             display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+            fontFamily: neon.font,
           }}
         >
           <style>{`
-            @keyframes splashLineSweep {
-              0% { transform: translateX(-30%) rotate(-8deg); opacity: 0.2; }
-              50% { opacity: 0.55; }
-              100% { transform: translateX(30%) rotate(-8deg); opacity: 0.2; }
-            }
             @keyframes splashPulseRing {
               0%, 100% { transform: scale(0.92); opacity: 0.35; }
               50% { transform: scale(1.08); opacity: 0.7; }
@@ -83,15 +80,9 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
             <div style={{
               position: 'absolute', inset: 0,
               background: `
-                radial-gradient(ellipse 70% 50% at 50% 40%, rgba(79,216,235,0.22), transparent 60%),
-                linear-gradient(180deg, rgba(2,6,14,0.2) 0%, rgba(2,6,14,0.75) 100%)
+                radial-gradient(ellipse 70% 50% at 50% 40%, ${neon.cyan}38, transparent 60%),
+                linear-gradient(180deg, ${neon.deep}33 0%, ${neon.deep}bf 100%)
               `,
-            }} />
-            <div style={{
-              position: 'absolute', left: '50%', top: '50%', height: '140%', width: '140%',
-              transform: 'translate(-50%, -50%)',
-              background: 'linear-gradient(105deg, transparent 35%, rgba(79,216,235,0.12) 50%, transparent 65%)',
-              animation: 'splashLineSweep 3.2s ease-in-out infinite',
             }} />
           </div>
 
@@ -104,7 +95,7 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
             <div style={{ position: 'relative' }}>
               <div style={{
                 position: 'absolute', inset: -18, borderRadius: 24,
-                border: '1px solid rgba(79,216,235,0.35)',
+                border: `1px solid ${neon.panelBorder}`,
                 animation: 'splashPulseRing 2.4s ease-in-out infinite',
               }} />
               <motion.img
@@ -113,9 +104,9 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
                 style={{ width: 112, height: 112, borderRadius: 22, objectFit: 'contain' }}
                 animate={{
                   boxShadow: [
-                    '0 0 24px rgba(79,216,235,0.25)',
-                    '0 0 56px rgba(79,216,235,0.55)',
-                    '0 0 24px rgba(79,216,235,0.25)',
+                    `0 0 24px ${neon.cyan}40`,
+                    `0 0 56px ${neon.cyanGlow}`,
+                    `0 0 24px ${neon.cyan}40`,
                   ],
                 }}
                 transition={{ duration: 2.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -128,9 +119,9 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
               style={{ textAlign: 'center' }}
             >
               <h1 style={{
-                margin: 0, fontSize: 34, fontWeight: 900, letterSpacing: '0.28em',
-                textTransform: 'uppercase', color: '#fff',
-                textShadow: '0 0 28px rgba(79,216,235,0.45)',
+                margin: 0, fontFamily: neon.font, fontSize: 34, fontWeight: 900, letterSpacing: '0.28em',
+                textTransform: 'uppercase', color: neon.text,
+                textShadow: `0 0 28px ${neon.cyanGlow}`,
               }}>
                 Arxon
               </h1>
@@ -138,23 +129,13 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
                 initial={{ opacity: 0, letterSpacing: '0.08em' }}
                 animate={{ opacity: 1, letterSpacing: '0.22em' }}
                 transition={{ delay: 0.7, duration: 0.7 }}
-                style={{ margin: '12px 0 0', fontSize: 11, textTransform: 'uppercase', color: '#4FD8EB' }}
+                style={{
+                  margin: '12px 0 0', fontFamily: neon.font, fontSize: 11, fontWeight: 700,
+                  textTransform: 'uppercase', color: neon.cyan,
+                }}
               >
                 Privacy for the people
               </motion.p>
-            </motion.div>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.85 }}
-              style={{ width: 208, height: 2, borderRadius: 99, overflow: 'hidden', background: 'rgba(255,255,255,0.1)' }}
-            >
-              <motion.div
-                initial={{ width: '0%' }}
-                animate={{ width: isAppReady ? '100%' : '72%' }}
-                transition={{ duration: isAppReady ? 0.35 : 1.4, ease: 'easeInOut' }}
-                style={{ height: '100%', borderRadius: 99, background: 'linear-gradient(90deg, #4FD8EB, #7FE7C4)' }}
-              />
             </motion.div>
           </motion.div>
         </motion.div>
