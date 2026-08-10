@@ -26,7 +26,9 @@ const IDLE_ROTATION = { x: -28, y: 36 };
 
 type FaceDef = { value: number; transform: string };
 
-function facesForSize(half: number): FaceDef[] {
+/** Cube faces: exact size×size panels with translateZ = half size so edges meet flush. */
+function facesForSize(size: number): FaceDef[] {
+  const half = size / 2;
   return [
     { value: 1, transform: `rotateY(0deg) translateZ(${half}px)` },
     { value: 6, transform: `rotateY(180deg) translateZ(${half}px)` },
@@ -42,6 +44,11 @@ function hashKey(key: number | string): number {
   let h = 0;
   for (let i = 0; i < s.length; i++) h = (Math.imul(31, h) + s.charCodeAt(i)) | 0;
   return Math.abs(h);
+}
+
+/** Default gap: room for 3D overhang + roll scale without the pair looking cramped. */
+function defaultDiceGap(size: number): number {
+  return Math.max(10, Math.round(size * 0.5));
 }
 
 function FacePips({
@@ -91,9 +98,8 @@ export function DiceFace({
   rolling?: boolean;
   rollKey?: number | string;
 }) {
-  const half = size / 2;
-  const radius = Math.max(6, size * 0.18);
-  const faces = facesForSize(half);
+  // Exact face size = cube size. No radius — rounded corners open vertex cracks.
+  const faces = facesForSize(size);
   const seed = hashKey(rollKey);
   const dir = seed % 2 === 0 ? 1 : -1;
   const spinX = 360 + (seed % 3) * 360;
@@ -118,14 +124,20 @@ export function DiceFace({
   const targetX = settled.x + dir * 360 * settleSpins;
   const targetY = settled.y - dir * 360 * settleSpins;
 
+  // Stage padding so 3D projection / roll scale aren't clipped and pairs keep air.
+  const stagePad = Math.ceil(size * 0.28);
+
   return (
     <div
       style={{
-        width: size,
-        height: size,
+        width: size + stagePad * 2,
+        height: size + stagePad * 2,
         flexShrink: 0,
         perspective: size * 5,
         perspectiveOrigin: '50% 45%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
       {/* Mild camera tilt so the cube always reads as 3D, even when a face is "front". */}
@@ -178,15 +190,20 @@ export function DiceFace({
               key={face.value}
               style={{
                 position: 'absolute',
-                inset: 0,
-                borderRadius: radius,
+                left: 0,
+                top: 0,
+                width: size,
+                height: size,
+                boxSizing: 'border-box',
+                borderRadius: 0,
                 transform: face.transform,
                 backfaceVisibility: 'hidden',
                 WebkitBackfaceVisibility: 'hidden',
+                // Opaque glass body — joins read as one solid die (no edge strokes).
                 background:
-                  'linear-gradient(155deg, rgba(255,255,255,0.16) 0%, rgba(12,24,42,0.92) 48%, rgba(4,10,20,0.97) 100%)',
-                border: `1.5px solid ${accent}60`,
-                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.35), 0 0 ${size * 0.2}px ${accent}28`,
+                  'linear-gradient(155deg, rgba(40,58,82,1) 0%, rgba(12,22,38,1) 50%, rgba(4,10,18,1) 100%)',
+                border: 'none',
+                boxShadow: `inset 0 1px 0 rgba(255,255,255,0.1), inset 0 -1px 0 rgba(0,0,0,0.5), inset 0 0 ${size * 0.4}px ${accent}16`,
               }}
             >
               <FacePips value={face.value} size={size} accent={accent} />
@@ -205,7 +222,7 @@ export function DicePair({
   accent = neon.cyan,
   rolling = false,
   rollKey = 0,
-  gap = 10,
+  gap,
 }: {
   die1: number | null;
   die2: number | null;
@@ -215,8 +232,17 @@ export function DicePair({
   rollKey?: number | string;
   gap?: number;
 }) {
+  const pairGap = gap ?? defaultDiceGap(size);
   return (
-    <div style={{ display: 'flex', gap, alignItems: 'center', justifyContent: 'center' }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: pairGap,
+        alignItems: 'center',
+        justifyContent: 'center',
+        overflow: 'visible',
+      }}
+    >
       <DiceFace value={die1} size={size} accent={accent} rolling={rolling} rollKey={`${rollKey}-a`} />
       <DiceFace value={die2} size={size} accent={accent} rolling={rolling} rollKey={`${rollKey}-b`} />
     </div>

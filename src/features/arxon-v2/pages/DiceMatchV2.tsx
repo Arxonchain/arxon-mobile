@@ -55,7 +55,7 @@ function Seat({
         <RoundPips wins={wins} accent={accent} />
       </div>
       <div style={{ display: 'flex', justifyContent: 'center' }}>
-        <DicePair die1={die1} die2={die2} size={46} accent={accent} rolling={rolling} rollKey={rollKey} gap={8} />
+        <DicePair die1={die1} die2={die2} size={46} accent={accent} rolling={rolling} rollKey={rollKey} />
       </div>
     </div>
   );

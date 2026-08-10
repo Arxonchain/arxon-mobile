@@ -47,7 +47,6 @@ function PlayerChip({ player, rolling, rollKey }: { player: RumblePlayerInfo; ro
           accent={accent}
           rolling={player.isMe && rolling}
           rollKey={rollKey}
-          gap={4}
         />
       </div>
     </div>
