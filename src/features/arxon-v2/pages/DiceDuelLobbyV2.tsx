@@ -109,7 +109,7 @@ export default function DiceDuelLobbyV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const preview = useIsAppPreview();
   const { points } = usePoints();
-  const { challenges, myMatch, loading, busy, createChallenge, joinChallenge, joinByCode, cancelChallenge } = useDiceDuelLobby();
+  const { challenges, myMatch, blockingMatch, loading, busy, createChallenge, joinChallenge, joinByCode, cancelChallenge, cancelMyOpenMatches } = useDiceDuelLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [joinCode, setJoinCode] = useState('');
   const [countdown, setCountdown] = useState(() => formatCountdown(myMatch?.expiresAt));
@@ -175,6 +175,15 @@ export default function DiceDuelLobbyV2() {
     go(`/arena/dice/duel/${res.matchId}`);
   }, [balance, stake, createChallenge, go]);
 
+  const handleClearStuck = useCallback(async () => {
+    const res = await cancelMyOpenMatches();
+    if (!res.success) {
+      toast({ title: 'Could not clear matches', description: res.error, variant: 'destructive' });
+      return;
+    }
+    toast({ title: 'Matches cleared', description: 'Open lobbies cancelled and stakes refunded.' });
+  }, [cancelMyOpenMatches]);
+
   const handleAccept = useCallback(async (challenge: DuelChallenge) => {
     if (balance < challenge.stake) {
       toast({ title: 'Insufficient ARX-P', description: `You need ${challenge.stake} ARX-P to accept.`, variant: 'destructive' });
@@ -222,6 +231,46 @@ export default function DiceDuelLobbyV2() {
       />
 
       <motion.div variants={stagger} initial="hidden" animate="show" style={{ padding: '0 16px' }}>
+        {!myMatch && blockingMatch && (
+          <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+            <NeonGlassCard accent={diceAccent.lose} padding="16px 16px 14px">
+              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: neon.text }}>
+                You already have an open {blockingMatch.mode === 'rumble' ? 'Rumble' : 'Dice'} match
+              </p>
+              <p style={{ margin: '4px 0 12px', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>
+                Finish or cancel it before opening a new Duel. Stake {blockingMatch.stake} ARX-P · {blockingMatch.status}
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => go(blockingMatch.mode === 'rumble' ? `/arena/dice/rumble/${blockingMatch.id}` : `/arena/dice/duel/${blockingMatch.id}`)}
+                  style={{
+                    flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: `linear-gradient(135deg, ${neon.purple}, ${neon.cyan})`, color: '#050510',
+                    fontFamily: neon.font, fontSize: 10, fontWeight: 800,
+                  }}
+                >
+                  Continue
+                </button>
+                {blockingMatch.status === 'open' && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void handleClearStuck()}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: 12, cursor: 'pointer',
+                      border: '1px solid rgba(255,107,74,0.3)', background: 'rgba(255,107,74,0.1)',
+                      color: diceAccent.lose, fontFamily: neon.font, fontSize: 10, fontWeight: 800,
+                    }}
+                  >
+                    Cancel & Refund
+                  </button>
+                )}
+              </div>
+            </NeonGlassCard>
+          </motion.div>
+        )}
+
         {myMatch ? (
           <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
             <NeonGlassCard
@@ -313,7 +362,7 @@ export default function DiceDuelLobbyV2() {
               )}
             </NeonGlassCard>
           </motion.div>
-        ) : (
+        ) : !blockingMatch ? (
           <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
             <NeonGlassCard accent={diceAccent.you} padding="16px 16px 14px">
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
@@ -366,9 +415,9 @@ export default function DiceDuelLobbyV2() {
               </motion.button>
             </NeonGlassCard>
           </motion.div>
-        )}
+        ) : null}
 
-        {!myMatch && (
+        {!myMatch && !blockingMatch && (
           <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
             <NeonGlassCard accent={neon.cyan} padding="14px 14px 12px">
               <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, color: neon.text }}>Join with invite code</p>

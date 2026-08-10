@@ -38,17 +38,24 @@ async function fetchProfilesMap(userIds: string[]) {
   return map;
 }
 
+export type MyDiceMatch = {
+  id: string;
+  status: string;
+  mode: string;
+  stake: number;
+  inviteCode?: string | null;
+  expiresAt?: string | null;
+  createdBy?: string | null;
+  maxPlayers?: number;
+  pot?: number;
+};
+
 export function useDiceDuelLobby() {
   const { user } = useAuth();
   const { refreshPoints } = usePoints();
   const [challenges, setChallenges] = useState<DuelChallenge[]>([]);
-  const [myMatch, setMyMatch] = useState<{
-    id: string;
-    status: string;
-    stake: number;
-    inviteCode?: string | null;
-    expiresAt?: string | null;
-  } | null>(null);
+  const [myMatch, setMyMatch] = useState<MyDiceMatch | null>(null);
+  const [blockingMatch, setBlockingMatch] = useState<MyDiceMatch | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -56,50 +63,91 @@ export function useDiceDuelLobby() {
     if (!user) {
       setChallenges([]);
       setMyMatch(null);
+      setBlockingMatch(null);
       setLoading(false);
       return;
     }
     try {
-      // Best-effort expire stale open lobbies so stakes refund instead of vanishing
-      try { await supabase.rpc('expire_open_dice_matches' as any); } catch { /* ignore */ }
-
-      const { data: myRows } = await (supabase as any)
-        .from('dice_match_players')
-        .select('match_id')
-        .eq('user_id', user.id);
-      const myMatchIds = (myRows ?? []).map((r: any) => r.match_id);
-
-      let mine: any = null;
-      if (myMatchIds.length) {
-        const { data: myMatches } = await (supabase as any)
-          .from('dice_matches')
-          .select('id, status, mode, stake, created_at, invite_code, expires_at')
-          .in('id', myMatchIds)
-          .eq('mode', 'duel')
-          .in('status', ['open', 'active'])
-          .order('created_at', { ascending: false })
-          .limit(1);
-        mine = (myMatches ?? [])[0] ?? null;
+      // Prefer SECURITY DEFINER list (bypasses RLS bugs + runs expire)
+      let mine: MyDiceMatch | null = null;
+      let blocking: MyDiceMatch | null = null;
+      try {
+        const { data: listed } = await supabase.rpc('list_my_open_dice_matches' as any);
+        const rows = ((listed as any)?.matches ?? []) as any[];
+        const mapped = rows.map((m: any) => ({
+          id: m.id as string,
+          status: m.status as string,
+          mode: m.mode as string,
+          stake: Number(m.stake) || 0,
+          inviteCode: m.invite_code ?? null,
+          expiresAt: m.expires_at ?? null,
+          createdBy: m.created_by ?? null,
+          maxPlayers: m.max_players,
+          pot: m.pot,
+        }));
+        mine = mapped.find((m) => m.mode === 'duel') ?? null;
+        blocking = mapped.find((m) => m.mode !== 'duel') ?? null;
+      } catch {
+        /* fall through to table query */
       }
-      setMyMatch(
-        mine
-          ? {
-              id: mine.id,
-              status: mine.status,
-              stake: mine.stake,
-              inviteCode: mine.invite_code ?? null,
-              expiresAt: mine.expires_at ?? null,
-            }
-          : null
-      );
 
+      if (!mine && !blocking) {
+        const { data: myRows } = await (supabase as any)
+          .from('dice_match_players')
+          .select('match_id')
+          .eq('user_id', user.id);
+        const myMatchIds = (myRows ?? []).map((r: any) => r.match_id);
+        if (myMatchIds.length) {
+          const { data: myMatches } = await (supabase as any)
+            .from('dice_matches')
+            .select('id, status, mode, stake, created_at, invite_code, expires_at, created_by, max_players, pot')
+            .in('id', myMatchIds)
+            .in('mode', ['duel', 'rumble'])
+            .in('status', ['open', 'active'])
+            .order('created_at', { ascending: false });
+          const rows = myMatches ?? [];
+          const duel = rows.find((m: any) => m.mode === 'duel');
+          const other = rows.find((m: any) => m.mode !== 'duel');
+          if (duel) {
+            mine = {
+              id: duel.id,
+              status: duel.status,
+              mode: duel.mode,
+              stake: duel.stake,
+              inviteCode: duel.invite_code ?? null,
+              expiresAt: duel.expires_at ?? null,
+              createdBy: duel.created_by ?? null,
+              maxPlayers: duel.max_players,
+              pot: duel.pot,
+            };
+          }
+          if (other) {
+            blocking = {
+              id: other.id,
+              status: other.status,
+              mode: other.mode,
+              stake: other.stake,
+              inviteCode: other.invite_code ?? null,
+              expiresAt: other.expires_at ?? null,
+              createdBy: other.created_by ?? null,
+              maxPlayers: other.max_players,
+              pot: other.pot,
+            };
+          }
+        }
+      }
+
+      setMyMatch(mine);
+      setBlockingMatch(blocking);
+
+      const nowIso = new Date().toISOString();
       const { data: open } = await (supabase as any)
         .from('dice_matches')
         .select('id, stake, pot, created_by, created_at, invite_code, expires_at')
         .eq('mode', 'duel')
         .eq('status', 'open')
         .neq('created_by', user.id)
-        .gt('expires_at', new Date().toISOString())
+        .or(`expires_at.gt.${nowIso},expires_at.is.null`)
         .order('created_at', { ascending: false })
         .limit(30);
 
@@ -212,7 +260,34 @@ export function useDiceDuelLobby() {
     }
   }, [refresh, refreshPoints]);
 
-  return { challenges, myMatch, loading, busy, refresh, createChallenge, joinChallenge, joinByCode, cancelChallenge };
+  const cancelMyOpenMatches = useCallback(async (): Promise<ActionResult> => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('cancel_my_open_dice_matches' as any);
+      if (error) return { success: false, error: error.message };
+      const d = data as any;
+      if (!d?.success) return { success: false, error: d?.error || 'Failed to clear stuck matches' };
+      void refreshPoints();
+      await refresh();
+      return { success: true };
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh, refreshPoints]);
+
+  return {
+    challenges,
+    myMatch,
+    blockingMatch,
+    loading,
+    busy,
+    refresh,
+    createChallenge,
+    joinChallenge,
+    joinByCode,
+    cancelChallenge,
+    cancelMyOpenMatches,
+  };
 }
 
 export interface DuelPlayerInfo {

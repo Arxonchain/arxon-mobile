@@ -39,19 +39,24 @@ async function fetchProfilesMap(userIds: string[]) {
   return map;
 }
 
+export type MyRumbleMatch = {
+  id: string;
+  status: string;
+  mode: string;
+  stake: number;
+  inviteCode?: string | null;
+  expiresAt?: string | null;
+  maxPlayers?: number;
+  createdBy?: string | null;
+  pot?: number;
+};
+
 export function useDiceRumbleLobby() {
   const { user } = useAuth();
   const { refreshPoints } = usePoints();
   const [lobbies, setLobbies] = useState<RumbleLobby[]>([]);
-  const [myMatch, setMyMatch] = useState<{
-    id: string;
-    status: string;
-    stake: number;
-    inviteCode?: string | null;
-    expiresAt?: string | null;
-    maxPlayers?: number;
-    createdBy?: string | null;
-  } | null>(null);
+  const [myMatch, setMyMatch] = useState<MyRumbleMatch | null>(null);
+  const [blockingMatch, setBlockingMatch] = useState<MyRumbleMatch | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -59,51 +64,90 @@ export function useDiceRumbleLobby() {
     if (!user) {
       setLobbies([]);
       setMyMatch(null);
+      setBlockingMatch(null);
       setLoading(false);
       return;
     }
     try {
-      try { await supabase.rpc('expire_open_dice_matches' as any); } catch { /* ignore */ }
-
-      const { data: myRows } = await (supabase as any)
-        .from('dice_match_players')
-        .select('match_id')
-        .eq('user_id', user.id);
-      const myMatchIds = (myRows ?? []).map((r: any) => r.match_id);
-
-      let mine: any = null;
-      if (myMatchIds.length) {
-        const { data: myMatches } = await (supabase as any)
-          .from('dice_matches')
-          .select('id, status, mode, stake, created_at, invite_code, expires_at, max_players, created_by')
-          .in('id', myMatchIds)
-          .eq('mode', 'rumble')
-          .in('status', ['open', 'active'])
-          .order('created_at', { ascending: false })
-          .limit(1);
-        mine = (myMatches ?? [])[0] ?? null;
+      let mine: MyRumbleMatch | null = null;
+      let blocking: MyRumbleMatch | null = null;
+      try {
+        const { data: listed } = await supabase.rpc('list_my_open_dice_matches' as any);
+        const rows = ((listed as any)?.matches ?? []) as any[];
+        const mapped = rows.map((m: any) => ({
+          id: m.id as string,
+          status: m.status as string,
+          mode: m.mode as string,
+          stake: Number(m.stake) || 0,
+          inviteCode: m.invite_code ?? null,
+          expiresAt: m.expires_at ?? null,
+          maxPlayers: m.max_players,
+          createdBy: m.created_by ?? null,
+          pot: m.pot,
+        }));
+        mine = mapped.find((m) => m.mode === 'rumble') ?? null;
+        blocking = mapped.find((m) => m.mode !== 'rumble') ?? null;
+      } catch {
+        /* fall through */
       }
-      setMyMatch(
-        mine
-          ? {
-              id: mine.id,
-              status: mine.status,
-              stake: mine.stake,
-              inviteCode: mine.invite_code ?? null,
-              expiresAt: mine.expires_at ?? null,
-              maxPlayers: mine.max_players,
-              createdBy: mine.created_by ?? null,
-            }
-          : null
-      );
 
+      if (!mine && !blocking) {
+        const { data: myRows } = await (supabase as any)
+          .from('dice_match_players')
+          .select('match_id')
+          .eq('user_id', user.id);
+        const myMatchIds = (myRows ?? []).map((r: any) => r.match_id);
+        if (myMatchIds.length) {
+          const { data: myMatches } = await (supabase as any)
+            .from('dice_matches')
+            .select('id, status, mode, stake, created_at, invite_code, expires_at, max_players, created_by, pot')
+            .in('id', myMatchIds)
+            .in('mode', ['duel', 'rumble'])
+            .in('status', ['open', 'active'])
+            .order('created_at', { ascending: false });
+          const rows = myMatches ?? [];
+          const rumble = rows.find((m: any) => m.mode === 'rumble');
+          const other = rows.find((m: any) => m.mode !== 'rumble');
+          if (rumble) {
+            mine = {
+              id: rumble.id,
+              status: rumble.status,
+              mode: rumble.mode,
+              stake: rumble.stake,
+              inviteCode: rumble.invite_code ?? null,
+              expiresAt: rumble.expires_at ?? null,
+              maxPlayers: rumble.max_players,
+              createdBy: rumble.created_by ?? null,
+              pot: rumble.pot,
+            };
+          }
+          if (other) {
+            blocking = {
+              id: other.id,
+              status: other.status,
+              mode: other.mode,
+              stake: other.stake,
+              inviteCode: other.invite_code ?? null,
+              expiresAt: other.expires_at ?? null,
+              maxPlayers: other.max_players,
+              createdBy: other.created_by ?? null,
+              pot: other.pot,
+            };
+          }
+        }
+      }
+
+      setMyMatch(mine);
+      setBlockingMatch(blocking);
+
+      const nowIso = new Date().toISOString();
       const { data: open } = await (supabase as any)
         .from('dice_matches')
         .select('id, stake, max_players, created_by, created_at, invite_code, expires_at')
         .eq('mode', 'rumble')
         .eq('status', 'open')
         .neq('created_by', user.id)
-        .gt('expires_at', new Date().toISOString())
+        .or(`expires_at.gt.${nowIso},expires_at.is.null`)
         .order('created_at', { ascending: false })
         .limit(30);
 
@@ -247,7 +291,35 @@ export function useDiceRumbleLobby() {
     }
   }, [refresh, refreshPoints]);
 
-  return { lobbies, myMatch, loading, busy, refresh, createLobby, joinLobby, joinByCode, cancelLobby, leaveLobby };
+  const cancelMyOpenMatches = useCallback(async (): Promise<ActionResult> => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('cancel_my_open_dice_matches' as any);
+      if (error) return { success: false, error: error.message };
+      const d = data as any;
+      if (!d?.success) return { success: false, error: d?.error || 'Failed to clear stuck matches' };
+      void refreshPoints();
+      await refresh();
+      return { success: true };
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh, refreshPoints]);
+
+  return {
+    lobbies,
+    myMatch,
+    blockingMatch,
+    loading,
+    busy,
+    refresh,
+    createLobby,
+    joinLobby,
+    joinByCode,
+    cancelLobby,
+    leaveLobby,
+    cancelMyOpenMatches,
+  };
 }
 
 export interface RumblePlayerInfo {
