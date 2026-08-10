@@ -24,24 +24,21 @@ export default function AppPreviewShell() {
             </p>
           </div>
 
+          {/*
+            Phone bezel is a clip-only frame — no transform/isolation.
+            Nesting a scrollport inside transform + overflow:hidden is a known
+            WebKit freeze; NeonPage / mobilePageScrollRoot owns scrolling instead.
+          */}
           <div style={{
             width: 390, maxWidth: '100%', height: 'min(844px, calc(100vh - 80px))',
             borderRadius: 44, overflow: 'hidden', position: 'relative',
             border: '10px solid #141820', boxShadow: '0 24px 80px rgba(0,0,0,0.65), inset 0 0 0 1px rgba(255,255,255,0.06)',
             background: neon.deep,
-            transform: 'translateZ(0)',
-            isolation: 'isolate',
           }}>
             <div style={{ position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)', width: 96, height: 28, borderRadius: 20, background: '#0a0e14', zIndex: 300, pointerEvents: 'none' }} />
 
             <div style={{
-              height: '100%', overflowY: 'auto', overflowX: 'hidden', position: 'relative',
-              touchAction: 'pan-y', overscrollBehaviorY: 'contain',
-              // Own compositing layer so this scroll container isn't tied to the phone-frame's
-              // transform/isolation context above — nesting a scrollable node inside a
-              // transformed + overflow:hidden ancestor is a known WebKit cause of scroll
-              // "freezing" mid-gesture on touch devices.
-              transform: 'translateZ(0)', willChange: 'scroll-position',
+              height: '100%', width: '100%', overflow: 'hidden', position: 'relative',
             }}>
               <Outlet />
             </div>

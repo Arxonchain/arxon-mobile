@@ -34,16 +34,22 @@ export function mobileScrollPaddingNavHidden(extra = 12): string {
 
 /**
  * Coherent V2 page scroll-root styles for Capacitor WebView + browser preview.
- * - Preview (contained): grow with content; parent phone-frame scrolls.
+ *
+ * The page ALWAYS owns the scrollport (single owner — avoids nested-scroll /
+ * WebKit "freeze" when a transformed phone-frame also tries to scroll).
+ * - Preview (contained): fill the phone-frame (height 100%) and scroll inside.
  * - Native / full page: bounded 100dvh scrollport with pan-y + momentum scroll.
  */
 export function mobilePageScrollRoot(contained = false): CSSProperties {
   if (contained) {
     return {
+      height: '100%',
       minHeight: '100%',
+      maxHeight: '100%',
       position: 'relative',
       overflowX: 'hidden',
-      overflowY: 'visible',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
       touchAction: 'pan-y',
       overscrollBehaviorY: 'contain',
     };

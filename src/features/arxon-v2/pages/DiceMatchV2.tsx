@@ -144,13 +144,13 @@ export default function DiceMatchV2() {
 
   return (
     <div style={{
-      ...mobilePageScrollRoot(false),
+      ...mobilePageScrollRoot(preview),
       paddingBottom: mobileScrollPaddingNavHidden(),
       fontFamily: neon.font,
       background: neon.deep,
       boxSizing: 'border-box',
     }}>
-      <div style={{ position: 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
+      <div style={{ position: preview ? 'absolute' : 'fixed', inset: 0, zIndex: 0, pointerEvents: 'none' }}>
         <div style={{
           position: 'absolute', inset: -30,
           background: `
