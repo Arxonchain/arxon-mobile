@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Users2, Clock, X, Crown, UsersRound, Copy, Link2 } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { V2Page, fadeUp, stagger } from '../design/Kit';
@@ -120,7 +121,7 @@ export default function DiceRumbleLobbyV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const preview = useIsAppPreview();
   const { points } = usePoints();
-  const { lobbies, myMatch, loading, busy, createLobby, joinLobby, joinByCode, cancelLobby } = useDiceRumbleLobby();
+  const { lobbies, myMatch, loading, busy, createLobby, joinLobby, joinByCode, cancelLobby, leaveLobby } = useDiceRumbleLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [size, setSize] = useState<number>(DICE_RUMBLE_LOBBY_SIZES[1]);
   const [joinCode, setJoinCode] = useState('');
@@ -209,11 +210,20 @@ export default function DiceRumbleLobbyV2() {
     go(`/arena/dice/rumble/${res.matchId}`);
   }, [joinCode, joinByCode, go]);
 
+  const { user } = useAuth();
+  const isHost = !!myMatch && !!user && myMatch.createdBy === user.id;
+
   const handleCancel = useCallback(async () => {
     if (!myMatch) return;
-    const res = await cancelLobby(myMatch.id);
-    if (!res.success) toast({ title: 'Could not cancel', description: res.error, variant: 'destructive' });
-  }, [myMatch, cancelLobby]);
+    const res = isHost ? await cancelLobby(myMatch.id) : await leaveLobby(myMatch.id);
+    if (!res.success) {
+      toast({
+        title: isHost ? 'Could not cancel' : 'Could not leave',
+        description: res.error,
+        variant: 'destructive',
+      });
+    }
+  }, [myMatch, cancelLobby, leaveLobby, isHost]);
 
   return (
     <V2Page>
@@ -287,7 +297,7 @@ export default function DiceRumbleLobbyV2() {
                     color: diceAccent.lose, fontFamily: neon.font, fontSize: 10, fontWeight: 800,
                   }}
                 >
-                  Cancel & Refund
+                  {isHost ? 'Cancel & Refund' : 'Leave Lobby'}
                 </button>
               )}
               <button

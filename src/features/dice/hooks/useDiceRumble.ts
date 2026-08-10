@@ -50,6 +50,7 @@ export function useDiceRumbleLobby() {
     inviteCode?: string | null;
     expiresAt?: string | null;
     maxPlayers?: number;
+    createdBy?: string | null;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -74,7 +75,7 @@ export function useDiceRumbleLobby() {
       if (myMatchIds.length) {
         const { data: myMatches } = await (supabase as any)
           .from('dice_matches')
-          .select('id, status, mode, stake, created_at, invite_code, expires_at, max_players')
+          .select('id, status, mode, stake, created_at, invite_code, expires_at, max_players, created_by')
           .in('id', myMatchIds)
           .eq('mode', 'rumble')
           .in('status', ['open', 'active'])
@@ -91,6 +92,7 @@ export function useDiceRumbleLobby() {
               inviteCode: mine.invite_code ?? null,
               expiresAt: mine.expires_at ?? null,
               maxPlayers: mine.max_players,
+              createdBy: mine.created_by ?? null,
             }
           : null
       );
@@ -230,7 +232,22 @@ export function useDiceRumbleLobby() {
     }
   }, [refresh, refreshPoints]);
 
-  return { lobbies, myMatch, loading, busy, refresh, createLobby, joinLobby, joinByCode, cancelLobby };
+  const leaveLobby = useCallback(async (matchId: string): Promise<ActionResult> => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('leave_dice_rumble_lobby' as any, { p_match_id: matchId });
+      if (error) return { success: false, error: error.message };
+      const d = data as any;
+      if (!d?.success) return { success: false, error: d?.error || 'Failed to leave lobby' };
+      void refreshPoints();
+      await refresh();
+      return { success: true };
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh, refreshPoints]);
+
+  return { lobbies, myMatch, loading, busy, refresh, createLobby, joinLobby, joinByCode, cancelLobby, leaveLobby };
 }
 
 export interface RumblePlayerInfo {
