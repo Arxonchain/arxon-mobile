@@ -24,10 +24,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const { requireAdminOrService, adminAuthResponse } = await import("../_shared/adminAuth.ts");
+    const auth = await requireAdminOrService(req);
+    if (!auth.ok) return adminAuthResponse(auth);
+
+    const supabase = auth.supabase;
 
     // Parse request - can optionally specify batch size and dry run
     const { batchSize = 100, dryRun = false } = await req.json().catch(() => ({}));

@@ -49,7 +49,7 @@ const validatePostQuality = async (postUrl: string): Promise<{ valid: boolean; r
 
 export const useSocialSubmissions = () => {
   const { user } = useAuth();
-  const { addPoints, triggerConfetti, refreshPoints } = usePoints();
+  const { triggerConfetti, refreshPoints } = usePoints();
   const [submitting, setSubmitting] = useState(false);
   const [claiming, setClaiming] = useState<string | null>(null);
   const [submissions, setSubmissions] = useState<SocialSubmission[]>([]);
@@ -259,90 +259,40 @@ export const useSocialSubmissions = () => {
     setClaiming(submissionId);
 
     try {
-      // First, verify from database that it hasn't been claimed (prevent race conditions)
-      const { data: freshData, error: checkError } = await supabase
-        .from('social_submissions')
-        .select('points_awarded, status')
-        .eq('id', submissionId)
-        .eq('user_id', user.id)
-        .single();
+      const { data: claimResult, error: claimError } = await supabase.rpc(
+        'claim_approved_social_submission' as any,
+        { p_submission_id: submissionId }
+      );
 
-      if (checkError) throw checkError;
+      if (claimError) throw claimError;
+      const result = claimResult as any;
+      if (!result?.success) {
+        toast({
+          title: "Claim Failed",
+          description: result?.error || "Could not claim rewards",
+          variant: "destructive",
+        });
+        return false;
+      }
 
-      // Double-check server-side: if already claimed, abort
-      if (freshData.points_awarded > 0) {
-        // Update local state to reflect reality
-        setSubmissions(prev => 
-          prev.map(s => s.id === submissionId 
-            ? { ...s, claimed: true, points_awarded: freshData.points_awarded }
+      if (result.already_claimed) {
+        setSubmissions(prev =>
+          prev.map(s => s.id === submissionId
+            ? { ...s, claimed: true, points_awarded: SOCIAL_POST_POINTS }
             : s
           )
         );
         toast({
           title: "Already Claimed",
           description: "Rewards for this post were already claimed",
-          variant: "destructive"
+          variant: "destructive",
         });
         return false;
-      }
-
-      // Check if still approved
-      if (freshData.status !== 'approved') {
-        setSubmissions(prev => 
-          prev.map(s => s.id === submissionId 
-            ? { ...s, status: freshData.status }
-            : s
-          )
-        );
-        toast({
-          title: "Not Eligible",
-          description: "This post is no longer approved for rewards",
-          variant: "destructive"
-        });
-        return false;
-      }
-
-      // Update submission as claimed with points (atomic operation)
-      const { error: updateError } = await supabase
-        .from('social_submissions')
-        .update({
-          points_awarded: SOCIAL_POST_POINTS,
-          reviewed_at: new Date().toISOString()
-        })
-        .eq('id', submissionId)
-        .eq('points_awarded', 0); // Only update if not already claimed
-
-      if (updateError) throw updateError;
-
-      // Add points to user's balance (social_points) - instant reflection
-      await addPoints(SOCIAL_POST_POINTS, 'social');
-
-      // Update X post mining boost in user_points (separate from referral boost)
-      const { data: currentPoints } = await supabase
-        .from('user_points')
-        .select('x_post_boost_percentage')
-        .eq('user_id', user.id)
-        .single();
-
-      if (currentPoints) {
-        // Each post adds 50% boost (5 ARX-P/HR out of base 10/hr)
-        const newXPostBoost = ((currentPoints as any).x_post_boost_percentage || 0) + (SOCIAL_MINING_BOOST * 10);
-        const { error: boostError } = await supabase
-          .from('user_points')
-          .update({ 
-            x_post_boost_percentage: newXPostBoost,
-            updated_at: new Date().toISOString()
-          })
-          .eq('user_id', user.id);
-        
-        if (!boostError) {
-          console.log('X post boost updated to:', newXPostBoost);
-        }
       }
 
       // Update local state immediately for instant UI reflection
-      setSubmissions(prev => 
-        prev.map(s => s.id === submissionId 
+      setSubmissions(prev =>
+        prev.map(s => s.id === submissionId
           ? { ...s, claimed: true, points_awarded: SOCIAL_POST_POINTS }
           : s
         )
@@ -359,10 +309,10 @@ export const useSocialSubmissions = () => {
 
       return true;
     } catch (error: any) {
-      console.error('Error claiming rewards:', error);
+      console.error('Claim error:', error);
       toast({
-        title: error instanceof BackendUnavailableError ? 'Service Unavailable' : 'Claim Failed',
-        description: error?.message || 'Please try again',
+        title: "Claim Failed",
+        description: error.message || "Could not claim rewards",
         variant: "destructive",
       });
       return false;

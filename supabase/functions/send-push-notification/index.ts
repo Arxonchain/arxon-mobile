@@ -196,15 +196,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    const { requireAdminOrService, adminAuthResponse } = await import("../_shared/adminAuth.ts");
+    const auth = await requireAdminOrService(req);
+    if (!auth.ok) return adminAuthResponse(auth);
+
     const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
     const firebaseSA = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
     const firebaseProject = Deno.env.get("FIREBASE_PROJECT_ID") || "arxon-cb305";
 
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const supabase = auth.supabase;
 
     const { userId, userIds, title, body, url, tag, data, broadcast } = await req.json();
     console.log("Push request:", { userId, userIds: userIds?.length, broadcast, title });
+
+    if (broadcast && auth.mode !== "service_role" && auth.mode !== "admin") {
+      return new Response(JSON.stringify({ success: false, error: "Admin access required for broadcast" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let query = supabase.from("push_subscriptions").select("*");
     if (!broadcast && userId) query = query.eq("user_id", userId);

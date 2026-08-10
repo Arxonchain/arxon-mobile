@@ -12,10 +12,14 @@ serve(async (req) => {
   }
 
   try {
+    const { requireAdminOrService, adminAuthResponse } = await import("../_shared/adminAuth.ts");
+    const auth = await requireAdminOrService(req);
+    if (!auth.ok) return adminAuthResponse(auth);
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = auth.supabase;
 
     const body = await req.json().catch(() => ({}));
     const marketId = body.market_id;

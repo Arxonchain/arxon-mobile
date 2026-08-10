@@ -30,22 +30,12 @@ Deno.serve(async (req) => {
 
     const body = await req.json()
 
-    await serviceClient.rpc('apply_word_forge_stats', {
-      p_user_id: user.id,
-      p_words_delta: 0,
-      p_best_level: body.best_level != null ? Math.min(Math.max(Number(body.best_level), 1), 999) : null,
-      p_current_level: body.current_level != null ? Math.min(Math.max(Number(body.current_level), 1), 999) : null,
-      p_session_high: body.session_high != null ? Math.max(0, Number(body.session_high)) : null,
-    })
-
-    if (body.hints_left != null || body.shuffles_left != null) {
+    // Consumables: only allow decreases (or equal) via RPC — never accept client daily/level inflation here
+    if (body.hints_left != null || body.shuffles_left != null || body.tutorial_completed != null) {
       await userClient.rpc('sync_word_forge_consumables', {
         p_hints_left: body.hints_left != null ? Math.min(10, Math.max(0, Number(body.hints_left))) : null,
         p_shuffles_left: body.shuffles_left != null ? Math.min(10, Math.max(0, Number(body.shuffles_left))) : null,
         p_tutorial_completed: body.tutorial_completed ?? null,
-        p_daily_completed_date: body.daily_completed_date ?? null,
-        p_daily_streak: body.daily_streak ?? null,
-        p_unlocked_skins: body.unlocked_skins ?? null,
       })
     }
 

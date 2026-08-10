@@ -55,7 +55,7 @@ const MarketBettingModal = ({
   const sideBPercent = totalPool > 0 ? (market.side_b_power / totalPool) * 100 : 50;
 
   const returns = useMemo(() => {
-    if (!selectedSide || stakeAmount < 100) return null;
+    if (!selectedSide || stakeAmount < 1000) return null;
     return calculateReturns(market, selectedSide, stakeAmount);
   }, [selectedSide, stakeAmount, market, calculateReturns]);
 
@@ -98,15 +98,15 @@ const MarketBettingModal = ({
   }, [market.ends_at]);
 
   const stakeTiers = [
-    { label: '100', value: 100 },
-    { label: '500', value: 500 },
     { label: '1K', value: 1000 },
     { label: '5K', value: 5000 },
+    { label: '10K', value: 10000 },
+    { label: '25K', value: 25000 },
     { label: 'MAX', value: availablePoints },
   ];
 
   const handlePlaceBet = () => {
-    if (stakeAmount >= 100 && selectedSide) {
+    if (stakeAmount >= 1000 && selectedSide) {
       setShowFingerprint(true);
     }
   };

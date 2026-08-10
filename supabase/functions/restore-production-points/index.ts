@@ -57,6 +57,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const { requireAdminOrService, adminAuthResponse } = await import('../_shared/adminAuth.ts')
+    const auth = await requireAdminOrService(req)
+    if (!auth.ok) return adminAuthResponse(auth)
+
     const prodUrl = Deno.env.get('PROD_SUPABASE_URL')!
     const prodKey = Deno.env.get('PROD_SUPABASE_SERVICE_ROLE_KEY')!
     const db = createClient(prodUrl, prodKey)

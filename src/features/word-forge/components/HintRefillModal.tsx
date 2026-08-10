@@ -59,7 +59,7 @@ export function HintRefillModal({ open, onClose, onClaim, preview = false, daily
       void handleShare(status);
       return;
     }
-    onClaim(status.task.reward, status.claimKey);
+    onClaim(status.task.reward, status.claimKey, status.task.id);
   };
 
   return (

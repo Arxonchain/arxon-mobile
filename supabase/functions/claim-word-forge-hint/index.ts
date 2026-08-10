@@ -5,6 +5,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** Server-authoritative task → reward map. claim_key is derived server-side. */
+const HINT_TASKS: Record<string, number> = {
+  'refer-one': 2,
+  'daily-checkin': 1,
+  'daily-forge': 2,
+  'share-link': 1,
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
@@ -24,13 +32,14 @@ Deno.serve(async (req) => {
     }
 
     const body = await req.json()
-    const claimKey = String(body.claim_key ?? '')
-    const reward = Math.min(Math.max(Math.ceil(Number(body.reward) || 0), 0), 5)
     const taskId = String(body.task_id ?? '')
-
-    if (!claimKey || reward <= 0) {
-      return new Response(JSON.stringify({ ok: false, error: 'Invalid claim' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    if (!taskId || !(taskId in HINT_TASKS)) {
+      return new Response(JSON.stringify({ ok: false, error: 'Unknown or missing task_id' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+
+    const reward = HINT_TASKS[taskId]
+    const today = new Date().toISOString().slice(0, 10)
+    const claimKey = `${taskId}:${today}`
 
     if (taskId === 'refer-one') {
       const { count } = await supabase
@@ -44,14 +53,12 @@ Deno.serve(async (req) => {
 
     if (taskId === 'daily-checkin') {
       const { data: pts } = await supabase.from('user_points').select('last_checkin_date').eq('user_id', user.id).maybeSingle()
-      const today = new Date().toISOString().slice(0, 10)
       if (pts?.last_checkin_date !== today) {
         return new Response(JSON.stringify({ ok: false, error: 'Check-in required today' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
     }
 
     if (taskId === 'daily-forge') {
-      const today = new Date().toISOString().slice(0, 10)
       const { data: done } = await supabase
         .from('word_forge_daily_completions')
         .select('completion_date')
@@ -63,6 +70,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    // share-link: one claim per day only (honor-system reduced to daily cap via claim_key)
     const { error: insertErr } = await supabase
       .from('word_forge_hint_claims')
       .insert({ user_id: user.id, claim_key: claimKey, reward })
@@ -90,7 +98,7 @@ Deno.serve(async (req) => {
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
 
-    return new Response(JSON.stringify({ ok: true, reward, hintsLeft, claims }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    return new Response(JSON.stringify({ ok: true, reward, hintsLeft, claims, claim_key: claimKey }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error'
     return new Response(JSON.stringify({ ok: false, error: msg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })

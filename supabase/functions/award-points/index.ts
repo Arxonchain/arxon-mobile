@@ -63,18 +63,14 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Validate type — game points must go through validate-word-forge / complete-word-forge-daily
-    if (type === 'game') {
+    // Only mining is allowed here. Task/social/referral/game must use dedicated RPCs/edge paths.
+    if (type !== 'mining') {
       return new Response(
-        JSON.stringify({ success: false, error: 'Game points must be awarded via Word Forge server validation' }),
+        JSON.stringify({
+          success: false,
+          error: 'Only mining credits are allowed via award-points. Use complete_task_and_award_points / social claim / referral trigger / Word Forge validators.',
+        }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    if (!['mining', 'task', 'social', 'referral'].includes(type)) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid point type' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -240,36 +236,9 @@ Deno.serve(async (req) => {
       )
     }
 
-    // For task/social points, validate and cap the amount - ALWAYS round UP
-    const maxAmount = type === 'task' ? 10000 : 500
-    const safeAmount = Math.min(Math.max(Math.ceil(Number(amount) || 0), 0), maxAmount)
-    if (safeAmount <= 0) {
-      return new Response(
-        JSON.stringify({ success: false, error: 'Invalid amount' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Award points using service role
-    const { data: result, error: pointsError } = await supabase.rpc('increment_user_points', {
-      p_user_id: user.id,
-      p_amount: safeAmount,
-      p_type: type,
-    })
-
-    if (pointsError) {
-      console.error('Failed to award points:', pointsError)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to award points' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    console.log(`Awarded ${safeAmount} ${type} points to ${user.id}`)
-
     return new Response(
-      JSON.stringify({ success: true, points: safeAmount, userPoints: result }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ success: false, error: 'Unhandled award path' }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error: any) {

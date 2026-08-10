@@ -132,17 +132,13 @@ Return ONLY a JSON object with your verdict.`;
     };
   } catch (e) {
     console.error("Failed to parse AI response:", e);
-    // Fallback: try to extract winner from text
-    if (content.toLowerCase().includes('"winner": "a"') || content.toLowerCase().includes('side a wins')) {
-      return { winner: 'a', confidence: 'low', reasoning: 'Extracted from AI response', source: 'AI fallback' };
-    }
-    if (content.toLowerCase().includes('"winner": "b"') || content.toLowerCase().includes('side b wins')) {
-      return { winner: 'b', confidence: 'low', reasoning: 'Extracted from AI response', source: 'AI fallback' };
-    }
-    if (content.toLowerCase().includes('"winner": "c"') || content.toLowerCase().includes('side c wins') || content.toLowerCase().includes('draw')) {
-      return { winner: 'c', confidence: 'low', reasoning: 'Extracted from AI response (draw)', source: 'AI fallback' };
-    }
-    throw new Error("Could not parse AI outcome");
+    // Never invent a winner from free-text fallback — force manual review
+    return {
+      winner: null,
+      confidence: "low",
+      reasoning: "Could not parse AI outcome — manual review required",
+      source: "AI parse failure",
+    };
   }
 }
 
@@ -207,21 +203,42 @@ serve(async (req) => {
         console.log(`AI Verdict: ${outcome.winner} (${outcome.confidence} confidence)`);
         console.log(`Reasoning: ${outcome.reasoning}`);
 
-        if (!outcome.winner) {
-          console.log("AI could not determine winner - skipping for manual review");
+        if (!outcome.winner || outcome.confidence !== "high") {
+          console.log("AI could not determine high-confidence winner - skipping auto-pay");
           
-          // Mark for manual review
+          // Mark for manual review — never auto-pay on medium/low/fallback
           await supabase
             .from("arena_battles")
             .update({
-              resolution_source: `AI Review Required: ${outcome.reasoning}`,
+              resolution_source: `AI Review Required (${outcome.confidence}): ${outcome.reasoning}`,
             })
             .eq("id", battle.id);
 
           results.push({
             battle: battle.title,
             status: "needs_manual_review",
+            confidence: outcome.confidence,
             reason: outcome.reasoning,
+          });
+          continue;
+        }
+
+        // Even high-confidence AI auto-pay requires explicit opt-in
+        const allowAiAutoPay = Deno.env.get("ALLOW_AI_AUTO_PAY") === "true";
+        if (!allowAiAutoPay) {
+          await supabase
+            .from("arena_battles")
+            .update({
+              resolution_source: `AI Suggestion (${outcome.confidence}): ${outcome.reasoning} [awaiting admin confirm]`,
+            })
+            .eq("id", battle.id);
+
+          results.push({
+            battle: battle.title,
+            status: "ai_suggestion_only",
+            winner: outcome.winner,
+            confidence: outcome.confidence,
+            reasoning: outcome.reasoning,
           });
           continue;
         }

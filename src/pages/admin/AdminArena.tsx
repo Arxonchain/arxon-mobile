@@ -302,7 +302,7 @@ const AdminArena = () => {
 
   const [resolving, setResolving] = useState<string | null>(null);
 
-  const handleManualResolve = async (battleId: string, winnerSide: 'a' | 'b', force = false) => {
+  const handleManualResolve = async (battleId: string, winnerSide: 'a' | 'b' | 'c', force = false) => {
     setResolving(battleId);
     try {
       const { data, error } = await supabase.functions.invoke('resolve-arena-battle', {
@@ -342,15 +342,15 @@ const AdminArena = () => {
   };
 
   const handleDelete = async (battleId: string) => {
-    if (!confirm('Are you sure you want to delete this market? This cannot be undone.')) return;
+    if (!confirm('Are you sure you want to delete this market? Stakes will be refunded if any votes exist.')) return;
 
     try {
-      const { error } = await supabase
-        .from('arena_battles')
-        .delete()
-        .eq('id', battleId);
+      const { data, error } = await supabase.rpc('admin_delete_arena_battle' as any, {
+        p_battle_id: battleId,
+      });
 
       if (error) throw error;
+      if ((data as any)?.success === false) throw new Error((data as any)?.error || 'Delete failed');
       
       toast.success('Market deleted');
       fetchBattles();
@@ -989,6 +989,20 @@ const AdminArena = () => {
                           >
                             {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_b_name} Wins`}
                           </Button>
+                          {battle.side_c_name && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={resolving === battle.id}
+                              onClick={() => {
+                                if (!confirm(`Resolve: Winner = ${battle.side_c_name} (Side C)?\n\nThis will distribute rewards immediately.`)) return;
+                                handleManualResolve(battle.id, 'c');
+                              }}
+                              className="text-xs flex-1 sm:flex-none min-w-0"
+                            >
+                              {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_c_name} Wins`}
+                            </Button>
+                          )}
                         </>
                       )}
                       {/* Force re-resolve for battles with winner but no rewards */}

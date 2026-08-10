@@ -106,23 +106,37 @@ serve(async (req) => {
         const sideCPower = Number(battle.side_c_power) || 0;
         const hasSideC = !!battle.side_c_name;
 
-        // Determine winner
+        // Determine winner — NEVER invent from stake popularity for prediction markets
         let winnerSide: string | null = null;
         if (battle.verified_winner) {
           winnerSide = battle.verified_winner;
-        } else if (hasSideC) {
-          if (sideAPower > sideBPower && sideAPower > sideCPower) winnerSide = "a";
-          else if (sideBPower > sideAPower && sideBPower > sideCPower) winnerSide = "b";
-          else if (sideCPower > sideAPower && sideCPower > sideBPower) winnerSide = "c";
-          else if (sideAPower >= sideBPower && sideAPower >= sideCPower && sideAPower > 0) winnerSide = "a";
-          else if (sideBPower > 0) winnerSide = "b";
-          else if (sideCPower > 0) winnerSide = "c";
         } else {
-          if (sideAPower > sideBPower) winnerSide = "a";
-          else if (sideBPower > sideAPower) winnerSide = "b";
-          else if (sideAPower === sideBPower && sideAPower > 0 && hasSideC) winnerSide = "c";
-          else if (sideAPower === sideBPower && sideAPower > 0) winnerSide = "none";
-          else if (sideAPower > 0) winnerSide = "a";
+          console.log(`Battle ${battle.id} has no verified_winner — skipping popularity resolve`);
+          results.push({
+            battle: battle.title,
+            battleId: battle.id,
+            skipped: true,
+            reason: "verified_winner_required",
+          });
+          continue;
+        }
+
+        if (!["a", "b", "c", "none"].includes(winnerSide)) {
+          throw new Error(`Invalid winner_side: ${winnerSide}`);
+        }
+
+        // Lock battle row to reduce concurrent resolve races
+        const { error: lockErr } = await supabase.rpc("lock_arena_battle_for_resolve", {
+          p_battle_id: battle.id,
+        });
+        if (lockErr) {
+          results.push({
+            battle: battle.title,
+            battleId: battle.id,
+            skipped: true,
+            reason: lockErr.message,
+          });
+          continue;
         }
 
         const prizePool = Number(battle.prize_pool) || 0;
@@ -131,6 +145,7 @@ serve(async (req) => {
 
         const winnerSideName = winnerSide === "a" ? battle.side_a_name :
                                winnerSide === "c" ? (battle.side_c_name || "Draw") :
+                               winnerSide === "none" ? "Void" :
                                battle.side_b_name;
 
         console.log(`Winner: ${winnerSide} (${winnerSideName}), TOTAL POOL: ${TOTAL_POOL}`);
@@ -146,7 +161,43 @@ serve(async (req) => {
         const votes = allVotes || [];
         console.log(`Total votes: ${votes.length}`);
 
+        // Tie / void / empty-winner → refund stakes (never burn pool)
+        if (winnerSide === "none" || votes.length === 0) {
+          const { data: refundResult, error: refundErr } = await supabase.rpc("refund_arena_battle_stakes", {
+            p_battle_id: battle.id,
+            p_reason: winnerSide === "none" ? "tie_or_void" : "no_votes",
+          });
+          if (refundErr) throw new Error(`Refund failed: ${refundErr.message}`);
+          results.push({
+            battle: battle.title,
+            battleId: battle.id,
+            winner: "none",
+            refunded: true,
+            refund: refundResult,
+          });
+          continue;
+        }
+
         if (winnerSide && winnerSide !== "none" && votes.length > 0) {
+          const winningVotes = votes.filter(v => v.side === winnerSide);
+
+          if (winningVotes.length === 0) {
+            const { data: refundResult, error: refundErr } = await supabase.rpc("refund_arena_battle_stakes", {
+              p_battle_id: battle.id,
+              p_reason: "empty_winning_side",
+            });
+            if (refundErr) throw new Error(`Refund failed: ${refundErr.message}`);
+            results.push({
+              battle: battle.title,
+              battleId: battle.id,
+              winner: winnerSide,
+              refunded: true,
+              reason: "empty_winning_side",
+              refund: refundResult,
+            });
+            continue;
+          }
+
           // DEDUP: Check if rewards already exist
           const { count: existingRewards } = await supabase
             .from("arena_earnings")
@@ -165,7 +216,6 @@ serve(async (req) => {
             continue;
           }
 
-          const winningVotes = votes.filter(v => v.side === winnerSide);
           const losingVotes = votes.filter(v => v.side !== winnerSide);
 
           console.log(`Winners: ${winningVotes.length}, Losers: ${losingVotes.length}`);

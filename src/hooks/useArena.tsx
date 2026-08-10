@@ -212,38 +212,26 @@ export const useArena = () => {
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      // Build leaderboard from arena_votes + profiles — works even without the view
-      const { data: votes, error: vErr } = await supabase
-        .from('arena_votes')
-        .select('user_id, power_spent, battle_id');
+      // Prefer earnings aggregate (world-readable) over raw arena_votes (own-only under RLS)
+      const { data: earnings, error: eErr } = await supabase
+        .from('arena_earnings')
+        .select('user_id, stake_amount, total_earned, is_winner');
 
-      if (vErr) throw vErr;
+      if (eErr) throw eErr;
 
-      // Get all resolved battles to determine wins
-      const { data: battles } = await supabase
-        .from('arena_battles')
-        .select('id, winner_side')
-        .not('winner_side', 'is', null);
-
-      const winMap: Record<string, string> = {};
-      (battles || []).forEach((b: any) => { winMap[b.id] = b.winner_side; });
-
-      // Aggregate per user
       const userMap: Record<string, { power: number; wins: number; battles: number; biggest: number }> = {};
-      (votes || []).forEach((v: any) => {
-        if (!userMap[v.user_id]) userMap[v.user_id] = { power: 0, wins: 0, battles: 0, biggest: 0 };
-        const u = userMap[v.user_id];
-        u.power   += Number(v.power_spent) || 0;
+      (earnings || []).forEach((row: any) => {
+        if (!userMap[row.user_id]) userMap[row.user_id] = { power: 0, wins: 0, battles: 0, biggest: 0 };
+        const u = userMap[row.user_id];
+        u.power += Number(row.stake_amount) || 0;
         u.battles += 1;
-        u.biggest  = Math.max(u.biggest, Number(v.power_spent) || 0);
-        const winner = winMap[v.battle_id];
-        if (winner && v.side === winner) u.wins += 1;
+        u.biggest = Math.max(u.biggest, Number(row.stake_amount) || 0);
+        if (row.is_winner) u.wins += 1;
       });
 
       const userIds = Object.keys(userMap);
       if (userIds.length === 0) { setLeaderboard([]); return []; }
 
-      // Fetch profiles for these users
       const { data: profiles } = await supabase
         .from('profiles')
         .select('user_id, username, avatar_url')

@@ -472,20 +472,20 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
           minWords: generation.slotWords.length,
         };
         const missionMet = dailyMissionBonusEligible(getDailyMission(), missionSnap);
+        const yesterday = dailySeed(new Date(Date.now() - 86_400_000));
+        const nextDailyStreak = prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1;
         if (missionMet) {
           setDailyBonusAwarded(true);
           void supabase.functions.invoke('complete-word-forge-daily', {
             body: {
+              // Server ignores these; kept for backward compatibility
               completion_date: dailySeed(),
               mission_met: true,
-              daily_streak: prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1,
             },
           }).then(({ data, error }) => {
             if (!error && data?.ok) void refreshPoints();
           });
         }
-        const yesterday = dailySeed(new Date(Date.now() - 86_400_000));
-        const nextDailyStreak = prog2.dailyCompletedDate === yesterday ? prog2.dailyStreak + 1 : 1;
         persistMeta({ dailyCompletedDate: dailySeed(), dailyStreak: nextDailyStreak });
       }
     }

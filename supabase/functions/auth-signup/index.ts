@@ -16,6 +16,8 @@ const corsHeaders = {
 type SignupBody = {
   email?: unknown;
   password?: unknown;
+  captchaToken?: unknown;
+  captcha_token?: unknown;
 };
 
 function jsonResponse(
@@ -55,8 +57,14 @@ serve(async (req) => {
     const email =
       typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
     const password = typeof body.password === "string" ? body.password : "";
+    const captchaToken =
+      typeof body.captchaToken === "string"
+        ? body.captchaToken
+        : typeof body.captcha_token === "string"
+          ? body.captcha_token
+          : "";
 
-    console.log("auth-signup request", { email, ip });
+    console.log("auth-signup request", { email, ip, hasCaptcha: !!captchaToken });
 
     if (!email || !password) {
       return jsonResponse(
@@ -64,6 +72,34 @@ serve(async (req) => {
         400,
         rateLimitHeaders(rl)
       );
+    }
+
+    // Require captcha when RECAPTCHA_SECRET_KEY is configured
+    const recaptchaSecret = Deno.env.get("RECAPTCHA_SECRET_KEY");
+    if (recaptchaSecret) {
+      if (!captchaToken) {
+        return jsonResponse(
+          { success: false, error: "Captcha required" },
+          400,
+          rateLimitHeaders(rl)
+        );
+      }
+      const params = new URLSearchParams();
+      params.set("secret", recaptchaSecret);
+      params.set("response", captchaToken);
+      const verifyRes = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params.toString(),
+      });
+      const verifyJson = await verifyRes.json().catch(() => ({}));
+      if (!verifyJson?.success) {
+        return jsonResponse(
+          { success: false, error: "Captcha verification failed" },
+          400,
+          rateLimitHeaders(rl)
+        );
+      }
     }
 
     // Use the proper environment variable names that Supabase provides
@@ -116,7 +152,10 @@ serve(async (req) => {
       );
     }
 
-    // Use Admin API to create + auto-confirm user (bypasses overloaded /signup)
+    // Auto-confirm only after captcha challenge (when configured), else opt-in via env.
+    const emailConfirm = recaptchaSecret
+      ? true
+      : Deno.env.get("AUTH_SIGNUP_AUTO_CONFIRM") === "true";
     const adminCreateUrl = `${SUPABASE_URL}/auth/v1/admin/users`;
     const adminRes = await fetch(adminCreateUrl, {
       method: "POST",
@@ -126,7 +165,7 @@ serve(async (req) => {
         "Authorization": `Bearer ${SERVICE_ROLE_KEY}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ email, password, email_confirm: true }),
+      body: JSON.stringify({ email, password, email_confirm: emailConfirm }),
     });
 
     const adminRaw = await adminRes.text().catch(() => "");
