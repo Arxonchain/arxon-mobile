@@ -3,7 +3,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
@@ -25,13 +25,15 @@ import {
   NeonHeaderActions,
 } from '@/features/arxon-v2/design/NeonSecondaryUI';
 import {
-  BalanceGlassCard, ExploreQuadGrid, MiningPillWidget, LiveBattleStrip, RecentActivityFeed,
+  BalanceGlassCard, ExploreQuadGrid, MiningPillWidget, MiningLiveSessionCard,
+  LiveBattleStrip, RecentActivityFeed,
   buildWeekDaysFromAmounts, mockPreviewWeekDays, inferActivityKind, activityAccent,
   MIN_CLAIM_ARX,
   type DayEarning, type ExploreBoxItem, type DashBattle, type ActivityFeedItem,
 } from '@/features/arxon-v2/components/DashboardWidgets';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { toast } from '@/hooks/use-toast';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -278,29 +280,36 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
 
   const handleMiningToggle = useCallback(async () => {
     if (preview) {
-      if (previewMining && Math.floor(previewEarn) >= MIN_CLAIM_ARX) {
-        setPreviewEarn(0);
-        return;
-      }
-      setPreviewMining((m) => {
-        if (m) {
-          setPreviewEarn(0);
-          setPreviewRemain(8 * 3600);
-        }
-        return !m;
-      });
+      if (previewMining) return;
+      setPreviewMining(true);
+      setPreviewEarn(0);
+      setPreviewRemain(8 * 3600);
       return;
     }
     if (!user) return;
-    const claimable = Math.floor(mining.earnedPoints);
-    if (mining.sessionMaxed || (mining.isMining && claimable >= MIN_CLAIM_ARX)) {
-      await mining.claimPoints();
-    } else if (mining.isMining) {
-      await mining.stopMining();
-    } else {
-      await mining.startMining();
+    if (mining.isMining) return;
+    await mining.startMining();
+  }, [preview, previewMining, user, mining]);
+
+  const handleClaim = useCallback(async () => {
+    if (preview) {
+      if (Math.floor(previewEarn) < MIN_CLAIM_ARX) {
+        toast({
+          title: 'Keep mining',
+          description: `Need at least ${MIN_CLAIM_ARX} ARX-P to claim.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+      setPreviewEarn(0);
+      setPreviewRemain(8 * 3600);
+      toast({ title: 'Points Claimed! 🎉', description: `+${MIN_CLAIM_ARX}+ ARX-P added (preview)` });
+      return;
     }
-  }, [preview, previewMining, previewEarn, user, mining]);
+    if (!user) return;
+    await mining.claimPoints();
+    void fetchActivityData();
+  }, [preview, previewEarn, user, mining, fetchActivityData]);
 
   const exploreItems = useMemo<ExploreBoxItem[]>(() => [
     {
@@ -407,6 +416,19 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
             loading={preview ? false : mining.loading || mining.isClaiming}
             sessionMaxed={preview ? false : mining.sessionMaxed}
           />
+          <AnimatePresence>
+            {isMiningLive && (
+              <MiningLiveSessionCard
+                earnedPoints={miningEarn}
+                remainingSeconds={miningRemain}
+                pointsPerHour={preview ? 11.5 : mining.pointsPerHour}
+                boostPercentage={preview ? 15 : mining.totalBoostPercentage}
+                onClaim={handleClaim}
+                claiming={preview ? false : mining.isClaiming}
+                sessionMaxed={preview ? false : mining.sessionMaxed}
+              />
+            )}
+          </AnimatePresence>
         </motion.div>
 
         {/* Explore — 2×2 quad grid */}

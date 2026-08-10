@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import { motion } from 'framer-motion';
-import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
+import v2FlowBg from '@/assets/v2-flow-bg.jpg';
 import { neon, neonShadow } from './neonTokens';
 import { useIsAppPreview } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { useMobileNav } from '@/contexts/MobileNavContext';
@@ -10,7 +10,7 @@ import {
   mobileScrollPaddingNavHidden,
 } from '@/lib/mobileLayout';
 
-/** Space nebula page shell — meshy creamy Word Forge aesthetic */
+/** Shared V2 page shell — flowing cyan lines on deep black */
 export function NeonPage({
   children,
   padBottom,
@@ -42,28 +42,20 @@ export function NeonPage({
         pointerEvents: 'none',
       }}>
         <div style={{
-          position: 'absolute', inset: -20,
-          backgroundImage: `url(${FORGE_UI.discoveryBg})`,
-          backgroundSize: 'cover', backgroundPosition: 'center',
-          filter: 'brightness(0.42) saturate(1.25) blur(0.5px)',
-          transform: 'scale(1.08)',
+          position: 'absolute', inset: 0,
+          backgroundImage: `url(${v2FlowBg})`,
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+          backgroundAttachment: contained ? 'scroll' : 'fixed',
+          opacity: 0.92,
         }} />
         <div style={{
           position: 'absolute', inset: 0,
           background: `
-            radial-gradient(ellipse 100% 70% at 50% -5%, rgba(79,216,235,0.14), transparent 55%),
-            radial-gradient(ellipse 60% 50% at 85% 15%, rgba(168,85,247,0.1), transparent 50%),
-            radial-gradient(ellipse 40% 35% at 10% 60%, rgba(127,231,196,0.06), transparent 45%),
-            linear-gradient(180deg, rgba(2,6,14,0.25) 0%, rgba(2,6,14,0.94) 88%)
+            radial-gradient(ellipse 90% 55% at 50% -8%, rgba(79,216,235,0.12), transparent 55%),
+            linear-gradient(180deg, rgba(2,6,14,0.15) 0%, rgba(2,6,14,0.55) 55%, rgba(2,6,14,0.88) 100%)
           `,
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0, opacity: 0.4,
-          backgroundImage: `
-            radial-gradient(circle at 25% 25%, rgba(255,255,255,0.03) 1px, transparent 1px),
-            radial-gradient(circle at 75% 75%, rgba(79,216,235,0.04) 1px, transparent 1px)
-          `,
-          backgroundSize: '32px 32px, 48px 48px',
         }} />
       </div>
       <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>

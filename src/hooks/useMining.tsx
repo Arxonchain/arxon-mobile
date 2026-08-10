@@ -91,6 +91,7 @@ export const useMining = (options?: UseMiningOptions) => {
   const sessionStartTimeRef = useRef<number | null>(null);
   const endingRef = useRef(false);
   const claimInProgressRef = useRef(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
   // Fetch X profile boost
   const fetchXProfileBoost = useCallback(async () => {
@@ -662,6 +663,7 @@ export const useMining = (options?: UseMiningOptions) => {
     }
 
     claimInProgressRef.current = true;
+    setIsClaiming(true);
 
     try {
       // Fetch the ACTUAL session from the database to prevent claiming more than mined
@@ -678,7 +680,6 @@ export const useMining = (options?: UseMiningOptions) => {
           description: 'Session not found or already claimed.',
           variant: 'destructive',
         });
-        claimInProgressRef.current = false;
         return;
       }
 
@@ -697,9 +698,15 @@ export const useMining = (options?: UseMiningOptions) => {
           description: `You need at least 10 ARX-P to claim. Currently mined: ~${pointsToClaim} ARX-P`,
           variant: 'destructive',
         });
-        claimInProgressRef.current = false;
         return;
       }
+
+      // Flush mined amount before ending so award-points / credit RPCs see current progress
+      await supabase
+        .from('mining_sessions')
+        .update({ arx_mined: pointsToClaim })
+        .eq('id', sessionId)
+        .eq('is_active', true);
 
       // First, end the current session in DB to lock it
       const { error: endError } = await supabase
@@ -805,6 +812,7 @@ export const useMining = (options?: UseMiningOptions) => {
       });
     } finally {
       claimInProgressRef.current = false;
+      setIsClaiming(false);
     }
   };
 
@@ -1177,5 +1185,6 @@ export const useMining = (options?: UseMiningOptions) => {
     pointsPerSecond,
     miningSettings,
     sessionMaxed, // New: indicates session reached max time, waiting for manual claim
+    isClaiming,
   };
 };

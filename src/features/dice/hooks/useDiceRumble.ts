@@ -23,9 +23,13 @@ export interface RumbleLobby {
   avatarUrl: string | null;
   playersJoined: number;
   createdAt: string;
+  inviteCode?: string | null;
+  expiresAt?: string | null;
 }
 
-type ActionResult = { success: true; matchId?: string } | { success: false; error: string };
+type ActionResult =
+  | { success: true; matchId?: string; inviteCode?: string; expiresAt?: string }
+  | { success: false; error: string };
 
 async function fetchProfilesMap(userIds: string[]) {
   if (!userIds.length) return {} as Record<string, { username: string; avatar_url: string | null }>;
@@ -39,7 +43,14 @@ export function useDiceRumbleLobby() {
   const { user } = useAuth();
   const { refreshPoints } = usePoints();
   const [lobbies, setLobbies] = useState<RumbleLobby[]>([]);
-  const [myMatch, setMyMatch] = useState<{ id: string; status: string; stake: number } | null>(null);
+  const [myMatch, setMyMatch] = useState<{
+    id: string;
+    status: string;
+    stake: number;
+    inviteCode?: string | null;
+    expiresAt?: string | null;
+    maxPlayers?: number;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -51,6 +62,8 @@ export function useDiceRumbleLobby() {
       return;
     }
     try {
+      try { await supabase.rpc('expire_open_dice_matches' as any); } catch { /* ignore */ }
+
       const { data: myRows } = await (supabase as any)
         .from('dice_match_players')
         .select('match_id')
@@ -61,7 +74,7 @@ export function useDiceRumbleLobby() {
       if (myMatchIds.length) {
         const { data: myMatches } = await (supabase as any)
           .from('dice_matches')
-          .select('id, status, mode, stake, created_at')
+          .select('id, status, mode, stake, created_at, invite_code, expires_at, max_players')
           .in('id', myMatchIds)
           .eq('mode', 'rumble')
           .in('status', ['open', 'active'])
@@ -69,11 +82,22 @@ export function useDiceRumbleLobby() {
           .limit(1);
         mine = (myMatches ?? [])[0] ?? null;
       }
-      setMyMatch(mine ? { id: mine.id, status: mine.status, stake: mine.stake } : null);
+      setMyMatch(
+        mine
+          ? {
+              id: mine.id,
+              status: mine.status,
+              stake: mine.stake,
+              inviteCode: mine.invite_code ?? null,
+              expiresAt: mine.expires_at ?? null,
+              maxPlayers: mine.max_players,
+            }
+          : null
+      );
 
       const { data: open } = await (supabase as any)
         .from('dice_matches')
-        .select('id, stake, max_players, created_by, created_at')
+        .select('id, stake, max_players, created_by, created_at, invite_code, expires_at')
         .eq('mode', 'rumble')
         .eq('status', 'open')
         .neq('created_by', user.id)
@@ -103,6 +127,8 @@ export function useDiceRumbleLobby() {
           avatarUrl: profilesMap[m.created_by]?.avatar_url ?? null,
           playersJoined: countsByMatch[m.id] ?? 1,
           createdAt: m.created_at,
+          inviteCode: m.invite_code ?? null,
+          expiresAt: m.expires_at ?? null,
         }))
       );
     } catch (err) {
@@ -146,7 +172,12 @@ export function useDiceRumbleLobby() {
       if (!d?.success) return { success: false, error: d?.error || 'Failed to create lobby' };
       void refreshPoints();
       await refresh();
-      return { success: true, matchId: d.match_id as string };
+      return {
+        success: true,
+        matchId: d.match_id as string,
+        inviteCode: d.invite_code as string | undefined,
+        expiresAt: d.expires_at as string | undefined,
+      };
     } finally {
       setBusy(false);
     }
@@ -167,6 +198,23 @@ export function useDiceRumbleLobby() {
     }
   }, [refresh, refreshPoints]);
 
+  const joinByCode = useCallback(async (code: string): Promise<ActionResult> => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('join_dice_match_by_code' as any, {
+        p_invite_code: code.trim().toUpperCase(),
+      });
+      if (error) return { success: false, error: error.message };
+      const d = data as any;
+      if (!d?.success) return { success: false, error: d?.error || 'Failed to join with code' };
+      void refreshPoints();
+      await refresh();
+      return { success: true, matchId: d.match_id as string };
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh, refreshPoints]);
+
   const cancelLobby = useCallback(async (matchId: string): Promise<ActionResult> => {
     setBusy(true);
     try {
@@ -182,7 +230,7 @@ export function useDiceRumbleLobby() {
     }
   }, [refresh, refreshPoints]);
 
-  return { lobbies, myMatch, loading, busy, refresh, createLobby, joinLobby, cancelLobby };
+  return { lobbies, myMatch, loading, busy, refresh, createLobby, joinLobby, joinByCode, cancelLobby };
 }
 
 export interface RumblePlayerInfo {

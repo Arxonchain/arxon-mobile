@@ -102,9 +102,10 @@ export default function DiceRumbleLobbyV2() {
   const navigate = useNavigate();
   const preview = useIsAppPreview();
   const { points } = usePoints();
-  const { lobbies, myMatch, loading, busy, createLobby, joinLobby, cancelLobby } = useDiceRumbleLobby();
+  const { lobbies, myMatch, loading, busy, createLobby, joinLobby, joinByCode, cancelLobby } = useDiceRumbleLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [size, setSize] = useState<number>(DICE_RUMBLE_LOBBY_SIZES[1]);
+  const [joinCode, setJoinCode] = useState('');
 
   const balance = Math.round(points?.total_points ?? 0);
 
@@ -137,6 +138,16 @@ export default function DiceRumbleLobbyV2() {
     }
     go(`/arena/dice/rumble/${res.matchId ?? lobby.id}`);
   }, [balance, joinLobby, go]);
+
+  const handleJoinCode = useCallback(async () => {
+    if (!joinCode.trim()) return;
+    const res = await joinByCode(joinCode);
+    if (!res.success) {
+      toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+      return;
+    }
+    go(`/arena/dice/rumble/${res.matchId}`);
+  }, [joinCode, joinByCode, go]);
 
   const handleCancel = useCallback(async () => {
     if (!myMatch) return;
@@ -176,9 +187,25 @@ export default function DiceRumbleLobbyV2() {
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: neon.text }}>
                     {myMatch.status === 'active' ? 'Rumble in progress!' : 'Your open lobby'}
                   </p>
-                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>Stake {myMatch.stake} ARX-P</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>
+                    Stake {myMatch.stake} ARX-P{myMatch.inviteCode ? ` · Code ${myMatch.inviteCode}` : ''}
+                  </p>
                 </div>
               </div>
+              {myMatch.status === 'open' && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); void handleCancel(); }}
+                  disabled={busy}
+                  style={{
+                    width: '100%', marginBottom: 8, padding: '9px 0', borderRadius: 12, cursor: 'pointer',
+                    border: '1px solid rgba(255,107,74,0.3)', background: 'rgba(255,107,74,0.1)',
+                    color: diceAccent.lose, fontFamily: neon.font, fontSize: 10, fontWeight: 800,
+                  }}
+                >
+                  Cancel & Refund
+                </button>
+              )}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); go(`/arena/dice/rumble/${myMatch.id}`); }}
@@ -188,7 +215,7 @@ export default function DiceRumbleLobbyV2() {
                   fontFamily: neon.font, fontSize: 11, fontWeight: 800,
                 }}
               >
-                {myMatch.status === 'active' ? 'Enter Match' : 'View Lobby'}
+                {myMatch.status === 'active' ? 'Enter Match' : 'Open Waiting Room'}
               </button>
             </NeonGlassCard>
           </motion.div>
@@ -204,7 +231,7 @@ export default function DiceRumbleLobbyV2() {
                 </div>
                 <div>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: neon.text }}>Open a Lobby</p>
-                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>Last miner standing takes the pot.</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>Stays open 15 min. Share invite code.</p>
                 </div>
               </div>
 
@@ -251,6 +278,41 @@ export default function DiceRumbleLobbyV2() {
           </motion.div>
         )}
 
+        {!myMatch && (
+          <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+            <NeonGlassCard accent={neon.cyan} padding="14px 14px 12px">
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, color: neon.text }}>Join with invite code</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="ABC123"
+                  maxLength={8}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 12,
+                    border: '1px solid rgba(79,216,235,0.25)', background: 'rgba(0,0,0,0.25)',
+                    color: neon.text, fontFamily: neon.font, fontSize: 13, fontWeight: 800, letterSpacing: '0.14em',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={busy || joinCode.trim().length < 4}
+                  onClick={() => void handleJoinCode()}
+                  style={{
+                    padding: '10px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: `linear-gradient(135deg, ${neon.cyan}, ${neon.teal})`, color: '#041018',
+                    fontFamily: neon.font, fontSize: 11, fontWeight: 800,
+                    opacity: joinCode.trim().length < 4 ? 0.5 : 1,
+                  }}
+                >
+                  Join
+                </button>
+              </div>
+            </NeonGlassCard>
+          </motion.div>
+        )}
+
         <motion.div variants={fadeUp}>
           <NeonSectionLabel>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -266,7 +328,7 @@ export default function DiceRumbleLobbyV2() {
             <NeonGlassCard accent={neon.gold} padding="22px 14px" style={{ textAlign: 'center' }}>
               <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: neon.text }}>No open lobbies</p>
               <p style={{ margin: '4px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>
-                Open one above and wait for other miners to join.
+                Open one above and share your invite code.
               </p>
             </NeonGlassCard>
           ) : (

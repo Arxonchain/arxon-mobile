@@ -553,7 +553,7 @@ function ArxonMiningLogo({ animated = false, keyholeFill = DREAM_BLUE }: { anima
 /** Minimum ARX-P before the center orb can claim (matches useMining). */
 export const MIN_CLAIM_ARX = 10;
 
-/** SALES-style mining pill — tap center to mine; live points + time remaining */
+/** SALES-style mining pill — tap center to start mining; claim lives in the session card below */
 export function MiningPillWidget({
   isMining,
   earnedPoints,
@@ -574,29 +574,27 @@ export function MiningPillWidget({
   sessionMaxed?: boolean;
 }) {
   const pts = Math.floor(Math.max(0, earnedPoints));
-  const claimable = pts;
-  const showClaim = sessionMaxed || (isMining && claimable >= MIN_CLAIM_ARX);
   const timeLabel = formatSessionTime(remainingSeconds);
   const timeFontSize = timeLabel.length > 7 ? 17 : 22;
-  const centerLabel = showClaim ? 'CLAIM' : isMining ? '' : 'MINE';
   const hasBoost = boostPercentage > 0;
   const rateLabel = `${pointsPerHour.toFixed(hasBoost ? 1 : 0)}/hr`;
   const boostLabel = hasBoost ? `+${boostPercentage}%` : '—';
+  const orbDisabled = loading || (isMining && !sessionMaxed);
 
   const orbButton = (
     <motion.button
       type="button"
-      whileTap={{ scale: 0.94 }}
+      whileTap={orbDisabled ? undefined : { scale: 0.94 }}
       onClick={onToggle}
-      disabled={loading}
-      aria-label={showClaim ? 'Claim mined ARX-P' : isMining ? 'Mining in progress' : 'Start mining'}
+      disabled={orbDisabled}
+      aria-label={sessionMaxed ? 'Session complete — claim below' : isMining ? 'Mining in progress' : 'Start mining'}
       style={{
         position: 'relative',
         width: ORB_SIZE,
         height: ORB_SIZE,
         borderRadius: '50%',
         border: 'none',
-        cursor: loading ? 'wait' : 'pointer',
+        cursor: orbDisabled ? (isMining ? 'default' : 'wait') : 'pointer',
         padding: 0,
         background: 'transparent',
         opacity: loading ? 0.7 : 1,
@@ -619,23 +617,11 @@ export function MiningPillWidget({
               fontSize: 9, fontWeight: 900, letterSpacing: '0.1em',
               color: '#041018', textTransform: 'uppercase',
             }}>
-              {centerLabel}
+              MINE
             </span>
           )}
-          {isMining && !showClaim && (
+          {isMining && (
             <ArxonMiningLogo animated keyholeFill="transparent" />
-          )}
-          {isMining && showClaim && (
-            <span style={{
-              fontSize: sessionMaxed ? 8 : 7,
-              fontWeight: 900,
-              letterSpacing: '0.08em',
-              color: neon.cyan,
-              textShadow: `0 0 12px ${neon.cyan}`,
-              animation: 'mining-claim-pulse 1.5s ease-in-out infinite',
-            }}>
-              CLAIM
-            </span>
           )}
         </div>
       </div>
@@ -734,6 +720,152 @@ export function MiningPillWidget({
         </div>
       </div>
     </div>
+  );
+}
+
+/** Glass session card revealed under the mining pill while a session is live */
+export function MiningLiveSessionCard({
+  earnedPoints,
+  remainingSeconds,
+  pointsPerHour,
+  boostPercentage,
+  onClaim,
+  claiming = false,
+  sessionMaxed = false,
+}: {
+  earnedPoints: number;
+  remainingSeconds: number;
+  pointsPerHour: number;
+  boostPercentage: number;
+  onClaim: () => void;
+  claiming?: boolean;
+  sessionMaxed?: boolean;
+}) {
+  const pts = Math.floor(Math.max(0, earnedPoints));
+  const canClaim = sessionMaxed || pts >= MIN_CLAIM_ARX;
+  const progress = Math.min(1, pts / MIN_CLAIM_ARX);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, height: 0 }}
+      animate={{ opacity: 1, y: 0, height: 'auto' }}
+      exit={{ opacity: 0, y: -6 }}
+      transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+      style={{ overflow: 'hidden', marginTop: 10 }}
+    >
+      <div style={{
+        borderRadius: 20,
+        padding: '16px 16px 14px',
+        position: 'relative',
+        overflow: 'hidden',
+        background: 'linear-gradient(160deg, rgba(12,36,58,0.72) 0%, rgba(6,16,32,0.82) 55%, rgba(4,10,22,0.9) 100%)',
+        border: `1px solid ${canClaim ? 'rgba(79,216,235,0.4)' : 'rgba(79,216,235,0.2)'}`,
+        boxShadow: `0 14px 36px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 28px ${canClaim ? 'rgba(79,216,235,0.12)' : 'rgba(79,216,235,0.05)'}`,
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none',
+          background: 'radial-gradient(ellipse 80% 60% at 100% 0%, rgba(79,216,235,0.14), transparent 55%)',
+        }} />
+
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+            <div>
+              <p style={{
+                margin: 0, fontSize: 9, fontWeight: 800, letterSpacing: '0.16em',
+                textTransform: 'uppercase', color: neon.cyan,
+              }}>
+                {sessionMaxed ? 'Session ready' : 'Live mining'}
+              </p>
+              <p style={{
+                margin: '6px 0 0', fontSize: 28, fontWeight: 900, letterSpacing: '-1px',
+                color: neon.text, fontVariantNumeric: 'tabular-nums',
+                textShadow: `0 0 20px ${neon.cyanGlow}`,
+              }}>
+                {earnedPoints.toFixed(2)}
+                <span style={{ fontSize: 11, fontWeight: 800, color: neon.cyan, marginLeft: 6 }}>ARX-P</span>
+              </p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: 0, fontSize: 16, fontWeight: 800, color: neon.text, fontVariantNumeric: 'tabular-nums' }}>
+                {formatSessionTime(remainingSeconds)}
+              </p>
+              <p style={{ margin: '3px 0 0', fontSize: 8, fontWeight: 700, letterSpacing: '0.1em', color: 'rgba(232,252,255,0.4)', textTransform: 'uppercase' }}>
+                {sessionMaxed ? 'Maxed' : 'Time left'}
+              </p>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <div style={{
+              flex: 1, padding: '7px 8px', borderRadius: 12, textAlign: 'center',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <p style={{ margin: 0, fontSize: 7, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(232,252,255,0.35)', textTransform: 'uppercase' }}>Rate</p>
+              <p style={{ margin: '3px 0 0', fontSize: 12, fontWeight: 900, color: neon.cyan }}>
+                {pointsPerHour.toFixed(boostPercentage > 0 ? 1 : 0)}/hr
+              </p>
+            </div>
+            <div style={{
+              flex: 1, padding: '7px 8px', borderRadius: 12, textAlign: 'center',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <p style={{ margin: 0, fontSize: 7, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(232,252,255,0.35)', textTransform: 'uppercase' }}>Boost</p>
+              <p style={{ margin: '3px 0 0', fontSize: 12, fontWeight: 900, color: boostPercentage > 0 ? neon.gold : 'rgba(255,255,255,0.35)' }}>
+                {boostPercentage > 0 ? `+${boostPercentage}%` : '—'}
+              </p>
+            </div>
+            <div style={{
+              flex: 1, padding: '7px 8px', borderRadius: 12, textAlign: 'center',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)',
+            }}>
+              <p style={{ margin: 0, fontSize: 7, fontWeight: 800, letterSpacing: '0.1em', color: 'rgba(232,252,255,0.35)', textTransform: 'uppercase' }}>To claim</p>
+              <p style={{ margin: '3px 0 0', fontSize: 12, fontWeight: 900, color: canClaim ? neon.teal : neon.textMuted }}>
+                {canClaim ? 'Ready' : `${Math.max(0, MIN_CLAIM_ARX - pts)}`}
+              </p>
+            </div>
+          </div>
+
+          {!canClaim && (
+            <div style={{
+              marginTop: 12, height: 4, borderRadius: 99, overflow: 'hidden',
+              background: 'rgba(255,255,255,0.06)',
+            }}>
+              <div style={{
+                width: `${progress * 100}%`, height: '100%',
+                background: `linear-gradient(90deg, ${neon.cyan}, ${neon.teal})`,
+                boxShadow: `0 0 10px ${neon.cyanGlow}`,
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+          )}
+
+          <motion.button
+            type="button"
+            whileTap={canClaim && !claiming ? { scale: 0.98 } : undefined}
+            onClick={onClaim}
+            disabled={!canClaim || claiming}
+            style={{
+              width: '100%', marginTop: 14, padding: '13px 0', borderRadius: 14, border: 'none',
+              cursor: canClaim && !claiming ? 'pointer' : 'default',
+              fontFamily: neon.font, fontSize: 12, fontWeight: 900, letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              background: canClaim
+                ? `linear-gradient(135deg, ${neon.cyan}, ${neon.teal})`
+                : 'rgba(255,255,255,0.06)',
+              color: canClaim ? '#041018' : 'rgba(255,255,255,0.35)',
+              boxShadow: canClaim ? `0 8px 24px ${neon.cyan}35` : 'none',
+              opacity: claiming ? 0.7 : 1,
+              animation: canClaim && !claiming ? 'mining-claim-pulse 1.8s ease-in-out infinite' : undefined,
+            }}
+          >
+            {claiming ? 'Claiming…' : canClaim ? 'Claim ARX-P' : `Mine ${MIN_CLAIM_ARX} to claim`}
+          </motion.button>
+        </div>
+      </div>
+      <style>{MINING_PILL_CSS}</style>
+    </motion.div>
   );
 }
 

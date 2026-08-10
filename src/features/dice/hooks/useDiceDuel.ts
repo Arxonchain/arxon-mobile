@@ -22,9 +22,13 @@ export interface DuelChallenge {
   username: string;
   avatarUrl: string | null;
   createdAt: string;
+  inviteCode?: string | null;
+  expiresAt?: string | null;
 }
 
-type ActionResult = { success: true; matchId?: string } | { success: false; error: string };
+type ActionResult =
+  | { success: true; matchId?: string; inviteCode?: string; expiresAt?: string }
+  | { success: false; error: string };
 
 async function fetchProfilesMap(userIds: string[]) {
   if (!userIds.length) return {} as Record<string, { username: string; avatar_url: string | null }>;
@@ -38,7 +42,13 @@ export function useDiceDuelLobby() {
   const { user } = useAuth();
   const { refreshPoints } = usePoints();
   const [challenges, setChallenges] = useState<DuelChallenge[]>([]);
-  const [myMatch, setMyMatch] = useState<{ id: string; status: string; stake: number } | null>(null);
+  const [myMatch, setMyMatch] = useState<{
+    id: string;
+    status: string;
+    stake: number;
+    inviteCode?: string | null;
+    expiresAt?: string | null;
+  } | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -50,6 +60,9 @@ export function useDiceDuelLobby() {
       return;
     }
     try {
+      // Best-effort expire stale open lobbies so stakes refund instead of vanishing
+      try { await supabase.rpc('expire_open_dice_matches' as any); } catch { /* ignore */ }
+
       const { data: myRows } = await (supabase as any)
         .from('dice_match_players')
         .select('match_id')
@@ -60,7 +73,7 @@ export function useDiceDuelLobby() {
       if (myMatchIds.length) {
         const { data: myMatches } = await (supabase as any)
           .from('dice_matches')
-          .select('id, status, mode, stake, created_at')
+          .select('id, status, mode, stake, created_at, invite_code, expires_at')
           .in('id', myMatchIds)
           .eq('mode', 'duel')
           .in('status', ['open', 'active'])
@@ -68,11 +81,21 @@ export function useDiceDuelLobby() {
           .limit(1);
         mine = (myMatches ?? [])[0] ?? null;
       }
-      setMyMatch(mine ? { id: mine.id, status: mine.status, stake: mine.stake } : null);
+      setMyMatch(
+        mine
+          ? {
+              id: mine.id,
+              status: mine.status,
+              stake: mine.stake,
+              inviteCode: mine.invite_code ?? null,
+              expiresAt: mine.expires_at ?? null,
+            }
+          : null
+      );
 
       const { data: open } = await (supabase as any)
         .from('dice_matches')
-        .select('id, stake, pot, created_by, created_at')
+        .select('id, stake, pot, created_by, created_at, invite_code, expires_at')
         .eq('mode', 'duel')
         .eq('status', 'open')
         .neq('created_by', user.id)
@@ -92,6 +115,8 @@ export function useDiceDuelLobby() {
           username: profilesMap[m.created_by]?.username ?? 'Miner',
           avatarUrl: profilesMap[m.created_by]?.avatar_url ?? null,
           createdAt: m.created_at,
+          inviteCode: m.invite_code ?? null,
+          expiresAt: m.expires_at ?? null,
         }))
       );
     } catch (err) {
@@ -129,7 +154,12 @@ export function useDiceDuelLobby() {
       if (!d?.success) return { success: false, error: d?.error || 'Failed to create challenge' };
       void refreshPoints();
       await refresh();
-      return { success: true, matchId: d.match_id as string };
+      return {
+        success: true,
+        matchId: d.match_id as string,
+        inviteCode: d.invite_code as string | undefined,
+        expiresAt: d.expires_at as string | undefined,
+      };
     } finally {
       setBusy(false);
     }
@@ -150,6 +180,23 @@ export function useDiceDuelLobby() {
     }
   }, [refresh, refreshPoints]);
 
+  const joinByCode = useCallback(async (code: string): Promise<ActionResult> => {
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.rpc('join_dice_match_by_code' as any, {
+        p_invite_code: code.trim().toUpperCase(),
+      });
+      if (error) return { success: false, error: error.message };
+      const d = data as any;
+      if (!d?.success) return { success: false, error: d?.error || 'Failed to join with code' };
+      void refreshPoints();
+      await refresh();
+      return { success: true, matchId: d.match_id as string };
+    } finally {
+      setBusy(false);
+    }
+  }, [refresh, refreshPoints]);
+
   const cancelChallenge = useCallback(async (matchId: string): Promise<ActionResult> => {
     setBusy(true);
     try {
@@ -165,7 +212,7 @@ export function useDiceDuelLobby() {
     }
   }, [refresh, refreshPoints]);
 
-  return { challenges, myMatch, loading, busy, refresh, createChallenge, joinChallenge, cancelChallenge };
+  return { challenges, myMatch, loading, busy, refresh, createChallenge, joinChallenge, joinByCode, cancelChallenge };
 }
 
 export interface DuelPlayerInfo {

@@ -10,6 +10,7 @@ import { Capacitor } from "@capacitor/core";
 // Web pages
 import Landing from "@/pages/Landing";
 import AuthPage from "@/pages/AuthPage";
+import AuthLandingV2 from "@/features/arxon-v2/pages/AuthLandingV2";
 import AuthConfirm from "@/pages/AuthConfirm";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import Dashboard from "@/pages/Dashboard";
@@ -195,7 +196,7 @@ function AppRoutes() {
       <PushNotificationInit />
       <WebBundleRefreshInit />
       <Routes>
-        <Route path="/auth"           element={<PublicRoute><AuthPage /></PublicRoute>} />
+        <Route path="/auth"           element={<PublicRoute>{ARXON_UI_V2_ENABLED ? <AuthLandingV2 /> : <AuthPage />}</PublicRoute>} />
         <Route path="/auth/confirm"   element={<AuthConfirm />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/litepaper"      element={<Litepaper />} />

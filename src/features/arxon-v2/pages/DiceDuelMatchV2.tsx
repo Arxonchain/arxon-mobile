@@ -206,8 +206,22 @@ export default function DiceDuelMatchV2() {
               </div>
               <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: neon.text }}>Waiting for a challenger…</p>
               <p style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(184,239,248,0.5)' }}>
-                Share the Duel lobby with a miner, or hang tight — anyone can accept.
+                Lobby stays open until someone joins or time expires — stake is escrowed.
               </p>
+              {match.invite_code && (
+                <div style={{
+                  margin: '16px auto 0', maxWidth: 280, padding: '12px 14px', borderRadius: 14,
+                  background: 'rgba(79,216,235,0.08)', border: '1px solid rgba(79,216,235,0.25)',
+                }}>
+                  <p style={{ margin: 0, fontSize: 8, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(184,239,248,0.45)', textTransform: 'uppercase' }}>Invite code</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 22, fontWeight: 900, letterSpacing: '0.2em', color: neon.cyan }}>{match.invite_code}</p>
+                  {match.expires_at && (
+                    <p style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(184,239,248,0.5)', fontVariantNumeric: 'tabular-nums' }}>
+                      Expires {new Date(match.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </p>
+                  )}
+                </div>
+              )}
               {isCreator && (
                 <button
                   type="button"
@@ -219,7 +233,7 @@ export default function DiceDuelMatchV2() {
                     color: diceAccent.lose, fontFamily: neon.font, fontSize: 11, fontWeight: 800,
                   }}
                 >
-                  Cancel Challenge
+                  Cancel & Refund
                 </button>
               )}
             </div>

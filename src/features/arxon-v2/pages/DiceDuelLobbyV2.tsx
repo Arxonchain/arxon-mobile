@@ -1,8 +1,8 @@
 /** Dice Roll — 1v1 Duel lobby: create an open challenge or accept someone else's. */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Swords, Users, X, Clock, Crown } from 'lucide-react';
+import { Swords, Users, X, Clock, Crown, Copy, Link2 } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
 import { toast } from '@/hooks/use-toast';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
@@ -12,13 +12,14 @@ import { NeonScreenHeader, NeonGlassCard, NeonSectionLabel } from '../design/Neo
 import { useDiceDuelLobby, type DuelChallenge } from '@/features/dice/hooks/useDiceDuel';
 import { DICE_STAKE_TIERS, diceAccent, diceDuelPot } from '@/features/dice/diceTokens';
 
-function relTime(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  return `${hrs}h ago`;
+function formatCountdown(expiresAt?: string | null) {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return 'Expired';
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
 }
 
 function StakePicker({ stake, setStake, balance }: { stake: number; setStake: (n: number) => void; balance: number }) {
@@ -52,6 +53,12 @@ function StakePicker({ stake, setStake, balance }: { stake: number; setStake: (n
 }
 
 function ChallengeRow({ challenge, onAccept, busy }: { challenge: DuelChallenge; onAccept: () => void; busy: boolean }) {
+  const [cd, setCd] = useState(() => formatCountdown(challenge.expiresAt));
+  useEffect(() => {
+    const id = window.setInterval(() => setCd(formatCountdown(challenge.expiresAt)), 1000);
+    return () => window.clearInterval(id);
+  }, [challenge.expiresAt]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -75,19 +82,19 @@ function ChallengeRow({ challenge, onAccept, busy }: { challenge: DuelChallenge;
           {challenge.username}
         </p>
         <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>
-          Stake {challenge.stake} · Pot {challenge.pot} · {relTime(challenge.createdAt)}
+          Stake {challenge.stake} · Pot {challenge.pot}{cd ? ` · ${cd}` : ''}
         </p>
       </div>
       <motion.button
         type="button"
         whileTap={{ scale: 0.94 }}
-        disabled={busy}
+        disabled={busy || cd === 'Expired'}
         onClick={onAccept}
         style={{
           flexShrink: 0, padding: '8px 14px', borderRadius: 11, border: 'none', cursor: busy ? 'default' : 'pointer',
           touchAction: 'manipulation',
           background: `linear-gradient(135deg, ${neon.purple}, ${neon.cyan})`, color: '#050510',
-          fontFamily: neon.font, fontSize: 10, fontWeight: 800, opacity: busy ? 0.6 : 1,
+          fontFamily: neon.font, fontSize: 10, fontWeight: 800, opacity: busy || cd === 'Expired' ? 0.6 : 1,
         }}
       >
         Accept
@@ -100,14 +107,34 @@ export default function DiceDuelLobbyV2() {
   const navigate = useNavigate();
   const preview = useIsAppPreview();
   const { points } = usePoints();
-  const { challenges, myMatch, loading, busy, createChallenge, joinChallenge, cancelChallenge } = useDiceDuelLobby();
+  const { challenges, myMatch, loading, busy, createChallenge, joinChallenge, joinByCode, cancelChallenge } = useDiceDuelLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
+  const [joinCode, setJoinCode] = useState('');
+  const [countdown, setCountdown] = useState(() => formatCountdown(myMatch?.expiresAt));
 
   const balance = Math.round(points?.total_points ?? 0);
+
+  useEffect(() => {
+    setCountdown(formatCountdown(myMatch?.expiresAt));
+    if (!myMatch?.expiresAt) return;
+    const id = window.setInterval(() => setCountdown(formatCountdown(myMatch.expiresAt)), 1000);
+    return () => window.clearInterval(id);
+  }, [myMatch?.expiresAt]);
 
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+
+  const copyInvite = useCallback(async () => {
+    if (!myMatch?.inviteCode) return;
+    const link = `${window.location.origin}/arena/dice/duel?code=${myMatch.inviteCode}`;
+    try {
+      await navigator.clipboard.writeText(`${myMatch.inviteCode} · ${link}`);
+      toast({ title: 'Invite copied', description: `Code ${myMatch.inviteCode}` });
+    } catch {
+      toast({ title: 'Invite code', description: myMatch.inviteCode });
+    }
+  }, [myMatch?.inviteCode]);
 
   const handleCreate = useCallback(async () => {
     if (balance < stake) {
@@ -119,6 +146,7 @@ export default function DiceDuelLobbyV2() {
       toast({ title: 'Could not create challenge', description: res.error, variant: 'destructive' });
       return;
     }
+    // Stay on persistent lobby slot — navigate into waiting room for this match
     go(`/arena/dice/duel/${res.matchId}`);
   }, [balance, stake, createChallenge, go]);
 
@@ -135,6 +163,16 @@ export default function DiceDuelLobbyV2() {
     go(`/arena/dice/duel/${res.matchId ?? challenge.id}`);
   }, [balance, joinChallenge, go]);
 
+  const handleJoinCode = useCallback(async () => {
+    if (!joinCode.trim()) return;
+    const res = await joinByCode(joinCode);
+    if (!res.success) {
+      toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+      return;
+    }
+    go(`/arena/dice/duel/${res.matchId}`);
+  }, [joinCode, joinByCode, go]);
+
   const handleCancel = useCallback(async () => {
     if (!myMatch) return;
     const res = await cancelChallenge(myMatch.id);
@@ -144,9 +182,9 @@ export default function DiceDuelLobbyV2() {
   return (
     <V2Page>
       <NeonScreenHeader
-        eyebrow="Dice Roll · PvP"
+        eyebrow="Dice Roll · Duel"
         title="1v1 Duel"
-        subtitle="Challenge a miner. Best of 3 — winner takes the pot."
+        subtitle="Open a lobby for 15 minutes. Share your code — winner takes the pot."
         onBack={() => go('/arena/dice')}
         right={
           <div style={{
@@ -179,9 +217,35 @@ export default function DiceDuelLobbyV2() {
                   </p>
                   <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>
                     Stake {myMatch.stake} · Pot {diceDuelPot(myMatch.stake)} ARX-P
+                    {countdown ? ` · ${countdown} left` : ''}
                   </p>
                 </div>
               </div>
+
+              {myMatch.status === 'open' && myMatch.inviteCode && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+                  padding: '10px 12px', borderRadius: 12,
+                  background: 'rgba(79,216,235,0.08)', border: '1px solid rgba(79,216,235,0.22)',
+                }}>
+                  <Link2 size={14} color={neon.cyan} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(184,239,248,0.45)', textTransform: 'uppercase' }}>Invite code</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 900, letterSpacing: '0.18em', color: neon.cyan }}>{myMatch.inviteCode}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void copyInvite(); }}
+                    style={{
+                      width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(79,216,235,0.3)',
+                      background: 'rgba(79,216,235,0.12)', color: neon.cyan, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              )}
 
               {myMatch.status === 'active' ? (
                 <button
@@ -197,18 +261,17 @@ export default function DiceDuelLobbyV2() {
                 </button>
               ) : (
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{
-                    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                    padding: '10px 0', borderRadius: 12, background: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.06)', color: 'rgba(184,239,248,0.55)', fontSize: 10, fontWeight: 700,
-                  }}>
-                    <motion.span
-                      animate={{ opacity: [0.4, 1, 0.4] }}
-                      transition={{ duration: 1.4, repeat: Infinity }}
-                      style={{ width: 6, height: 6, borderRadius: '50%', background: neon.purple, display: 'inline-block' }}
-                    />
-                    Waiting for a challenger…
-                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); go(`/arena/dice/duel/${myMatch.id}`); }}
+                    style={{
+                      flex: 1, padding: '10px 0', borderRadius: 12, border: 'none', cursor: 'pointer',
+                      background: `linear-gradient(135deg, ${neon.purple}, ${neon.cyan})`, color: '#050510',
+                      fontFamily: neon.font, fontSize: 10, fontWeight: 800,
+                    }}
+                  >
+                    Open Waiting Room
+                  </button>
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); void handleCancel(); }}
@@ -237,7 +300,7 @@ export default function DiceDuelLobbyV2() {
                 </div>
                 <div>
                   <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: neon.text }}>Open a Challenge</p>
-                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>Pick a stake, wait for a miner to accept.</p>
+                  <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>Lobby stays open 15 minutes. Stake is escrowed.</p>
                 </div>
               </div>
 
@@ -280,6 +343,41 @@ export default function DiceDuelLobbyV2() {
           </motion.div>
         )}
 
+        {!myMatch && (
+          <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
+            <NeonGlassCard accent={neon.cyan} padding="14px 14px 12px">
+              <p style={{ margin: '0 0 8px', fontSize: 11, fontWeight: 800, color: neon.text }}>Join with invite code</p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <input
+                  value={joinCode}
+                  onChange={(e) => setJoinCode(e.target.value.toUpperCase())}
+                  placeholder="ABC123"
+                  maxLength={8}
+                  style={{
+                    flex: 1, padding: '10px 12px', borderRadius: 12,
+                    border: '1px solid rgba(79,216,235,0.25)', background: 'rgba(0,0,0,0.25)',
+                    color: neon.text, fontFamily: neon.font, fontSize: 13, fontWeight: 800, letterSpacing: '0.14em',
+                    outline: 'none',
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={busy || joinCode.trim().length < 4}
+                  onClick={() => void handleJoinCode()}
+                  style={{
+                    padding: '10px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
+                    background: `linear-gradient(135deg, ${neon.cyan}, ${neon.teal})`, color: '#041018',
+                    fontFamily: neon.font, fontSize: 11, fontWeight: 800,
+                    opacity: joinCode.trim().length < 4 ? 0.5 : 1,
+                  }}
+                >
+                  Join
+                </button>
+              </div>
+            </NeonGlassCard>
+          </motion.div>
+        )}
+
         <motion.div variants={fadeUp}>
           <NeonSectionLabel>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -295,7 +393,7 @@ export default function DiceDuelLobbyV2() {
             <NeonGlassCard accent={neon.purple} padding="22px 14px" style={{ textAlign: 'center' }}>
               <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: neon.text }}>No open challenges</p>
               <p style={{ margin: '4px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>
-                Be the first — open a challenge above and wait for a miner to accept.
+                Be the first — open a challenge above and share your invite code.
               </p>
             </NeonGlassCard>
           ) : (
