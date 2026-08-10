@@ -1,6 +1,6 @@
 /** Dice Roll — 1v1 Duel lobby: create an open challenge or accept someone else's. */
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Swords, Users, X, Clock, Crown, Copy, Link2 } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
@@ -11,6 +11,7 @@ import { neon } from '../design/neonTokens';
 import { NeonScreenHeader, NeonGlassCard, NeonSectionLabel } from '../design/NeonSecondaryUI';
 import { useDiceDuelLobby, type DuelChallenge } from '@/features/dice/hooks/useDiceDuel';
 import { DICE_STAKE_TIERS, diceAccent, diceDuelPot } from '@/features/dice/diceTokens';
+import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
 
 function formatCountdown(expiresAt?: string | null) {
   if (!expiresAt) return null;
@@ -105,12 +106,14 @@ function ChallengeRow({ challenge, onAccept, busy }: { challenge: DuelChallenge;
 
 export default function DiceDuelLobbyV2() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const preview = useIsAppPreview();
   const { points } = usePoints();
   const { challenges, myMatch, loading, busy, createChallenge, joinChallenge, joinByCode, cancelChallenge } = useDiceDuelLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [joinCode, setJoinCode] = useState('');
   const [countdown, setCountdown] = useState(() => formatCountdown(myMatch?.expiresAt));
+  const autoJoinTried = useRef(false);
 
   const balance = Math.round(points?.total_points ?? 0);
 
@@ -125,9 +128,31 @@ export default function DiceDuelLobbyV2() {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
 
+  useEffect(() => {
+    const code = (searchParams.get('code') || '').trim().toUpperCase();
+    if (code) setJoinCode(code);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const code = (searchParams.get('code') || '').trim().toUpperCase();
+    if (!code || autoJoinTried.current || loading || busy || myMatch || preview) return;
+    autoJoinTried.current = true;
+    void (async () => {
+      const res = await joinByCode(code);
+      const next = new URLSearchParams(searchParams);
+      next.delete('code');
+      setSearchParams(next, { replace: true });
+      if (!res.success) {
+        toast({ title: 'Could not join invite', description: res.error, variant: 'destructive' });
+        return;
+      }
+      go(`/arena/dice/duel/${res.matchId}`);
+    })();
+  }, [searchParams, loading, busy, myMatch, preview, joinByCode, setSearchParams, go]);
+
   const copyInvite = useCallback(async () => {
     if (!myMatch?.inviteCode) return;
-    const link = `${window.location.origin}/arena/dice/duel?code=${myMatch.inviteCode}`;
+    const link = buildDiceInviteUrl('/arena/dice/duel', myMatch.inviteCode);
     try {
       await navigator.clipboard.writeText(`${myMatch.inviteCode} · ${link}`);
       toast({ title: 'Invite copied', description: `Code ${myMatch.inviteCode}` });

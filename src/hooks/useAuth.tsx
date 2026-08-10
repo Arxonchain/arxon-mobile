@@ -11,7 +11,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, referralCode?: string, captchaToken?: string) => Promise<{ error: Error | null; user: User | null }>;
   signIn: (email: string, password: string, captchaToken?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  resetPassword: (email: string, captchaToken?: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
@@ -171,9 +171,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await supabase.auth.signOut();
   };
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = async (email: string, captchaToken?: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
       redirectTo: `${window.location.origin}/auth/confirm`,
+      captchaToken,
     });
     return { error: error as Error | null };
   };

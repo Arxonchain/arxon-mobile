@@ -30,7 +30,7 @@ const WORD_FORGE_SLIDE: Slide = {
   title: 'Word Forge',
   subtitle: 'Connect letters. Earn ARX-P.',
   cta: 'Play Now',
-  path: '/arena',
+  path: '/word-forge',
   accent: neon.cyan,
   heroImage: FORGE_UI.bannerWordForge,
   heroMode: 'cutout',

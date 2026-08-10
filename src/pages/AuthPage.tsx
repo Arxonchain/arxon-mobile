@@ -37,6 +37,10 @@ export default function AuthPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    setCaptchaToken(null);
+  }, [mode]);
+
   // FIX BUG-28: Use useEffect instead of useState() with side effects
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -55,7 +59,7 @@ export default function AuthPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (mode !== 'forgot' && captchaRequired && !captchaToken) {
+    if (captchaRequired && !captchaToken) {
       toast({
         title: 'Security check required',
         description: 'Complete the verification below (or tap Retry), then try again.',
@@ -117,7 +121,7 @@ export default function AuthPage() {
         navigate('/');
 
       } else if (mode === 'forgot') {
-        const { error } = await resetPassword(email);
+        const { error } = await resetPassword(email, captchaToken || undefined);
         if (error) throw error;
         toast({
           title: '📧 Reset link sent',
@@ -262,15 +266,13 @@ export default function AuthPage() {
             )}
 
             {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
-            {mode !== 'forgot' && (
-              <TurnstileWidget
-                key={mode}
-                action={mode}
-                onVerify={setCaptchaToken}
-                onExpire={() => setCaptchaToken(null)}
-                onError={() => setCaptchaToken(null)}
-              />
-            )}
+            <TurnstileWidget
+              key={mode}
+              action={mode}
+              onVerify={setCaptchaToken}
+              onExpire={() => setCaptchaToken(null)}
+              onError={() => setCaptchaToken(null)}
+            />
 
             {/* Forgot password link */}
             {mode === 'signin' && (
@@ -290,12 +292,12 @@ export default function AuthPage() {
               disabled={
                 loading ||
                 (mode === 'signup' && !!confirmPassword && password !== confirmPassword) ||
-                (mode !== 'forgot' && captchaRequired && !captchaToken)
+                (captchaRequired && !captchaToken)
               }
             >
               {loading
                 ? 'Please wait...'
-                : mode !== 'forgot' && captchaRequired && !captchaToken
+                : captchaRequired && !captchaToken
                 ? 'Complete security check'
                 : mode === 'signin'
                 ? 'Sign In'

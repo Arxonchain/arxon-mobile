@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -24,8 +25,8 @@ export interface AuthDialogProps {
 /**
  * Compatibility AuthDialog used across the app.
  *
- * The project now uses a dedicated /auth page; this dialog simply routes users there.
- * Keeping this component avoids broken imports in production builds (e.g. Vercel).
+ * The project now uses a dedicated /auth page; this dialog routes users there
+ * via react-router (HashRouter-safe on native).
  */
 export default function AuthDialog({
   open,
@@ -33,6 +34,7 @@ export default function AuthDialog({
   initialReferralCode = "",
   defaultMode = "signup",
 }: AuthDialogProps) {
+  const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>(defaultMode);
 
   useEffect(() => {
@@ -52,7 +54,10 @@ export default function AuthDialog({
     }
   }, [open, initialReferralCode]);
 
-  const href = useMemo(() => `/auth?mode=${mode}`, [mode]);
+  const handleContinue = () => {
+    onOpenChange(false);
+    navigate(`/auth?mode=${mode}`);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -88,8 +93,8 @@ export default function AuthDialog({
           <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
             Not now
           </Button>
-          <Button asChild onClick={() => onOpenChange(false)}>
-            <a href={href}>Continue</a>
+          <Button type="button" onClick={handleContinue}>
+            Continue
           </Button>
         </DialogFooter>
       </DialogContent>

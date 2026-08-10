@@ -1,8 +1,8 @@
 /** Dice Roll — Rumble lobby: open a multiplayer elimination lobby or join someone else's. */
-import { useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Users2, Clock, X, Crown, UsersRound } from 'lucide-react';
+import { Users2, Clock, X, Crown, UsersRound, Copy, Link2 } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
 import { toast } from '@/hooks/use-toast';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
@@ -11,6 +11,17 @@ import { neon } from '../design/neonTokens';
 import { NeonScreenHeader, NeonGlassCard, NeonSectionLabel } from '../design/NeonSecondaryUI';
 import { useDiceRumbleLobby, type RumbleLobby } from '@/features/dice/hooks/useDiceRumble';
 import { DICE_STAKE_TIERS, DICE_RUMBLE_LOBBY_SIZES, diceAccent, diceRumblePot, diceRumblePayout } from '@/features/dice/diceTokens';
+import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
+
+function formatCountdown(expiresAt?: string | null) {
+  if (!expiresAt) return null;
+  const ms = new Date(expiresAt).getTime() - Date.now();
+  if (ms <= 0) return 'Expired';
+  const total = Math.floor(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 function relTime(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -53,6 +64,12 @@ function TierPicker<T extends number>({ options, value, onChange, balance }: { o
 
 function LobbyRow({ lobby, onJoin, busy }: { lobby: RumbleLobby; onJoin: () => void; busy: boolean }) {
   const full = lobby.playersJoined >= lobby.maxPlayers;
+  const [cd, setCd] = useState(() => formatCountdown(lobby.expiresAt));
+  useEffect(() => {
+    const id = window.setInterval(() => setCd(formatCountdown(lobby.expiresAt)), 1000);
+    return () => window.clearInterval(id);
+  }, [lobby.expiresAt]);
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -76,23 +93,23 @@ function LobbyRow({ lobby, onJoin, busy }: { lobby: RumbleLobby; onJoin: () => v
           {lobby.username}'s lobby
         </p>
         <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.45)' }}>
-          Stake {lobby.stake} · {lobby.playersJoined}/{lobby.maxPlayers} joined · {relTime(lobby.createdAt)}
+          Stake {lobby.stake} · {lobby.playersJoined}/{lobby.maxPlayers} joined · {cd ?? relTime(lobby.createdAt)}
         </p>
       </div>
       <motion.button
         type="button"
         whileTap={{ scale: 0.94 }}
-        disabled={busy || full}
+        disabled={busy || full || cd === 'Expired'}
         onClick={onJoin}
         style={{
           flexShrink: 0, padding: '8px 14px', borderRadius: 11, border: 'none', cursor: busy || full ? 'default' : 'pointer',
           touchAction: 'manipulation',
-          background: full ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${neon.gold}, #ffb020)`,
-          color: full ? 'rgba(255,255,255,0.35)' : '#1a1400',
+          background: full || cd === 'Expired' ? 'rgba(255,255,255,0.06)' : `linear-gradient(135deg, ${neon.gold}, #ffb020)`,
+          color: full || cd === 'Expired' ? 'rgba(255,255,255,0.35)' : '#1a1400',
           fontFamily: neon.font, fontSize: 10, fontWeight: 800,
         }}
       >
-        {full ? 'Full' : 'Join'}
+        {full ? 'Full' : cd === 'Expired' ? 'Expired' : 'Join'}
       </motion.button>
     </motion.div>
   );
@@ -100,18 +117,61 @@ function LobbyRow({ lobby, onJoin, busy }: { lobby: RumbleLobby; onJoin: () => v
 
 export default function DiceRumbleLobbyV2() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const preview = useIsAppPreview();
   const { points } = usePoints();
   const { lobbies, myMatch, loading, busy, createLobby, joinLobby, joinByCode, cancelLobby } = useDiceRumbleLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [size, setSize] = useState<number>(DICE_RUMBLE_LOBBY_SIZES[1]);
   const [joinCode, setJoinCode] = useState('');
+  const [countdown, setCountdown] = useState(() => formatCountdown(myMatch?.expiresAt));
+  const autoJoinTried = useRef(false);
 
   const balance = Math.round(points?.total_points ?? 0);
 
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+
+  useEffect(() => {
+    setCountdown(formatCountdown(myMatch?.expiresAt));
+    if (!myMatch?.expiresAt) return;
+    const id = window.setInterval(() => setCountdown(formatCountdown(myMatch.expiresAt)), 1000);
+    return () => window.clearInterval(id);
+  }, [myMatch?.expiresAt]);
+
+  useEffect(() => {
+    const code = (searchParams.get('code') || '').trim().toUpperCase();
+    if (code) setJoinCode(code);
+  }, [searchParams]);
+
+  useEffect(() => {
+    const code = (searchParams.get('code') || '').trim().toUpperCase();
+    if (!code || autoJoinTried.current || loading || busy || myMatch || preview) return;
+    autoJoinTried.current = true;
+    void (async () => {
+      const res = await joinByCode(code);
+      const next = new URLSearchParams(searchParams);
+      next.delete('code');
+      setSearchParams(next, { replace: true });
+      if (!res.success) {
+        toast({ title: 'Could not join invite', description: res.error, variant: 'destructive' });
+        return;
+      }
+      go(`/arena/dice/rumble/${res.matchId}`);
+    })();
+  }, [searchParams, loading, busy, myMatch, preview, joinByCode, setSearchParams, go]);
+
+  const copyInvite = useCallback(async () => {
+    if (!myMatch?.inviteCode) return;
+    const link = buildDiceInviteUrl('/arena/dice/rumble', myMatch.inviteCode);
+    try {
+      await navigator.clipboard.writeText(`${myMatch.inviteCode} · ${link}`);
+      toast({ title: 'Invite copied', description: `Code ${myMatch.inviteCode}` });
+    } catch {
+      toast({ title: 'Invite code', description: myMatch.inviteCode });
+    }
+  }, [myMatch?.inviteCode]);
 
   const handleCreate = useCallback(async () => {
     if (balance < stake) {
@@ -188,10 +248,34 @@ export default function DiceRumbleLobbyV2() {
                     {myMatch.status === 'active' ? 'Rumble in progress!' : 'Your open lobby'}
                   </p>
                   <p style={{ margin: '1px 0 0', fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>
-                    Stake {myMatch.stake} ARX-P{myMatch.inviteCode ? ` · Code ${myMatch.inviteCode}` : ''}
+                    Stake {myMatch.stake} ARX-P{countdown ? ` · ${countdown} left` : ''}
                   </p>
                 </div>
               </div>
+              {myMatch.status === 'open' && myMatch.inviteCode && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10,
+                  padding: '10px 12px', borderRadius: 12,
+                  background: 'rgba(79,216,235,0.08)', border: '1px solid rgba(79,216,235,0.22)',
+                }}>
+                  <Link2 size={14} color={neon.cyan} />
+                  <div style={{ flex: 1 }}>
+                    <p style={{ margin: 0, fontSize: 8, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(184,239,248,0.45)', textTransform: 'uppercase' }}>Invite code</p>
+                    <p style={{ margin: '2px 0 0', fontSize: 16, fontWeight: 900, letterSpacing: '0.18em', color: neon.cyan }}>{myMatch.inviteCode}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); void copyInvite(); }}
+                    style={{
+                      width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(79,216,235,0.3)',
+                      background: 'rgba(79,216,235,0.12)', color: neon.cyan, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              )}
               {myMatch.status === 'open' && (
                 <button
                   type="button"

@@ -60,6 +60,10 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
     }
   }, [initialReferralCode]);
 
+  useEffect(() => {
+    setCaptchaToken(null);
+  }, [mode]);
+
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmedEmail = email.trim();
@@ -72,6 +76,15 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       return;
     }
 
+    if (captchaRequired && !captchaToken) {
+      toast({
+        title: "Security check required",
+        description: "Complete the verification below (or tap Retry), then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
       const redirectTo = getPasswordResetRedirectUrl();
@@ -79,6 +92,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       const { error } = await withTimeout(
         supabase.auth.resetPasswordForEmail(trimmedEmail, {
           redirectTo,
+          captchaToken: captchaToken || undefined,
         }),
         12_000
       );
@@ -105,6 +119,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       });
     } finally {
       setLoading(false);
+      // Turnstile tokens are single-use — clear so the widget can refresh.
+      setCaptchaToken(null);
     }
   };
 
@@ -378,13 +394,23 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
                 </div>
               </div>
 
+              <TurnstileWidget
+                key="forgot"
+                action="forgot"
+                onVerify={setCaptchaToken}
+                onExpire={() => setCaptchaToken(null)}
+                onError={() => setCaptchaToken(null)}
+              />
+
               <Button
                 type="submit"
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-5 group"
-                disabled={loading}
+                disabled={loading || (captchaRequired && !captchaToken)}
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
+                ) : captchaRequired && !captchaToken ? (
+                  <span>Complete security check</span>
                 ) : (
                   <>
                     Send Reset Link

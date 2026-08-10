@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronLeft, Crown, Skull, User, X, Clock, Play } from 'lucide-react';
+import { ChevronLeft, Crown, Skull, User, X, Clock, Play, Copy } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
@@ -13,6 +13,7 @@ import { neon } from '../design/neonTokens';
 import { DicePair } from '@/features/dice/components/DiceFace';
 import { useDiceRumbleMatch, type RumblePlayerInfo } from '@/features/dice/hooks/useDiceRumble';
 import { diceAccent, diceRumblePot, diceRumblePayout } from '@/features/dice/diceTokens';
+import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
 
 function PlayerChip({ player, rolling, rollKey }: { player: RumblePlayerInfo; rolling: boolean; rollKey: number }) {
   const accent = player.isMe ? diceAccent.you : player.alive ? neon.gold : 'rgba(255,255,255,0.25)';
@@ -98,6 +99,18 @@ export default function DiceRumbleMatchV2() {
       setCancelling(false);
     }
   }, [matchId, go]);
+
+  const copyInvite = useCallback(async () => {
+    const code = match?.invite_code as string | undefined;
+    if (!code) return;
+    const link = buildDiceInviteUrl('/arena/dice/rumble', code);
+    try {
+      await navigator.clipboard.writeText(`${code} · ${link}`);
+      toast({ title: 'Invite copied', description: `Code ${code}` });
+    } catch {
+      toast({ title: 'Invite code', description: code });
+    }
+  }, [match?.invite_code]);
 
   const stake = match?.stake ?? 0;
   const playerCount = players.length;
@@ -217,6 +230,35 @@ export default function DiceRumbleMatchV2() {
                   Pot grows to {diceRumblePot(stake, match.max_players)} · Winner takes {diceRumblePayout(stake, match.max_players)} ARX-P
                 </p>
               </div>
+
+              {match.invite_code && (
+                <div style={{
+                  margin: '0 auto 16px', maxWidth: 300, padding: '12px 14px', borderRadius: 14,
+                  background: 'rgba(79,216,235,0.08)', border: '1px solid rgba(79,216,235,0.25)',
+                  display: 'flex', alignItems: 'center', gap: 10,
+                }}>
+                  <div style={{ flex: 1, textAlign: 'left' }}>
+                    <p style={{ margin: 0, fontSize: 8, fontWeight: 700, letterSpacing: '0.14em', color: 'rgba(184,239,248,0.45)', textTransform: 'uppercase' }}>Invite code</p>
+                    <p style={{ margin: '4px 0 0', fontSize: 22, fontWeight: 900, letterSpacing: '0.2em', color: neon.cyan }}>{match.invite_code}</p>
+                    {match.expires_at && (
+                      <p style={{ margin: '6px 0 0', fontSize: 10, color: 'rgba(184,239,248,0.5)', fontVariantNumeric: 'tabular-nums' }}>
+                        Expires {new Date(match.expires_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyInvite()}
+                    style={{
+                      width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(79,216,235,0.3)',
+                      background: 'rgba(79,216,235,0.12)', color: neon.cyan, cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    }}
+                  >
+                    <Copy size={16} />
+                  </button>
+                </div>
+              )}
 
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 20 }}>
                 {players.map((p) => (

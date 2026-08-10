@@ -13,6 +13,7 @@ import AuthPage from "@/pages/AuthPage";
 import AuthLandingV2 from "@/features/arxon-v2/pages/AuthLandingV2";
 import AuthConfirm from "@/pages/AuthConfirm";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
+import ChangePassword from "@/pages/ChangePassword";
 import Dashboard from "@/pages/Dashboard";
 import DashboardLayout from "@/components/layout/DashboardLayout";
 import Mining from "@/pages/Mining";
@@ -199,6 +200,7 @@ function AppRoutes() {
         <Route path="/auth"           element={<PublicRoute>{ARXON_UI_V2_ENABLED ? <AuthLandingV2 /> : <AuthPage />}</PublicRoute>} />
         <Route path="/auth/confirm"   element={<AuthConfirm />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/litepaper"      element={<Litepaper />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
         <Route path="/ui-preview" element={<AppPreviewShell />}>
