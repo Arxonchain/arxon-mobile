@@ -59,7 +59,14 @@ function FreeRollCard({
     if (!res.success) {
       setRolling(false);
       setBusy(false);
-      toast({ title: 'No luck', description: res.error, variant: 'destructive' });
+      const needsAuth = /sign in|not authenticated/i.test(res.error);
+      toast({
+        title: needsAuth ? 'Sign in required' : 'No luck',
+        description: needsAuth
+          ? 'Open /auth (or the real app) and sign in, then try again.'
+          : res.error,
+        variant: 'destructive',
+      });
       return;
     }
 

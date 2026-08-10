@@ -170,6 +170,7 @@ export function useDiceGame() {
   const claimFreeRoll = useCallback(async (): Promise<
     { success: true; result: DiceFreeRollResult } | { success: false; error: string }
   > => {
+    if (!user) return { success: false, error: 'Sign in to claim free rolls' };
     const { data, error } = await supabase.rpc('claim_dice_free_roll' as any);
     if (error) return { success: false, error: error.message };
     const d = data as any;
@@ -183,11 +184,12 @@ export function useDiceGame() {
       success: true,
       result: { die1: d.die1, die2: d.die2, total: d.total, reward: d.reward, rollsLeft: d.rolls_left },
     };
-  }, [refreshPoints, refreshSummary]);
+  }, [user, refreshPoints, refreshSummary]);
 
   const playHouseMatch = useCallback(async (
     stake: number,
   ): Promise<{ success: true; result: DiceHouseMatchResult } | { success: false; error: string }> => {
+    if (!user) return { success: false, error: 'Sign in to play' };
     const { data, error } = await supabase.rpc('play_dice_house_match' as any, { p_stake: stake });
     if (error) return { success: false, error: error.message };
     const d = data as any;
@@ -217,7 +219,7 @@ export function useDiceGame() {
         balance: d.balance,
       },
     };
-  }, [refreshPoints, refreshSummary]);
+  }, [user, refreshPoints, refreshSummary]);
 
   return {
     daily,
