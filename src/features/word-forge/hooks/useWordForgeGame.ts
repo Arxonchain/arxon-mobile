@@ -69,6 +69,8 @@ interface UseWordForgeGameOptions {
   preview?: boolean;
   mode?: ForgeGameMode;
   resume?: boolean;
+  /** Freeze the round timer while a blocking overlay (settings, FAQ, etc.) is open */
+  overlayPaused?: boolean;
 }
 
 async function haptic(style: ImpactStyle): Promise<void> {
@@ -77,7 +79,7 @@ async function haptic(style: ImpactStyle): Promise<void> {
 }
 
 export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
-  const { preview = false, mode = 'campaign', resume = false } = options;
+  const { preview = false, mode = 'campaign', resume = false, overlayPaused = false } = options;
   const isDaily = mode === 'daily';
   const { user } = useAuth();
   const { triggerConfetti, refreshPoints } = usePoints();
@@ -220,7 +222,8 @@ export function useWordForgeGame(options: UseWordForgeGameOptions = {}) {
     totalSeconds: generation.params.timerSeconds,
     initialSeconds: restoredTimeLeftRef.current,
     active: phase === 'playing',
-    paused: phase === 'paused' || showTutorial,
+    // Overlay pause is separate from phase so Settings/FAQ don't toggle the pause menu
+    paused: phase === 'paused' || showTutorial || overlayPaused,
     onExpire: onTimerExpire,
   });
 

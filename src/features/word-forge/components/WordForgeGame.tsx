@@ -41,9 +41,13 @@ export function WordForgeGame({ preview = false, mode = 'campaign', resume = fal
   const [exitConfirm, setExitConfirm] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [faqOpen, setFaqOpen] = useState(false);
+  const [dockOpen, setDockOpen] = useState(false);
   const [rewardsToast, setRewardsToast] = useState(false);
   const [hintRefillOpen, setHintRefillOpen] = useState(false);
-  const game = useWordForgeGame({ preview, mode, resume });
+  // Freeze the deadline timer while any focus-stealing overlay is open (not phase pause)
+  const overlayPaused =
+    settingsOpen || faqOpen || hintRefillOpen || exitConfirm || dockOpen;
+  const game = useWordForgeGame({ preview, mode, resume, overlayPaused });
   const { generation, phase } = game;
   const passed = game.slotsFilled >= game.minWords;
   const urgent = game.timeLeft <= 10 && phase === 'playing';
@@ -406,6 +410,8 @@ export function WordForgeGame({ preview = false, mode = 'campaign', resume = fal
           </div>
           <ForgeArenaDock
             dailyDone={dailyDone}
+            open={dockOpen}
+            onOpenChange={setDockOpen}
             onStats={() => leaveTo('/word-forge/stats')}
             onSettings={() => setSettingsOpen(true)}
             onLeaderboard={() => leaveTo('/word-forge/leaderboard')}
@@ -468,7 +474,15 @@ export function WordForgeGame({ preview = false, mode = 'campaign', resume = fal
       />
 
       <PauseOverlay
-        open={phase === 'paused' && !game.showTutorial && !settingsOpen && !faqOpen}
+        open={
+          phase === 'paused'
+          && !game.showTutorial
+          && !settingsOpen
+          && !faqOpen
+          && !exitConfirm
+          && !hintRefillOpen
+          && !dockOpen
+        }
         onResume={game.togglePause}
         onReplay={handleReplay}
         onExit={() => setExitConfirm(true)}

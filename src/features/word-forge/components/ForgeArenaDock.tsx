@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import {
   BarChart3, Gift, Map, Menu, Settings, Sparkles, Trophy, X,
 } from 'lucide-react';
@@ -6,6 +5,8 @@ import { GlossyIconButton } from './GlossyKit';
 
 interface ForgeArenaDockProps {
   dailyDone: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onStats: () => void;
   onSettings: () => void;
   onLeaderboard: () => void;
@@ -16,9 +17,8 @@ interface ForgeArenaDockProps {
 
 /** Compact hamburger menu — frees vertical space for slot grid + wheel */
 export function ForgeArenaDock({
-  dailyDone, onStats, onSettings, onLeaderboard, onMap, onDaily, onRewards,
+  dailyDone, open, onOpenChange, onStats, onSettings, onLeaderboard, onMap, onDaily, onRewards,
 }: ForgeArenaDockProps) {
-  const [open, setOpen] = useState(false);
 
   const items = [
     { label: 'Stats', icon: BarChart3, onClick: onStats },
@@ -36,7 +36,7 @@ export function ForgeArenaDock({
   ];
 
   const run = (fn: () => void) => {
-    setOpen(false);
+    onOpenChange(false);
     fn();
   };
 
@@ -48,7 +48,7 @@ export function ForgeArenaDock({
           caption="Menu"
           color="slate"
           size={44}
-          onClick={() => setOpen(true)}
+          onClick={() => onOpenChange(true)}
         >
           <Menu size={20} strokeWidth={2.8} />
         </GlossyIconButton>
@@ -66,7 +66,7 @@ export function ForgeArenaDock({
             display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
             padding: '0 16px max(18px, env(safe-area-inset-bottom))',
           }}
-          onClick={() => setOpen(false)}
+          onClick={() => onOpenChange(false)}
         >
           <div
             onClick={(e) => e.stopPropagation()}
@@ -85,7 +85,7 @@ export function ForgeArenaDock({
               <button
                 type="button"
                 aria-label="Close menu"
-                onClick={() => setOpen(false)}
+                onClick={() => onOpenChange(false)}
                 style={{
                   width: 34, height: 34, borderRadius: 10, border: '1px solid rgba(79,216,235,0.25)',
                   background: 'rgba(2,10,22,0.8)', color: '#e8fcff', cursor: 'pointer',
