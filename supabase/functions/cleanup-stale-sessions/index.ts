@@ -24,11 +24,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { requireAdminOrService, adminAuthResponse } = await import("../_shared/adminAuth.ts");
-    const auth = await requireAdminOrService(req);
-    if (!auth.ok) return adminAuthResponse(auth);
-
-    const supabase = auth.supabase;
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
+    );
 
     // Parse request - can optionally specify batch size and dry run
     const { batchSize = 100, dryRun = false } = await req.json().catch(() => ({}));
@@ -120,48 +119,37 @@ Deno.serve(async (req) => {
         const cappedPoints = Math.min(earnedPoints, 480);
 
         if (!dryRun) {
-          // Update the session to inactive
-          const endedAt = new Date(
-            new Date(session.started_at).getTime() + 8 * 60 * 60 * 1000
-          ).toISOString();
+          // Atomic end+credit (balance + ledger). Avoid marking arx_mined without credited_at.
+          const { data: creditResult, error: creditError } = await supabase.rpc(
+            "end_and_credit_mining_session",
+            {
+              p_session_id: session.id,
+              p_user_id: session.user_id,
+            },
+          );
 
-          const { error: updateError } = await supabase
-            .from("mining_sessions")
-            .update({
-              is_active: false,
-              ended_at: endedAt,
-              arx_mined: cappedPoints,
-            })
-            .eq("id", session.id);
-
-          if (updateError) {
-            console.error(`Failed to update session ${session.id}:`, updateError);
+          if (creditError || !creditResult?.success) {
+            const msg = creditError?.message || creditResult?.error || "credit failed";
+            console.error(`Failed to credit session ${session.id}:`, msg);
             results.push({
               sessionId: session.id,
               userId: session.user_id,
               pointsEarned: 0,
-              status: `failed: ${updateError.message}`,
+              status: `failed: ${msg}`,
             });
             continue;
           }
 
-          // Credit points to user via RPC (atomic, validated)
-          const { error: pointsError } = await supabase.rpc("increment_user_points", {
-            p_user_id: session.user_id,
-            p_amount: cappedPoints,
-            p_type: "mining",
+          results.push({
+            sessionId: session.id,
+            userId: session.user_id,
+            pointsEarned: Math.max(0, Number(creditResult.points || 0)),
+            status: "success",
           });
-
-          if (pointsError) {
-            console.error(`Failed to credit points for ${session.user_id}:`, pointsError);
-            results.push({
-              sessionId: session.id,
-              userId: session.user_id,
-              pointsEarned: cappedPoints,
-              status: `session closed but points failed: ${pointsError.message}`,
-            });
-            continue;
-          }
+          console.log(
+            `Processed session ${session.id}: ${creditResult.points || 0} ARX-P credited`,
+          );
+          continue;
         }
 
         results.push({

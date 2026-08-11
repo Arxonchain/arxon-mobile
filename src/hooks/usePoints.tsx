@@ -202,6 +202,38 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
         void calculateRank();
       };
 
+      const rpcFallback = async (reason?: string) => {
+        try {
+          if (type === 'mining') {
+            if (sessionId) {
+              const { data, error } = await supabase.rpc('end_and_credit_mining_session' as any, {
+                p_session_id: sessionId,
+              });
+              if (error || !data?.success) {
+                return { success: false, error: error?.message || data?.error || reason || 'Fallback failed' };
+              }
+              if (data.user_points) applyUserPoints(data.user_points);
+              const pts = Math.max(0, Math.ceil(Number(data.points || 0)));
+              if (pts >= 10) triggerConfetti();
+              return { success: true, points: pts };
+            }
+
+            const { data, error } = await supabase.rpc('credit_my_pending_mining' as any);
+            if (error || !data?.success) {
+              return { success: false, error: error?.message || data?.error || reason || 'Fallback failed' };
+            }
+            if (data.user_points) applyUserPoints(data.user_points);
+            const pts = Math.max(0, Math.ceil(Number(data.points || 0)));
+            if (pts >= 10) triggerConfetti();
+            return { success: true, points: pts };
+          }
+
+          return { success: false, error: reason || 'Fallback unavailable for this reward type' };
+        } catch (err: any) {
+          return { success: false, error: err?.message || reason || 'Fallback failed' };
+        }
+      };
+
       const invokeAward = async (attempt = 0): Promise<{ data: any; error: any }> => {
         const { data, error } = await supabase.functions.invoke('award-points', {
           body: { type, amount: safeAmount, session_id: sessionId },
@@ -215,11 +247,11 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
         const { data, error } = await invokeAward();
 
         if (error || !data?.success) {
-          // Client RPC is blocked for authenticated users — refresh in case server credited anyway
-          void fetchPoints();
+          const fallback = await rpcFallback(error?.message || data?.error);
+          if (fallback.success) return fallback;
           return {
             success: false,
-            error: error?.message || data?.error || 'Backend error',
+            error: fallback.error || error?.message || data?.error || 'Backend error',
           };
         }
 
@@ -242,14 +274,15 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
 
         return { success: true, points: awardedPoints };
       } catch (err: any) {
-        void fetchPoints();
+        const fallback = await rpcFallback(err?.message);
+        if (fallback.success) return fallback;
         return {
           success: false,
-          error: err?.message || 'Network error',
+          error: fallback.error || err?.message || 'Network error',
         };
       }
     },
-    [calculateRank, fetchPoints, triggerConfetti, user]
+    [calculateRank, triggerConfetti, user]
   );
 
   // Hydrate instantly from cache on login (so ARX-P shows immediately), then refresh in background

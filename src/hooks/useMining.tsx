@@ -238,48 +238,63 @@ export const useMining = (options?: UseMiningOptions) => {
   }, []);
 
   const endSession = useCallback(
-    async (id: string, finalPoints: number) => {
-      // Round DOWN to prevent over-rewarding
-      const pointsToCredit = Math.max(0, Math.floor(finalPoints));
-
+    async (id: string, _finalPoints: number) => {
       try {
-        // First, end the session in DB
-        await supabase
-          .from('mining_sessions')
-          .update({
-            is_active: false,
-            ended_at: new Date().toISOString(),
-            arx_mined: pointsToCredit,
-          })
-          .eq('id', id);
+        // Server-authoritative end+credit. Clients must not PATCH arx_mined/credited_at
+        // (protect_mining_session_credits rejects those fields → silent/zero credit).
+        let credited = false;
+        let creditedPoints = 0;
+
+        const { data: rpcData, error: rpcError } = await supabase.rpc(
+          'end_and_credit_mining_session' as any,
+          { p_session_id: id }
+        );
+
+        if (!rpcError && rpcData?.success) {
+          credited = true;
+          creditedPoints = Math.max(0, Math.ceil(Number(rpcData.points || 0)));
+        } else {
+          const { error: endError } = await supabase
+            .from('mining_sessions')
+            .update({
+              is_active: false,
+              ended_at: new Date().toISOString(),
+            })
+            .eq('id', id);
+
+          if (endError) {
+            console.error('Failed to end mining session:', endError);
+            endingRef.current = false;
+            toast({
+              title: 'Could not stop mining',
+              description: endError.message || 'Please try again.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          try {
+            const result = await addPoints(1, 'mining', id);
+            credited = result.success;
+            creditedPoints = result.points || 0;
+          } catch (edgeError) {
+            console.warn('award-points failed after end:', edgeError);
+          }
+
+          if (!credited) {
+            const { data: pending } = await supabase.rpc('credit_my_pending_mining' as any);
+            if (pending?.success) {
+              credited = true;
+              creditedPoints = Math.max(0, Math.ceil(Number(pending.points || 0)));
+            }
+          }
+        }
 
         if (user) {
           clearActiveSessionCache(user.id);
         }
 
-        // Try to credit points if any
-        let credited = false;
-        let creditedPoints = 0;
-        
-        if (pointsToCredit > 0) {
-          const result = await addPoints(pointsToCredit, 'mining', id);
-          credited = result.success;
-          creditedPoints = result.points || pointsToCredit;
-
-          if (!credited) {
-            const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
-            if (syncData?.success && Number(syncData.points ?? 0) > 0) {
-              credited = true;
-              creditedPoints = Number(syncData.points);
-            }
-          }
-
-          await refreshPoints();
-
-          if (!credited) {
-            console.error('Point crediting failed for session:', id, result);
-          }
-        }
+        await refreshPoints();
 
         setIsMining(false);
         setSessionId(null);
@@ -296,17 +311,26 @@ export const useMining = (options?: UseMiningOptions) => {
             title: 'Mining Session Complete! 🎉',
             description: `You earned ${Math.ceil(creditedPoints)} ARX-P points`,
           });
-        } else if (pointsToCredit > 0 && !credited) {
+        } else if (credited) {
           toast({
             title: 'Session Ended',
-            description: 'Open the dashboard to sync your balance — points will appear shortly.',
+            description: 'No points earned this session.',
+          });
+        } else {
+          toast({
+            title: 'Session Ended',
+            description: 'Points will be credited automatically. Please refresh.',
             variant: 'default',
           });
         }
       } catch (error) {
         console.error('Error ending session:', error);
-        // Allow another attempt if we failed to end
         endingRef.current = false;
+        toast({
+          title: 'Could not stop mining',
+          description: 'Please try again.',
+          variant: 'destructive',
+        });
       }
     },
     [addPoints, refreshPoints, user]
@@ -314,21 +338,22 @@ export const useMining = (options?: UseMiningOptions) => {
 
   const finalizeSessionSilently = useCallback(
     async (session: { id: string; started_at: string; arx_mined?: number | null }) => {
-      const startTime = new Date(session.started_at).getTime();
-      const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startTime) / 1000));
-      const effectiveSeconds = Math.min(elapsedSeconds, maxTimeSeconds);
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'end_and_credit_mining_session' as any,
+        { p_session_id: session.id }
+      );
 
-      // Round DOWN to prevent over-rewarding
-      const calculatedPoints = Math.min(480, Math.floor((effectiveSeconds / 3600) * cappedPointsPerHour));
-      const dbPoints = Math.max(0, Math.floor(Number(session.arx_mined ?? 0)));
-      const finalPoints = Math.max(calculatedPoints, dbPoints);
+      if (!rpcError && rpcData?.success) {
+        const points = Math.max(0, Math.ceil(Number(rpcData.points || 0)));
+        await refreshPoints();
+        return points;
+      }
 
       const { data: updated, error: updateError } = await supabase
         .from('mining_sessions')
         .update({
           is_active: false,
           ended_at: new Date().toISOString(),
-          arx_mined: finalPoints,
         })
         .eq('id', session.id)
         .eq('is_active', true)
@@ -338,30 +363,23 @@ export const useMining = (options?: UseMiningOptions) => {
       if (updateError) throw updateError;
       if (!updated) return 0;
 
-      if (finalPoints > 0 && user) {
-        let credited = false;
-        try {
-          const result = await addPoints(finalPoints, 'mining', session.id);
-          credited = result.success;
-        } catch {
-          /* award-points failed */
-        }
-
-        if (!credited) {
-          try {
-            const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
-            credited = syncData?.success === true && Number(syncData.points ?? 0) > 0;
-          } catch {
-            /* ignore */
-          }
-        }
-
-        await refreshPoints();
+      let points = 0;
+      try {
+        const result = await addPoints(1, 'mining', session.id);
+        if (result.success) points = result.points || 0;
+      } catch {
+        // ignore; try pending credit RPC
       }
 
-      return finalPoints;
+      if (!points) {
+        const { data: pending } = await supabase.rpc('credit_my_pending_mining' as any);
+        if (pending?.success) points = Math.max(0, Math.ceil(Number(pending.points || 0)));
+      }
+
+      await refreshPoints();
+      return points;
     },
-    [addPoints, cappedPointsPerHour, maxTimeSeconds, refreshPoints, user]
+    [addPoints, refreshPoints]
   );
 
   const checkActiveSession = useCallback(async () => {
@@ -410,13 +428,7 @@ export const useMining = (options?: UseMiningOptions) => {
           lastDbPointsRef.current = Math.floor(resumePoints);
           sessionStartTimeRef.current = startTime;
           endingRef.current = false;
-
-          if (calculatedPoints > dbPoints) {
-            void supabase
-              .from('mining_sessions')
-              .update({ arx_mined: Math.floor(calculatedPoints) })
-              .eq('id', latestSession.id);
-          }
+          // Do not client-write arx_mined — protect_mining_session_credits blocks it.
         }
       } else {
         // If a session is in optimistic "pending" mode, the DB insert may not have
@@ -666,100 +678,49 @@ export const useMining = (options?: UseMiningOptions) => {
     setIsClaiming(true);
 
     try {
-      // Fetch the ACTUAL session from the database to prevent claiming more than mined
-      const { data: dbSession, error: fetchError } = await supabase
-        .from('mining_sessions')
-        .select('id, started_at, arx_mined, is_active')
-        .eq('id', sessionId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (fetchError || !dbSession) {
-        toast({
-          title: 'Claim Failed',
-          description: 'Session not found or already claimed.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // Calculate server-authoritative points based on actual elapsed time
-      const serverStart = new Date(dbSession.started_at).getTime();
-      const serverElapsed = Math.min(Math.max(0, Math.floor((Date.now() - serverStart) / 1000)), maxTimeSeconds);
-      const serverCalculatedPoints = Math.min(480, Math.floor((serverElapsed / 3600) * cappedPointsPerHour));
-
-      // Use the LESSER of client earnedPoints and server-calculated to prevent over-reward
-      const pointsToClaim = Math.max(0, Math.min(Math.floor(earnedPoints), serverCalculatedPoints));
-
-      // MINIMUM 10 ARX-P threshold before any claim is allowed
-      if (pointsToClaim < 10) {
+      // Client preview only — server recomputes on credit
+      const previewPoints = Math.max(0, Math.floor(earnedPoints));
+      if (previewPoints < 10) {
         toast({
           title: 'Not Enough Mined',
-          description: `You need at least 10 ARX-P to claim. Currently mined: ~${pointsToClaim} ARX-P`,
+          description: `You need at least 10 ARX-P to claim. Currently mined: ~${previewPoints} ARX-P`,
           variant: 'destructive',
         });
         return;
       }
 
-      // Flush mined amount before ending so award-points / credit RPCs see current progress
-      await supabase
-        .from('mining_sessions')
-        .update({ arx_mined: pointsToClaim })
-        .eq('id', sessionId)
-        .eq('is_active', true);
+      const { data: rpcData, error: rpcError } = await supabase.rpc(
+        'end_and_credit_mining_session' as any,
+        { p_session_id: sessionId }
+      );
 
-      // First, end the current session in DB to lock it
-      const { error: endError } = await supabase
-        .from('mining_sessions')
-        .update({
-          is_active: false,
-          ended_at: new Date().toISOString(),
-          arx_mined: pointsToClaim,
-        })
-        .eq('id', sessionId)
-        .eq('is_active', true);
+      let credited = !!(rpcData?.success);
+      let creditedPoints = Math.max(0, Math.ceil(Number(rpcData?.points || 0)));
 
-      if (endError) {
-        console.error('Failed to end session for claim:', endError);
+      if (rpcError || !credited) {
+        console.error('end_and_credit_mining_session failed for claim:', rpcError || rpcData);
         toast({
           title: 'Claim Failed',
-          description: 'Could not process session. Please try again.',
+          description: rpcError?.message || rpcData?.error || 'Could not process session. Please try again.',
           variant: 'destructive',
         });
         return;
       }
 
-      let credited = false;
-      let creditedPoints = 0;
-
-      const result = await addPoints(pointsToClaim, 'mining', sessionId);
-      credited = result.success;
-      creditedPoints = result.points || pointsToClaim;
-
-      if (!credited) {
-        const { data: syncData } = await supabase.rpc('credit_my_pending_mining' as any);
-        if (syncData?.success && Number(syncData.points ?? 0) > 0) {
-          credited = true;
-          creditedPoints = Number(syncData.points);
-        }
-      }
-
-      if (credited) {
+      if (creditedPoints > 0) {
         toast({
           title: 'Points Claimed! 🎉',
           description: `+${Math.floor(creditedPoints)} ARX-P added to your balance`,
         });
         triggerConfetti();
       } else {
-        console.error('Point crediting failed for session:', sessionId);
         toast({
           title: 'Claim Issue',
-          description: 'Open the dashboard to sync your balance — points will appear shortly.',
+          description: 'No new points credited for this session.',
           variant: 'destructive',
         });
       }
 
-      // Force-refresh balance IMMEDIATELY
       await refreshPoints();
 
       // CRITICAL: Create a NEW session instead of reusing the old one
@@ -836,15 +797,8 @@ export const useMining = (options?: UseMiningOptions) => {
       const finalPoints = Math.min(480, Math.floor((maxTimeSeconds / 3600) * cappedPointsPerHour));
       setEarnedPoints(finalPoints);
       setSessionMaxed(true);
-      
-      // Update DB with final points (but don't end session)
-      if (!isPending && !endingRef.current) {
-        const wholePoints = Math.floor(finalPoints);
-        if (wholePoints > lastDbPointsRef.current) {
-          lastDbPointsRef.current = wholePoints;
-          void supabase.from('mining_sessions').update({ arx_mined: wholePoints }).eq('id', sessionId);
-        }
-      }
+      lastDbPointsRef.current = Math.floor(finalPoints);
+      // Progress is client-side until end_and_credit_mining_session credits.
       return;
     }
 
@@ -860,13 +814,7 @@ export const useMining = (options?: UseMiningOptions) => {
     const wholePoints = Math.min(480, Math.floor(fractionalPoints));
     if (wholePoints > lastDbPointsRef.current) {
       lastDbPointsRef.current = wholePoints;
-
-      // Hard throttle (safety): never write more often than every 15s.
-      const now = Date.now();
-      if (now - lastDbWriteAtRef.current > 15_000) {
-        lastDbWriteAtRef.current = now;
-        void supabase.from('mining_sessions').update({ arx_mined: wholePoints }).eq('id', sessionId);
-      }
+      lastDbWriteAtRef.current = Date.now();
     }
   }, [isMining, sessionId, maxTimeSeconds, cappedPointsPerHour]);
 
