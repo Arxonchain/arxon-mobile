@@ -4,15 +4,23 @@ const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+
+  if (req.method !== "POST") {
+    return new Response(JSON.stringify({ error: "Method not allowed" }), {
+      status: 405,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   try {
-    const authHeader = req.headers.get("Authorization");
+    const authHeader = req.headers.get("authorization") || req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No auth" }), {
         status: 401,
@@ -20,15 +28,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    if (!supabaseUrl || !serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Server misconfigured" }), {
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
-    // Get user from token
-    const anonClient = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!);
-    const { data: { user }, error: userError } = await anonClient.auth.getUser(
-      authHeader.replace("Bearer ", "")
-    );
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser(token);
 
     if (userError || !user) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
@@ -37,20 +51,19 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Check if country already set
     const { data: profile } = await supabase
       .from("profiles")
-      .select("country_code")
+      .select("country, country_code")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (profile?.country_code) {
-      return new Response(JSON.stringify({ country_code: profile.country_code, already_set: true }), {
+      return new Response(JSON.stringify({ ...profile, already_set: true }), {
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Detect country from IP using free API
     const clientIp =
       req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
       req.headers.get("cf-connecting-ip") ||
@@ -61,46 +74,31 @@ Deno.serve(async (req) => {
     let countryCode = "XX";
 
     try {
-      // Try ip-api.com (free, no key needed)
-      const geoRes = await fetch(`http://ip-api.com/json/${clientIp}?fields=country,countryCode`);
+      const geoRes = await fetch(
+        `https://ip-api.com/json/${encodeURIComponent(clientIp)}?fields=country,countryCode`,
+      );
       if (geoRes.ok) {
         const geo = await geoRes.json();
-        if (geo.countryCode && geo.countryCode !== "") {
-          country = geo.country;
-          countryCode = geo.countryCode;
+        if (geo?.countryCode) {
+          country = geo.country ?? country;
+          countryCode = geo.countryCode ?? countryCode;
         }
       }
     } catch {
-      console.log("Geo lookup failed, using fallback");
+      // ignore lookup failures
     }
 
-    // If IP lookup failed, try accepting from body
-    if (countryCode === "XX") {
-      try {
-        const body = await req.json();
-        if (body.country_code && body.country) {
-          countryCode = body.country_code;
-          country = body.country;
-        }
-      } catch {
-        // no body
-      }
-    }
-
-    // Update profile
     if (countryCode !== "XX") {
-      await supabase
-        .from("profiles")
-        .update({ country, country_code: countryCode })
-        .eq("user_id", user.id);
+      await supabase.from("profiles").update({ country, country_code: countryCode }).eq("user_id", user.id);
     }
 
-    return new Response(
-      JSON.stringify({ country, country_code: countryCode, updated: countryCode !== "XX" }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: err?.message || 'Unknown error' }), {
+    return new Response(JSON.stringify({ country, country_code: countryCode, updated: countryCode !== "XX" }), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
