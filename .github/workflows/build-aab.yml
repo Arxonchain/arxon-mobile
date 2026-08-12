@@ -35,10 +35,10 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # Default Capacitor config loads OTA from https://arxon-mobile.pages.dev (not localhost).
+      # Do not set CAPACITOR_BUNDLE_LOCAL here — that forces https://localhost and breaks store OTA.
       - name: Sync Capacitor
         run: npx cap sync android
-        env:
-          CAPACITOR_BUNDLE_LOCAL: 'true'
 
       - name: Decode keystore from secret
         run: |

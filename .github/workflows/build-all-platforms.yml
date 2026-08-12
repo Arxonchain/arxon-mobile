@@ -26,9 +26,8 @@ jobs:
       - uses: android-actions/setup-android@v2
       - run: npm install @capacitor/cli
       - run: npx cap add android || true
+      # Default Capacitor config loads OTA from https://arxon-mobile.pages.dev (not localhost).
       - run: npx cap sync android
-        env:
-          CAPACITOR_BUNDLE_LOCAL: 'true'
       - name: Verify native plugins synced
         run: |
           grep -q 'capgo-capacitor-native-biometric' android/app/capacitor.build.gradle
@@ -67,9 +66,8 @@ jobs:
           VITE_ARXON_UI_V2: 'true'
       - run: npm install @capacitor/cli
       - run: npx cap add ios || true
+      # Default Capacitor config loads OTA from https://arxon-mobile.pages.dev (not localhost).
       - run: npx cap sync ios
-        env:
-          CAPACITOR_BUNDLE_LOCAL: 'true'
       - uses: ruby/setup-ruby@v1
         with:
           ruby-version: '3.0'

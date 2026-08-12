@@ -1,11 +1,13 @@
 import { CapacitorConfig } from '@capacitor/cli';
 
+/** Production OTA host used by Play Store / release builds (never localhost). */
 const REMOTE_URL = 'https://arxon-mobile.pages.dev';
 
 /**
- * Default: load UI from Cloudflare (instant OTA on git push).
- * Store builds with offline support: set CAPACITOR_BUNDLE_LOCAL=true before cap sync
- * so the app ships bundled dist/ and works without network.
+ * Default (release / Play Store / CI): load UI from Cloudflare OTA (REMOTE_URL).
+ * Opt-in offline/local-bundle only: set CAPACITOR_BUNDLE_LOCAL=true before `cap sync`
+ * so the WebView origin becomes https://localhost and ships bundled dist/.
+ * Do NOT enable CAPACITOR_BUNDLE_LOCAL for store AAB/APK workflows.
  */
 const bundleLocal = process.env.CAPACITOR_BUNDLE_LOCAL === 'true';
 
