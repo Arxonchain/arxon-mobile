@@ -118,7 +118,7 @@ export default function DiceDuelMatchV2() {
   const copyInvite = useCallback(async () => {
     const code = match?.invite_code as string | undefined;
     if (!code) return;
-    const link = buildDiceInviteUrl('/arena/dice/duel', code);
+    const link = buildDiceInviteUrl('duel', code);
     try {
       await navigator.clipboard.writeText(`${code} · ${link}`);
       toast({ title: 'Invite copied', description: `Code ${code}` });

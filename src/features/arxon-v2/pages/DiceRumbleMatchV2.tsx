@@ -102,7 +102,7 @@ export default function DiceRumbleMatchV2() {
   const copyInvite = useCallback(async () => {
     const code = match?.invite_code as string | undefined;
     if (!code) return;
-    const link = buildDiceInviteUrl('/arena/dice/rumble', code);
+    const link = buildDiceInviteUrl('rumble', code);
     try {
       await navigator.clipboard.writeText(`${code} · ${link}`);
       toast({ title: 'Invite copied', description: `Code ${code}` });

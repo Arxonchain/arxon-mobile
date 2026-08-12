@@ -165,7 +165,7 @@ export default function DiceRumbleLobbyV2() {
 
   const copyInvite = useCallback(async () => {
     if (!myMatch?.inviteCode) return;
-    const link = buildDiceInviteUrl('/arena/dice/rumble', myMatch.inviteCode);
+    const link = buildDiceInviteUrl('rumble', myMatch.inviteCode);
     try {
       await navigator.clipboard.writeText(`${myMatch.inviteCode} · ${link}`);
       toast({ title: 'Invite copied', description: `Code ${myMatch.inviteCode}` });

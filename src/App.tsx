@@ -2,10 +2,16 @@ import React, { useState, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
+import { lobbyPathForDiceInvite, type DiceInviteMode } from "@/features/dice/diceInviteUrl";
+
+function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
+  const { code = '' } = useParams<{ code: string }>();
+  return <Navigate to={lobbyPathForDiceInvite(mode, code)} replace />;
+}
 
 // Web pages
 import Landing from "@/pages/Landing";
@@ -65,6 +71,7 @@ import PublicProfile from "@/pages/PublicProfile";
 import MobileSplash from "@/components/mobile/MobileSplash";
 import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
+import DiceInviteDeepLinkListener from "@/components/system/DiceInviteDeepLinkListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
@@ -193,6 +200,7 @@ function AppRoutes() {
   return (
     <>
       <PushNavListener />
+      <DiceInviteDeepLinkListener />
       <SessionRecovery />
       <PushNotificationInit />
       <WebBundleRefreshInit />
@@ -318,6 +326,9 @@ function AppRoutes() {
             <Route path="/arena/dice/duel/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceDuelMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             <Route path="/arena/dice/rumble" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceRumbleLobbyV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             <Route path="/arena/dice/rumble/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceRumbleMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            {/* Short brand invite paths → existing ?code= join UX (if Capacitor/HashRouter ever receives them) */}
+            <Route path="/d/:code" element={<DiceShortInviteRedirect mode="duel" />} />
+            <Route path="/r/:code" element={<DiceShortInviteRedirect mode="rumble" />} />
             <Route path="/arena"        element={ARXON_UI_V2_ENABLED ? <ArenaV2 /> : <MobileArena />} />
             <Route path="/leaderboard"  element={ARXON_UI_V2_ENABLED ? <LeaderboardV2 /> : <MobileLeaderboard />} />
             <Route path="/nexus"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NexusV2 /> : <MobileNexus />}</ProtectedRoute>} />
