@@ -4,7 +4,7 @@ import {
   Target, Trophy, Users, Send, Pickaxe, Swords, Gift, CheckCircle2,
   Sparkles, RotateCcw, Gamepad2, Activity, Dices,
 } from 'lucide-react';
-import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
+import leaderboardKing from '@/assets/word-forge/ui/leaderboard-king.png';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 import { neon } from '../design/neonTokens';
 
@@ -967,7 +967,7 @@ function ExploreBoxIcon({ variant }: { variant: ExploreBoxItem['variant'] }) {
   if (variant === 'leaderboard') {
     return (
       <div style={{ ...shell, borderRadius: 11, overflow: 'hidden', padding: 0 }}>
-        <img src={FORGE_UI.leaderboardKing} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 40%' }} />
+        <img src={leaderboardKing} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 40%' }} />
       </div>
     );
   }

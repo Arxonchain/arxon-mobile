@@ -43,7 +43,8 @@ const config: CapacitorConfig = {
       },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 2500,
+      // Native splash only; Play Store rebuild required to change. Keep short so OTA WebView can paint sooner.
+      launchShowDuration: 1200,
       launchAutoHide: true,
       backgroundColor: '#07080f',
       androidSplashResourceName: 'splash',

@@ -8,67 +8,16 @@ import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
 import { lobbyPathForDiceInvite, type DiceInviteMode } from "@/features/dice/diceInviteUrl";
 
-function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
-  const { code = '' } = useParams<{ code: string }>();
-  return <Navigate to={lobbyPathForDiceInvite(mode, code)} replace />;
-}
-
-// Web pages
-import Landing from "@/pages/Landing";
+// Critical-path sync (auth + splash + home shell). Everything else is lazy so OTA main JS stays smaller.
 import AuthPage from "@/pages/AuthPage";
 import AuthLandingV2 from "@/features/arxon-v2/pages/AuthLandingV2";
 import AuthConfirm from "@/pages/AuthConfirm";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import ChangePassword from "@/pages/ChangePassword";
-import Dashboard from "@/pages/Dashboard";
-import DashboardLayout from "@/components/layout/DashboardLayout";
-import Mining from "@/pages/Mining";
-import Tasks from "@/pages/Tasks";
-import Leaderboard from "@/pages/Leaderboard";
-import Arena from "@/pages/Arena";
-import Referrals from "@/pages/Referrals";
-import Nexus from "@/pages/Nexus";
-import Profile from "@/pages/Profile";
-import Settings from "@/pages/Settings";
-import Notifications from "@/pages/Notifications";
-import PointsHistory from "@/pages/PointsHistory";
-import Litepaper from "@/pages/Litepaper";
-
-// Admin
-import AdminLayout from "@/components/admin/AdminLayout";
-import AdminDashboard from "@/pages/admin/AdminDashboard";
-import AdminUsers from "@/pages/admin/AdminUsers";
-import AdminSignups from "@/pages/admin/AdminSignups";
-import AdminControls from "@/pages/admin/AdminControls";
-import AdminArena from "@/pages/admin/AdminArena";
-import AdminReconciliation from "@/pages/admin/AdminReconciliation";
-import AdminLogin from "@/pages/admin/AdminLogin";
-import AdminImportUsers from "@/pages/admin/AdminImportUsers";
-import AdminExportFilter from "@/pages/admin/AdminExportFilter";
-import AdminBattleHistory from "@/pages/admin/AdminBattleHistory";
-import AdminGlobalMap from "@/pages/admin/AdminGlobalMap";
-import AdminTasks from "@/pages/admin/AdminTasks";
-import AdminReferrals from "@/pages/admin/AdminReferrals";
-import AdminReferralRecovery from "@/pages/admin/AdminReferralRecovery";
-import AdminAnalytics from "@/pages/admin/AdminAnalytics";
-import AdminAnnouncements from "@/pages/admin/AdminAnnouncements";
-import AdminClaims from "@/pages/admin/AdminClaims";
-
-import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
-
-// Mobile
-import MobileDashboard from "@/components/mobile/MobileDashboard";
-import MobileMining from "@/components/mobile/MobileMining";
-import MobileLeaderboard from "@/components/mobile/MobileLeaderboard";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
-import MobileArena from "@/components/mobile/MobileArena";
-import MobileNexus from "@/components/mobile/MobileNexus";
-import MobileProfile from "@/components/mobile/MobileProfile";
-import MobileWallet from "@/components/mobile/MobileWallet";
-import MobileSettings from "@/components/mobile/MobileSettings";
-import PublicProfile from "@/pages/PublicProfile";
 import MobileSplash from "@/components/mobile/MobileSplash";
+import MobileBottomNav from "@/components/mobile/MobileBottomNav";
+import MobileBottomNavV2 from "@/features/arxon-v2/layout/MobileBottomNavV2";
+import DashboardV2 from "@/features/arxon-v2/pages/DashboardV2";
 import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
 import DiceInviteDeepLinkListener from "@/components/system/DiceInviteDeepLinkListener";
@@ -76,14 +25,6 @@ import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
-
-import {
-  DashboardV2, ArenaV2, PredictionMarketV2, LeaderboardV2, ProfileV2,
-  TasksV2, ReferralsV2, NexusV2, WalletV2, SettingsV2,
-  NotificationsV2, PointsHistoryV2, DiceHubV2, DiceMatchV2,
-  DiceDuelLobbyV2, DiceDuelMatchV2, DiceRumbleLobbyV2, DiceRumbleMatchV2,
-  MobileBottomNavV2,
-} from "@/features/arxon-v2";
 import AppPreviewShell, { PreviewSpinner } from "@/features/arxon-v2/preview/AppPreviewShell";
 import {
   PreviewWordForgePage,
@@ -91,9 +32,78 @@ import {
   PreviewSectorMapPage,
   PreviewWordForgeLeaderboardPage,
 } from "@/features/arxon-v2/preview/previewLazyPages";
-import DashboardNeon from "@/features/arxon-v2/pages/DashboardNeon";
 import { ARXON_UI_V2_ENABLED } from "@/lib/uiFeature";
 import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
+import { usePushNotifications } from "@/hooks/usePushNotifications";
+import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
+
+function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
+  const { code = '' } = useParams<{ code: string }>();
+  return <Navigate to={lobbyPathForDiceInvite(mode, code)} replace />;
+}
+
+const Landing = lazy(() => import("@/pages/Landing"));
+const Dashboard = lazy(() => import("@/pages/Dashboard"));
+const DashboardLayout = lazy(() => import("@/components/layout/DashboardLayout"));
+const Mining = lazy(() => import("@/pages/Mining"));
+const Tasks = lazy(() => import("@/pages/Tasks"));
+const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
+const Arena = lazy(() => import("@/pages/Arena"));
+const Referrals = lazy(() => import("@/pages/Referrals"));
+const Nexus = lazy(() => import("@/pages/Nexus"));
+const Profile = lazy(() => import("@/pages/Profile"));
+const Settings = lazy(() => import("@/pages/Settings"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
+const PointsHistory = lazy(() => import("@/pages/PointsHistory"));
+const Litepaper = lazy(() => import("@/pages/Litepaper"));
+const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
+
+const AdminLayout = lazy(() => import("@/components/admin/AdminLayout"));
+const AdminDashboard = lazy(() => import("@/pages/admin/AdminDashboard"));
+const AdminUsers = lazy(() => import("@/pages/admin/AdminUsers"));
+const AdminSignups = lazy(() => import("@/pages/admin/AdminSignups"));
+const AdminControls = lazy(() => import("@/pages/admin/AdminControls"));
+const AdminArena = lazy(() => import("@/pages/admin/AdminArena"));
+const AdminReconciliation = lazy(() => import("@/pages/admin/AdminReconciliation"));
+const AdminLogin = lazy(() => import("@/pages/admin/AdminLogin"));
+const AdminImportUsers = lazy(() => import("@/pages/admin/AdminImportUsers"));
+const AdminExportFilter = lazy(() => import("@/pages/admin/AdminExportFilter"));
+const AdminBattleHistory = lazy(() => import("@/pages/admin/AdminBattleHistory"));
+const AdminGlobalMap = lazy(() => import("@/pages/admin/AdminGlobalMap"));
+const AdminTasks = lazy(() => import("@/pages/admin/AdminTasks"));
+const AdminReferrals = lazy(() => import("@/pages/admin/AdminReferrals"));
+const AdminReferralRecovery = lazy(() => import("@/pages/admin/AdminReferralRecovery"));
+const AdminAnalytics = lazy(() => import("@/pages/admin/AdminAnalytics"));
+const AdminAnnouncements = lazy(() => import("@/pages/admin/AdminAnnouncements"));
+const AdminClaims = lazy(() => import("@/pages/admin/AdminClaims"));
+
+const MobileDashboard = lazy(() => import("@/components/mobile/MobileDashboard"));
+const MobileMining = lazy(() => import("@/components/mobile/MobileMining"));
+const MobileLeaderboard = lazy(() => import("@/components/mobile/MobileLeaderboard"));
+const MobileArena = lazy(() => import("@/components/mobile/MobileArena"));
+const MobileNexus = lazy(() => import("@/components/mobile/MobileNexus"));
+const MobileProfile = lazy(() => import("@/components/mobile/MobileProfile"));
+const MobileWallet = lazy(() => import("@/components/mobile/MobileWallet"));
+const MobileSettings = lazy(() => import("@/components/mobile/MobileSettings"));
+
+const ArenaV2 = lazy(() => import("@/features/arxon-v2/pages/ArenaV2"));
+const PredictionMarketV2 = lazy(() => import("@/features/arxon-v2/pages/PredictionMarketV2"));
+const LeaderboardV2 = lazy(() => import("@/features/arxon-v2/pages/LeaderboardV2"));
+const ProfileV2 = lazy(() => import("@/features/arxon-v2/pages/ProfileV2"));
+const TasksV2 = lazy(() => import("@/features/arxon-v2/pages/TasksV2"));
+const ReferralsV2 = lazy(() => import("@/features/arxon-v2/pages/ReferralsV2"));
+const NexusV2 = lazy(() => import("@/features/arxon-v2/pages/NexusV2"));
+const WalletV2 = lazy(() => import("@/features/arxon-v2/pages/WalletV2"));
+const SettingsV2 = lazy(() => import("@/features/arxon-v2/pages/SettingsV2"));
+const NotificationsV2 = lazy(() => import("@/features/arxon-v2/pages/NotificationsV2"));
+const PointsHistoryV2 = lazy(() => import("@/features/arxon-v2/pages/PointsHistoryV2"));
+const DiceHubV2 = lazy(() => import("@/features/arxon-v2/pages/DiceHubV2"));
+const DiceMatchV2 = lazy(() => import("@/features/arxon-v2/pages/DiceMatchV2"));
+const DiceDuelLobbyV2 = lazy(() => import("@/features/arxon-v2/pages/DiceDuelLobbyV2"));
+const DiceDuelMatchV2 = lazy(() => import("@/features/arxon-v2/pages/DiceDuelMatchV2"));
+const DiceRumbleLobbyV2 = lazy(() => import("@/features/arxon-v2/pages/DiceRumbleLobbyV2"));
+const DiceRumbleMatchV2 = lazy(() => import("@/features/arxon-v2/pages/DiceRumbleMatchV2"));
+const DashboardNeon = lazy(() => import("@/features/arxon-v2/pages/DashboardNeon"));
 
 const GamingHubPage = WORD_FORGE_ENABLED
   ? lazy(() => import("@/components/mobile/GamingHubPage"))
@@ -204,6 +214,7 @@ function AppRoutes() {
       <SessionRecovery />
       <PushNotificationInit />
       <WebBundleRefreshInit />
+      <Suspense fallback={<Spinner />}>
       <Routes>
         <Route path="/auth"           element={<PublicRoute>{ARXON_UI_V2_ENABLED ? <AuthLandingV2 /> : <AuthPage />}</PublicRoute>} />
         <Route path="/auth/confirm"   element={<AuthConfirm />} />
@@ -452,6 +463,7 @@ function AppRoutes() {
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      </Suspense>
 
       {isNative && (ARXON_UI_V2_ENABLED ? <MobileBottomNavV2 /> : <MobileBottomNav />)}
     </>

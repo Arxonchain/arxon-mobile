@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import v2FlowBg from '@/assets/v2-flow-bg.jpg';
 import { ARXON_UI_V2_ENABLED } from '@/lib/uiFeature';
@@ -7,22 +7,37 @@ import { neon } from '@/features/arxon-v2/design/neonTokens';
 
 interface Props { isAppReady: boolean; onFinish: () => void; }
 
+/** Min brand hold from splash mount (overlaps auth bootstrap — not stacked after it). */
+const MIN_HOLD_MS = ARXON_UI_V2_ENABLED ? 450 : 500;
+const EXIT_MS = ARXON_UI_V2_ENABLED ? 320 : 400;
+
 /** Classic OTA splash when V2 flag is off; neon flow splash only for new-main. */
 export default function MobileSplash({ isAppReady, onFinish }: Props) {
   const [visible, setVisible] = useState(true);
+  const mountedAt = useRef(Date.now());
+  const finished = useRef(false);
 
   useEffect(() => {
-    if (!isAppReady) return;
-    const holdMs = ARXON_UI_V2_ENABLED ? 1400 : 900;
-    const t = setTimeout(() => { setVisible(false); setTimeout(onFinish, 700); }, holdMs);
-    return () => clearTimeout(t);
+    if (!isAppReady || finished.current) return;
+
+    const elapsed = Date.now() - mountedAt.current;
+    const wait = Math.max(0, MIN_HOLD_MS - elapsed);
+
+    const t = window.setTimeout(() => {
+      if (finished.current) return;
+      finished.current = true;
+      setVisible(false);
+      window.setTimeout(onFinish, EXIT_MS);
+    }, wait);
+
+    return () => window.clearTimeout(t);
   }, [isAppReady, onFinish]);
 
   if (!ARXON_UI_V2_ENABLED) {
     return (
       <AnimatePresence>
         {visible && (
-          <motion.div initial={{opacity:1}} exit={{opacity:0}} transition={{duration:0.7,ease:'easeInOut'}}
+          <motion.div initial={{opacity:1}} exit={{opacity:0}} transition={{duration: EXIT_MS / 1000, ease:'easeInOut'}}
             style={{position:'fixed',inset:0,zIndex:9999,background:'hsl(225 30% 3%)',
               display:'flex',alignItems:'center',justifyContent:'center'}}>
             <div style={{position:'absolute',top:'50%',left:'50%',transform:'translate(-50%,-50%)',
@@ -58,7 +73,7 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
         <motion.div
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.65, ease: 'easeInOut' }}
+          transition={{ duration: EXIT_MS / 1000, ease: 'easeInOut' }}
           style={{
             position: 'fixed', inset: 0, zIndex: 9999, background: neon.deep,
             display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
@@ -89,7 +104,7 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
           <motion.div
             initial={{ scale: 0.7, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.75, ease: [0.22, 1, 0.36, 1] }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
             style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}
           >
             <div style={{ position: 'relative' }}>
@@ -115,7 +130,7 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
             <motion.div
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35, duration: 0.55 }}
+              transition={{ delay: 0.2, duration: 0.4 }}
               style={{ textAlign: 'center' }}
             >
               <h1 style={{
@@ -128,7 +143,7 @@ export default function MobileSplash({ isAppReady, onFinish }: Props) {
               <motion.p
                 initial={{ opacity: 0, letterSpacing: '0.08em' }}
                 animate={{ opacity: 1, letterSpacing: '0.22em' }}
-                transition={{ delay: 0.7, duration: 0.7 }}
+                transition={{ delay: 0.35, duration: 0.45 }}
                 style={{
                   margin: '12px 0 0', fontFamily: neon.font, fontSize: 11, fontWeight: 700,
                   textTransform: 'uppercase', color: neon.cyan,

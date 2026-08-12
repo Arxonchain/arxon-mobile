@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import confetti from 'canvas-confetti';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheGet, cacheSet, cacheRemove } from '@/lib/localCache';
 import { useAuth } from '@/contexts/AuthContext';
@@ -60,11 +59,13 @@ export const PointsProvider = ({ children }: { children: ReactNode }) => {
   const lastRankAtRef = useRef(0);
 
   const triggerConfetti = useCallback(() => {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-      colors: ['#6B8CAE', '#8BA4C4', '#A0B8D4', '#C0D0E0'],
+    void import('canvas-confetti').then(({ default: confetti }) => {
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 },
+        colors: ['#6B8CAE', '#8BA4C4', '#A0B8D4', '#C0D0E0'],
+      });
     });
   }, []);
 

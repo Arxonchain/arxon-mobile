@@ -3,7 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Sparkles, Swords, Target } from 'lucide-react';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
-import { FORGE_UI } from '@/features/word-forge/data/uiAssets';
+import bannerWordForge from '@/assets/word-forge/ui/banner-word-forge-clean.png';
+import bannerTasks from '@/assets/word-forge/ui/banner-tasks-clean.png';
+import bannerArena from '@/assets/word-forge/ui/banner-arena-clean.png';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 
 interface Slide {
@@ -32,7 +34,7 @@ const WORD_FORGE_SLIDE: Slide = {
   cta: 'Play Now',
   path: '/word-forge',
   accent: neon.cyan,
-  heroImage: FORGE_UI.bannerWordForge,
+  heroImage: bannerWordForge,
   heroMode: 'cutout',
   heroSize: 158,
   icon: 'sparkles',
@@ -49,7 +51,7 @@ const SLIDES: Slide[] = [
     cta: 'Enter Arena',
     path: '/arena',
     accent: neon.purple,
-    heroImage: FORGE_UI.bannerArena,
+    heroImage: bannerArena,
     heroMode: 'arena-blend',
     icon: 'swords',
   },
@@ -62,7 +64,7 @@ const SLIDES: Slide[] = [
     cta: 'View Tasks',
     path: '/tasks',
     accent: neon.teal,
-    heroImage: FORGE_UI.bannerTasks,
+    heroImage: bannerTasks,
     heroMode: 'cutout',
     icon: 'target',
   },

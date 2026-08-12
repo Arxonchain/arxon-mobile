@@ -45,11 +45,10 @@ void (async () => {
         console.warn("CapacitorUpdater.notifyAppReady failed:", e);
       }
 
-      try {
-        await ensureArxonNotificationChannel();
-      } catch (e) {
+      // Non-blocking: do not delay first paint / App mount on notification channel setup.
+      void ensureArxonNotificationChannel().catch((e) => {
         console.warn('LocalNotifications channel setup failed:', e);
-      }
+      });
     }
 
     const { default: App } = await import("./App.tsx");
