@@ -73,10 +73,16 @@ jobs:
             echo "CLOUDFLARE_ACCOUNT_ID=$ACCOUNT_ID"
           } >> "$GITHUB_ENV"
 
+      # Match store AAB/APK/iOS: V2 UI + Word Forge on for Capacitor OTA (pages.dev).
+      # Keep write-web-bundle-version so Play WebViews pick up new deploys without a store upload.
       - name: Install and build
+        env:
+          VITE_WORD_FORGE_ENABLED: 'true'
+          VITE_ARXON_UI_V2: 'true'
         run: |
           npm ci
-          npm run build
+          node scripts/write-web-bundle-version.mjs
+          npx vite build --mode word-forge
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

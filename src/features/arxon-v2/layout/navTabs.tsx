@@ -15,7 +15,7 @@ const INACTIVE = 'rgba(232,252,255,0.38)';
 const stroke = (active: boolean, accent: string) => (active ? accent : INACTIVE);
 const fill = (active: boolean, accent: string) => (active ? `${accent}30` : 'none');
 
-/** V2 / new-main nav only (VITE_ARXON_UI_V2). No mining tab — mining stays on classic OTA nav. */
+/** V2 nav (VITE_ARXON_UI_V2). No mining tab — mining remains on classic UI only. */
 export function buildV2NavTabs(basePath = ''): NavTab[] {
   const p = (path: string) => (basePath ? `${basePath}${path === '/' ? '' : path}` : path || '/');
 

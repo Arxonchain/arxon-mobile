@@ -64,7 +64,7 @@ const ProfileIcon = (a: boolean) => (
 );
 
 /**
- * Classic / public OTA bottom nav (VITE_ARXON_UI_V2 unset).
+ * Classic bottom nav (VITE_ARXON_UI_V2 unset).
  * Mining stays here for Play Store OTA users. New-main redesign uses MobileBottomNavV2
  * (no mining tab) when built with .env.word-forge / build:internal.
  */

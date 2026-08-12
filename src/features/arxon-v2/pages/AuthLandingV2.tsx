@@ -1,5 +1,5 @@
 /**
- * V2-only auth landing (ARXON_UI_V2). Classic OTA continues to use pages/AuthPage.tsx.
+ * V2-only auth landing (ARXON_UI_V2). Classic builds use pages/AuthPage.tsx.
  */
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';

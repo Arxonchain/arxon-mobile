@@ -308,8 +308,8 @@ function AppRoutes() {
               } />
             )}
             {/*
-              Public OTA / classic Play Store (npm run build): VITE_ARXON_UI_V2 unset → keep /mining.
-              New-main redesign (npm run build:internal / .env.word-forge): VITE_ARXON_UI_V2=true → hide mining page until a new store upload ships.
+              V2 / store+OTA (VITE_ARXON_UI_V2=true): /mining redirects to dashboard.
+              Classic (flag unset): keep /mining page.
             */}
             <Route
               path="/mining"
