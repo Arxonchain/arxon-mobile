@@ -8,8 +8,8 @@
  *   api.js?render=explicit  — no async/defer; wait for script.onload, then call render().
  * Do not call turnstile.ready() with an async/defer script tag (Cloudflare warns and can fail).
  *
- * Tokens are single-use. Parents must bump `resetKey` (or call remount via Retry) after any
- * auth attempt so the widget does not stay on "Success!" while React state has no token.
+ * Tokens are single-use. Parents should bump `resetKey` only after a failed auth response
+ * (or on mode change / Retry) — never before the request finishes.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TURNSTILE_SITE_KEY, isTurnstileConfigured } from '@/lib/turnstile';

@@ -47,8 +47,8 @@ const AdminLogin = () => {
       return;
     }
 
-    invalidateCaptcha();
     setLoading(true);
+    let authFailed = false;
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
@@ -57,7 +57,10 @@ const AdminLogin = () => {
         options: token ? { captchaToken: token } : undefined,
       });
 
-      if (authError) throw authError;
+      if (authError) {
+        authFailed = true;
+        throw authError;
+      }
 
       if (!(await checkUserIsAdmin(authData.user))) {
         await supabase.auth.signOut();
@@ -75,6 +78,7 @@ const AdminLogin = () => {
       });
       navigate("/admin");
     } catch (error: any) {
+      authFailed = true;
       toast({
         title: "Login Failed",
         description: error.message || "Invalid credentials",
@@ -82,6 +86,7 @@ const AdminLogin = () => {
       });
     } finally {
       setLoading(false);
+      if (authFailed) invalidateCaptcha();
     }
   };
 

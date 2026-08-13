@@ -99,9 +99,9 @@ export default function AuthPage() {
       return;
     }
 
-    // Consume immediately — tokens are single-use; remount so Success cannot stick after failure.
-    invalidateCaptcha();
+    // Keep the Turnstile token until the auth request finishes.
     setLoading(true);
+    let authFailed = false;
 
     try {
       if (mode === 'signup') {
@@ -117,6 +117,7 @@ export default function AuthPage() {
 
         const { error, user: newUser } = await signUp(email, password, ref || undefined, token || undefined);
         if (error) {
+          authFailed = true;
           if (isAlreadyRegisteredError(error.message)) {
             toast({
               title: 'Account already exists',
@@ -141,12 +142,18 @@ export default function AuthPage() {
 
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password, token || undefined);
-        if (error) throw error;
+        if (error) {
+          authFailed = true;
+          throw error;
+        }
         navigate('/');
 
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email, token || undefined);
-        if (error) throw error;
+        if (error) {
+          authFailed = true;
+          throw error;
+        }
         toast({
           title: 'Check your email',
           description: 'Reset link sent. You stay signed out until you open the email link and set a new password.',
@@ -154,6 +161,7 @@ export default function AuthPage() {
         setMode('signin');
       }
     } catch (err: any) {
+      authFailed = true;
       if (isAlreadyRegisteredError(err?.message)) {
         toast({
           title: 'Account already exists',
@@ -170,6 +178,7 @@ export default function AuthPage() {
       }
     } finally {
       setLoading(false);
+      if (authFailed) invalidateCaptcha();
     }
   };
 

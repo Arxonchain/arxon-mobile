@@ -92,8 +92,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       return;
     }
 
-    invalidateCaptcha();
     setLoading(true);
+    let authFailed = false;
     try {
       const redirectTo = getPasswordResetRedirectUrl();
 
@@ -106,6 +106,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       );
 
       if (error) {
+        authFailed = true;
         toast({
           title: "Reset Failed",
           description: error.message || "Unable to send reset link. Try again later.",
@@ -120,6 +121,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
         setEmail(""); // clear for next time
       }
     } catch (error: any) {
+      authFailed = true;
       toast({
         title: "Error",
         description: error?.message || "Something went wrong. Please try again.",
@@ -127,6 +129,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       });
     } finally {
       setLoading(false);
+      if (authFailed) invalidateCaptcha();
     }
   };
 
@@ -190,14 +193,15 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       return;
     }
 
-    // Consume immediately — tokens are single-use; remount so Success cannot stick after failure.
-    invalidateCaptcha();
+    // Keep captcha token until the request finishes; remount only after a failed response.
     setLoading(true);
+    let authFailed = false;
 
     try {
       if (mode === "signin") {
         const { error } = await signIn(email, password, token || undefined);
         if (error) {
+          authFailed = true;
           const msg = error.message?.toLowerCase() || '';
           let description = error.message;
           if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
@@ -226,11 +230,11 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
         const { error, user: newUser } = await signUp(email, password, undefined, token || undefined);
 
         if (error) {
+          authFailed = true;
           const msg = error.message?.toLowerCase() || '';
           let title = 'Sign Up Failed';
           let description = error.message;
 
-          // Do not auto sign-in without a fresh captchaToken (Attack Protection rejects it).
           if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('504') || msg.includes('deadline')) {
             title = 'Connection Error';
             description =
@@ -263,6 +267,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
         }
       }
     } catch (error) {
+      authFailed = true;
       const msg = (error as Error)?.message?.toLowerCase() || '';
       let title = 'Connection Error';
       let description = 'Connection timed out. The server may be busy - please try again.';
@@ -279,6 +284,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       });
     } finally {
       setLoading(false);
+      if (authFailed) invalidateCaptcha();
     }
   };
 

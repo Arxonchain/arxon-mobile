@@ -16,13 +16,27 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   ) {
     return "An account already exists with this email — please log in.";
   }
+  // Prefer mailer/request timeouts over captcha copy — 504s often surface as captcha
+  // "timeout-or-duplicate" on retry after the first attempt hangs on email send.
+  if (
+    m.includes("504") ||
+    m.includes("context deadline") ||
+    m.includes("request_timeout") ||
+    (m.includes("timed out") && !m.includes("timeout-or-duplicate")) ||
+    (m.includes("timeout") && !m.includes("timeout-or-duplicate") && !m.includes("captcha"))
+  ) {
+    if (context === "signup") {
+      return "Signup timed out. Wait a moment, complete a fresh security check, then try Create Account again.";
+    }
+    return "Connection timed out. Please try again.";
+  }
   if (
     m.includes("captcha") ||
     m.includes("timeout-or-duplicate") ||
     m.includes("invalid-input-response") ||
     m.includes("no captcha_token")
   ) {
-    return "Security check failed or expired. Complete the verification again, then tap Create Account promptly — do not reuse an old check.";
+    return "Security check failed or expired. Complete the verification again, then tap Create Account.";
   }
   if (m.includes("signups not allowed") || m.includes("signup is disabled") || m.includes("disable_signup")) {
     return "Signups are currently disabled. Please try again later.";
@@ -35,17 +49,6 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   }
   if (m.includes("network") || m.includes("failed to fetch") || m.includes("edge function")) {
     return "Connection failed. Please check your internet and try again.";
-  }
-  if (
-    m.includes("timed out") ||
-    m.includes("timeout") ||
-    m.includes("504") ||
-    m.includes("context deadline")
-  ) {
-    if (context === "signup") {
-      return "The request took too long. Your account may still have been created — check your email, then try signing in.";
-    }
-    return "Connection timed out. Please try again.";
   }
   if (m.includes("server busy") || m.includes("503") || m.includes("502") || m.includes("gateway")) {
     return "Our servers are temporarily overloaded. Please wait a moment and try again.";
