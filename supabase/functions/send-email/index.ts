@@ -62,15 +62,21 @@ function subjectFor(action: EmailActionType): string {
 
 /**
  * App-side confirm URL. Prefetch/bots that only HTTP GET won't run verifyOtp.
+ * Always force https:// — bare or http:// redirect_to would make Firefox show "Not Secure".
  */
 function buildConfirmUrl(tokenHash: string, action: string, redirectTo: string): string {
   let base = (redirectTo || "").trim();
   if (!base) {
     base = "https://arxonchain.xyz/auth/confirm";
   }
+  // Tolerate "arxonchain.xyz/..." without scheme
+  if (!/^https?:\/\//i.test(base)) {
+    base = `https://${base.replace(/^\/+/, "")}`;
+  }
 
   try {
     const u = new URL(base);
+    u.protocol = "https:";
     if (!u.pathname.includes("/auth/confirm")) {
       u.pathname = "/auth/confirm";
     }

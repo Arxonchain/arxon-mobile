@@ -7,9 +7,13 @@ import { Capacitor } from '@capacitor/core';
 import { PRODUCTION_APP_ORIGIN } from '@/lib/appOrigins';
 
 export function getAuthRedirectUrl(path = "/"): string {
-  const origin = Capacitor.isNativePlatform()
+  let origin = Capacitor.isNativePlatform()
     ? PRODUCTION_APP_ORIGIN
     : window.location.origin;
+  // Auth email links must be https (never capacitor:// or http://).
+  if (!origin.startsWith("https://")) {
+    origin = PRODUCTION_APP_ORIGIN;
+  }
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${origin}${normalizedPath}`;
 }
