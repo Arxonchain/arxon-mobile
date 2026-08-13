@@ -187,10 +187,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       // Never carry an existing session into / through a reset request.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 
+      const token = typeof captchaToken === 'string' ? captchaToken.trim() : '';
       const { error } = await withTimeout(
         supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
           redirectTo: getPasswordResetRedirectUrl(),
-          captchaToken,
+          ...(token ? { captchaToken: token } : {}),
         }),
         20_000,
         'Connection timed out. Please try again.'

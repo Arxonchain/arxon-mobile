@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,15 @@ const AdminLogin = () => {
   const [loading, setLoading] = useState(false);
   const [checkingSession, setCheckingSession] = useState(true);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const navigate = useNavigate();
   const { toast } = useToast();
   const captchaRequired = isTurnstileConfigured();
+
+  const invalidateCaptcha = useCallback(() => {
+    setCaptchaToken(null);
+    setCaptchaResetKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -31,13 +37,24 @@ const AdminLogin = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    const token = captchaToken?.trim() || "";
+    if (captchaRequired && !token) {
+      toast({
+        title: "Security check required",
+        description: "Complete the verification below, then try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    invalidateCaptcha();
     setLoading(true);
 
     try {
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email,
         password,
-        options: captchaToken ? { captchaToken } : undefined,
+        options: token ? { captchaToken: token } : undefined,
       });
 
       if (authError) throw authError;
@@ -65,8 +82,6 @@ const AdminLogin = () => {
       });
     } finally {
       setLoading(false);
-      // Turnstile tokens are single-use — clear it so the widget can refresh for the next attempt.
-      setCaptchaToken(null);
     }
   };
 
@@ -133,6 +148,7 @@ const AdminLogin = () => {
 
             <TurnstileWidget
               action="admin-signin"
+              resetKey={captchaResetKey}
               onVerify={setCaptchaToken}
               onExpire={() => setCaptchaToken(null)}
               onError={() => setCaptchaToken(null)}

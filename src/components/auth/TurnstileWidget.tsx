@@ -7,6 +7,9 @@
  * Script load follows Cloudflare's explicit-render guidance:
  *   api.js?render=explicit  — no async/defer; wait for script.onload, then call render().
  * Do not call turnstile.ready() with an async/defer script tag (Cloudflare warns and can fail).
+ *
+ * Tokens are single-use. Parents must bump `resetKey` (or call remount via Retry) after any
+ * auth attempt so the widget does not stay on "Success!" while React state has no token.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TURNSTILE_SITE_KEY, isTurnstileConfigured } from '@/lib/turnstile';
@@ -120,6 +123,8 @@ export function TurnstileWidget({
   onExpire,
   onError,
   className,
+  /** Bump after every auth attempt so Success UI cannot outlive a consumed token. */
+  resetKey = 0,
 }: {
   /** Optional Turnstile "action" label, e.g. "signup" / "signin". */
   action?: string;
@@ -127,6 +132,7 @@ export function TurnstileWidget({
   onExpire?: () => void;
   onError?: (message?: string) => void;
   className?: string;
+  resetKey?: number;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const widgetIdRef = useRef<string | null>(null);
@@ -213,7 +219,7 @@ export function TurnstileWidget({
       }
       widgetIdRef.current = null;
     };
-  }, [action, retryNonce]);
+  }, [action, retryNonce, resetKey]);
 
   if (!TURNSTILE_SITE_KEY) return null;
 

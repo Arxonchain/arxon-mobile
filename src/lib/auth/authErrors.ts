@@ -16,8 +16,13 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   ) {
     return "An account already exists with this email — please log in.";
   }
-  if (m.includes("captcha") || m.includes("timeout-or-duplicate") || m.includes("invalid-input-response")) {
-    return "Security check failed or expired. Complete the verification again, then retry.";
+  if (
+    m.includes("captcha") ||
+    m.includes("timeout-or-duplicate") ||
+    m.includes("invalid-input-response") ||
+    m.includes("no captcha_token")
+  ) {
+    return "Security check failed or expired. Complete the verification again, then tap Create Account promptly — do not reuse an old check.";
   }
   if (m.includes("signups not allowed") || m.includes("signup is disabled") || m.includes("disable_signup")) {
     return "Signups are currently disabled. Please try again later.";

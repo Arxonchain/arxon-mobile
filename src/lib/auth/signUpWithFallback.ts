@@ -45,13 +45,15 @@ export async function signUpWithFallback(
   const normalizedEmail = email.trim().toLowerCase();
   const timeoutMs = 45_000;
 
+  const token = typeof captchaToken === "string" ? captchaToken.trim() : "";
   const signupPromise = supabase.auth.signUp({
     email: normalizedEmail,
     password,
     options: {
       emailRedirectTo: getEmailConfirmRedirectUrl(),
       data: referralCode ? { referral_code: referralCode.trim().toUpperCase() } : undefined,
-      captchaToken,
+      // Only send when present — empty/undefined must not become a bogus captcha payload.
+      ...(token ? { captchaToken: token } : {}),
     },
   });
 

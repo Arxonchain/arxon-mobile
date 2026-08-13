@@ -1,7 +1,7 @@
 /**
  * V2-only auth landing (ARXON_UI_V2). Classic builds use pages/AuthPage.tsx.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -33,11 +33,18 @@ export default function AuthLandingV2() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   const { signIn, signUp, resetPassword } = useAuth();
   const captchaRequired = isTurnstileConfigured();
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  /** Clear token + remount widget so Success UI never outlives a consumed/expired token. */
+  const invalidateCaptcha = useCallback(() => {
+    setCaptchaToken(null);
+    setCaptchaResetKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     const ref = searchParams.get('ref');
@@ -54,13 +61,34 @@ export default function AuthLandingV2() {
   }, [searchParams]);
 
   useEffect(() => {
-    setCaptchaToken(null);
-  }, [mode]);
+    invalidateCaptcha();
+  }, [mode, invalidateCaptcha]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (captchaRequired && !captchaToken) {
+    // Client-side validation before consuming a single-use Turnstile token.
+    if (mode === 'signup') {
+      if (password !== confirmPassword) {
+        toast({
+          title: 'Passwords do not match',
+          description: 'Please make sure both passwords are identical.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (password.length < 8) {
+        toast({
+          title: 'Password too short',
+          description: 'Use at least 8 characters.',
+          variant: 'destructive',
+        });
+        return;
+      }
+    }
+
+    const token = captchaToken?.trim() || '';
+    if (captchaRequired && !token) {
       toast({
         title: 'Security check required',
         description: 'Complete the verification below (or tap Retry), then try again.',
@@ -69,30 +97,12 @@ export default function AuthLandingV2() {
       return;
     }
 
+    // Consume immediately — tokens are single-use; remount so Success cannot stick after failure.
+    invalidateCaptcha();
     setLoading(true);
 
     try {
       if (mode === 'signup') {
-        if (password !== confirmPassword) {
-          toast({
-            title: 'Passwords do not match',
-            description: 'Please make sure both passwords are identical.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
-
-        if (password.length < 8) {
-          toast({
-            title: 'Password too short',
-            description: 'Use at least 8 characters.',
-            variant: 'destructive',
-          });
-          setLoading(false);
-          return;
-        }
-
         const ref = referralCode.trim().toUpperCase();
         if (ref) {
           try {
@@ -101,7 +111,7 @@ export default function AuthLandingV2() {
           } catch {}
         }
 
-        const { error, user: newUser } = await signUp(email, password, ref || undefined, captchaToken || undefined);
+        const { error, user: newUser } = await signUp(email, password, ref || undefined, token || undefined);
         if (error) {
           if (isAlreadyRegisteredError(error.message)) {
             toast({
@@ -123,11 +133,11 @@ export default function AuthLandingV2() {
         });
         setMode('signin');
       } else if (mode === 'signin') {
-        const { error } = await signIn(email, password, captchaToken || undefined);
+        const { error } = await signIn(email, password, token || undefined);
         if (error) throw error;
         navigate('/');
       } else if (mode === 'forgot') {
-        const { error } = await resetPassword(email, captchaToken || undefined);
+        const { error } = await resetPassword(email, token || undefined);
         if (error) throw error;
         toast({
           title: 'Check your email',
@@ -152,7 +162,6 @@ export default function AuthLandingV2() {
       }
     } finally {
       setLoading(false);
-      setCaptchaToken(null);
     }
   };
 
@@ -314,8 +323,9 @@ export default function AuthLandingV2() {
             )}
 
             <TurnstileWidget
-              key={mode}
+              key={`${mode}-${captchaResetKey}`}
               action={mode}
+              resetKey={captchaResetKey}
               onVerify={setCaptchaToken}
               onExpire={() => setCaptchaToken(null)}
               onError={() => setCaptchaToken(null)}

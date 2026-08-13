@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +28,13 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaResetKey, setCaptchaResetKey] = useState(0);
   const captchaRequired = isTurnstileConfigured();
+
+  const invalidateCaptcha = useCallback(() => {
+    setCaptchaToken(null);
+    setCaptchaResetKey((k) => k + 1);
+  }, []);
 
   // NOTE: Avoid automatic retries for signup/signin requests because we can't truly cancel
   // the underlying request, which can lead to multiple in-flight auth calls under load.
@@ -61,8 +67,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
   }, [initialReferralCode]);
 
   useEffect(() => {
-    setCaptchaToken(null);
-  }, [mode]);
+    invalidateCaptcha();
+  }, [mode, invalidateCaptcha]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +82,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       return;
     }
 
-    if (captchaRequired && !captchaToken) {
+    const token = captchaToken?.trim() || "";
+    if (captchaRequired && !token) {
       toast({
         title: "Security check required",
         description: "Complete the verification below (or tap Retry), then try again.",
@@ -85,6 +92,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       return;
     }
 
+    invalidateCaptcha();
     setLoading(true);
     try {
       const redirectTo = getPasswordResetRedirectUrl();
@@ -92,7 +100,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       const { error } = await withTimeout(
         supabase.auth.resetPasswordForEmail(trimmedEmail, {
           redirectTo,
-          captchaToken: captchaToken || undefined,
+          captchaToken: token || undefined,
         }),
         12_000
       );
@@ -119,8 +127,6 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       });
     } finally {
       setLoading(false);
-      // Turnstile tokens are single-use — clear so the widget can refresh.
-      setCaptchaToken(null);
     }
   };
 
@@ -174,7 +180,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       }
     }
 
-    if (captchaRequired && !captchaToken) {
+    const token = captchaToken?.trim() || "";
+    if (captchaRequired && !token) {
       toast({
         title: "Security check required",
         description: "Complete the verification below (or tap Retry), then try again.",
@@ -183,11 +190,13 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       return;
     }
 
+    // Consume immediately — tokens are single-use; remount so Success cannot stick after failure.
+    invalidateCaptcha();
     setLoading(true);
 
     try {
       if (mode === "signin") {
-        const { error } = await signIn(email, password, captchaToken || undefined);
+        const { error } = await signIn(email, password, token || undefined);
         if (error) {
           const msg = error.message?.toLowerCase() || '';
           let description = error.message;
@@ -214,33 +223,19 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
         }
       } else {
         const codeToUse = referralCode.trim();
-        const { error, user: newUser } = await signUp(email, password, undefined, captchaToken || undefined);
+        const { error, user: newUser } = await signUp(email, password, undefined, token || undefined);
 
         if (error) {
           const msg = error.message?.toLowerCase() || '';
           let title = 'Sign Up Failed';
           let description = error.message;
 
-          // If the signup request timed out, the account may still have been created.
-          // Attempt a single sign-in to confirm, then treat it as success.
-          if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('busy')) {
+          // Do not auto sign-in without a fresh captchaToken (Attack Protection rejects it).
+          if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('504') || msg.includes('deadline')) {
             title = 'Connection Error';
-            description = 'Connection timed out. The server may be busy - please try again.';
-
-            // Wait a beat, then try a sign-in once.
-            await new Promise((r) => setTimeout(r, 1200));
-            const { error: signInError } = await signIn(email, password);
-            if (!signInError) {
-              onOpenChange(false);
-              toast({
-                title: 'Account Created!',
-                description: "Welcome to ARXON! Start mining to earn rewards.",
-              });
-              return;
-            }
-          }
-
-          if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already') || msg.includes('please log in')) {
+            description =
+              'The request took too long. Your account may still have been created — check your email, then try signing in with a new security check.';
+          } else if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already') || msg.includes('please log in')) {
             description = 'An account already exists with this email — please log in.';
           } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('edge function')) {
             description = 'Connection failed. Please check your internet and try again.';
@@ -284,8 +279,6 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       });
     } finally {
       setLoading(false);
-      // Turnstile tokens are single-use — clear it so the widget can refresh for the next attempt.
-      setCaptchaToken(null);
     }
   };
 
@@ -395,8 +388,9 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
               </div>
 
               <TurnstileWidget
-                key="forgot"
+                key={`forgot-${captchaResetKey}`}
                 action="forgot"
+                resetKey={captchaResetKey}
                 onVerify={setCaptchaToken}
                 onExpire={() => setCaptchaToken(null)}
                 onError={() => setCaptchaToken(null)}
@@ -512,8 +506,9 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
 
               {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
               <TurnstileWidget
-                key={mode}
+                key={`${mode}-${captchaResetKey}`}
                 action={mode}
+                resetKey={captchaResetKey}
                 onVerify={setCaptchaToken}
                 onExpire={() => setCaptchaToken(null)}
                 onError={() => setCaptchaToken(null)}
