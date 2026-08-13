@@ -3,6 +3,8 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/lib/utils';
 import { signUpWithFallback } from '@/lib/auth/signUpWithFallback';
+import { getEmailConfirmRedirectUrl, getPasswordResetRedirectUrl } from '@/lib/auth/getRedirectUrl';
+import { mapAuthError } from '@/lib/auth/authErrors';
 
 interface AuthContextType {
   user: User | null;
@@ -12,6 +14,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null }>;
+  resendConfirmationEmail: (email: string) => Promise<{ error: Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ error: Error | null }>;
 }
 
@@ -156,13 +159,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           email: email.trim(),
           password,
         }),
-        15_000,
-        'Connection timed out. The server may be busy - please try again.'
+        20_000,
+        'Connection timed out. Please try again.'
       );
 
-      return { error: (error as unknown as Error) ?? null };
+      if (error) {
+        return { error: new Error(mapAuthError(error.message, 'signin')) };
+      }
+      return { error: null };
     } catch (e) {
-      return { error: e as Error };
+      const msg = e instanceof Error ? e.message : 'Sign in failed';
+      return { error: new Error(mapAuthError(msg, 'signin')) };
     }
   };
 
@@ -172,7 +179,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/auth/confirm`,
+      redirectTo: getPasswordResetRedirectUrl(),
+    });
+    return { error: error as Error | null };
+  };
+
+  const resendConfirmationEmail = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim().toLowerCase(),
+      options: { emailRedirectTo: getEmailConfirmRedirectUrl() },
     });
     return { error: error as Error | null };
   };
@@ -183,7 +199,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resetPassword, updatePassword }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut, resetPassword, resendConfirmationEmail, updatePassword }}>
       {children}
     </AuthContext.Provider>
   );

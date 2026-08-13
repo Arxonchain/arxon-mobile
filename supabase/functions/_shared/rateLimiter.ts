@@ -139,8 +139,8 @@ export const RATE_LIMITS = {
   standard: { maxRequests: 60, windowMs: 60_000 } as RateLimitConfig,
   /** Expensive operations (scans, etc.): 10 per minute */
   expensive: { maxRequests: 10, windowMs: 60_000 } as RateLimitConfig,
-  /** Authentication: 10 per minute */
-  auth: { maxRequests: 10, windowMs: 60_000 } as RateLimitConfig,
+  /** Authentication: 30 per minute (signup retries + shared NAT IPs) */
+  auth: { maxRequests: 30, windowMs: 60_000 } as RateLimitConfig,
   /** Batch operations: 5 per minute */
   batch: { maxRequests: 5, windowMs: 60_000 } as RateLimitConfig,
 } as const;
