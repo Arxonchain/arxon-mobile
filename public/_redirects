@@ -1,2 +1,5 @@
-# Cloudflare Pages SPA fallback — keep deep links on /auth/confirm (do not 302 to /)
+# Cloudflare Pages — serve Digital Asset Links as static JSON (not SPA index)
+/.well-known/assetlinks.json   /.well-known/assetlinks.json   200
+
+# SPA fallback — keep deep links on /auth/confirm (do not 302 to /)
 /*    /index.html   200

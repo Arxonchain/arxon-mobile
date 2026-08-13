@@ -5,6 +5,7 @@
     "/web-bundle-version.json",
     "/app-version.json",
     "/_headers",
+    "/.well-known/*",
     "/assets/*",
     "/*.png",
     "/*.jpg",

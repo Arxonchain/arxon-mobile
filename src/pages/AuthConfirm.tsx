@@ -5,6 +5,7 @@ import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import OtpEmailPrompt from "@/components/auth/OtpEmailPrompt";
 import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
 import { markPasswordRecovery } from "@/lib/auth/passwordRecoveryGate";
+import { takeStashedAuthCallbackHash } from "@/lib/auth/parseAuthAppLink";
 
 /**
  * Handles all auth callbacks from email links (confirmation, recovery, magic links).
@@ -44,7 +45,9 @@ const AuthConfirm = () => {
 
       // Handle hash fragment tokens (implicit flow) OR HashRouter paths like
       // #/auth/confirm?token_hash=... (Capacitor native OTA).
-      const rawHash = window.location.hash.slice(1);
+      // App Links may stash the https URL's #access_token=… before HashRouter navigation.
+      const stashedHash = takeStashedAuthCallbackHash();
+      const rawHash = stashedHash || window.location.hash.slice(1);
       const hashQuery = rawHash.includes("?")
         ? rawHash.slice(rawHash.indexOf("?") + 1)
         : rawHash.startsWith("/")

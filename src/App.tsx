@@ -20,7 +20,7 @@ import MobileBottomNavV2 from "@/features/arxon-v2/layout/MobileBottomNavV2";
 import DashboardV2 from "@/features/arxon-v2/pages/DashboardV2";
 import SessionRecovery from "@/components/system/SessionRecovery";
 import PushNavListener from "@/components/system/PushNavListener";
-import DiceInviteDeepLinkListener from "@/components/system/DiceInviteDeepLinkListener";
+import AppDeepLinkListener from "@/components/system/AppDeepLinkListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
@@ -229,7 +229,7 @@ function AppRoutes() {
   return (
     <>
       <PushNavListener />
-      <DiceInviteDeepLinkListener />
+      <AppDeepLinkListener />
       <SessionRecovery />
       <PushNotificationInit />
       <WebBundleRefreshInit />

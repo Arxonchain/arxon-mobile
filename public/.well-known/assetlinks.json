@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "xyz.arxonchain.app",
+      "sha256_cert_fingerprints": [
+        "9C:0F:BB:5B:FC:D3:AA:04:84:E3:06:5B:15:8E:22:57:DB:39:63:98:1E:FA:66:C0:01:48:BB:34:2F:B2:90:17"
+      ]
+    }
+  }
+]

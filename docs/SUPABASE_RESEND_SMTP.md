@@ -2,6 +2,8 @@
 
 Signup, password reset, and magic-link emails are sent by **Supabase Auth** using **Custom SMTP** (Resend). The app code only sets `emailRedirectTo` / `redirectTo` to `https://arxonchain.xyz/auth/confirm` via `getPublicSiteOrigin()`.
 
+**Android App Links:** those same branded https confirm URLs open in the Play app when installed (see `docs/ANDROID_APP_LINKS.md`). Browser SPA remains the fallback.
+
 ## Supabase Dashboard checklist
 
 ### 1. Custom SMTP (Resend)
