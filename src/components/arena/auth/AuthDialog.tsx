@@ -240,8 +240,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
             }
           }
 
-          if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already registered')) {
-            description = 'This email is already registered. Try signing in instead.';
+          if (msg.includes('already registered') || msg.includes('already exists') || msg.includes('user already') || msg.includes('please log in')) {
+            description = 'An account already exists with this email — please log in.';
           } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('edge function')) {
             description = 'Connection failed. Please check your internet and try again.';
           } else if (msg.includes('rate limit') || msg.includes('too many')) {
