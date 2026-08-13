@@ -4,8 +4,9 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 export default defineConfig(({ mode }) => ({
-  // Capacitor loads from file:// → must be relative
-  base: "./",
+  // Absolute base required for Capacitor OTA (pages.dev) deep links like /auth/confirm.
+  // Relative "./" resolves assets under /auth/assets/* and blanks the confirm page.
+  base: "/",
 
   // IMPORTANT: support older Android WebView (Android 7/8 devices)
   esbuild: {

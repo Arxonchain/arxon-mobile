@@ -1,6 +1,2 @@
-# SPA fallback for client routes (incl. /auth/confirm deep links)
-/auth/confirm  /index.html  200
-/auth/confirm/  /index.html  200
-/reset-password  /index.html  200
-/change-password  /index.html  200
+# Cloudflare Pages SPA fallback — keep deep links on /auth/confirm (do not 302 to /)
 /*    /index.html   200

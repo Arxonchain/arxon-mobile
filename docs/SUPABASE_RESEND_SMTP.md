@@ -76,7 +76,17 @@ Dashboard → **Edge Functions → Secrets** on Mining App (`oztccmrhiawleucdluw
 | Name | Value |
 |------|-------|
 | `RESEND_API_KEY` | Mining App Resend API key (not the website project key) |
-| `RESEND_FROM_EMAIL` | `Arxon <noreply@arxonchain.xyz>` (optional) |
+| `RESEND_FROM_EMAIL` | `Arxon <security@arxonchain.xyz>` (optional) |
+
+Optional Send Email hook (covers GoTrue-native mailers if enabled):
+
+```bash
+# Mining App Owner PAT required to auto-enable; otherwise paste secrets in Dashboard
+node scripts/enable-send-email-hook.mjs
+```
+
+Also set Edge secret `SEND_EMAIL_HOOK_SECRET` and point Auth → Hooks → Send Email at:
+`https://oztccmrhiawleucdluwb.supabase.co/functions/v1/send-email`
 
 Auth **Custom SMTP** password and Edge `RESEND_API_KEY` are separate settings — both should use the **Mining App** Resend key, never the website/arxon-web key.
 

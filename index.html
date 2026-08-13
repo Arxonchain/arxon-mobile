@@ -60,11 +60,25 @@
     }
     </script>
     <script>
-      // Capacitor OTA uses HashRouter. Email / deep links often open as
-      // /auth/confirm?... — rewrite to #/auth/confirm?... so the route mounts.
+      // Deep-link bootstrap for auth callbacks.
+      // 1) Capacitor HashRouter: path /auth/confirm?... → #/auth/confirm?...
+      // 2) If a host ever drops us on /?token_hash=...&type=..., send to /auth/confirm.
       (function () {
         try {
-          var path = location.pathname || "";
+          var path = location.pathname || "/";
+          var search = location.search || "";
+          var params = new URLSearchParams(search);
+          var hasAuthParams =
+            params.has("token_hash") ||
+            params.has("type") ||
+            params.has("code") ||
+            params.has("token");
+
+          if (path === "/" && hasAuthParams && (params.get("type") || params.has("token_hash") || params.has("code"))) {
+            history.replaceState(null, "", "/auth/confirm" + search);
+            path = "/auth/confirm";
+          }
+
           if (
             path.indexOf("/auth/confirm") === 0 ||
             path.indexOf("/reset-password") === 0 ||
@@ -76,7 +90,6 @@
                 window.Capacitor.isNativePlatform());
             var hash = location.hash || "";
             if (isNative && (!hash || hash === "#" || hash.indexOf("#/") !== 0)) {
-              var search = location.search || "";
               history.replaceState(null, "", "/" + "#" + path + search);
             }
           }
