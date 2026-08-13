@@ -1,5 +1,7 @@
 name: Deploy Web (Cloudflare Pages OTA)
 
+# OTA ALWAYS = full V2 UI + games (same as store AAB / build:internal).
+# Never deploy classic mining-only to arxon-mobile.pages.dev unless explicitly requested.
 on:
   push:
     branches: [main, master]
@@ -67,6 +69,13 @@ jobs:
             exit 1
           fi
 
+          # If the project is Git-connected, its dashboard build command MUST match Actions:
+          #   npm ci && npm run build
+          # (package.json "build" is locked to vite --mode word-forge + V2 flags via .env.word-forge).
+          # Prefer disabling CF Git builds and using only this workflow to avoid race overwrites.
+          BUILD_CFG="$(printf '%s' "$PROJECT" | tr -d '\n' | sed -n 's/.*"build_config":{\([^}]*\)}.*/\1/p' | head -c 400)"
+          echo "Pages build_config (truncated): ${BUILD_CFG:-unknown}"
+
           echo "Cloudflare secrets look valid for Pages project arxon-mobile."
           {
             echo "CLOUDFLARE_API_TOKEN=$TOKEN"
@@ -75,14 +84,14 @@ jobs:
 
       # Match store AAB/APK/iOS: V2 UI + Word Forge on for Capacitor OTA (pages.dev).
       # Keep write-web-bundle-version so Play WebViews pick up new deploys without a store upload.
-      - name: Install and build
+      - name: Install and build (full V2 + games)
         env:
           VITE_WORD_FORGE_ENABLED: 'true'
           VITE_ARXON_UI_V2: 'true'
         run: |
           npm ci
-          node scripts/write-web-bundle-version.mjs
-          npx vite build --mode word-forge
+          npm run build:internal
+          npm run verify:ota-v2
 
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3

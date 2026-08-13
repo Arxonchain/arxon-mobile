@@ -3,6 +3,6 @@
  *
  * Enabled when VITE_ARXON_UI_V2=true (store AAB/APK/iOS and Cloudflare OTA deploy-web).
  * Capacitor loads https://arxon-mobile.pages.dev; Play v14+ picks up this flag via OTA.
- * Classic UI only when the flag is unset (local `npm run build` without env).
+ * Default `npm run build` is locked to word-forge mode so OTA cannot ship classic by accident.
  */
 export const ARXON_UI_V2_ENABLED = import.meta.env.VITE_ARXON_UI_V2 === 'true';

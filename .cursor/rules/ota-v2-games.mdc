@@ -1,0 +1,26 @@
+---
+description: OTA always means full V2 UI with games (never classic mining-only)
+alwaysApply: true
+---
+
+# OTA = full V2 with games
+
+Whenever the user says **OTA** (deploy OTA, update OTA, push to OTA, redeploy web bundle, pages.dev, Capacitor remote UI), they mean the **full V2 app with games** — same as the store AAB/internal build.
+
+## Required build
+
+- `VITE_ARXON_UI_V2=true`
+- `VITE_WORD_FORGE_ENABLED=true`
+- `vite build --mode word-forge` / `npm run build:internal` (or `npm run build`, which must stay locked to word-forge)
+
+Target: `https://arxon-mobile.pages.dev` (Capacitor OTA).
+
+## Never
+
+- Do **not** deploy classic mining-only OTA (`vite build` without word-forge / without those flags) unless the user **explicitly** asks for classic.
+
+## After deploy
+
+- Confirm `web-bundle-version.json` updated
+- Confirm live JS includes `/games`, Dice/Word Forge (or `uiV2`/`wordForge` stamps)
+- Remind: force-close and reopen the Play app
