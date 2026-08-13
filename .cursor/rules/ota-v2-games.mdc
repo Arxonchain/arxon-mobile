@@ -11,16 +11,26 @@ Whenever the user says **OTA** (deploy OTA, update OTA, push to OTA, redeploy we
 
 - `VITE_ARXON_UI_V2=true`
 - `VITE_WORD_FORGE_ENABLED=true`
-- `vite build --mode word-forge` / `npm run build:internal` (or `npm run build`, which must stay locked to word-forge)
+- `vite build --mode word-forge` / `npm run build` / `npm run build:internal`
+- `npm run build` **must** end with `verify:ota-v2` (hard fail on classic)
 
 Target: `https://arxon-mobile.pages.dev` (Capacitor OTA).
 
 ## Never
 
 - Do **not** deploy classic mining-only OTA (`vite build` without word-forge / without those flags) unless the user **explicitly** asks for classic.
+- Do **not** leave Cloudflare Pages **Git-connected production builds** competing with Actions `deploy-web` — they overwrite V2 with classic. Disable Git auto-deploy (`npm run lock:cf-pages-ota` / see `docs/OTA_V2_LOCK.md`).
 
 ## After deploy
 
-- Confirm `web-bundle-version.json` updated
-- Confirm live JS includes `/games`, Dice/Word Forge (or `uiV2`/`wordForge` stamps)
+- Confirm `web-bundle-version.json` → `uiV2: true`, `wordForge: true`, `mode: "v2-games"`
+- Run `npm run verify:ota-v2:live` (or rely on deploy-web post-check)
+- Confirm live JS includes `/games`, Dice/Word Forge
 - Remind: force-close and reopen the Play app
+
+## If OTA “flips” again
+
+1. Check live stamp + `verify:ota-v2:live`
+2. Check CF Pages Deployments for a Git build that beat Actions
+3. Re-run `lock:cf-pages-ota` / disable Git production builds
+4. Redeploy via `deploy-web` only

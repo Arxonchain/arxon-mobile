@@ -39,7 +39,7 @@ if (failed.length) {
   process.exit(1);
 }
 
-if (version.uiV2 === false || version.wordForge === false) {
+if (version.uiV2 !== true || version.wordForge !== true || version.mode !== 'v2-games') {
   console.error('[verify-ota-v2] FAIL — web-bundle-version.json flags not V2+games:', version);
   process.exit(1);
 }
@@ -49,4 +49,6 @@ console.log('[verify-ota-v2] OK — full V2+games markers present', {
   builtAt: version.builtAt,
   uiV2: version.uiV2,
   wordForge: version.wordForge,
+  mode: version.mode,
+  jsFiles: files.length,
 });

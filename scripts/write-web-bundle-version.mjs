@@ -36,20 +36,31 @@ try {
 const uiV2 = process.env.VITE_ARXON_UI_V2 === 'true';
 const wordForge = process.env.VITE_WORD_FORGE_ENABLED === 'true';
 
+if (!uiV2 || !wordForge) {
+  console.error(
+    '[build] FATAL: OTA/production requires VITE_ARXON_UI_V2=true and VITE_WORD_FORGE_ENABLED=true.',
+  );
+  console.error(
+    '[build] Got:',
+    {
+      VITE_ARXON_UI_V2: process.env.VITE_ARXON_UI_V2 ?? '(unset)',
+      VITE_WORD_FORGE_ENABLED: process.env.VITE_WORD_FORGE_ENABLED ?? '(unset)',
+    },
+  );
+  console.error(
+    '[build] Ensure .env.word-forge / .env.production are present, or export the flags, then: vite build --mode word-forge',
+  );
+  process.exit(1);
+}
+
 const payload = {
   version: gitSha,
   builtAt: new Date().toISOString(),
   // Stamped for OTA verification (Play WebView + pages.dev).
-  uiV2,
-  wordForge,
+  uiV2: true,
+  wordForge: true,
   mode: 'v2-games',
 };
 
 writeFileSync('public/web-bundle-version.json', `${JSON.stringify(payload, null, 2)}\n`);
 console.log('[build] web-bundle-version.json →', payload);
-
-if (!uiV2 || !wordForge) {
-  console.warn(
-    '[build] WARNING: OTA expects VITE_ARXON_UI_V2=true and VITE_WORD_FORGE_ENABLED=true (word-forge mode).',
-  );
-}

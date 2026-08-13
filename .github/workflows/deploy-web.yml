@@ -2,6 +2,7 @@ name: Deploy Web (Cloudflare Pages OTA)
 
 # OTA ALWAYS = full V2 UI + games (same as store AAB / build:internal).
 # Never deploy classic mining-only to arxon-mobile.pages.dev unless explicitly requested.
+# Single production pipeline: this workflow. Git-connected CF builds are disabled/hardened.
 on:
   push:
     branches: [main, master]
@@ -69,13 +70,6 @@ jobs:
             exit 1
           fi
 
-          # If the project is Git-connected, its dashboard build command MUST match Actions:
-          #   npm ci && npm run build
-          # (package.json "build" is locked to vite --mode word-forge + V2 flags via .env.word-forge).
-          # Prefer disabling CF Git builds and using only this workflow to avoid race overwrites.
-          BUILD_CFG="$(printf '%s' "$PROJECT" | tr -d '\n' | sed -n 's/.*"build_config":{\([^}]*\)}.*/\1/p' | head -c 400)"
-          echo "Pages build_config (truncated): ${BUILD_CFG:-unknown}"
-
           echo "Cloudflare secrets look valid for Pages project arxon-mobile."
           {
             echo "CLOUDFLARE_API_TOKEN=$TOKEN"
@@ -90,7 +84,10 @@ jobs:
           VITE_ARXON_UI_V2: 'true'
         run: |
           npm ci
-          npm run build:internal
+          # Disable competing Git-connected Pages builds (classic overwrite race).
+          node scripts/lock-cloudflare-pages-ota.mjs || echo "::warning::Could not lock CF Pages Git builds via API — check docs/OTA_V2_LOCK.md"
+          # npm run build already ends with verify:ota-v2 (hard fail on classic).
+          npm run build
           npm run verify:ota-v2
 
       - name: Deploy to Cloudflare Pages
@@ -102,3 +99,18 @@ jobs:
           wranglerVersion: '4.28.0'
           command: pages deploy dist --project-name=arxon-mobile --branch=main --commit-dirty=true
           quiet: false
+
+      - name: Verify live OTA is still full V2 + games
+        run: |
+          set -euo pipefail
+          # CDN may lag a few seconds after upload.
+          for i in 1 2 3 4 5 6; do
+            if npm run verify:ota-v2:live; then
+              exit 0
+            fi
+            echo "Live verify attempt $i failed; waiting..."
+            sleep 10
+          done
+          echo "::error::Live https://arxon-mobile.pages.dev is not full V2+games after deploy."
+          echo "::error::Likely a competing Cloudflare Git deploy overwrote the bundle — disable production builds in CF Pages Settings."
+          exit 1
