@@ -1,2 +1,6 @@
-# SPA fallback - redirect all routes to index.html for client-side routing
+# SPA fallback for client routes (incl. /auth/confirm deep links)
+/auth/confirm  /index.html  200
+/auth/confirm/  /index.html  200
+/reset-password  /index.html  200
+/change-password  /index.html  200
 /*    /index.html   200

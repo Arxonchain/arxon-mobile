@@ -160,7 +160,8 @@ Deno.serve(async (req) => {
   const resendKey = (Deno.env.get("RESEND_API_KEY") || "").trim();
   const hookSecretRaw = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").trim();
   const fromEmail =
-    (Deno.env.get("RESEND_FROM_EMAIL") || "").trim() || "Arxon <onboarding@resend.dev>";
+    (Deno.env.get("RESEND_FROM_EMAIL") || "").trim() ||
+    "Arxon <security@arxonchain.xyz>";
 
   if (!resendKey) {
     console.error("send-email misconfigured: missing RESEND_API_KEY");

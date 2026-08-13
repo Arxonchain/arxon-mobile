@@ -42,12 +42,23 @@ const AuthConfirm = () => {
       const email = searchParams.get("email");
       const explicitNext = searchParams.get("next");
 
-      // Handle hash fragment tokens (implicit flow)
-      const hash = window.location.hash.slice(1);
-      const hashParams = new URLSearchParams(hash);
+      // Handle hash fragment tokens (implicit flow) OR HashRouter paths like
+      // #/auth/confirm?token_hash=... (Capacitor native OTA).
+      const rawHash = window.location.hash.slice(1);
+      const hashQuery = rawHash.includes("?")
+        ? rawHash.slice(rawHash.indexOf("?") + 1)
+        : rawHash.startsWith("/")
+          ? ""
+          : rawHash;
+      const hashParams = new URLSearchParams(hashQuery);
       const accessToken = hashParams.get("access_token");
       const refreshToken = hashParams.get("refresh_token");
       const hashType = hashParams.get("type");
+      const hashError =
+        hashParams.get("error_description") ||
+        hashParams.get("error") ||
+        searchParams.get("error_description") ||
+        searchParams.get("error");
 
       const flowType = (type || hashType || "").toLowerCase();
       const next =
@@ -68,7 +79,17 @@ const AuthConfirm = () => {
         next,
         hasToken: !!token,
         hasEmail: !!email,
+        hasHashError: !!hashError,
       });
+
+      if (hashError) {
+        setStatus("error");
+        setMessage(
+          decodeURIComponent(hashError.replace(/\+/g, " ")) ||
+            "This link is invalid or has expired. Please request a new one."
+        );
+        return;
+      }
 
       // Fail-safe: don't hang forever
       const hangTimer = window.setTimeout(() => {
@@ -200,13 +221,22 @@ const AuthConfirm = () => {
           return;
         }
 
-        // 3. Handle token_hash verification
-        if (token_hash && type) {
+        // 3. Handle token_hash verification (branded email links)
+        // Prefer query params; also accept HashRouter query embedded in hash.
+        const tokenHashEffective =
+          token_hash || hashParams.get("token_hash");
+        const typeEffective = (type || hashParams.get("type") || "").toLowerCase();
+        if (tokenHashEffective && typeEffective) {
           setMessage("Verifying link...");
 
+          const otpType =
+            typeEffective === "email" || typeEffective === "signup"
+              ? "signup"
+              : typeEffective;
+
           const { error } = await supabase.auth.verifyOtp({
-            token_hash,
-            type: type as any,
+            token_hash: tokenHashEffective,
+            type: otpType as any,
           });
 
           if (error) {
@@ -216,7 +246,7 @@ const AuthConfirm = () => {
             return;
           }
 
-          if (flowType === "recovery") {
+          if (otpType === "recovery" || flowType === "recovery") {
             markPasswordRecovery();
             setStatus("success");
             setMessage("Verified! Redirecting to password reset...");
@@ -224,7 +254,7 @@ const AuthConfirm = () => {
             return;
           }
 
-          if (flowType === "magiclink") {
+          if (otpType === "magiclink" || flowType === "magiclink") {
             setStatus("success");
             setMessage("Verified! Redirecting...");
             setTimeout(() => navigate("/change-password"), 800);

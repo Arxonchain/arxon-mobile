@@ -188,10 +188,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
 
       const token = typeof captchaToken === 'string' ? captchaToken.trim() : '';
-      const { error } = await withTimeout(
-        supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-          redirectTo: getPasswordResetRedirectUrl(),
-          ...(token ? { captchaToken: token } : {}),
+      const { data, error } = await withTimeout(
+        supabase.functions.invoke('auth-recover', {
+          body: {
+            email: email.trim().toLowerCase(),
+            captcha_token: token || undefined,
+            redirect_to: getPasswordResetRedirectUrl(),
+          },
         }),
         20_000,
         'Connection timed out. Please try again.'
@@ -204,6 +207,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       if (error) {
         return { error: new Error(mapAuthError(error.message, 'reset')) };
+      }
+      if (data && (data as any).success === false) {
+        return {
+          error: new Error(
+            mapAuthError(String((data as any).error || 'Password reset failed'), 'reset')
+          ),
+        };
       }
       return { error: null };
     } catch (e) {

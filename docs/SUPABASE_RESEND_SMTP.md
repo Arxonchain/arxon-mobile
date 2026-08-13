@@ -42,9 +42,43 @@ $env:RESEND_FROM_EMAIL="ARXON <noreply@arxonchain.xyz>"
 node scripts/configure-auth-resend.mjs
 ```
 
-### 3. Email templates
+### 3. Email templates (branded links — required)
 
-**Authentication → Email Templates** — confirm signup & reset password templates should use `{{ .ConfirmationURL }}` (default). Links will use the `emailRedirectTo` / `redirectTo` values from the client (`/auth/confirm` on `arxonchain.xyz`).
+**Authentication → Email Templates** — do **not** use `{{ .ConfirmationURL }}` (that exposes `*.supabase.co/auth/v1/verify`).
+
+Use TokenHash links so the email only shows your app host:
+
+**Confirm sign up** button href:
+
+```html
+<a href="{{ if .RedirectTo }}{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=signup{{ else }}{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup{{ end }}">Confirm email address</a>
+```
+
+**Reset password** button href:
+
+```html
+<a href="{{ if .RedirectTo }}{{ .RedirectTo }}?token_hash={{ .TokenHash }}&type=recovery{{ else }}{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery{{ end }}">Reset password</a>
+```
+
+Expected hosts in the email: `arxonchain.xyz` or `arxon-mobile.pages.dev` only.
+
+Or run (Mining App Owner PAT):
+
+```bash
+$env:SUPABASE_ACCESS_TOKEN="sbp_..."
+node scripts/patch-auth-email-templates.mjs
+```
+
+### 3b. Edge Function secret (for auth-signup / auth-recover / send-email)
+
+Dashboard → **Edge Functions → Secrets** on Mining App (`oztccmrhiawleucdluwb`):
+
+| Name | Value |
+|------|-------|
+| `RESEND_API_KEY` | Mining App Resend API key (not the website project key) |
+| `RESEND_FROM_EMAIL` | `Arxon <noreply@arxonchain.xyz>` (optional) |
+
+Auth **Custom SMTP** password and Edge `RESEND_API_KEY` are separate settings — both should use the **Mining App** Resend key, never the website/arxon-web key.
 
 ### 4. Confirm email enabled
 

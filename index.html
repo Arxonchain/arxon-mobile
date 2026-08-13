@@ -59,6 +59,30 @@
       ]
     }
     </script>
+    <script>
+      // Capacitor OTA uses HashRouter. Email / deep links often open as
+      // /auth/confirm?... — rewrite to #/auth/confirm?... so the route mounts.
+      (function () {
+        try {
+          var path = location.pathname || "";
+          if (
+            path.indexOf("/auth/confirm") === 0 ||
+            path.indexOf("/reset-password") === 0 ||
+            path.indexOf("/change-password") === 0
+          ) {
+            var isNative =
+              !!(window.Capacitor &&
+                typeof window.Capacitor.isNativePlatform === "function" &&
+                window.Capacitor.isNativePlatform());
+            var hash = location.hash || "";
+            if (isNative && (!hash || hash === "#" || hash.indexOf("#/") !== 0)) {
+              var search = location.search || "";
+              history.replaceState(null, "", "/" + "#" + path + search);
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
 
   <body>
