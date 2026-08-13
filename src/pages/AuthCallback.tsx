@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 
 export default function AuthCallback() {
@@ -57,16 +57,15 @@ export default function AuthCallback() {
         const { data: { session } } = await supabase.auth.getSession();
         
         if (session) {
-          // If this was a password recovery, go to reset page
           if (type === 'recovery' || emailType === 'recovery') {
             navigate('/reset-password', { replace: true });
+          } else if (type === 'signup' || emailType === 'signup' || emailType === 'email') {
+            navigate('/auth?mode=signin', { replace: true });
           } else {
-            // Normal login - go to dashboard
             navigate('/', { replace: true });
           }
         } else {
-          // No session - might be email confirmation
-          navigate('/auth', { replace: true });
+          navigate('/auth?mode=signin', { replace: true });
         }
       } catch (err: any) {
         console.error('Auth callback error:', err);

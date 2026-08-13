@@ -23,6 +23,7 @@ jobs:
       - name: Build web app
         run: npm run build
         env:
+          VITE_PUBLIC_SITE_URL: https://arxonchain.xyz
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
 
