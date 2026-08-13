@@ -103,7 +103,7 @@ export default function AuthPage() {
           } catch {}
         }
 
-        const { error } = await signUp(email, password, ref || undefined, captchaToken || undefined);
+        const { error, user: newUser } = await signUp(email, password, ref || undefined, captchaToken || undefined);
         if (error) throw error;
 
         // If session exists immediately (auto-confirm on), apply referral now
@@ -111,7 +111,9 @@ export default function AuthPage() {
 
         toast({
           title: '✅ Account Created!',
-          description: 'Check your email to confirm your account.',
+          description: newUser?.email_confirmed_at
+            ? 'You can sign in with your email and password.'
+            : 'Check your email to confirm your account.',
         });
         setMode('signin');
 

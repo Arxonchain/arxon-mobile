@@ -99,10 +99,16 @@ export default function AuthLandingV2() {
           } catch {}
         }
 
-        const { error } = await signUp(email, password, ref || undefined, captchaToken || undefined);
+        const { error, user: newUser } = await signUp(email, password, ref || undefined, captchaToken || undefined);
         if (error) throw error;
         try { await applyPendingReferralCode(); } catch {}
-        toast({ title: '✅ Account Created!', description: 'Check your email to confirm your account.' });
+        const confirmed = !!newUser?.email_confirmed_at;
+        toast({
+          title: '✅ Account Created!',
+          description: confirmed
+            ? 'You can sign in with your email and password.'
+            : 'Check your email to confirm your account.',
+        });
         setMode('signin');
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password, captchaToken || undefined);

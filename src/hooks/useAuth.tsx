@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/lib/utils';
 import { signUpWithFallback } from '@/lib/auth/signUpWithFallback';
+import { getPasswordResetRedirectUrl } from '@/lib/auth/getRedirectUrl';
 
 interface AuthContextType {
   user: User | null;
@@ -173,7 +174,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const resetPassword = async (email: string, captchaToken?: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      redirectTo: `${window.location.origin}/auth/confirm`,
+      // Capacitor native must use the allowlisted Pages origin, not capacitor://localhost
+      redirectTo: getPasswordResetRedirectUrl(),
       captchaToken,
     });
     return { error: error as Error | null };

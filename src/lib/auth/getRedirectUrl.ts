@@ -27,10 +27,12 @@ export function getPasswordResetRedirectUrl(): string {
 }
 
 /**
- * Returns the email confirmation redirect URL
+ * Returns the email confirmation redirect URL.
+ * Keep this path exact (no query string) so it matches Auth redirect allowlists.
+ * AuthConfirm defaults next="/" for signup confirmations.
  */
 export function getEmailConfirmRedirectUrl(): string {
-  return getAuthRedirectUrl("/auth/confirm?next=/");
+  return getAuthRedirectUrl("/auth/confirm");
 }
 
 /**

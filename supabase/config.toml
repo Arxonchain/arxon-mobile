@@ -1,1 +1,9 @@
 project_id = "oztccmrhiawleucdluwb"
+
+# Auth email delivery: prefer Resend SMTP (Dashboard → Auth → SMTP)
+# or HTTPS Send Email Hook → functions/v1/send-email
+# Configure with: node scripts/configure-auth-resend.mjs
+# Required secrets for the hook path: RESEND_API_KEY, SEND_EMAIL_HOOK_SECRET, RESEND_FROM_EMAIL
+
+[functions.send-email]
+verify_jwt = false
