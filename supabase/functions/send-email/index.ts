@@ -1,14 +1,15 @@
-import { Webhook } from "https://esm.sh/standardwebhooks@1.0.0";
+import { Webhook } from "npm:standardwebhooks@1.0.0";
 
 /**
  * Supabase Auth "Send Email" hook → Resend API.
- * Handles signup confirm, recovery, magiclink, invite, email_change, OTP codes.
  *
- * Secrets required:
- * - RESEND_API_KEY
- * - SEND_EMAIL_HOOK_SECRET  (dashboard value, often prefixed "v1,whsec_")
- * Optional:
- * - RESEND_FROM_EMAIL  (default: Arxon <onboarding@resend.dev>)
+ * Critical:
+ * - Links go to the app `/auth/confirm?token_hash&type` (JS verifyOtp).
+ *   Do NOT use GET `/auth/v1/verify` — mail scanners / prefetch can auto-login.
+ * - Keep cold starts fast (npm: import, short Resend timeout) so Auth's ~10s hook budget is met.
+ *
+ * Secrets: RESEND_API_KEY, SEND_EMAIL_HOOK_SECRET
+ * Optional: RESEND_FROM_EMAIL
  */
 
 type EmailActionType =
@@ -59,17 +60,31 @@ function subjectFor(action: EmailActionType): string {
   }
 }
 
-function buildVerifyUrl(
-  supabaseUrl: string,
-  tokenHash: string,
-  action: string,
-  redirectTo: string
-): string {
-  const u = new URL(`${supabaseUrl.replace(/\/$/, "")}/auth/v1/verify`);
-  u.searchParams.set("token", tokenHash);
-  u.searchParams.set("type", action);
-  if (redirectTo) u.searchParams.set("redirect_to", redirectTo);
-  return u.toString();
+/**
+ * App-side confirm URL. Prefetch/bots that only HTTP GET won't run verifyOtp.
+ */
+function buildConfirmUrl(tokenHash: string, action: string, redirectTo: string): string {
+  let base = (redirectTo || "").trim();
+  if (!base) {
+    base = "https://arxonchain.xyz/auth/confirm";
+  }
+
+  try {
+    const u = new URL(base);
+    if (!u.pathname.includes("/auth/confirm")) {
+      u.pathname = "/auth/confirm";
+    }
+    u.hash = "";
+    u.search = "";
+    u.searchParams.set("token_hash", tokenHash);
+    u.searchParams.set("type", action);
+    return u.toString();
+  } catch {
+    const fallback = new URL("https://arxonchain.xyz/auth/confirm");
+    fallback.searchParams.set("token_hash", tokenHash);
+    fallback.searchParams.set("type", action);
+    return fallback.toString();
+  }
 }
 
 function htmlBody(action: EmailActionType, verifyUrl: string, otp?: string): string {
@@ -140,7 +155,6 @@ Deno.serve(async (req) => {
   const hookSecretRaw = (Deno.env.get("SEND_EMAIL_HOOK_SECRET") || "").trim();
   const fromEmail =
     (Deno.env.get("RESEND_FROM_EMAIL") || "").trim() || "Arxon <onboarding@resend.dev>";
-  const supabaseUrl = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/$/, "");
 
   if (!resendKey) {
     console.error("send-email misconfigured: missing RESEND_API_KEY");
@@ -153,14 +167,6 @@ Deno.serve(async (req) => {
   if (!hookSecretRaw) {
     console.error("send-email misconfigured: missing SEND_EMAIL_HOOK_SECRET");
     return new Response(JSON.stringify({ error: { message: "SEND_EMAIL_HOOK_SECRET missing" } }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
-
-  if (!supabaseUrl) {
-    console.error("send-email misconfigured: missing SUPABASE_URL");
-    return new Response(JSON.stringify({ error: { message: "SUPABASE_URL missing" } }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -183,7 +189,6 @@ Deno.serve(async (req) => {
       throw new Error("Missing user email in hook payload");
     }
 
-    // Notification-only events (no verify link)
     const notifyOnly = [
       "password_changed_notification",
       "email_changed_notification",
@@ -196,7 +201,7 @@ Deno.serve(async (req) => {
 
     let verifyUrl = "";
     if (!notifyOnly.includes(action) && tokenHash) {
-      verifyUrl = buildVerifyUrl(supabaseUrl, tokenHash, action, redirectTo);
+      verifyUrl = buildConfirmUrl(tokenHash, action, redirectTo);
     }
 
     const subject = subjectFor(action);
@@ -211,34 +216,50 @@ Deno.serve(async (req) => {
       action,
       toDomain: email.split("@")[1] || "?",
       hasVerifyUrl: !!verifyUrl,
+      linkHost: (() => {
+        try {
+          return verifyUrl ? new URL(verifyUrl).host : "";
+        } catch {
+          return "";
+        }
+      })(),
       from: fromEmail,
     });
 
-    const emailRes = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${resendKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: fromEmail,
-        to: [email],
-        subject,
-        html,
-        text,
-      }),
-    });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 7_500);
+    let emailRes: Response;
+    let emailRaw = "";
+    try {
+      emailRes = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${resendKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          from: fromEmail,
+          to: [email],
+          subject,
+          html,
+          text,
+        }),
+        signal: controller.signal,
+      });
+      emailRaw = await emailRes.text();
+    } finally {
+      clearTimeout(timeout);
+    }
 
-    const emailRaw = await emailRes.text();
-    if (!emailRes.ok) {
+    if (!emailRes!.ok) {
       console.error("Resend API error", {
-        status: emailRes.status,
+        status: emailRes!.status,
         snippet: emailRaw.slice(0, 400),
       });
       return new Response(
         JSON.stringify({
           error: {
-            http_code: emailRes.status,
+            http_code: emailRes!.status,
             message: `Resend send failed: ${emailRaw.slice(0, 200)}`,
           },
         }),
@@ -255,16 +276,17 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error("send-email hook error", message);
+    const aborted = error instanceof DOMException && error.name === "AbortError";
+    console.error("send-email hook error", aborted ? "resend_timeout" : message);
     return new Response(
       JSON.stringify({
         error: {
-          http_code: 401,
-          message,
+          http_code: aborted ? 504 : 401,
+          message: aborted ? "Email provider timed out" : message,
         },
       }),
       {
-        status: 401,
+        status: aborted ? 500 : 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );

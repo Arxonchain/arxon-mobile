@@ -4,6 +4,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { withTimeout } from '@/lib/utils';
 import { signUpWithFallback } from '@/lib/auth/signUpWithFallback';
 import { getPasswordResetRedirectUrl } from '@/lib/auth/getRedirectUrl';
+import { markPasswordRecovery } from '@/lib/auth/passwordRecoveryGate';
+import { mapAuthError } from '@/lib/auth/authErrors';
 
 interface AuthContextType {
   user: User | null;
@@ -53,16 +55,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
       
-      // Handle PASSWORD_RECOVERY event - redirect to reset password page
+      // Recovery session: only after email link — gate full app until password update.
       if (event === 'PASSWORD_RECOVERY' && session) {
         console.log('useAuth: PASSWORD_RECOVERY event received');
+        markPasswordRecovery();
         setSession(session);
         setUser(session.user);
         setLoading(false);
         window.clearTimeout(failSafe);
 
-        // If we're on /auth/confirm, let that page finish its own routing.
-        // Otherwise, do a soft navigation to avoid hard reloads.
         if (
           window.location.pathname !== '/reset-password' &&
           !window.location.pathname.startsWith('/auth/confirm')
@@ -71,9 +72,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
         return;
       }
-      
-      // Handle successful sign-in after password change
+
       if (event === 'SIGNED_IN' && session) {
+        const recoveryInUrl =
+          window.location.hash.includes('type=recovery') ||
+          window.location.search.includes('type=recovery');
+        if (recoveryInUrl) {
+          markPasswordRecovery();
+        }
         setSession(session);
         setUser(session.user);
         setLoading(false);
@@ -162,9 +168,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         'Connection timed out. The server may be busy - please try again.'
       );
 
-      return { error: (error as unknown as Error) ?? null };
+      if (error) {
+        return { error: new Error(mapAuthError(error.message, 'signin')) };
+      }
+      return { error: null };
     } catch (e) {
-      return { error: e as Error };
+      const msg = e instanceof Error ? e.message : 'Sign in failed';
+      return { error: new Error(mapAuthError(msg, 'signin')) };
     }
   };
 
@@ -173,12 +183,35 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const resetPassword = async (email: string, captchaToken?: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-      // Capacitor native must use the allowlisted Pages origin, not capacitor://localhost
-      redirectTo: getPasswordResetRedirectUrl(),
-      captchaToken,
-    });
-    return { error: error as Error | null };
+    try {
+      // Never carry an existing session into / through a reset request.
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+
+      const { error } = await withTimeout(
+        supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+          redirectTo: getPasswordResetRedirectUrl(),
+          captchaToken,
+        }),
+        20_000,
+        'Connection timed out. Please try again.'
+      );
+
+      // Ensure submit does not leave a session (recover must not auto-login).
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      setSession(null);
+      setUser(null);
+
+      if (error) {
+        return { error: new Error(mapAuthError(error.message, 'reset')) };
+      }
+      return { error: null };
+    } catch (e) {
+      await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+      setSession(null);
+      setUser(null);
+      const msg = e instanceof Error ? e.message : 'Password reset failed';
+      return { error: new Error(mapAuthError(msg, 'reset')) };
+    }
   };
 
   const updatePassword = async (newPassword: string) => {

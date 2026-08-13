@@ -14,10 +14,12 @@ import authCrystal from '@/assets/v2-auth-crystal.jpg';
 import authEarth from '@/assets/v2-auth-earth-cyan.png';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
-import { getPasswordResetRedirectUrl } from '@/lib/auth/getRedirectUrl';
-import { supabase } from '@/integrations/supabase/client';
-
 type AuthMode = 'signin' | 'signup' | 'forgot';
+
+function isAlreadyRegisteredError(message?: string) {
+  const m = (message || '').toLowerCase();
+  return m.includes('already exists') || m.includes('already registered') || m.includes('please log in');
+}
 
 export default function AuthLandingV2() {
   const [searchParams] = useSearchParams();
@@ -32,7 +34,7 @@ export default function AuthLandingV2() {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
 
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resetPassword } = useAuth();
   const captchaRequired = isTurnstileConfigured();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -100,14 +102,24 @@ export default function AuthLandingV2() {
         }
 
         const { error, user: newUser } = await signUp(email, password, ref || undefined, captchaToken || undefined);
-        if (error) throw error;
+        if (error) {
+          if (isAlreadyRegisteredError(error.message)) {
+            toast({
+              title: 'Account already exists',
+              description: 'An account already exists with this email — please log in.',
+              variant: 'destructive',
+            });
+            setMode('signin');
+            return;
+          }
+          throw error;
+        }
         try { await applyPendingReferralCode(); } catch {}
-        const confirmed = !!newUser?.email_confirmed_at;
         toast({
-          title: '✅ Account Created!',
-          description: confirmed
+          title: 'Check your email',
+          description: newUser?.email_confirmed_at
             ? 'You can sign in with your email and password.'
-            : 'Check your email to confirm your account.',
+            : 'We sent a confirmation link. Open it to activate your account (check spam too).',
         });
         setMode('signin');
       } else if (mode === 'signin') {
@@ -115,24 +127,29 @@ export default function AuthLandingV2() {
         if (error) throw error;
         navigate('/');
       } else if (mode === 'forgot') {
-        // V2-only: pass captcha into reset without changing shared useAuth / classic AuthPage
-        const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
-          redirectTo: getPasswordResetRedirectUrl(),
-          captchaToken: captchaToken || undefined,
-        });
+        const { error } = await resetPassword(email, captchaToken || undefined);
         if (error) throw error;
         toast({
-          title: '📧 Reset link sent',
-          description: 'Check your email for the password reset link.',
+          title: 'Check your email',
+          description: 'Reset link sent. You stay signed out until you open the email link and set a new password.',
         });
         setMode('signin');
       }
     } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err.message || 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
+      if (isAlreadyRegisteredError(err?.message)) {
+        toast({
+          title: 'Account already exists',
+          description: 'An account already exists with this email — please log in.',
+          variant: 'destructive',
+        });
+        setMode('signin');
+      } else {
+        toast({
+          title: 'Error',
+          description: err.message || 'Something went wrong. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
       setCaptchaToken(null);

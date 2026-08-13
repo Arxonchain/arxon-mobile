@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import OtpEmailPrompt from "@/components/auth/OtpEmailPrompt";
 import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
+import { markPasswordRecovery } from "@/lib/auth/passwordRecoveryGate";
 
 /**
  * Handles all auth callbacks from email links (confirmation, recovery, magic links).
@@ -105,6 +106,7 @@ const AuthConfirm = () => {
           }
 
           if (t === "recovery") {
+            markPasswordRecovery();
             setStatus("success");
             setMessage("Verified! Redirecting to password reset...");
             setTimeout(() => navigate("/reset-password"), 800);
@@ -142,6 +144,7 @@ const AuthConfirm = () => {
           }
 
           if (flowType === "recovery") {
+            markPasswordRecovery();
             setStatus("success");
             setMessage("Verified! Redirecting to password reset...");
             setTimeout(() => navigate("/reset-password"), 800);
@@ -176,6 +179,7 @@ const AuthConfirm = () => {
           }
 
           if (flowType === "recovery") {
+            markPasswordRecovery();
             setStatus("success");
             setMessage("Verified! Redirecting to password reset...");
             setTimeout(() => navigate("/reset-password"), 800);
@@ -213,6 +217,7 @@ const AuthConfirm = () => {
           }
 
           if (flowType === "recovery") {
+            markPasswordRecovery();
             setStatus("success");
             setMessage("Verified! Redirecting to password reset...");
             setTimeout(() => navigate("/reset-password"), 800);
@@ -240,6 +245,7 @@ const AuthConfirm = () => {
 
         if (session) {
           if (flowType === "recovery") {
+            markPasswordRecovery();
             setStatus("success");
             setMessage("Session found! Redirecting to password reset...");
             setTimeout(() => navigate("/reset-password"), 500);
@@ -292,6 +298,7 @@ const AuthConfirm = () => {
     }
 
     if (otpType === "recovery") {
+      markPasswordRecovery();
       setStatus("success");
       setMessage("Verified! Redirecting to password reset...");
       setTimeout(() => navigate("/reset-password"), 800);

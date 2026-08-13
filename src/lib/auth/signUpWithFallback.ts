@@ -4,6 +4,9 @@ import { mapAuthError } from "./authErrors";
 
 type SignUpResult = { error: Error | null; user: User | null };
 
+const ALREADY_REGISTERED =
+  "An account already exists with this email — please log in.";
+
 function toError(e: unknown, fallback = "Sign up failed"): Error {
   if (e instanceof Error) return e;
   const maybeMsg = (e as any)?.message || (e as any)?.error_description || (e as any)?.error;
@@ -67,7 +70,24 @@ export async function signUpWithFallback(
       return { error: new Error(friendly), user: null };
     }
 
-    return { error: null, user: result.data?.user ?? null };
+    const user = result.data?.user ?? null;
+    const session = result.data?.session ?? null;
+
+    // Supabase anti-enumeration: existing email often returns 200 with empty identities.
+    const identities = (user as { identities?: unknown[] } | null)?.identities;
+    if (user && Array.isArray(identities) && identities.length === 0) {
+      if (session) {
+        await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+      }
+      return { error: new Error(ALREADY_REGISTERED), user: null };
+    }
+
+    // Confirmation required: never keep a session from signup.
+    if (session && !user?.email_confirmed_at) {
+      await supabase.auth.signOut({ scope: "local" }).catch(() => {});
+    }
+
+    return { error: null, user };
   } catch (e) {
     const friendly = mapAuthError(toError(e).message, "signup");
     return { error: new Error(friendly), user: null };

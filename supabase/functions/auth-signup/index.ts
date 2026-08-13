@@ -17,6 +17,7 @@ type SignupBody = {
   email?: unknown;
   password?: unknown;
   referral_code?: unknown;
+  captcha_token?: unknown;
 };
 
 function jsonResponse(
@@ -34,9 +35,33 @@ function jsonResponse(
   });
 }
 
+function resolveAnonKey(req: Request): string {
+  const fromEnv = (Deno.env.get("SUPABASE_ANON_KEY") || "").trim();
+  if (fromEnv && fromEnv.split(".").filter(Boolean).length === 3) return fromEnv;
+
+  try {
+    const publishable = Deno.env.get("SUPABASE_PUBLISHABLE_KEYS");
+    if (publishable) {
+      const parsed = JSON.parse(publishable) as Record<string, string>;
+      const candidate = (parsed.default || Object.values(parsed)[0] || "").trim();
+      if (candidate) return candidate;
+    }
+  } catch {
+    // ignore malformed publishable key JSON
+  }
+
+  const fromHeader = (req.headers.get("apikey") || "").trim();
+  if (fromHeader) return fromHeader;
+
+  const auth = (req.headers.get("Authorization") || "").trim();
+  const m = auth.match(/^Bearer\s+(.+)$/i);
+  return (m?.[1] || "").trim();
+}
+
 function mapSignupError(status: number, payload: Record<string, unknown> | null): {
   message: string;
   httpStatus: number;
+  code?: string;
 } {
   const raw =
     (typeof payload?.msg === "string" && payload.msg) ||
@@ -50,7 +75,24 @@ function mapSignupError(status: number, payload: Record<string, unknown> | null)
     return { message: "Too many signup attempts. Please wait a minute and try again.", httpStatus: 429 };
   }
   if (lower.includes("already registered") || lower.includes("already exists") || lower.includes("user already")) {
-    return { message: "This email is already registered. Try signing in instead.", httpStatus: 422 };
+    return {
+      message: "An account already exists with this email — please log in.",
+      httpStatus: 422,
+      code: "already_registered",
+    };
+  }
+  if (lower.includes("captcha")) {
+    return {
+      message: "Security check failed or expired. Complete the verification again, then retry.",
+      httpStatus: 400,
+      code: "captcha_failed",
+    };
+  }
+  if (status === 504 || lower.includes("deadline") || lower.includes("timeout")) {
+    return {
+      message: "Email delivery is temporarily unavailable. Please try again in a few minutes.",
+      httpStatus: 503,
+    };
   }
   if (status >= 500) {
     return { message: "Our servers are temporarily overloaded. Please try again shortly.", httpStatus: 503 };
@@ -85,8 +127,10 @@ serve(async (req) => {
       typeof body.referral_code === "string"
         ? body.referral_code.trim().toUpperCase()
         : "";
+    const captchaToken =
+      typeof body.captcha_token === "string" ? body.captcha_token.trim() : "";
 
-    console.log("auth-signup request", { email, ip });
+    console.log("auth-signup request", { email, ip, hasCaptcha: !!captchaToken });
 
     if (!email || !password) {
       return jsonResponse(
@@ -97,23 +141,13 @@ serve(async (req) => {
     }
 
     const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/$/, "");
-    const SUPABASE_ANON_KEY = (Deno.env.get("SUPABASE_ANON_KEY") || "").trim();
+    const SUPABASE_ANON_KEY = resolveAnonKey(req);
     const SITE_URL = (Deno.env.get("PUBLIC_SITE_URL") || "https://arxonchain.xyz")
       .trim()
       .replace(/\/+$/, "");
 
     if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      console.error("auth-signup misconfigured: missing SUPABASE_URL or SUPABASE_ANON_KEY");
-      return jsonResponse(
-        { success: false, error: "Server misconfigured" },
-        500,
-        rateLimitHeaders(rl)
-      );
-    }
-
-    const anonSegs = SUPABASE_ANON_KEY.split(".").filter(Boolean).length;
-    if (anonSegs !== 3) {
-      console.error("auth-signup misconfigured: SUPABASE_ANON_KEY is not a valid JWT", { anonSegs });
+      console.error("auth-signup misconfigured: missing SUPABASE_URL or anon/publishable key");
       return jsonResponse(
         { success: false, error: "Server misconfigured" },
         500,
@@ -125,21 +159,47 @@ serve(async (req) => {
     // GoTrue expects redirect_to as a query param (not nested options like supabase-js).
     const signupUrl =
       `${SUPABASE_URL}/auth/v1/signup?redirect_to=${encodeURIComponent(`${SITE_URL}/auth/confirm`)}`;
-    const signupRes = await fetch(signupUrl, {
-      method: "POST",
-      headers: {
-        apikey: SUPABASE_ANON_KEY,
-        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        email,
-        password,
-        data: referralCode ? { referral_code: referralCode } : undefined,
-      }),
-    });
 
-    const signupRaw = await signupRes.text().catch(() => "");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20_000);
+    let signupRes: Response;
+    let signupRaw = "";
+    try {
+      signupRes = await fetch(signupUrl, {
+        method: "POST",
+        headers: {
+          apikey: SUPABASE_ANON_KEY,
+          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          data: referralCode ? { referral_code: referralCode } : undefined,
+          gotrue_meta_security: captchaToken
+            ? { captcha_token: captchaToken }
+            : undefined,
+        }),
+        signal: controller.signal,
+      });
+      signupRaw = await signupRes.text().catch(() => "");
+    } catch (e) {
+      const aborted = e instanceof DOMException && e.name === "AbortError";
+      console.error("auth-signup auth fetch failed", { aborted, err: String(e) });
+      return jsonResponse(
+        {
+          success: false,
+          error: aborted
+            ? "Email delivery is temporarily unavailable. Please try again in a few minutes."
+            : "Something went wrong. Please try again.",
+        },
+        503,
+        rateLimitHeaders(rl)
+      );
+    } finally {
+      clearTimeout(timeout);
+    }
+
     let signupJson: Record<string, unknown> | null = null;
     try {
       signupJson = signupRaw ? JSON.parse(signupRaw) : null;
@@ -153,6 +213,21 @@ serve(async (req) => {
     });
 
     if (signupRes.ok) {
+      const user = (signupJson?.user ?? signupJson) as Record<string, unknown> | null;
+      const identities = Array.isArray(user?.identities) ? user!.identities : null;
+      // Existing email: Auth often returns 200 with empty identities (anti-enumeration).
+      if (user && identities && identities.length === 0) {
+        return jsonResponse(
+          {
+            success: false,
+            error: "An account already exists with this email — please log in.",
+            code: "already_registered",
+          },
+          422,
+          rateLimitHeaders(rl)
+        );
+      }
+
       return jsonResponse(
         {
           success: true,
@@ -167,7 +242,11 @@ serve(async (req) => {
 
     const mapped = mapSignupError(signupRes.status, signupJson);
     return jsonResponse(
-      { success: false, error: mapped.message },
+      {
+        success: false,
+        error: mapped.message,
+        ...(mapped.code ? { code: mapped.code } : {}),
+      },
       mapped.httpStatus,
       rateLimitHeaders(rl)
     );

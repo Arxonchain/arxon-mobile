@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { usePasswordRecoverySession } from "@/hooks/usePasswordRecoverySession";
+import { clearPasswordRecovery } from "@/lib/auth/passwordRecoveryGate";
 import arxonLogo from "@/assets/arxon-icon.svg";
 
 export default function ResetPassword() {
@@ -46,10 +47,8 @@ export default function ResetPassword() {
 
       if (error) throw error;
 
-      // Refresh session
       await supabase.auth.refreshSession();
-      
-      // Sign out to clear recovery session
+      clearPasswordRecovery();
       await supabase.auth.signOut();
 
       setSuccess(true);

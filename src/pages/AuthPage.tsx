@@ -19,6 +19,11 @@ import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/Turnst
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
+function isAlreadyRegisteredError(message?: string) {
+  const m = (message || '').toLowerCase();
+  return m.includes('already exists') || m.includes('already registered') || m.includes('please log in');
+}
+
 export default function AuthPage() {
   const [searchParams] = useSearchParams();
   const initialMode = (searchParams.get('mode') as AuthMode) || 'signin';
@@ -104,16 +109,26 @@ export default function AuthPage() {
         }
 
         const { error, user: newUser } = await signUp(email, password, ref || undefined, captchaToken || undefined);
-        if (error) throw error;
+        if (error) {
+          if (isAlreadyRegisteredError(error.message)) {
+            toast({
+              title: 'Account already exists',
+              description: 'An account already exists with this email — please log in.',
+              variant: 'destructive',
+            });
+            setMode('signin');
+            return;
+          }
+          throw error;
+        }
 
-        // If session exists immediately (auto-confirm on), apply referral now
         try { await applyPendingReferralCode(); } catch {}
 
         toast({
-          title: '✅ Account Created!',
+          title: 'Check your email',
           description: newUser?.email_confirmed_at
             ? 'You can sign in with your email and password.'
-            : 'Check your email to confirm your account.',
+            : 'We sent a confirmation link. Open it to activate your account (check spam too).',
         });
         setMode('signin');
 
@@ -126,17 +141,26 @@ export default function AuthPage() {
         const { error } = await resetPassword(email, captchaToken || undefined);
         if (error) throw error;
         toast({
-          title: '📧 Reset link sent',
-          description: 'Check your email for the password reset link.',
+          title: 'Check your email',
+          description: 'Reset link sent. You stay signed out until you open the email link and set a new password.',
         });
         setMode('signin');
       }
     } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err.message || 'Something went wrong. Please try again.',
-        variant: 'destructive',
-      });
+      if (isAlreadyRegisteredError(err?.message)) {
+        toast({
+          title: 'Account already exists',
+          description: 'An account already exists with this email — please log in.',
+          variant: 'destructive',
+        });
+        setMode('signin');
+      } else {
+        toast({
+          title: 'Error',
+          description: err.message || 'Something went wrong. Please try again.',
+          variant: 'destructive',
+        });
+      }
     } finally {
       setLoading(false);
       // Turnstile tokens are single-use — clear it so the widget can refresh for the next attempt.

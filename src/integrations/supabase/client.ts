@@ -10,6 +10,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, 
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    // AuthConfirm / explicit verifyOtp only — never auto-exchange URL tokens on every page.
     detectSessionInUrl: false,
     storageKey: 'arxon-auth-session',
     storage: {

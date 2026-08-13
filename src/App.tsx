@@ -180,13 +180,32 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
   if (!user) return <Navigate to="/auth" replace />;
+  // Recovery sessions must update password before accessing the app.
+  if (typeof window !== "undefined") {
+    try {
+      if (sessionStorage.getItem("arxon_password_recovery") === "1") {
+        return <Navigate to="/reset-password" replace />;
+      }
+    } catch {
+      // ignore
+    }
+  }
   return <>{children}</>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) {
+    try {
+      if (sessionStorage.getItem("arxon_password_recovery") === "1") {
+        return <Navigate to="/reset-password" replace />;
+      }
+    } catch {
+      // ignore
+    }
+    return <Navigate to="/" replace />;
+  }
   return <>{children}</>;
 }
 

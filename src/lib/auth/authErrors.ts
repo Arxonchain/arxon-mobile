@@ -8,8 +8,16 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   if (m.includes("email not confirmed")) {
     return "Please check your email and confirm your account first.";
   }
-  if (m.includes("already registered") || m.includes("already exists") || m.includes("user already")) {
-    return "This email is already registered. Try signing in instead.";
+  if (
+    m.includes("already registered") ||
+    m.includes("already exists") ||
+    m.includes("user already") ||
+    m.includes("please log in")
+  ) {
+    return "An account already exists with this email — please log in.";
+  }
+  if (m.includes("captcha") || m.includes("timeout-or-duplicate") || m.includes("invalid-input-response")) {
+    return "Security check failed or expired. Complete the verification again, then retry.";
   }
   if (m.includes("signups not allowed") || m.includes("signup is disabled") || m.includes("disable_signup")) {
     return "Signups are currently disabled. Please try again later.";
