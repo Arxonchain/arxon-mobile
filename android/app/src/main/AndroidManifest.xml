@@ -33,30 +33,19 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- App Links: branded auth (arxonchain.xyz) — separate filter per host for autoVerify -->
-            <intent-filter android:autoVerify="true">
+            <!--
+              Best-effort deep links for branded auth emails (browser remains primary).
+              NO android:autoVerify — verified App Links must never interfere with OTA WebView boot.
+              Do NOT claim arxon-mobile.pages.dev here (that is the Capacitor server.url host).
+            -->
+            <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="arxonchain.xyz" android:pathPrefix="/auth/confirm" />
                 <data android:scheme="https" android:host="arxonchain.xyz" android:pathPrefix="/reset-password" />
-            </intent-filter>
-
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="https" android:host="www.arxonchain.xyz" android:pathPrefix="/auth/confirm" />
                 <data android:scheme="https" android:host="www.arxonchain.xyz" android:pathPrefix="/reset-password" />
-            </intent-filter>
-
-            <!-- App Links: Capacitor OTA host -->
-            <intent-filter android:autoVerify="true">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="https" android:host="arxon-mobile.pages.dev" android:pathPrefix="/auth/confirm" />
-                <data android:scheme="https" android:host="arxon-mobile.pages.dev" android:pathPrefix="/reset-password" />
             </intent-filter>
 
         </activity>
