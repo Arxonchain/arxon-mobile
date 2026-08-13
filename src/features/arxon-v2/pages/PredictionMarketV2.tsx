@@ -426,35 +426,116 @@ function BattleDetailSide({
 }) {
   const selected = activeSide === side;
   const won = winnerSide === side;
+  const pressable = !!(isActive && !existingVote);
+  const borderColor = selected
+    ? `${ARENA}aa`
+    : won
+      ? `${v2.accent.gold}88`
+      : pressable
+        ? `${v2.brand.steel}55`
+        : `${v2.brand.steel}28`;
   return (
     <motion.div
-      whileTap={{ scale: 0.97 }}
-      onClick={() => isActive && !existingVote && onSelect(side)}
+      whileTap={pressable ? { scale: 0.96, y: 1 } : undefined}
+      whileHover={pressable ? { y: -2 } : undefined}
+      onClick={() => pressable && onSelect(side)}
+      role={pressable ? 'button' : undefined}
+      tabIndex={pressable ? 0 : undefined}
+      onKeyDown={(e) => {
+        if (!pressable) return;
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onSelect(side);
+        }
+      }}
       style={{
-        borderRadius: v2.radius.sm,
-        padding: '16px 12px',
+        position: 'relative',
+        borderRadius: 18,
+        padding: '18px 12px 14px',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: 10,
-        cursor: isActive && !existingVote ? 'pointer' : 'default',
-        background: selected ? `${ARENA}18` : `${v2.brand.raised}88`,
-        border: `2px solid ${selected ? `${ARENA}66` : won ? `${v2.accent.gold}55` : `${v2.brand.steel}22`}`,
+        gap: 8,
+        cursor: pressable ? 'pointer' : 'default',
+        touchAction: 'manipulation',
+        // Solid “portable card” sitting on the big battle panel — not flat text.
+        background: selected
+          ? `linear-gradient(165deg, hsl(255 45% 22%) 0%, hsl(225 28% 9%) 55%, hsl(225 30% 6%) 100%)`
+          : `linear-gradient(165deg, hsl(225 26% 14%) 0%, hsl(225 28% 8%) 60%, hsl(225 30% 5%) 100%)`,
+        border: `1.5px solid ${borderColor}`,
+        boxShadow: selected
+          ? `0 14px 32px rgba(0,0,0,0.55), 0 0 28px ${ARENA}40, inset 0 1px 0 rgba(255,255,255,0.12)`
+          : `0 12px 28px rgba(0,0,0,0.5), 0 2px 0 rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.08)`,
+        transform: selected ? 'translateY(-3px)' : 'translateY(0)',
+        transition: 'box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
       }}
     >
-      <p style={{ fontSize: 12, fontWeight: 700, color: v2.brand.steelLight, textAlign: 'center', margin: 0 }}>{name}</p>
+      {pressable && !selected && (
+        <div
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            fontSize: 8,
+            fontWeight: 800,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            color: `${v2.brand.steel}99`,
+          }}
+        >
+          Tap
+        </div>
+      )}
+      <p style={{ fontSize: 12, fontWeight: 700, color: v2.brand.steelLight, textAlign: 'center', margin: 0, lineHeight: 1.25 }}>
+        {name}
+      </p>
       <div
         style={{
-          fontSize: 24,
+          fontSize: 26,
           fontWeight: 800,
+          letterSpacing: '-0.02em',
           color: won ? v2.accent.gold : selected ? ARENA : v2.brand.steelBright,
+          textShadow: selected ? `0 0 18px ${ARENA}66` : undefined,
         }}
       >
         {pct}%
       </div>
-      <p style={{ fontSize: 10, color: v2.brand.muted, textAlign: 'center', margin: 0 }}>{power.toLocaleString()} ARX-P</p>
-      {won && <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.gold }}>👑 Winner</div>}
-      {selected && isActive && <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.success }}>✓ Your pick</div>}
+      <p style={{ fontSize: 10, color: v2.brand.muted, textAlign: 'center', margin: 0 }}>
+        {power.toLocaleString()} ARX-P
+      </p>
+      {won && (
+        <div
+          style={{
+            marginTop: 2,
+            fontSize: 10,
+            fontWeight: 800,
+            color: v2.accent.gold,
+            padding: '3px 8px',
+            borderRadius: 999,
+            background: `${v2.accent.gold}18`,
+            border: `1px solid ${v2.accent.gold}44`,
+          }}
+        >
+          👑 Winner
+        </div>
+      )}
+      {selected && isActive && (
+        <div
+          style={{
+            marginTop: 2,
+            fontSize: 10,
+            fontWeight: 800,
+            color: v2.accent.success,
+            padding: '4px 10px',
+            borderRadius: 999,
+            background: `${v2.accent.success}18`,
+            border: `1px solid ${v2.accent.success}55`,
+            boxShadow: `0 0 14px ${v2.accent.success}33`,
+          }}
+        >
+          ✓ Your pick
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -589,10 +670,11 @@ function BattleDetail({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr 40px 1fr',
-                    gap: 10,
+                    gridTemplateColumns: '1fr 36px 1fr',
+                    gap: 12,
                     alignItems: 'stretch',
                     marginBottom: 14,
+                    padding: '2px 2px 6px',
                   }}
                 >
                   <BattleDetailSide
@@ -607,7 +689,25 @@ function BattleDetail({
                     onSelect={setLocalSide}
                   />
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontWeight: 900, fontSize: 12, color: ARENA }}>VS</div>
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: 999,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 900,
+                        fontSize: 10,
+                        letterSpacing: '0.04em',
+                        color: ARENA,
+                        background: 'rgba(0,0,0,0.35)',
+                        border: `1px solid ${ARENA}55`,
+                        boxShadow: `0 6px 16px rgba(0,0,0,0.4), 0 0 12px ${ARENA}33`,
+                      }}
+                    >
+                      VS
+                    </div>
                   </div>
                   <BattleDetailSide
                     name={battle.side_b_name}
@@ -624,18 +724,34 @@ function BattleDetail({
 
                 {hasSideC && (
                   <motion.div
-                    whileTap={{ scale: 0.97 }}
+                    whileTap={isActive && !existingVote ? { scale: 0.97, y: 1 } : undefined}
                     onClick={() => isActive && !existingVote && setLocalSide('c')}
+                    role={isActive && !existingVote ? 'button' : undefined}
                     style={{
-                      borderRadius: v2.radius.sm,
+                      borderRadius: 18,
                       padding: '14px 16px',
                       marginBottom: 14,
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       cursor: isActive && !existingVote ? 'pointer' : 'default',
-                      background: activeSide === 'c' ? `${ARENA}18` : `${v2.brand.raised}88`,
-                      border: `2px solid ${activeSide === 'c' ? `${ARENA}66` : battle.winner_side === 'c' ? `${v2.accent.gold}55` : `${v2.brand.steel}22`}`,
+                      touchAction: 'manipulation',
+                      background:
+                        activeSide === 'c'
+                          ? `linear-gradient(165deg, hsl(255 45% 22%) 0%, hsl(225 28% 9%) 55%, hsl(225 30% 6%) 100%)`
+                          : `linear-gradient(165deg, hsl(225 26% 14%) 0%, hsl(225 28% 8%) 60%, hsl(225 30% 5%) 100%)`,
+                      border: `1.5px solid ${
+                        activeSide === 'c'
+                          ? `${ARENA}aa`
+                          : battle.winner_side === 'c'
+                            ? `${v2.accent.gold}88`
+                            : `${v2.brand.steel}55`
+                      }`,
+                      boxShadow:
+                        activeSide === 'c'
+                          ? `0 14px 32px rgba(0,0,0,0.55), 0 0 28px ${ARENA}40, inset 0 1px 0 rgba(255,255,255,0.12)`
+                          : `0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)`,
+                      transform: activeSide === 'c' ? 'translateY(-2px)' : undefined,
                     }}
                   >
                     <div>
@@ -658,10 +774,24 @@ function BattleDetail({
                         {pctC}%
                       </div>
                       {battle.winner_side === 'c' && (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.gold }}>👑 Winner</div>
+                        <div style={{ fontSize: 10, fontWeight: 800, color: v2.accent.gold, marginTop: 4 }}>👑 Winner</div>
                       )}
                       {activeSide === 'c' && isActive && (
-                        <div style={{ fontSize: 10, fontWeight: 700, color: v2.accent.success }}>✓ Your pick</div>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            display: 'inline-block',
+                            fontSize: 10,
+                            fontWeight: 800,
+                            color: v2.accent.success,
+                            padding: '3px 8px',
+                            borderRadius: 999,
+                            background: `${v2.accent.success}18`,
+                            border: `1px solid ${v2.accent.success}55`,
+                          }}
+                        >
+                          ✓ Your pick
+                        </div>
                       )}
                     </div>
                   </motion.div>

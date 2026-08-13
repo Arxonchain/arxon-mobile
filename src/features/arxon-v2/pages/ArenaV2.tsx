@@ -15,6 +15,8 @@ import arenaBattleground from '@/assets/arxon-v2/arena-battleground.png';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { NeonEyebrow } from '@/features/arxon-v2/design/NeonKit';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { DiceFace } from '@/features/dice/components/DiceFace';
+import { diceAccent } from '@/features/dice/diceTokens';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 22 },
@@ -37,6 +39,8 @@ interface GameCardProps {
   cta: string;
   accent: string;
   banner?: string;
+  /** Custom banner art (e.g. 3D dice) — takes precedence over `banner` when set. */
+  bannerContent?: ReactNode;
   icon: ReactNode;
   badge?: string;
   badgeLive?: boolean;
@@ -44,6 +48,42 @@ interface GameCardProps {
   soon?: boolean;
   onClick?: () => void;
   delay?: number;
+}
+
+/** Stacked neon dice for the Arena hub entry — reads as “this goes to Dice Roll”. */
+function DiceHubBannerArt() {
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+      }}
+    >
+      <div
+        style={{
+          position: 'absolute',
+          width: 90,
+          height: 90,
+          borderRadius: '50%',
+          background: `radial-gradient(circle, ${neon.cyan}35 0%, transparent 70%)`,
+          filter: 'blur(6px)',
+        }}
+      />
+      <div style={{ position: 'relative', width: 96, height: 92 }}>
+        <div style={{ position: 'absolute', left: 2, top: 18, transform: 'rotate(-14deg)', zIndex: 1 }}>
+          <DiceFace value={5} size={42} accent={neon.cyan} />
+        </div>
+        <div style={{ position: 'absolute', right: 0, top: 0, transform: 'rotate(16deg)', zIndex: 2 }}>
+          <DiceFace value={6} size={46} accent={diceAccent.gold} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function GameBattleCard({
@@ -54,6 +94,7 @@ function GameBattleCard({
   cta,
   accent,
   banner,
+  bannerContent,
   icon,
   badge,
   badgeLive,
@@ -188,24 +229,37 @@ function GameBattleCard({
           </div>
         </div>
 
-        {banner && (
+        {(bannerContent || banner) && (
           <div style={{
             width: 130, flexShrink: 0, position: 'relative', overflow: 'hidden',
           }}>
             <div style={{
               position: 'absolute', inset: 0,
-              background: `linear-gradient(90deg, rgba(6,14,28,0.95) 0%, transparent 45%)`,
+              background: bannerContent
+                ? `radial-gradient(ellipse 80% 70% at 60% 50%, ${accent}22 0%, transparent 65%), linear-gradient(90deg, rgba(6,14,28,0.92) 0%, rgba(6,14,28,0.2) 55%, transparent 100%)`
+                : `linear-gradient(90deg, rgba(6,14,28,0.95) 0%, transparent 45%)`,
               zIndex: 1,
+              pointerEvents: 'none',
             }} />
-            <img
-              src={banner}
-              alt=""
-              style={{
-                position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
-                height: '115%', width: 'auto', maxWidth: 'none', objectFit: 'cover',
-                filter: locked ? 'grayscale(0.6) brightness(0.5)' : 'saturate(1.1)',
-              }}
-            />
+            {bannerContent ? (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 2,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                filter: locked ? 'grayscale(0.6) brightness(0.5)' : undefined,
+              }}>
+                {bannerContent}
+              </div>
+            ) : (
+              <img
+                src={banner}
+                alt=""
+                style={{
+                  position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
+                  height: '115%', width: 'auto', maxWidth: 'none', objectFit: 'cover',
+                  filter: locked ? 'grayscale(0.6) brightness(0.5)' : 'saturate(1.1)',
+                }}
+              />
+            )}
           </div>
         )}
       </div>
@@ -375,6 +429,7 @@ export default function ArenaV2() {
             description="Free daily rolls, plus best-of-3 dice duels against the house for real ARX-P stakes."
             cta="Roll the Dice"
             accent={neon.cyan}
+            bannerContent={<DiceHubBannerArt />}
             icon={<Dices size={16} strokeWidth={2.2} />}
             badge="NEW"
             onClick={() => go('/arena/dice')}
