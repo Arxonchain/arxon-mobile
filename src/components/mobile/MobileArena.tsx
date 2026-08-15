@@ -146,7 +146,7 @@ function BattleCard({
                 color:userWon?'hsl(155 45% 55%)':'hsl(215 18% 45%)',
                 background:userWon?'hsl(155 45% 43%/0.1)':'hsl(215 22% 13%)',
                 border:`1px solid ${userWon?'hsl(155 45% 43%/0.22)':'hsl(215 22% 20%)'}`}}>
-                {userVoted?(userWon?'🏆 Won':'💧 Lost'):'Ended'}
+                {userVoted?(userWon?'🏆 Won':'💧 Lost'):'Resolved'}
               </div>
             )}
             {!isActive && !concluded && !isEnded && (
@@ -157,8 +157,8 @@ function BattleCard({
             )}
             {!isActive && !concluded && isEnded && (
               <div style={{fontSize:9,fontWeight:700,padding:'3px 9px',borderRadius:20,
-                color:'hsl(0 55% 55%)',background:'hsl(0 55% 55%/0.1)',border:'1px solid hsl(0 55% 55%/0.25)'}}>
-                Ended
+                color:'hsl(215 18% 55%)',background:'hsl(215 22% 13%)',border:'1px solid hsl(215 22% 20%)'}}>
+                Awaiting results
               </div>
             )}
             <ChevronRight size={14} color="hsl(215 18% 35%)" style={{marginLeft:6}}/>
@@ -250,7 +250,10 @@ function BattleDetail({
   const [localSide, setLocalSide] = useState<ArenaSide|null>(null);
   const [stakeAmt, setStakeAmt] = useState('');
   const activeSide = existingVote ?? localSide;
-  const concluded = !isActive && battle.winner_side;
+  const concluded = !isActive && !!battle.winner_side;
+  const winnerSide = (battle.winner_side ?? null) as ArenaSide | null;
+  const userWon = !!(existingVote && winnerSide && existingVote === winnerSide);
+  const winnerLabel = winnerSide ? sideName(battle as any, winnerSide) : null;
 
   const handleVote = async () => {
     if (!activeSide) return;
@@ -282,15 +285,57 @@ function BattleDetail({
         </button>
         <div style={{textAlign:'center'}}>
           <h1 style={{fontSize:16,fontWeight:700,color:'hsl(215 20% 93%)',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{battle.title}</h1>
+          {concluded && (
+            <p style={{fontSize:10,color:'hsl(38 55% 58%)',marginTop:2,fontWeight:700}}>
+              Resolved · {winnerLabel} won
+            </p>
+          )}
           {isActive && <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>⏱ {timer} remaining</p>}
+          {!isActive && !concluded && (
+            <p style={{fontSize:10,color:'hsl(215 14% 38%)',marginTop:2}}>Awaiting results</p>
+          )}
         </div>
         <div style={{width:40}}/>
       </div>
 
       <div style={{padding:'16px 20px 0'}}>
+        {concluded && (
+          <div style={{marginBottom:14,padding:'14px 16px',borderRadius:18,display:'flex',alignItems:'center',gap:12,
+            background:userWon?'hsl(155 45% 43%/0.1)':existingVote?'hsl(215 22% 11%)':'hsl(38 55% 52%/0.1)',
+            border:`1px solid ${userWon?'hsl(155 45% 43%/0.28)':existingVote?'hsl(215 22% 18%)':'hsl(38 55% 52%/0.35)'}`}}>
+            <div style={{width:36,height:36,borderRadius:12,flexShrink:0,
+              background:userWon?'hsl(155 45% 43%/0.15)':existingVote?'hsl(215 22% 14%)':'hsl(38 55% 52%/0.15)',
+              display:'flex',alignItems:'center',justifyContent:'center',fontSize:16}}>
+              {userWon ? '🏆' : existingVote ? '💧' : '✓'}
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
+                <span style={{fontSize:9,fontWeight:800,letterSpacing:'0.06em',textTransform:'uppercase',
+                  color:userWon?'hsl(155 45% 55%)':existingVote?'hsl(215 18% 55%)':'hsl(38 55% 58%)',
+                  padding:'3px 8px',borderRadius:999,
+                  background:userWon?'hsl(155 45% 43%/0.12)':existingVote?'hsl(215 22% 14%)':'hsl(38 55% 52%/0.12)',
+                  border:`1px solid ${userWon?'hsl(155 45% 43%/0.3)':existingVote?'hsl(215 22% 20%)':'hsl(38 55% 52%/0.35)'}`}}>
+                  Resolved
+                </span>
+                {existingVote && (
+                  <span style={{fontSize:9,fontWeight:700,color:userWon?'hsl(155 45% 55%)':'hsl(215 18% 50%)'}}>
+                    {userWon ? 'You won' : 'You lost'}
+                  </span>
+                )}
+              </div>
+              <p style={{fontSize:13,fontWeight:800,color:'hsl(215 20% 90%)',margin:0}}>{winnerLabel} won</p>
+              {existingVote && (
+                <p style={{fontSize:11,color:'hsl(215 14% 42%)',margin:'3px 0 0'}}>
+                  You staked {(battleUserVote?.power_spent ?? 0).toLocaleString()} ARX-P on {sideName(battle as any, existingVote as ArenaSide)}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Hero VS card */}
         <div className="glass-elevated" style={{borderRadius:22,padding:'20px',marginBottom:14,position:'relative',overflow:'hidden',
-          border:`1px solid ${isActive?'hsl(215 30% 22%/0.5)':'hsl(215 22% 16%)'}`,
+          border:`1px solid ${isActive?'hsl(215 30% 22%/0.5)':concluded?'hsl(38 55% 52%/0.28)':'hsl(215 22% 16%)'}`,
           background:isActive?'linear-gradient(145deg,hsl(225 28% 11%),hsl(215 30% 14%))':'hsl(225 26% 9%)'}}>
           {isActive && <div style={{position:'absolute',top:0,left:0,right:0,height:2,
             background:'linear-gradient(90deg,transparent,hsl(215 35% 62%/0.5),transparent)'}}/>}
@@ -299,6 +344,13 @@ function BattleDetail({
             <div style={{margin:'-20px -20px 14px -20px',height:100,overflow:'hidden',position:'relative',borderRadius:'22px 22px 0 0'}}>
               <img src={(battle as any).banner_image} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}}/>
               <div style={{position:'absolute',inset:0,background:'linear-gradient(to bottom,transparent 30%,hsl(225 28% 11%))'}}/>
+              {concluded && (
+                <div style={{position:'absolute',top:10,right:10,fontSize:9,fontWeight:800,letterSpacing:'0.06em',
+                  textTransform:'uppercase',color:'hsl(38 55% 58%)',padding:'4px 10px',borderRadius:999,
+                  background:'hsl(225 30% 6%/0.85)',border:'1px solid hsl(38 55% 52%/0.45)'}}>
+                  Resolved
+                </div>
+              )}
             </div>
           )}
 
@@ -454,11 +506,27 @@ function BattleDetail({
           </div>
         )}
 
+        {existingVote && !isActive && !concluded && (
+          <div style={{marginBottom:14,padding:'14px 16px',background:'hsl(215 22% 11%)',
+            border:'1px solid hsl(215 22% 18%)',borderRadius:18,display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:36,height:36,borderRadius:12,background:'hsl(215 22% 14%)',
+              display:'flex',alignItems:'center',justifyContent:'center',fontSize:18,flexShrink:0}}>✓</div>
+            <div>
+              <p style={{fontSize:13,fontWeight:700,color:'hsl(215 18% 75%)'}}>
+                Staked {battleUserVote?.power_spent?.toLocaleString()} ARX-P
+              </p>
+              <p style={{fontSize:11,color:'hsl(215 14% 42%)',marginTop:2}}>
+                On {sideName(battle as any, existingVote as ArenaSide)} · Awaiting results
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Live participants */}
         {loadingParticipants && (
           <>
             <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.12em',color:'hsl(215 14% 30%)',fontWeight:700,marginBottom:10}}>
-              Live Stakers
+              {concluded ? 'Stakers' : 'Live Stakers'}
             </p>
             {[0, 1, 2].map(i => (
               <div key={i} style={{ height: 52, borderRadius: 14, marginBottom: 7, background: 'hsl(215 22% 10%)', opacity: 1 - i * 0.2 }} />
@@ -468,7 +536,7 @@ function BattleDetail({
         {!loadingParticipants && battleParticipants.length > 0 && (
           <>
             <p style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.12em',color:'hsl(215 14% 30%)',fontWeight:700,marginBottom:10}}>
-              Live Stakers ({battleParticipants.length})
+              {concluded ? 'Stakers' : 'Live Stakers'} ({battleParticipants.length})
             </p>
             {battleParticipants.slice(0,8).map((p:any) => (
               <div key={p.user_id} style={{display:'flex',alignItems:'center',gap:10,

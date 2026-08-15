@@ -109,6 +109,7 @@ function StatusBadge({
     );
   }
   if (concluded) {
+    const label = userVoted ? (userWon ? '🏆 Won' : '💧 Lost') : 'Resolved';
     return (
       <div
         style={{
@@ -116,12 +117,22 @@ function StatusBadge({
           fontWeight: 700,
           padding: '3px 9px',
           borderRadius: 20,
-          color: userWon ? v2.accent.success : v2.brand.mutedSoft,
-          background: userWon ? `${v2.accent.success}18` : v2.brand.raised,
-          border: `1px solid ${userWon ? `${v2.accent.success}38` : v2.brand.border}`,
+          color: userVoted ? (userWon ? v2.accent.success : v2.brand.mutedSoft) : v2.accent.gold,
+          background: userVoted
+            ? userWon
+              ? `${v2.accent.success}18`
+              : v2.brand.raised
+            : `${v2.accent.gold}18`,
+          border: `1px solid ${
+            userVoted
+              ? userWon
+                ? `${v2.accent.success}38`
+                : v2.brand.border
+              : `${v2.accent.gold}44`
+          }`,
         }}
       >
-        {userVoted ? (userWon ? '🏆 Won' : '💧 Lost') : 'Ended'}
+        {label}
       </div>
     );
   }
@@ -149,12 +160,12 @@ function StatusBadge({
         fontWeight: 700,
         padding: '3px 9px',
         borderRadius: 20,
-        color: v2.accent.danger,
-        background: `${v2.accent.danger}18`,
-        border: `1px solid ${v2.accent.danger}40`,
+        color: v2.brand.mutedSoft,
+        background: v2.brand.raised,
+        border: `1px solid ${v2.brand.border}`,
       }}
     >
-      Ended
+      Awaiting results
     </div>
   );
 }
@@ -394,8 +405,10 @@ function BattleCard({
           <span style={{ fontSize: 9, color: v2.brand.muted }}>
             {totalPow.toLocaleString()} ARX-P · {totalVoters} voter{totalVoters !== 1 ? 's' : ''}
           </span>
-          <span style={{ fontSize: 9, color: v2.brand.muted }}>
-            {new Date(isActive ? battle.ends_at : battle.starts_at).toLocaleDateString()}
+          <span style={{ fontSize: 9, color: concluded ? v2.accent.gold : v2.brand.muted, fontWeight: concluded ? 700 : 400 }}>
+            {concluded
+              ? `Resolved · ${sideName(battle, battle.winner_side as ArenaSide)}`
+              : new Date(isActive ? battle.ends_at : battle.starts_at).toLocaleDateString()}
           </span>
         </div>
       </div>
@@ -573,6 +586,19 @@ function BattleDetail({
   const [stakeAmt, setStakeAmt] = useState('');
   const activeSide = existingVote ?? localSide;
   const banner = (battle as ArenaBattle & { banner_image?: string }).banner_image;
+  const winnerSide = (battle.winner_side ?? null) as ArenaSide | null;
+  const isResolved = !!winnerSide;
+  const userWon = !!(existingVote && winnerSide && existingVote === winnerSide);
+  const winnerLabel = winnerSide ? sideName(battle, winnerSide) : null;
+  const detailAccent = isResolved
+    ? userWon
+      ? v2.accent.success
+      : existingVote
+        ? v2.brand.steel
+        : v2.accent.gold
+    : isActive
+      ? ARENA
+      : v2.brand.steel;
 
   const handleVote = async () => {
     if (!activeSide) return;
@@ -610,18 +636,98 @@ function BattleDetail({
       <V2Page style={{ minHeight: '100%', background: v2.gradient.mesh }}>
         <V2Header
           title={battle.title}
-          subtitle={isActive ? `⏱ ${timer} remaining` : undefined}
+          subtitle={
+            isResolved
+              ? `Resolved · ${winnerLabel} won`
+              : isActive
+                ? `⏱ ${timer} remaining`
+                : 'Awaiting results'
+          }
           onBack={onClose}
         />
 
         <div style={{ padding: '8px 20px 0' }}>
+          {isResolved && (
+            <V2Card
+              accent={detailAccent}
+              padding="14px 16px"
+              style={{
+                marginBottom: 14,
+                background: userWon
+                  ? `linear-gradient(160deg, ${v2.accent.success}14, hsl(225 30% 6% / 0.56))`
+                  : existingVote
+                    ? undefined
+                    : `linear-gradient(160deg, ${v2.accent.gold}12, hsl(225 30% 6% / 0.56))`,
+                boxShadow: v2.shadow(detailAccent, 0.16),
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 12,
+                    background: `${detailAccent}18`,
+                    border: `1px solid ${detailAccent}44`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 16,
+                    flexShrink: 0,
+                  }}
+                >
+                  {userWon ? '🏆' : existingVote ? '💧' : '✓'}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: detailAccent,
+                        padding: '3px 8px',
+                        borderRadius: 999,
+                        background: `${detailAccent}18`,
+                        border: `1px solid ${detailAccent}44`,
+                      }}
+                    >
+                      Resolved
+                    </span>
+                    {existingVote && (
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          color: userWon ? v2.accent.success : v2.brand.mutedSoft,
+                        }}
+                      >
+                        {userWon ? 'You won' : 'You lost'}
+                      </span>
+                    )}
+                  </div>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: v2.brand.steelBright, margin: 0 }}>
+                    {winnerLabel} won
+                  </p>
+                  {existingVote && (
+                    <p style={{ fontSize: 11, color: v2.brand.muted, margin: '3px 0 0' }}>
+                      You staked {(battleUserVote?.power_spent ?? 0).toLocaleString()} ARX-P on{' '}
+                      {sideName(battle, existingVote)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </V2Card>
+          )}
+
           <V2Card
-            accent={isActive ? ARENA : v2.brand.steel}
+            accent={detailAccent}
             padding="0"
             style={{
               marginBottom: 14,
               background: isActive ? v2.gradient.arena : undefined,
-              boxShadow: isActive ? v2.shadow(ARENA, 0.2) : undefined,
+              boxShadow: isActive ? v2.shadow(ARENA, 0.2) : isResolved ? v2.shadow(detailAccent, 0.12) : undefined,
             }}
           >
             {isActive && (
@@ -649,10 +755,49 @@ function BattleDetail({
                       background: `linear-gradient(to bottom, transparent 30%, ${v2.brand.deep}ee)`,
                     }}
                   />
+                  {isResolved && (
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: 10,
+                        right: 10,
+                        fontSize: 9,
+                        fontWeight: 800,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: v2.accent.gold,
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        background: `${v2.brand.deep}cc`,
+                        border: `1px solid ${v2.accent.gold}55`,
+                      }}
+                    >
+                      Resolved
+                    </div>
+                  )}
                 </div>
               )}
 
               <div style={{ padding: banner ? '14px 18px 18px' : 0 }}>
+                {!banner && isResolved && (
+                  <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 12 }}>
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 800,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: v2.accent.gold,
+                        padding: '4px 10px',
+                        borderRadius: 999,
+                        background: `${v2.accent.gold}18`,
+                        border: `1px solid ${v2.accent.gold}44`,
+                      }}
+                    >
+                      Resolved
+                    </span>
+                  </div>
+                )}
                 {battle.description && (
                   <p style={{ fontSize: 12, color: v2.brand.mutedSoft, marginBottom: 14, textAlign: 'center' }}>{battle.description}</p>
                 )}
@@ -948,9 +1093,39 @@ function BattleDetail({
             </V2Card>
           )}
 
+          {existingVote && !isActive && !isResolved && (
+            <V2Card accent={v2.brand.steel} padding="14px 16px" style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 12,
+                    background: `${v2.brand.steel}18`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 18,
+                    flexShrink: 0,
+                  }}
+                >
+                  ✓
+                </div>
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelLight, margin: 0 }}>
+                    Staked {battleUserVote?.power_spent?.toLocaleString()} ARX-P
+                  </p>
+                  <p style={{ fontSize: 11, color: v2.brand.muted, marginTop: 2, marginBottom: 0 }}>
+                    On {sideName(battle, existingVote)} · Awaiting results
+                  </p>
+                </div>
+              </div>
+            </V2Card>
+          )}
+
           {loadingParticipants && (
             <>
-              <V2SectionHeader title="Live Stakers" />
+              <V2SectionHeader title={isResolved ? 'Stakers' : 'Live Stakers'} />
               {[0, 1, 2].map((i) => (
                 <div
                   key={i}
@@ -968,7 +1143,7 @@ function BattleDetail({
 
           {!loadingParticipants && battleParticipants.length > 0 && (
             <>
-              <V2SectionHeader title={`Live Stakers (${battleParticipants.length})`} />
+              <V2SectionHeader title={`${isResolved ? 'Stakers' : 'Live Stakers'} (${battleParticipants.length})`} />
               {battleParticipants.slice(0, 8).map((p) => (
                 <V2Card key={p.user_id} accent={v2.brand.steel} padding="10px 14px" style={{ marginBottom: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -1532,7 +1707,7 @@ export default function PredictionMarketV2() {
               items={[
                 { id: 'live' as BattleFilter, label: 'Live', count: liveCt, dot: true, accent: v2.accent.danger },
                 { id: 'upcoming' as BattleFilter, label: 'Upcoming', count: upcomingCt, accent: v2.brand.steel },
-                { id: 'ended' as BattleFilter, label: 'Ended', count: endedCt, accent: v2.brand.mutedSoft },
+                { id: 'ended' as BattleFilter, label: 'Resolved', count: endedCt, accent: v2.accent.gold },
               ]}
               active={battleFilter}
               onChange={setBattleFilter}
@@ -1572,7 +1747,7 @@ export default function PredictionMarketV2() {
 
             {battleFilter === 'ended' &&
               (endedCt === 0 ? (
-                <EmptyState emoji="🏁" title="No ended battles yet" subtitle="Results will appear here once battles conclude" />
+                <EmptyState emoji="🏁" title="No resolved battles yet" subtitle="Results will appear here once battles conclude" />
               ) : (
                 <>
                   {endedList.slice(0, endedVisible).map((b) => (
@@ -1603,15 +1778,24 @@ export default function PredictionMarketV2() {
           (myStakes.length === 0 ? (
             <EmptyState emoji="🎯" title="No stakes yet" subtitle="Stake ARX-P on a battle to see your history" />
           ) : (
-            myStakes.map((b) => (
-              <BattleCard
-                key={b.id}
-                battle={b}
-                userVoted={!!userPositions.get(b.id)}
-                userWon={userPositions.get(b.id)?.side === b.winner_side}
-                onClick={() => openBattle(b, false)}
-              />
-            ))
+            myStakes.map((b) => {
+              const starts = new Date(b.starts_at);
+              const ends = new Date(b.ends_at);
+              const active =
+                starts <= now && ends > now && (b.is_active ?? true) && !b.winner_side;
+              const ended = !!b.winner_side || ends <= now;
+              return (
+                <BattleCard
+                  key={b.id}
+                  battle={b}
+                  isActive={active}
+                  isEnded={ended}
+                  userVoted={!!userPositions.get(b.id)}
+                  userWon={userPositions.get(b.id)?.side === b.winner_side}
+                  onClick={() => openBattle(b, active)}
+                />
+              );
+            })
           ))}
       </div>
 

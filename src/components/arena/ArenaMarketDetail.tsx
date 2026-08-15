@@ -350,24 +350,59 @@ const ArenaMarketDetail = ({
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="p-3 rounded-xl bg-primary/10 border border-primary/30"
+            className={`p-3 rounded-xl border ${
+              isEnded && market.winner_side
+                ? userPosition.side === market.winner_side
+                  ? 'bg-emerald-500/10 border-emerald-500/30'
+                  : 'bg-muted/40 border-border/50'
+                : 'bg-primary/10 border-primary/30'
+            }`}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-[10px] text-muted-foreground mb-0.5">Your Position</p>
-                <p className="text-base font-bold text-primary">
+                <p className="text-[10px] text-muted-foreground mb-0.5">
+                  {isEnded && market.winner_side
+                    ? userPosition.side === market.winner_side
+                      ? 'You won'
+                      : 'You lost'
+                    : 'Your Position'}
+                </p>
+                <p
+                  className={`text-base font-bold ${
+                    isEnded && market.winner_side
+                      ? userPosition.side === market.winner_side
+                        ? 'text-emerald-400'
+                        : 'text-foreground'
+                      : 'text-primary'
+                  }`}
+                >
                   {userPosition.power_spent >= 1000 
                     ? `${(userPosition.power_spent / 1000).toFixed(1)}K` 
                     : userPosition.power_spent.toLocaleString()} ARX-P
                 </p>
                 <p className="text-[10px] text-muted-foreground">
                   on {userPosition.side === 'a' ? market.side_a_name : userPosition.side === 'c' ? market.side_c_name : market.side_b_name}
+                  {!isEnded || !market.winner_side ? ' · Awaiting results' : ''}
                 </p>
               </div>
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/20">
-                <Zap className="w-3 h-3 text-primary" />
-                <span className="text-[10px] font-bold text-primary">+25% Boost</span>
-              </div>
+              {isEnded && market.winner_side ? (
+                <div
+                  className={`flex items-center gap-1.5 px-2 py-1 rounded-full ${
+                    userPosition.side === market.winner_side
+                      ? 'bg-emerald-500/20 text-emerald-400'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  <span className="text-[10px] font-bold">
+                    {userPosition.side === market.winner_side ? '🏆 Won' : 'Lost'}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/20">
+                  <Zap className="w-3 h-3 text-primary" />
+                  <span className="text-[10px] font-bold text-primary">+25% Boost</span>
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -381,7 +416,7 @@ const ArenaMarketDetail = ({
             <div className="flex items-center gap-2">
               <Trophy className="w-5 h-5 text-amber-500" />
               <div>
-                <p className="text-[10px] text-muted-foreground">Winner</p>
+                <p className="text-[10px] text-muted-foreground">Resolved · Winner</p>
                 <p className="text-sm font-bold text-amber-500">
                   {market.winner_side === 'a' ? market.side_a_name : market.winner_side === 'c' ? market.side_c_name : market.side_b_name}
                 </p>

@@ -227,8 +227,8 @@ const MarketCard = ({ market, userPosition, onClick, variant = 'default' }: Mark
         
         <div className="flex items-center gap-1">
           {isEnded ? (
-            <span className="px-1.5 py-0.5 rounded-full bg-muted/60 text-muted-foreground text-[9px] font-bold">
-              Ended
+            <span className="px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 text-[9px] font-bold">
+              {market.winner_side ? 'Resolved' : 'Awaiting'}
             </span>
           ) : isUpcoming ? (
             <span className="px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[9px] font-bold flex items-center gap-0.5">
@@ -416,7 +416,7 @@ const MarketCard = ({ market, userPosition, onClick, variant = 'default' }: Mark
         >
           <Trophy className="w-4 h-4 text-amber-500" />
           <span className="text-sm font-black text-amber-500">
-            {market.winner_side === 'a' ? market.side_a_name : market.winner_side === 'c' ? market.side_c_name : market.side_b_name} Won!
+            Resolved · {market.winner_side === 'a' ? market.side_a_name : market.winner_side === 'c' ? market.side_c_name : market.side_b_name} Won!
           </span>
         </motion.div>
       )}
@@ -426,13 +426,35 @@ const MarketCard = ({ market, userPosition, onClick, variant = 'default' }: Mark
         <motion.div 
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          className="mt-3 pt-3 border-t border-primary/30 flex items-center justify-between"
+          className={`mt-3 pt-3 border-t flex items-center justify-between ${
+            isEnded && market.winner_side
+              ? userPosition.side === market.winner_side
+                ? 'border-emerald-500/30'
+                : 'border-border/40'
+              : 'border-primary/30'
+          }`}
         >
           <span className="text-xs text-muted-foreground flex items-center gap-1">
-            <Zap className="w-3 h-3 text-primary" />
-            Your stake
+            <Zap className={`w-3 h-3 ${
+              isEnded && market.winner_side
+                ? userPosition.side === market.winner_side
+                  ? 'text-emerald-400'
+                  : 'text-muted-foreground'
+                : 'text-primary'
+            }`} />
+            {isEnded && market.winner_side
+              ? userPosition.side === market.winner_side
+                ? 'You won'
+                : 'You lost'
+              : 'Your stake'}
           </span>
-          <span className="text-sm font-black text-primary">
+          <span className={`text-sm font-black ${
+            isEnded && market.winner_side
+              ? userPosition.side === market.winner_side
+                ? 'text-emerald-400'
+                : 'text-foreground'
+              : 'text-primary'
+          }`}>
             {userPosition.power_spent >= 1000 ? `${(userPosition.power_spent/1000).toFixed(1)}K` : userPosition.power_spent} on {userPosition.side === 'a' ? market.side_a_name : userPosition.side === 'c' ? market.side_c_name : market.side_b_name}
           </span>
         </motion.div>
