@@ -262,16 +262,7 @@ serve(async (req) => {
               if (totalReward < 0) totalReward = 0;
               totalRewardsDistributed += totalReward;
 
-              if (memberData) {
-                const { error: memberErr } = await supabase.from("arena_members").update({
-                  current_win_streak: currentStreak,
-                  best_win_streak: bestStreak,
-                  total_wins: (memberData.total_wins || 0) + 1,
-                }).eq("user_id", vote.user_id);
-                if (memberErr) throw new Error(`Member update failed: ${memberErr.message}`);
-              }
-
-              const { error: stakeErr } = await supabase.from("arena_staking_rewards").insert({
+              const { error: stakeErr } = await supabase.from("arena_staking_rewards").upsert({
                 battle_id: battle.id,
                 user_id: vote.user_id,
                 original_stake: vote.power_spent,
@@ -280,10 +271,10 @@ serve(async (req) => {
                 loser_pool_share: totalReward,
                 total_reward: totalReward,
                 is_winner: true,
-              });
+              }, { onConflict: "battle_id,user_id", ignoreDuplicates: true });
               if (stakeErr) throw new Error(`Staking reward insert failed: ${stakeErr.message}`);
 
-              const { error: earnErr } = await supabase.from("arena_earnings").insert({
+              const { data: earnRow, error: earnErr } = await supabase.from("arena_earnings").upsert({
                 battle_id: battle.id,
                 user_id: vote.user_id,
                 stake_amount: vote.power_spent,
@@ -292,19 +283,31 @@ serve(async (req) => {
                 streak_bonus: streakBonus,
                 total_earned: totalReward,
                 is_winner: true,
-              });
+              }, { onConflict: "battle_id,user_id", ignoreDuplicates: true }).select("id").maybeSingle();
               if (earnErr) throw new Error(`Earnings insert failed: ${earnErr.message}`);
 
-              let remainingReward = totalReward;
-              while (remainingReward > 0) {
-                const increment = Math.min(remainingReward, 500);
-                const { error: rpcErr } = await supabase.rpc("increment_user_points", {
-                  p_user_id: vote.user_id,
-                  p_amount: increment,
-                  p_type: "arena",
-                });
-                if (rpcErr) throw new Error(`Points credit failed: ${rpcErr.message}`);
-                remainingReward -= increment;
+              // Only credit points / win stats when a new earnings row was written
+              if (earnRow) {
+                if (memberData) {
+                  const { error: memberErr } = await supabase.from("arena_members").update({
+                    current_win_streak: currentStreak,
+                    best_win_streak: bestStreak,
+                    total_wins: (memberData.total_wins || 0) + 1,
+                  }).eq("user_id", vote.user_id);
+                  if (memberErr) throw new Error(`Member update failed: ${memberErr.message}`);
+                }
+
+                let remainingReward = totalReward;
+                while (remainingReward > 0) {
+                  const increment = Math.min(remainingReward, 500);
+                  const { error: rpcErr } = await supabase.rpc("increment_user_points", {
+                    p_user_id: vote.user_id,
+                    p_amount: increment,
+                    p_type: "arena",
+                  });
+                  if (rpcErr) throw new Error(`Points credit failed: ${rpcErr.message}`);
+                  remainingReward -= increment;
+                }
               }
 
               const streakText = currentStreak >= 3 ? ` 🔥 ${currentStreak}-Win Streak!` : "";
@@ -331,17 +334,17 @@ serve(async (req) => {
             try {
               await supabase.from("arena_members").update({ current_win_streak: 0 }).eq("user_id", vote.user_id);
 
-              await supabase.from("arena_staking_rewards").insert({
+              await supabase.from("arena_staking_rewards").upsert({
                 battle_id: battle.id, user_id: vote.user_id,
                 original_stake: vote.power_spent, multiplier: 0,
                 stake_return: 0, loser_pool_share: 0, total_reward: 0, is_winner: false,
-              });
+              }, { onConflict: "battle_id,user_id", ignoreDuplicates: true });
 
-              await supabase.from("arena_earnings").insert({
+              await supabase.from("arena_earnings").upsert({
                 battle_id: battle.id, user_id: vote.user_id,
                 stake_amount: vote.power_spent, bonus_earned: 0,
                 pool_share_earned: 0, streak_bonus: 0, total_earned: 0, is_winner: false,
-              });
+              }, { onConflict: "battle_id,user_id", ignoreDuplicates: true });
 
               const loserSideName = vote.side === "a" ? battle.side_a_name :
                                     vote.side === "c" ? (battle.side_c_name || "Draw") :
