@@ -7,11 +7,13 @@ const corsHeaders = {
 };
 
 /**
- * FIXED Reward System (v2):
+ * FIXED Reward System (v3):
  * - Total Pool = Prize Pool (admin set) + All Stakes (winners + losers)
- * - Winners share the ENTIRE pool proportionally by (stake × earlyMultiplier)
- * - Streak bonus = % of NET PROFIT only (never inflates beyond pool)
- * - Hard cap: total distributed NEVER exceeds TOTAL_POOL
+ * - EVERY winner gets a guaranteed proportional base share first
+ *   (weight = stake × earlyMultiplier; base = floor(weight/totalWeight * TOTAL_POOL))
+ * - Streak bonus = % of NET PROFIT, paid ONLY from leftover after all bases
+ *   (scaled down if desired streaks exceed leftover — never zeros other winners)
+ * - Floor dust (if any) goes to top-weight winner; sum never exceeds TOTAL_POOL
  * - Losers get NOTHING
  * - Battle marked resolved AFTER rewards distributed (atomic)
  */
@@ -220,47 +222,89 @@ serve(async (req) => {
 
           console.log(`Winners: ${winningVotes.length}, Losers: ${losingVotes.length}`);
 
-          // ─── FIXED WEIGHT CALCULATION ───
+          // ─── v3: base shares first, streak only from leftover ───
           // Weight = stake × earlyMultiplier ONLY (no bonus_percentage multiplier)
+          type WinnerPayout = {
+            vote: typeof winningVotes[0];
+            weight: number;
+            memberData: { current_win_streak: number; best_win_streak: number; total_wins: number } | null;
+            currentStreak: number;
+            bestStreak: number;
+            baseReward: number;
+            desiredStreak: number;
+            streakBonus: number;
+            totalReward: number;
+          };
+
           let totalWeight = 0;
-          const winnerWeights: { vote: typeof winningVotes[0]; weight: number; earlyMultiplier: number }[] = [];
+          const payouts: WinnerPayout[] = [];
 
           for (const vote of winningVotes) {
             const earlyMultiplier = Number(vote.early_stake_multiplier) || 1.0;
             const weight = vote.power_spent * earlyMultiplier;
-            winnerWeights.push({ vote, weight, earlyMultiplier });
             totalWeight += weight;
+
+            const { data: memberData } = await supabase
+              .from("arena_members")
+              .select("current_win_streak, best_win_streak, total_wins")
+              .eq("user_id", vote.user_id)
+              .maybeSingle();
+
+            const currentStreak = (memberData?.current_win_streak || 0) + 1;
+            const bestStreak = Math.max(currentStreak, memberData?.best_win_streak || 0);
+
+            payouts.push({
+              vote,
+              weight,
+              memberData: memberData ?? null,
+              currentStreak,
+              bestStreak,
+              baseReward: 0,
+              desiredStreak: 0,
+              streakBonus: 0,
+              totalReward: 0,
+            });
           }
 
+          let sumBase = 0;
+          let sumDesiredStreak = 0;
+          for (const p of payouts) {
+            const baseReward = totalWeight > 0 ? Math.floor((p.weight / totalWeight) * TOTAL_POOL) : 0;
+            const netProfit = Math.max(0, baseReward - p.vote.power_spent);
+            let streakBonusPercent = 0;
+            if (p.currentStreak >= 10) streakBonusPercent = 100;
+            else if (p.currentStreak >= 5) streakBonusPercent = 50;
+            else if (p.currentStreak >= 3) streakBonusPercent = 25;
+            const desiredStreak = Math.floor(netProfit * (streakBonusPercent / 100));
+            p.baseReward = baseReward;
+            p.desiredStreak = desiredStreak;
+            sumBase += baseReward;
+            sumDesiredStreak += desiredStreak;
+          }
+
+          const leftover = Math.max(0, TOTAL_POOL - sumBase);
+          const streakScale = sumDesiredStreak > 0 && leftover > 0
+            ? Math.min(1, leftover / sumDesiredStreak)
+            : 0;
+
           let totalRewardsDistributed = 0;
+          for (const p of payouts) {
+            p.streakBonus = Math.floor(p.desiredStreak * streakScale);
+            p.totalReward = p.baseReward + p.streakBonus;
+            totalRewardsDistributed += p.totalReward;
+          }
+
+          // Floor dust → top-weight winner
+          const dust = Math.max(0, TOTAL_POOL - totalRewardsDistributed);
+          if (dust > 0 && payouts.length > 0) {
+            const top = payouts.reduce((a, b) => (b.weight > a.weight ? b : a));
+            top.totalReward += dust;
+            totalRewardsDistributed += dust;
+          }
 
           // ─── DISTRIBUTE REWARDS TO WINNERS ───
-          for (const { vote, weight } of winnerWeights) {
-              // Get win streak
-              const { data: memberData } = await supabase
-                .from("arena_members")
-                .select("current_win_streak, best_win_streak, total_wins")
-                .eq("user_id", vote.user_id)
-                .maybeSingle();
-
-              const currentStreak = (memberData?.current_win_streak || 0) + 1;
-              const bestStreak = Math.max(currentStreak, memberData?.best_win_streak || 0);
-
-              let streakBonusPercent = 0;
-              if (currentStreak >= 10) streakBonusPercent = 100;
-              else if (currentStreak >= 5) streakBonusPercent = 50;
-              else if (currentStreak >= 3) streakBonusPercent = 25;
-
-              const baseReward = totalWeight > 0 ? (weight / totalWeight) * TOTAL_POOL : 0;
-              const netProfit = Math.max(0, baseReward - vote.power_spent);
-              const streakBonus = Math.floor(netProfit * (streakBonusPercent / 100));
-
-              let totalReward = Math.floor(baseReward + streakBonus);
-
-              const remainingPool = TOTAL_POOL - totalRewardsDistributed;
-              if (totalReward > remainingPool) totalReward = Math.floor(remainingPool);
-              if (totalReward < 0) totalReward = 0;
-              totalRewardsDistributed += totalReward;
+          for (const p of payouts) {
+              const { vote, memberData, currentStreak, bestStreak, streakBonus, totalReward } = p;
 
               const { error: stakeErr } = await supabase.from("arena_staking_rewards").upsert({
                 battle_id: battle.id,
