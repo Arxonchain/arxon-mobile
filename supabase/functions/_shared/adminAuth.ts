@@ -26,12 +26,13 @@ export async function requireAdminOrService(req: Request): Promise<AdminAuthResu
   const authHeader = req.headers.get("authorization") ?? "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   const headerSecret = req.headers.get("x-admin-secret") ?? "";
+  const apiKey = req.headers.get("apikey") ?? "";
 
   if (adminSecret && headerSecret && headerSecret === adminSecret) {
     return { ok: true, mode: "service_role", supabase };
   }
 
-  if (token && token === serviceKey) {
+  if ((token && token === serviceKey) || (apiKey && apiKey === serviceKey)) {
     return { ok: true, mode: "service_role", supabase };
   }
 
