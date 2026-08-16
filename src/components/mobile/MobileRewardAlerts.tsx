@@ -62,6 +62,11 @@ export default function MobileRewardAlerts() {
                       +{n.amount.toLocaleString()} ARX-P
                     </p>
                   )}
+                  {n.amount && n.amount < 0 && (
+                    <p style={{ fontSize: 13, fontWeight: 800, marginTop: 4, color: 'hsl(215 14% 50%)' }}>
+                      {n.amount.toLocaleString()} ARX-P stake
+                    </p>
+                  )}
                 </div>
               </div>
             </motion.div>

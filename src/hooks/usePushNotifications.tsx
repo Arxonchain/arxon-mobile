@@ -272,22 +272,6 @@ export const usePushNotifications = () => {
   }, [user, isNative]);
 
   useEffect(() => {
-    if (!user || !preferences.arenaLive) return;
-    const ch = supabase.channel('arena-live-notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'arena_battles' }, async (payload) => {
-        const b = payload.new as { is_active?: boolean; title?: string };
-        if (b?.is_active) {
-          await sendServerPush(
-            '⚔️ New Arena Battle is LIVE!',
-            `${b.title} just started — stake your ARX-P now!`,
-            { url: '/arena', tag: 'arena-live' },
-          );
-        }
-      }).subscribe();
-    return () => { supabase.removeChannel(ch); };
-  }, [user, preferences.arenaLive, sendServerPush]);
-
-  useEffect(() => {
     if (!user || !preferences.adminAnnouncements) return;
     const ch = supabase.channel('announcements-notifs')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, async (payload) => {
@@ -365,18 +349,39 @@ export const usePushNotifications = () => {
         const n = payload.new as { notification_type?: string; title?: string; message?: string; amount?: number };
         const type = n?.notification_type || '';
 
-        if ((type === 'arena_win' || type === 'arena_loss') && preferences.arenaResults) {
+        const data = (n as { data?: { url?: string } }).data;
+        const navUrl = data?.url || '/arena';
+
+        if (type === 'arena_new_battle' && preferences.arenaLive) {
+          await sendServerPush(
+            n.title || '⚔️ New Arena Battle!',
+            n.message || 'A new battle is live — stake your ARX-P now!',
+            { url: navUrl, tag: 'arena-live' },
+          );
+        } else if (type === 'arena_battle_end' && preferences.arenaLive) {
+          await sendServerPush(
+            n.title || '⏱️ Arena Battle Ended',
+            n.message || 'Staking closed — results coming soon.',
+            { url: navUrl, tag: 'arena-ended' },
+          );
+        } else if (type === 'arena_battle_resolved' && preferences.arenaResults) {
+          await sendServerPush(
+            n.title || '📊 Battle Resolved',
+            n.message || 'Arena results are in — tap to view.',
+            { url: navUrl, tag: 'arena-resolved' },
+          );
+        } else if ((type === 'arena_win' || type === 'arena_loss') && preferences.arenaResults) {
           if (type === 'arena_win') {
             await sendServerPush(
-              '🏆 You Won!',
-              `You won ${n.amount?.toLocaleString() || ''} ARX-P!`,
-              { url: '/arena', tag: 'arena-win' },
+              n.title || '🏆 You Won!',
+              n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`,
+              { url: navUrl, tag: 'arena-win' },
             );
           } else {
             await sendServerPush(
-              '💧 Battle Result',
-              `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P deducted.`,
-              { url: '/arena', tag: 'arena-loss' },
+              n.title || '💧 Battle Result',
+              n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`,
+              { url: navUrl, tag: 'arena-loss' },
             );
           }
         } else if (type === 'announcement' && preferences.adminAnnouncements) {
@@ -394,7 +399,7 @@ export const usePushNotifications = () => {
         }
       }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush]);
+  }, [user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush]);
 
   const updatePreferences = useCallback((newPrefs: NotificationPreferences) => {
     const normalized = normalizePrefs(newPrefs as unknown as Record<string, unknown>);

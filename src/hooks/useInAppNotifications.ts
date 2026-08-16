@@ -21,7 +21,7 @@ type DbNotification = {
   amount?: number | null;
   read: boolean;
   created_at: string;
-  data?: unknown;
+  data?: Record<string, unknown> | null;
 };
 
 function mapRow(row: DbNotification): AppNotification {
@@ -94,12 +94,5 @@ export function useInAppNotifications() {
     }
   }, [user]);
 
-  const notify = useCallback(async (type: string, title: string, message: string, amount = 0) => {
-    if (!user) return;
-    await supabase.from('user_notifications').insert({
-      user_id: user.id, notification_type: type, title, message, amount,
-    });
-  }, [user]);
-
-  return { notifications, unread, loading, markRead, notify, reload: load };
+  return { notifications, unread, loading, markRead, reload: load };
 }

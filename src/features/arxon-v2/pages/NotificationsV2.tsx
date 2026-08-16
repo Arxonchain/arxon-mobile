@@ -9,8 +9,12 @@ import {
 import { v2 } from '../design/tokens';
 
 function getIconInfo(type: string) {
-  if (type === 'rumble_reward' || type === 'arena' || type.includes('arena'))
+  if (type === 'arena_win' || type === 'rumble_reward' || type === 'arena' || type.includes('arena_win'))
     return { icon: <Trophy size={18} color={v2.accent.gold} />, accent: v2.accent.gold };
+  if (type === 'arena_loss')
+    return { icon: <Trophy size={18} color={v2.brand.mutedSoft} />, accent: v2.brand.mutedSoft };
+  if (type === 'arena_new_battle' || type === 'arena_battle_end' || type === 'arena_resolved' || type === 'arena_battle_resolved')
+    return { icon: <Bell size={18} color={v2.accent.cyan} />, accent: v2.accent.cyan };
   if (type === 'new_tasks')
     return { icon: <Bell size={18} color={v2.accent.cyan} />, accent: v2.accent.cyan };
   return { icon: <Gift size={18} color={v2.brand.steel} />, accent: v2.brand.steel };
@@ -51,13 +55,23 @@ export default function NotificationsV2() {
             {icon}
           </div>
           <h2 style={{ fontSize: 20, fontWeight: 800, color: v2.brand.steelBright, marginBottom: 10 }}>{selectedNotif.title}</h2>
-          {selectedNotif.amount && selectedNotif.amount > 0 && (
+          {selectedNotif.amount != null && selectedNotif.amount !== 0 && (
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
               borderRadius: 20, marginBottom: 14, background: `${accent}18`, border: `1px solid ${accent}44`,
             }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: v2.brand.steelLight }}>
-                +{selectedNotif.amount.toLocaleString()} ARX-P
+              <span style={{ fontSize: 14, fontWeight: 800, color: selectedNotif.amount > 0 ? v2.accent.mining : v2.accent.danger }}>
+                {selectedNotif.amount > 0 ? '+' : ''}{selectedNotif.amount.toLocaleString()} ARX-P
+              </span>
+            </div>
+          )}
+          {selectedNotif.amount && selectedNotif.amount < 0 && (
+            <div style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
+              borderRadius: 20, marginBottom: 14, background: `${v2.brand.muted}18`, border: `1px solid ${v2.brand.muted}44`,
+            }}>
+              <span style={{ fontSize: 14, fontWeight: 800, color: v2.brand.mutedSoft }}>
+                {selectedNotif.amount.toLocaleString()} ARX-P stake
               </span>
             </div>
           )}
@@ -156,7 +170,12 @@ export default function NotificationsV2() {
                         </div>
                         {n.amount && n.amount > 0 && (
                           <span style={{ fontSize: 12, fontWeight: 800, color: v2.accent.mining, flexShrink: 0 }}>
-                            +{n.amount}
+                            +{n.amount.toLocaleString()}
+                          </span>
+                        )}
+                        {n.amount && n.amount < 0 && (
+                          <span style={{ fontSize: 12, fontWeight: 800, color: v2.brand.mutedSoft, flexShrink: 0 }}>
+                            {n.amount.toLocaleString()}
                           </span>
                         )}
                       </div>

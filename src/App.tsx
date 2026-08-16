@@ -36,6 +36,7 @@ import { ARXON_UI_V2_ENABLED } from "@/lib/uiFeature";
 import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
+import V2NotificationPopup from "@/features/arxon-v2/components/V2NotificationPopup";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
@@ -173,7 +174,7 @@ class AppErrorBoundary extends React.Component<
 function PushNotificationInit() {
   const { preferences } = usePushNotifications();
   useForgeDailyReminder(preferences.wordForgeDaily);
-  return null;
+  return ARXON_UI_V2_ENABLED ? <V2NotificationPopup /> : null;
 }
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {

@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { notifyArenaBattleResolved } from "../_shared/arenaNotifications.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -62,8 +63,28 @@ serve(async (req) => {
     const manualWinner = body.winner_side;
     const battleId = body.battle_id;
     const forceResolve = body.force === true;
+    const notificationsOnly = body.notifications_only === true;
 
-    console.log("Starting battle resolution...", { manualWinner, battleId, forceResolve });
+    console.log("Starting battle resolution...", { manualWinner, battleId, forceResolve, notificationsOnly });
+
+    if (notificationsOnly && battleId) {
+      const { data: battleRow, error: battleErr } = await supabase
+        .from("arena_battles")
+        .select("id, title, winner_side, side_a_name, side_b_name, side_c_name")
+        .eq("id", battleId)
+        .maybeSingle();
+      if (battleErr || !battleRow?.winner_side) {
+        throw new Error(battleErr?.message || "Battle not found or not resolved yet");
+      }
+      const notif = await notifyArenaBattleResolved(supabase, battleRow, {
+        supabaseUrl,
+        serviceKey: supabaseServiceKey,
+        push: body.push !== false,
+      });
+      return new Response(JSON.stringify({ message: "Arena notifications blasted", battleId, notif }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     let battlesToResolve;
 
@@ -427,6 +448,33 @@ serve(async (req) => {
             total_rewards_distributed: totalRewardsDistributed,
           }).eq("id", battle.id);
 
+          // In-app + push notifications (RPC when migration applied, else direct insert)
+          const { error: blastErr } = await supabase.rpc("blast_arena_battle_notifications", {
+            p_battle_id: battle.id,
+          });
+          if (blastErr) {
+            console.warn("blast_arena_battle_notifications RPC failed, using fallback:", blastErr.message);
+            const { notifyArenaParticipantsResolved } = await import("../_shared/arenaNotifications.ts");
+            const { data: earningsRows } = await supabase
+              .from("arena_earnings")
+              .select("user_id, is_winner, total_earned, stake_amount")
+              .eq("battle_id", battle.id);
+            if (earningsRows?.length) {
+              await notifyArenaParticipantsResolved(
+                supabase,
+                {
+                  id: battle.id,
+                  title: battle.title,
+                  winner_side: winnerSide,
+                  side_a_name: battle.side_a_name,
+                  side_b_name: battle.side_b_name,
+                  side_c_name: battle.side_c_name,
+                },
+                earningsRows,
+              );
+            }
+          }
+
           results.push({
             battle: battle.title,
             battleId: battle.id,
@@ -437,6 +485,20 @@ serve(async (req) => {
             totalPool: TOTAL_POOL,
             totalDistributed: totalRewardsDistributed,
           });
+
+          try {
+            const notif = await notifyArenaBattleResolved(supabase, {
+              id: battle.id,
+              title: battle.title,
+              winner_side: winnerSide,
+              side_a_name: battle.side_a_name,
+              side_b_name: battle.side_b_name,
+              side_c_name: battle.side_c_name,
+            }, { supabaseUrl, serviceKey: supabaseServiceKey });
+            results[results.length - 1].notifications = notif;
+          } catch (notifErr) {
+            console.error(`Notifications failed for ${battle.id}:`, notifErr);
+          }
 
         } else {
           // No winner or no votes
