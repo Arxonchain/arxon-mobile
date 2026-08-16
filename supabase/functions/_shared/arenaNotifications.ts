@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-type BattleRow = {
+export type BattleRow = {
   id: string;
   title: string;
   winner_side?: string | null;
@@ -9,7 +9,14 @@ type BattleRow = {
   side_c_name?: string | null;
 };
 
-function winnerName(battle: BattleRow): string {
+type EarningsRow = {
+  user_id: string;
+  is_winner: boolean;
+  total_earned: number;
+  stake_amount: number;
+};
+
+export function winnerName(battle: BattleRow): string {
   switch (battle.winner_side) {
     case "a":
       return battle.side_a_name || "Side A";
@@ -24,6 +31,12 @@ function winnerName(battle: BattleRow): string {
   }
 }
 
+const ARENA_URL = "/arena/prediction-market";
+
+function battleData(battleId: string, extra: Record<string, unknown> = {}) {
+  return { battle_id: battleId, url: ARENA_URL, ...extra };
+}
+
 /** Idempotent in-app notifications via DB RPC (migration 20260816201500). */
 export async function blastArenaBattleNotifications(
   supabase: SupabaseClient,
@@ -34,6 +47,19 @@ export async function blastArenaBattleNotifications(
   });
   if (error) return { ok: false, error: error.message };
   return { ok: true, detail: data };
+}
+
+export async function notifyArenaResolveFallback(
+  supabase: SupabaseClient,
+  battle: BattleRow,
+): Promise<{ wins: number; losses: number; resolved: number }> {
+  const winSide = winnerName(battle);
+  const { data: earnings, error } = await supabase
+    .from("arena_earnings")
+    .select("user_id, is_winner, total_earned, stake_amount")
+    .eq("battle_id", battle.id);
+  if (error) throw error;
+  return notifyArenaParticipantsResolved(supabase, battle, earnings || [], winSide);
 }
 
 /** REST fallback when migration RPCs are not applied yet. */
@@ -49,34 +75,31 @@ export async function blastArenaBattleNotificationsFallback(
   if (battleErr || !battle?.winner_side) {
     return { ok: false, error: battleErr?.message || "battle_not_resolved" };
   }
-
   const detail = await notifyArenaResolveFallback(supabase, battle);
   return { ok: true, detail };
 }
 
-export async function notifyArenaResolveFallback(
+export async function notifyArenaParticipantsResolved(
   supabase: SupabaseClient,
   battle: BattleRow,
+  earnings: EarningsRow[],
+  winSide?: string,
 ): Promise<{ wins: number; losses: number; resolved: number }> {
-  const winSide = winnerName(battle);
-  const { data: earnings, error } = await supabase
-    .from("arena_earnings")
-    .select("user_id, is_winner, total_earned, stake_amount")
-    .eq("battle_id", battle.id);
-  if (error) throw error;
-
+  const winner = winSide || winnerName(battle);
   const rows: Array<Record<string, unknown>> = [];
   const seenResolved = new Set<string>();
 
-  for (const row of earnings || []) {
+  for (const row of earnings) {
     if (!seenResolved.has(row.user_id)) {
       seenResolved.add(row.user_id);
       rows.push({
         user_id: row.user_id,
         title: "📊 Battle Resolved",
-        message: `[${battle.id}] "${battle.title}" is settled. Winning side: ${winSide}. Tap to view your result.`,
+        message: `"${battle.title}" is settled — winner: ${winner}. Tap to view your result.`,
         notification_type: "arena_battle_resolved",
         amount: 0,
+        battle_id: battle.id,
+        data: battleData(battle.id, { winner_name: winner }),
       });
     }
 
@@ -84,17 +107,21 @@ export async function notifyArenaResolveFallback(
       rows.push({
         user_id: row.user_id,
         title: "🏆 Arena Victory!",
-        message: `[${battle.id}] You won "${battle.title}". ${Number(row.total_earned).toLocaleString()} ARX-P has been credited to your balance!`,
+        message: `You won "${battle.title}" on ${winner}. +${Number(row.total_earned).toLocaleString()} ARX-P credited!`,
         notification_type: "arena_win",
         amount: row.total_earned,
+        battle_id: battle.id,
+        data: battleData(battle.id, { winner_name: winner }),
       });
     } else {
       rows.push({
         user_id: row.user_id,
         title: "💧 Arena Battle Result",
-        message: `[${battle.id}] Your side lost "${battle.title}". ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
+        message: `Your pick lost in "${battle.title}". ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
         notification_type: "arena_loss",
         amount: -Math.abs(Number(row.stake_amount)),
+        battle_id: battle.id,
+        data: battleData(battle.id, { winner_name: winner }),
       });
     }
   }
@@ -105,57 +132,109 @@ export async function notifyArenaResolveFallback(
   if (insertErr) throw insertErr;
 
   return {
-    wins: (earnings || []).filter((e) => e.is_winner).length,
-    losses: (earnings || []).filter((e) => !e.is_winner).length,
+    wins: earnings.filter((e) => e.is_winner).length,
+    losses: earnings.filter((e) => !e.is_winner).length,
     resolved: seenResolved.size,
   };
 }
 
+type PushTarget = { userId: string; title: string; body: string; tag: string };
+
+export async function sendPushToUser(
+  supabaseUrl: string,
+  serviceKey: string,
+  target: PushTarget,
+): Promise<{ sent: number; total: number; error?: string }> {
+  const res = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      userId: target.userId,
+      title: target.title,
+      body: target.body,
+      url: ARENA_URL,
+      tag: target.tag,
+    }),
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    return { sent: 0, total: 0, error: json.error || res.statusText };
+  }
+  return { sent: Number(json.sent || 0), total: Number(json.total || 0) };
+}
+
+export async function pushArenaResolvedNotifications(
+  supabase: SupabaseClient,
+  battle: BattleRow,
+  serviceKey: string,
+  supabaseUrl: string,
+): Promise<{ pushed: number; attempted: number; errors: string[] }> {
+  const { data: earnings } = await supabase
+    .from("arena_earnings")
+    .select("user_id, is_winner, total_earned, stake_amount")
+    .eq("battle_id", battle.id);
+
+  const winSide = winnerName(battle);
+  let pushed = 0;
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of earnings || []) {
+    if (!seen.has(row.user_id)) {
+      seen.add(row.user_id);
+      const resolved = await sendPushToUser(supabaseUrl, serviceKey, {
+        userId: row.user_id,
+        title: "📊 Battle Resolved",
+        body: `"${battle.title}" is settled — winner: ${winSide}.`,
+        tag: "arena-resolved",
+      });
+      if (resolved.sent > 0) pushed += 1;
+      if (resolved.error) errors.push(resolved.error);
+    }
+
+    const winPush = row.is_winner
+      ? {
+          title: "🏆 You Won!",
+          body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
+          tag: "arena-win",
+        }
+      : {
+          title: "💧 Battle Result",
+          body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
+          tag: "arena-loss",
+        };
+
+    const result = await sendPushToUser(supabaseUrl, serviceKey, {
+      userId: row.user_id,
+      ...winPush,
+    });
+    if (result.sent > 0) pushed += 1;
+    if (result.error) errors.push(result.error);
+  }
+
+  return { pushed, attempted: (earnings || []).length, errors: [...new Set(errors)] };
+}
+
+/** @deprecated use pushArenaResolvedNotifications */
 export async function pushArenaNotifications(
   supabase: SupabaseClient,
   battle: BattleRow,
   serviceKey: string,
   supabaseUrl: string,
 ): Promise<{ pushed: number }> {
-  const { data: earnings } = await supabase
-    .from("arena_earnings")
-    .select("user_id, is_winner, total_earned, stake_amount")
-    .eq("battle_id", battle.id);
-
-  let pushed = 0;
-  for (const row of earnings || []) {
-    const title = row.is_winner ? "🏆 You Won!" : "💧 Battle Result";
-    const body = row.is_winner
-      ? `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`
-      : `Your team lost "${battle.title}". ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`;
-
-    const res = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        userId: row.user_id,
-        title,
-        body,
-        url: "/arena/prediction-market",
-        tag: row.is_winner ? "arena-win" : "arena-loss",
-      }),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.sent > 0) pushed += 1;
-    }
-  }
-  return { pushed };
+  const r = await pushArenaResolvedNotifications(supabase, battle, serviceKey, supabaseUrl);
+  return { pushed: r.pushed };
 }
 
 export async function notifyArenaBattleResolved(
   supabase: SupabaseClient,
   battle: BattleRow,
   options: { supabaseUrl: string; serviceKey: string; push?: boolean },
-): Promise<{ inApp: unknown; push?: { pushed: number } }> {
+): Promise<{ inApp: unknown; push?: { pushed: number; attempted: number; errors: string[] } }> {
   const rpc = await blastArenaBattleNotifications(supabase, battle.id);
   let inApp: unknown = rpc.detail;
   if (!rpc.ok && rpc.error?.includes("Could not find the function")) {
@@ -164,11 +243,30 @@ export async function notifyArenaBattleResolved(
     throw new Error(rpc.error || "notify failed");
   }
 
-  let push: { pushed: number } | undefined;
+  let push: { pushed: number; attempted: number; errors: string[] } | undefined;
   if (options.push !== false) {
-    push = await pushArenaNotifications(supabase, battle, options.serviceKey, options.supabaseUrl);
+    push = await pushArenaResolvedNotifications(
+      supabase,
+      battle,
+      options.serviceKey,
+      options.supabaseUrl,
+    );
   }
   return { inApp, push };
 }
 
-export { winnerName };
+export async function blastArenaBattleWithPush(
+  supabase: SupabaseClient,
+  battleId: string,
+  options: { supabaseUrl: string; serviceKey: string; push?: boolean },
+): Promise<{ inApp: unknown; push?: { pushed: number; attempted: number; errors: string[] } }> {
+  const { data: battle, error } = await supabase
+    .from("arena_battles")
+    .select("id, title, winner_side, side_a_name, side_b_name, side_c_name")
+    .eq("id", battleId)
+    .maybeSingle();
+  if (error || !battle?.winner_side) {
+    throw new Error(error?.message || "battle_not_resolved");
+  }
+  return notifyArenaBattleResolved(supabase, battle, options);
+}

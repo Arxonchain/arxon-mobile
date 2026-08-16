@@ -8,11 +8,17 @@ project_id = "oztccmrhiawleucdluwb"
 [functions.send-email]
 verify_jwt = false
 
+[functions.send-push-notification]
+verify_jwt = false
+
+[functions.resolve-arena-battle]
+verify_jwt = false
+
 [functions.blast-arena-notifications]
-verify_jwt = true
+verify_jwt = false
 
 [functions.notify-arena-battle-ends]
-verify_jwt = true
+verify_jwt = false
 
 [functions.apply-arena-notifications-migration]
-verify_jwt = true
+verify_jwt = false

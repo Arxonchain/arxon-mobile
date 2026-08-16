@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Gift, Trophy, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInAppNotifications, type AppNotification } from '@/hooks/useInAppNotifications';
+import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
 import {
   V2Page, V2Header, V2Card, V2Eyebrow, fadeUp, stagger,
 } from '../design/Kit';
@@ -54,7 +55,9 @@ export default function NotificationsV2() {
           }}>
             {icon}
           </div>
-          <h2 style={{ fontSize: 20, fontWeight: 800, color: v2.brand.steelBright, marginBottom: 10 }}>{selectedNotif.title}</h2>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: v2.brand.steelBright, marginBottom: 8, lineHeight: 1.3 }}>
+            {displayNotificationTitle(selectedNotif.title)}
+          </h2>
           {selectedNotif.amount != null && selectedNotif.amount !== 0 && (
             <div style={{
               display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
@@ -75,7 +78,9 @@ export default function NotificationsV2() {
               </span>
             </div>
           )}
-          <p style={{ fontSize: 14, color: v2.brand.steelLight, lineHeight: 1.6, marginBottom: 20 }}>{selectedNotif.message}</p>
+          <p style={{ fontSize: 13, color: v2.brand.steelLight, lineHeight: 1.55, marginBottom: 16 }}>
+            {displayNotificationMessage(selectedNotif.message)}
+          </p>
           <V2Eyebrow accent={v2.brand.muted}>{formatDate(selectedNotif.created_at)}</V2Eyebrow>
         </motion.div>
       </V2Page>
@@ -120,61 +125,63 @@ export default function NotificationsV2() {
             <p style={{ fontSize: 12, color: v2.brand.muted, marginTop: 6 }}>Rewards and updates will appear here</p>
           </motion.div>
         ) : (
-          <div style={{ padding: '0 20px' }}>
+          <div style={{ padding: '0 16px' }}>
             <AnimatePresence>
               {notifications.map((n, i) => {
                 const { icon, accent } = getIconInfo(n.type);
+                const title = displayNotificationTitle(n.title);
+                const message = displayNotificationMessage(n.message);
                 return (
                   <motion.div
                     key={n.id}
                     variants={fadeUp}
                     initial="hidden"
                     animate="show"
-                    transition={{ delay: i * 0.04 }}
+                    transition={{ delay: i * 0.03 }}
                     whileTap={{ scale: 0.98 }}
                     onClick={() => { if (!n.read) markOneRead(n.id); setSelectedNotif(n); }}
-                    style={{ marginBottom: 10, cursor: 'pointer' }}
+                    style={{ marginBottom: 8, cursor: 'pointer' }}
                   >
                     <V2Card
                       accent={!n.read ? accent : undefined}
-                      padding="16px"
-                      style={n.read ? { opacity: 0.75 } : undefined}
+                      padding="12px 14px"
+                      style={n.read ? { opacity: 0.72 } : undefined}
                     >
-                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{
-                          width: 44, height: 44, borderRadius: v2.radius.sm, flexShrink: 0,
+                          width: 38, height: 38, borderRadius: v2.radius.sm, flexShrink: 0,
                           background: `${accent}18`, border: `1px solid ${accent}44`,
                           display: 'flex', alignItems: 'center', justifyContent: 'center',
                         }}>
                           {icon}
                         </div>
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                             <p style={{
-                              fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0,
+                              fontSize: 12, fontWeight: 700, color: v2.brand.steelBright, margin: 0,
                               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                             }}>
-                              {n.title}
+                              {title}
                             </p>
                             {!n.read && (
-                              <div style={{ width: 6, height: 6, borderRadius: '50%', background: v2.brand.glow, flexShrink: 0 }} />
+                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: v2.brand.glow, flexShrink: 0 }} />
                             )}
                           </div>
                           <p style={{
-                            fontSize: 11, color: v2.brand.muted, lineHeight: 1.4, margin: 0,
+                            fontSize: 11, color: v2.brand.mutedSoft, lineHeight: 1.35, margin: 0,
                             overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                           }}>
-                            {n.message}
+                            {message}
                           </p>
-                          <p style={{ fontSize: 10, color: v2.brand.muted, margin: '6px 0 0' }}>{formatDate(n.created_at)}</p>
+                          <p style={{ fontSize: 10, color: v2.brand.muted, margin: '4px 0 0' }}>{formatDate(n.created_at)}</p>
                         </div>
-                        {n.amount && n.amount > 0 && (
-                          <span style={{ fontSize: 12, fontWeight: 800, color: v2.accent.mining, flexShrink: 0 }}>
+                        {n.amount != null && n.amount > 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 800, color: v2.accent.mining, flexShrink: 0 }}>
                             +{n.amount.toLocaleString()}
                           </span>
                         )}
-                        {n.amount && n.amount < 0 && (
-                          <span style={{ fontSize: 12, fontWeight: 800, color: v2.brand.mutedSoft, flexShrink: 0 }}>
+                        {n.amount != null && n.amount < 0 && (
+                          <span style={{ fontSize: 11, fontWeight: 800, color: v2.brand.mutedSoft, flexShrink: 0 }}>
                             {n.amount.toLocaleString()}
                           </span>
                         )}

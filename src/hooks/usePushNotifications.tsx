@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { dispatchAppNavigate } from '@/lib/nativeNavigation';
+import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
 import {
   ARXON_NOTIF_CHANNEL,
   ARXON_NOTIF_SMALL_ICON,
@@ -354,33 +355,33 @@ export const usePushNotifications = () => {
 
         if (type === 'arena_new_battle' && preferences.arenaLive) {
           await sendServerPush(
-            n.title || '⚔️ New Arena Battle!',
-            n.message || 'A new battle is live — stake your ARX-P now!',
+            displayNotificationTitle(n.title || '⚔️ New Arena Battle!'),
+            displayNotificationMessage(n.message || 'A new battle is live — stake your ARX-P now!'),
             { url: navUrl, tag: 'arena-live' },
           );
         } else if (type === 'arena_battle_end' && preferences.arenaLive) {
           await sendServerPush(
-            n.title || '⏱️ Arena Battle Ended',
-            n.message || 'Staking closed — results coming soon.',
+            displayNotificationTitle(n.title || '⏱️ Arena Battle Ended'),
+            displayNotificationMessage(n.message || 'Staking closed — results coming soon.'),
             { url: navUrl, tag: 'arena-ended' },
           );
-        } else if (type === 'arena_battle_resolved' && preferences.arenaResults) {
+        } else if ((type === 'arena_battle_resolved' || type === 'arena_resolved') && preferences.arenaResults) {
           await sendServerPush(
-            n.title || '📊 Battle Resolved',
-            n.message || 'Arena results are in — tap to view.',
+            displayNotificationTitle(n.title || '📊 Battle Resolved'),
+            displayNotificationMessage(n.message || 'Arena results are in — tap to view.'),
             { url: navUrl, tag: 'arena-resolved' },
           );
         } else if ((type === 'arena_win' || type === 'arena_loss') && preferences.arenaResults) {
           if (type === 'arena_win') {
             await sendServerPush(
-              n.title || '🏆 You Won!',
-              n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`,
+              displayNotificationTitle(n.title || '🏆 You Won!'),
+              displayNotificationMessage(n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`),
               { url: navUrl, tag: 'arena-win' },
             );
           } else {
             await sendServerPush(
-              n.title || '💧 Battle Result',
-              n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`,
+              displayNotificationTitle(n.title || '💧 Battle Result'),
+              displayNotificationMessage(n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`),
               { url: navUrl, tag: 'arena-loss' },
             );
           }

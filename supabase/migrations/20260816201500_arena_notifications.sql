@@ -246,6 +246,45 @@ REVOKE ALL ON FUNCTION public.blast_arena_battle_notifications(uuid) FROM PUBLIC
 GRANT EXECUTE ON FUNCTION public.notify_arena_battle_resolved(uuid) TO service_role, postgres;
 GRANT EXECUTE ON FUNCTION public.blast_arena_battle_notifications(uuid) TO service_role, postgres;
 
+-- Cleanup + re-blast helpers (admin / service_role only)
+CREATE OR REPLACE FUNCTION public.cleanup_arena_battle_notifications(p_battle_id uuid)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_title text;
+  v_deleted integer;
+BEGIN
+  SELECT title INTO v_title FROM public.arena_battles WHERE id = p_battle_id;
+  DELETE FROM public.user_notifications
+  WHERE battle_id = p_battle_id
+     OR (
+       notification_type IN (
+         'arena_win', 'arena_loss', 'arena_battle_resolved', 'arena_resolved',
+         'arena_new_battle', 'arena_battle_end'
+       )
+       AND (
+         message ILIKE '%' || p_battle_id::text || '%'
+         OR (v_title IS NOT NULL AND message ILIKE '%' || v_title || '%')
+       )
+     );
+  GET DIAGNOSTICS v_deleted = ROW_COUNT;
+
+  UPDATE public.arena_battles
+  SET resolved_notified_at = NULL,
+      end_notified_at = NULL,
+      created_notified_at = NULL
+  WHERE id = p_battle_id;
+
+  RETURN v_deleted;
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.cleanup_arena_battle_notifications(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.cleanup_arena_battle_notifications(uuid) TO service_role, postgres;
+
 CREATE OR REPLACE FUNCTION public.trg_fn_notify_arena_battle_resolved()
 RETURNS trigger
 LANGUAGE plpgsql

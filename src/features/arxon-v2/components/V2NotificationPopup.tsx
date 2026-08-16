@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Swords, Clock, Bell, X } from 'lucide-react';
+import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
 import { useInAppNotifications, type AppNotification } from '@/hooks/useInAppNotifications';
 import { v2 } from '@/features/arxon-v2/design/tokens';
 
@@ -82,8 +83,8 @@ export default function V2NotificationPopup() {
               width: '100%',
               textAlign: 'left',
               border: `1px solid ${meta.accent}66`,
-              borderRadius: v2.radius.lg,
-              padding: '14px 16px',
+              borderRadius: v2.radius.md,
+              padding: '12px 14px',
               background: `linear-gradient(135deg, ${meta.glow}, hsl(225 28% 7% / 0.96))`,
               boxShadow: v2.shadow(meta.accent, 0.35),
               backdropFilter: 'blur(12px)',
@@ -109,21 +110,23 @@ export default function V2NotificationPopup() {
             >
               <X size={16} />
             </button>
-            <div style={{ display: 'flex', gap: 14, paddingRight: 24 }}>
+            <div style={{ display: 'flex', gap: 12, paddingRight: 22 }}>
               <div style={{
-                width: 48, height: 48, borderRadius: v2.radius.sm, flexShrink: 0,
+                width: 40, height: 40, borderRadius: v2.radius.sm, flexShrink: 0,
                 background: `${meta.accent}22`, border: `1px solid ${meta.accent}55`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {meta.icon}
               </div>
               <div style={{ minWidth: 0 }}>
-                <p style={{ margin: 0, fontSize: 14, fontWeight: 800, color: v2.brand.steelBright }}>{active.title}</p>
+                <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: v2.brand.steelBright, lineHeight: 1.3 }}>
+                  {displayNotificationTitle(active.title)}
+                </p>
                 <p style={{
-                  margin: '4px 0 0', fontSize: 12, color: v2.brand.steelLight, lineHeight: 1.45,
+                  margin: '3px 0 0', fontSize: 11, color: v2.brand.steelLight, lineHeight: 1.4,
                   overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
                 }}>
-                  {active.message}
+                  {displayNotificationMessage(active.message)}
                 </p>
                 {active.amount != null && active.amount !== 0 && (
                   <p style={{

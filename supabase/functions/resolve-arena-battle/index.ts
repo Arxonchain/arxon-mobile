@@ -448,33 +448,6 @@ serve(async (req) => {
             total_rewards_distributed: totalRewardsDistributed,
           }).eq("id", battle.id);
 
-          // In-app + push notifications (RPC when migration applied, else direct insert)
-          const { error: blastErr } = await supabase.rpc("blast_arena_battle_notifications", {
-            p_battle_id: battle.id,
-          });
-          if (blastErr) {
-            console.warn("blast_arena_battle_notifications RPC failed, using fallback:", blastErr.message);
-            const { notifyArenaParticipantsResolved } = await import("../_shared/arenaNotifications.ts");
-            const { data: earningsRows } = await supabase
-              .from("arena_earnings")
-              .select("user_id, is_winner, total_earned, stake_amount")
-              .eq("battle_id", battle.id);
-            if (earningsRows?.length) {
-              await notifyArenaParticipantsResolved(
-                supabase,
-                {
-                  id: battle.id,
-                  title: battle.title,
-                  winner_side: winnerSide,
-                  side_a_name: battle.side_a_name,
-                  side_b_name: battle.side_b_name,
-                  side_c_name: battle.side_c_name,
-                },
-                earningsRows,
-              );
-            }
-          }
-
           results.push({
             battle: battle.title,
             battleId: battle.id,
@@ -486,6 +459,7 @@ serve(async (req) => {
             totalDistributed: totalRewardsDistributed,
           });
 
+          // In-app + background FCM push (single path)
           try {
             const notif = await notifyArenaBattleResolved(supabase, {
               id: battle.id,
@@ -494,7 +468,7 @@ serve(async (req) => {
               side_a_name: battle.side_a_name,
               side_b_name: battle.side_b_name,
               side_c_name: battle.side_c_name,
-            }, { supabaseUrl, serviceKey: supabaseServiceKey });
+            }, { supabaseUrl, serviceKey: supabaseServiceKey, push: true });
             results[results.length - 1].notifications = notif;
           } catch (notifErr) {
             console.error(`Notifications failed for ${battle.id}:`, notifErr);

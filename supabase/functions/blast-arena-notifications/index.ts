@@ -4,10 +4,7 @@ import {
   adminCorsHeaders,
   requireAdminOrService,
 } from "../_shared/adminAuth.ts";
-import {
-  blastArenaBattleNotifications,
-  blastArenaBattleNotificationsFallback,
-} from "../_shared/arenaNotifications.ts";
+import { blastArenaBattleWithPush } from "../_shared/arenaNotifications.ts";
 
 const corsHeaders = adminCorsHeaders;
 
@@ -27,13 +24,34 @@ serve(async (req) => {
       });
     }
 
-    let result = await blastArenaBattleNotifications(auth.supabase, battleId);
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
-    if (!result.ok && result.error?.includes("Could not find the function")) {
-      result = await blastArenaBattleNotificationsFallback(auth.supabase, battleId);
+    if (body.cleanup === true) {
+      const { data: deleted, error } = await auth.supabase.rpc("cleanup_arena_battle_notifications", {
+        p_battle_id: battleId,
+      });
+      if (error && !error.message.includes("Could not find the function")) {
+        return new Response(JSON.stringify({ ok: false, error: error.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (error) {
+        await auth.supabase
+          .from("user_notifications")
+          .delete()
+          .like("message", `%${battleId}%`);
+      }
     }
 
-    return new Response(JSON.stringify({ ok: result.ok, ...result }), {
+    const result = await blastArenaBattleWithPush(auth.supabase, battleId, {
+      supabaseUrl,
+      serviceKey,
+      push: body.push !== false,
+    });
+
+    return new Response(JSON.stringify({ ok: true, battle_id: battleId, ...result }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

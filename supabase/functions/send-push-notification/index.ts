@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  adminAuthResponse,
+  adminCorsHeaders,
+  requireAdminOrService,
+} from "../_shared/adminAuth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-secret",
-};
+const corsHeaders = adminCorsHeaders;
 
 async function generateVapidAuthHeader(
   endpoint: string,
@@ -147,86 +148,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-    const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-    const adminSecret = Deno.env.get("ADMIN_FUNCTION_SECRET") ?? "";
-    if (!supabaseUrl || !serviceKey) {
-      return new Response(JSON.stringify({ success: false, error: "Server misconfigured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceKey);
-    const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-    const headerSecret = req.headers.get("x-admin-secret") ?? "";
-
-    let mode: "service_role" | "admin" | "self" = "self";
-    let actorUserId: string | undefined;
-
-    if (adminSecret && headerSecret && headerSecret === adminSecret) {
-      mode = "service_role";
-    } else if (token && token === serviceKey) {
-      mode = "service_role";
-    } else if (!token) {
-      return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    } else {
-      const {
-        data: { user },
-        error: authErr,
-      } = await supabase.auth.getUser(token);
-      if (authErr || !user) {
-        return new Response(JSON.stringify({ success: false, error: "Unauthorized" }), {
-          status: 401,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data: roleRow } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      if (roleRow) {
-        mode = "admin";
-        actorUserId = user.id;
-      } else {
-        mode = "self";
-        actorUserId = user.id;
-      }
-    }
+    const auth = await requireAdminOrService(req);
+    if (!auth.ok) return adminAuthResponse(auth);
 
     const vapidPublicKey = Deno.env.get("VAPID_PUBLIC_KEY");
     const vapidPrivateKey = Deno.env.get("VAPID_PRIVATE_KEY");
     const firebaseSA = Deno.env.get("FIREBASE_SERVICE_ACCOUNT");
     const firebaseProject = Deno.env.get("FIREBASE_PROJECT_ID") || "arxon-cb305";
+    const supabase = auth.supabase;
 
     const { userId, userIds, title, body, url, tag, data, broadcast } = await req.json();
 
-    if (broadcast && mode === "self") {
+    if (broadcast && auth.mode !== "service_role" && auth.mode !== "admin") {
       return new Response(JSON.stringify({ success: false, error: "Admin access required for broadcast" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    if (mode === "self") {
-      const target = userId || actorUserId;
-      if (!target || target !== actorUserId || (userIds && userIds.length > 0)) {
-        return new Response(JSON.stringify({ success: false, error: "Can only send push to yourself" }), {
-          status: 403,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
-
     let query = supabase.from("push_subscriptions").select("*");
-    if (!broadcast && mode === "self") query = query.eq("user_id", actorUserId!);
-    else if (!broadcast && userId) query = query.eq("user_id", userId);
+    if (!broadcast && userId) query = query.eq("user_id", userId);
     else if (!broadcast && userIds?.length > 0) query = query.in("user_id", userIds);
 
     const { data: subscriptions, error } = await query;
@@ -245,14 +186,19 @@ serve(async (req) => {
       tag: tag || "arxon",
       ...(data || {}),
     };
-    const dataStrings: Record<string, string> = { url: url || "/", tag: tag || "arxon" };
+    const dataStrings: Record<string, string> = {
+      url: url || "/",
+      tag: tag || "arxon",
+      title: title || "ARXON",
+      body: body || "New notification",
+    };
 
     let serviceAccount: Record<string, string> | null = null;
     if (firebaseSA) {
       try {
         serviceAccount = JSON.parse(firebaseSA);
       } catch {
-        /* ignore */
+        console.error("Invalid FIREBASE_SERVICE_ACCOUNT JSON");
       }
     }
 

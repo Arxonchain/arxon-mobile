@@ -1,10 +1,9 @@
 #!/usr/bin/env node
 /**
- * Blast in-app + push notifications for a resolved arena battle.
- * Works before/after migration 20260816190000 (RPC or REST fallback).
+ * Clean + re-blast arena notifications for a resolved battle.
  *
  * Usage:
- *   node scripts/blast-arena-battle-notifications.mjs [battle_id] [--no-push]
+ *   node scripts/blast-arena-battle-notifications.mjs [battle_id] [--no-push] [--no-cleanup]
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const battleId = process.argv[2] || '7af24605-79b3-4af0-956a-e98cb4681964';
 const pushEnabled = !process.argv.includes('--no-push');
+const cleanupEnabled = !process.argv.includes('--no-cleanup');
 
 function loadEnv() {
   const envPath = path.join(__dirname, '..', '.env');
@@ -60,7 +60,47 @@ async function main() {
     'Content-Type': 'application/json',
   };
 
-  // Prefer RPC when migration is applied
+  // Prefer unified edge function (cleanup + in-app + FCM)
+  const edgeRes = await fetchRetry(`${url}/functions/v1/blast-arena-notifications`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ battle_id: battleId, cleanup: cleanupEnabled, push: pushEnabled }),
+  });
+
+  if (edgeRes.ok) {
+    const detail = await edgeRes.json();
+    console.log('Edge blast OK:', JSON.stringify(detail, null, 2));
+    return;
+  }
+
+  const edgeErr = await edgeRes.text();
+  console.warn('Edge blast unavailable, using REST fallback:', edgeErr.slice(0, 200));
+
+  const [battle] = await fetchRetry(
+    `${url}/rest/v1/arena_battles?id=eq.${battleId}&select=id,title,winner_side,side_a_name,side_b_name,side_c_name`,
+    { headers },
+  ).then((r) => r.json());
+
+  if (!battle?.winner_side) throw new Error(`Battle ${battleId} not found or not resolved`);
+
+  if (cleanupEnabled) {
+    const cleanupRpc = await fetchRetry(`${url}/rest/v1/rpc/cleanup_arena_battle_notifications`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ p_battle_id: battleId }),
+    });
+    if (cleanupRpc.ok) {
+      console.log('Cleanup deleted rows:', await cleanupRpc.json());
+    } else {
+      const del = await fetchRetry(
+        `${url}/rest/v1/user_notifications?message=like.*${battleId}*`,
+        { method: 'DELETE', headers: { ...headers, Prefer: 'return=representation' } },
+      );
+      const deleted = del.ok ? await del.json() : [];
+      console.log('REST cleanup deleted:', Array.isArray(deleted) ? deleted.length : 0);
+    }
+  }
+
   const rpcRes = await fetchRetry(`${url}/rest/v1/rpc/blast_arena_battle_notifications`, {
     method: 'POST',
     headers,
@@ -68,33 +108,12 @@ async function main() {
   });
 
   if (rpcRes.ok) {
-    const detail = await rpcRes.json();
-    console.log('RPC blast OK:', JSON.stringify(detail, null, 2));
+    console.log('RPC blast OK:', JSON.stringify(await rpcRes.json(), null, 2));
   } else {
-    const rpcErr = await rpcRes.text();
-    console.warn('RPC unavailable, using REST fallback:', rpcErr.slice(0, 160));
-
-    const [battle] = await fetchRetry(
-      `${url}/rest/v1/arena_battles?id=eq.${battleId}&select=id,title,winner_side,side_a_name,side_b_name,side_c_name`,
-      { headers },
-    ).then((r) => r.json());
-
-    if (!battle?.winner_side) throw new Error(`Battle ${battleId} not found or not resolved`);
-
     const earnings = await fetchRetry(
       `${url}/rest/v1/arena_earnings?battle_id=eq.${battleId}&select=user_id,is_winner,total_earned,stake_amount`,
       { headers },
     ).then((r) => r.json());
-
-    const existing = await fetchRetry(
-      `${url}/rest/v1/user_notifications?notification_type=in.(arena_win,arena_loss,arena_battle_resolved,arena_resolved)&message=like.*${battleId}*&select=id&limit=1`,
-      { headers },
-    ).then((r) => r.json());
-
-    let inserted = false;
-    if (existing?.length) {
-      console.log('Blast in-app rows already present — skipping inserts');
-    } else {
 
     const winSide = winnerName(battle);
     const rows = [];
@@ -106,7 +125,7 @@ async function main() {
         rows.push({
           user_id: row.user_id,
           title: '📊 Battle Resolved',
-          message: `[${battleId}] "${battle.title}" is settled. Winning side: ${winSide}. Tap to view your result.`,
+          message: `"${battle.title}" is settled — winner: ${winSide}. Tap to view your result.`,
           notification_type: 'arena_battle_resolved',
           amount: 0,
         });
@@ -116,7 +135,7 @@ async function main() {
         rows.push({
           user_id: row.user_id,
           title: '🏆 Arena Victory!',
-          message: `[${battleId}] You won "${battle.title}". ${Number(row.total_earned).toLocaleString()} ARX-P has been credited to your balance!`,
+          message: `You won "${battle.title}" on ${winSide}. +${Number(row.total_earned).toLocaleString()} ARX-P credited!`,
           notification_type: 'arena_win',
           amount: row.total_earned,
         });
@@ -124,7 +143,7 @@ async function main() {
         rows.push({
           user_id: row.user_id,
           title: '💧 Arena Battle Result',
-          message: `[${battleId}] Your side lost "${battle.title}". ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
+          message: `Your pick lost in "${battle.title}". ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
           notification_type: 'arena_loss',
           amount: -Math.abs(Number(row.stake_amount)),
         });
@@ -146,8 +165,6 @@ async function main() {
       wins: earnings.filter((e) => e.is_winner).length,
       losses: earnings.filter((e) => !e.is_winner).length,
     });
-    inserted = true;
-    }
   }
 
   if (!pushEnabled) {
@@ -160,39 +177,63 @@ async function main() {
     { headers },
   ).then((r) => r.json());
 
-  const [battle] = await fetchRetry(
-    `${url}/rest/v1/arena_battles?id=eq.${battleId}&select=title`,
-    { headers },
-  ).then((r) => r.json());
+  const winSide = winnerName(battle);
+  let devicesSent = 0;
+  let usersReached = 0;
+  const pushErrors = new Set();
+  const seen = new Set();
 
-  let pushed = 0;
   for (const row of earnings) {
-    const title = row.is_winner ? '🏆 You Won!' : '💧 Battle Result';
-    const body = row.is_winner
-      ? `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`
-      : `Your team lost "${battle.title}". ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`;
+    const targets = [];
 
-    const res = await fetchRetry(`${url}/functions/v1/send-push-notification`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${serviceKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId: row.user_id,
-        title,
-        body,
-        url: '/arena',
-        tag: row.is_winner ? 'arena-win' : 'arena-loss',
-      }),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      if (json.sent > 0) pushed += 1;
+    if (!seen.has(row.user_id)) {
+      seen.add(row.user_id);
+      targets.push({
+        title: '📊 Battle Resolved',
+        body: `"${battle.title}" is settled — winner: ${winSide}.`,
+        tag: 'arena-resolved',
+      });
+    }
+
+    targets.push(row.is_winner
+      ? {
+          title: '🏆 You Won!',
+          body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
+          tag: 'arena-win',
+        }
+      : {
+          title: '💧 Battle Result',
+          body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
+          tag: 'arena-loss',
+        });
+
+    for (const t of targets) {
+      const res = await fetchRetry(`${url}/functions/v1/send-push-notification`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          userId: row.user_id,
+          title: t.title,
+          body: t.body,
+          url: '/arena/prediction-market',
+          tag: t.tag,
+        }),
+      });
+      const json = res.ok ? await res.json() : { error: await res.text() };
+      if (json.sent > 0) {
+        devicesSent += json.sent;
+        usersReached += 1;
+      }
+      if (json.error) pushErrors.add(String(json.error).slice(0, 120));
     }
   }
 
-  console.log('Push attempts for participants:', earnings.length, 'devices_reached_users:', pushed);
+  console.log('Push summary:', {
+    participants: earnings.length,
+    users_reached: usersReached,
+    devices_sent: devicesSent,
+    errors: [...pushErrors],
+  });
 }
 
 main().catch((e) => {
