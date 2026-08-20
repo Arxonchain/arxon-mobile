@@ -61,9 +61,9 @@ Deno.serve(async (req) => {
     const auth = await requireAdminOrService(req)
     if (!auth.ok) return adminAuthResponse(auth)
 
-    const prodUrl = Deno.env.get('PROD_SUPABASE_URL')!
-    const prodKey = Deno.env.get('PROD_SUPABASE_SERVICE_ROLE_KEY')!
-    const db = createClient(prodUrl, prodKey)
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const db = createClient(supabaseUrl, supabaseServiceKey)
 
     const body = await req.json().catch(() => ({}))
     const {

@@ -31,10 +31,26 @@ const checks = [
   { name: 'Gaming hub or WordForge page chunk', ok: /GamingHub|WordForgePage/.test(blob) },
 ];
 
+const MINING_PROJECT_REF = 'oztccmrhiawleucdluwb';
+const FORBIDDEN_PROJECT_REF = 'knfpmzjghbjnlnarsivs';
+
+const dbChecks = [
+  {
+    name: 'Mining App Supabase project',
+    ok: blob.includes(MINING_PROJECT_REF) || blob.includes(`${MINING_PROJECT_REF}.supabase.co`),
+  },
+  {
+    name: 'No website Supabase project',
+    ok: !blob.includes(FORBIDDEN_PROJECT_REF),
+  },
+];
+
 const failed = checks.filter((c) => !c.ok);
-if (failed.length) {
+const dbFailed = dbChecks.filter((c) => !c.ok);
+if (failed.length || dbFailed.length) {
   console.error('[verify-ota-v2] FAIL — dist does not look like full V2+games OTA:');
   for (const f of failed) console.error(`  - missing: ${f.name}`);
+  for (const f of dbFailed) console.error(`  - DB isolation: ${f.name}`);
   console.error('Build with: VITE_ARXON_UI_V2=true VITE_WORD_FORGE_ENABLED=true && vite build --mode word-forge');
   process.exit(1);
 }

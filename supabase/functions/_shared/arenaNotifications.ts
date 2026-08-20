@@ -270,3 +270,47 @@ export async function blastArenaBattleWithPush(
   }
   return notifyArenaBattleResolved(supabase, battle, options);
 }
+
+/**
+ * Broadcast FCM/web-push for a newly live arena battle (works with app closed).
+ * Uses send-push-notification broadcast in one call; falls back to paged userIds.
+ */
+export async function pushArenaNewBattleBroadcast(
+  _supabase: SupabaseClient,
+  battle: BattleRow,
+  serviceKey: string,
+  supabaseUrl: string,
+): Promise<{ sent: number; total: number; errors: string[] }> {
+  const title = "⚔️ New Arena Battle!";
+  const body = `"${battle.title}" is live — open Arxon and stake your ARX-P!`;
+  const errors: string[] = [];
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      broadcast: true,
+      title,
+      body,
+      url: ARENA_URL,
+      tag: `arena-live-${battle.id}`,
+      data: { battle_id: battle.id, type: "arena_new_battle" },
+    }),
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    errors.push(json.error || res.statusText || `HTTP ${res.status}`);
+    return { sent: 0, total: 0, errors };
+  }
+
+  return {
+    sent: Number(json.sent || 0),
+    total: Number(json.total || 0),
+    errors,
+  };
+}

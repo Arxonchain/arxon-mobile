@@ -248,7 +248,7 @@ const AdminArena = () => {
       
       const endsAt = new Date(startsAt.getTime() + totalDurationMs);
 
-      const { error } = await supabase.from('arena_battles').insert({
+      const { data: created, error } = await supabase.from('arena_battles').insert({
         title: formData.title,
         description: formData.description || null,
         side_a_name: formData.side_a_name,
@@ -265,12 +265,31 @@ const AdminArena = () => {
         starts_at: startsAt.toISOString(),
         ends_at: endsAt.toISOString(),
         is_active: true,
-      });
+      }).select('id, starts_at').maybeSingle();
 
       if (error) throw error;
 
+      const battleId = created?.id;
+      const startsMs = created?.starts_at ? new Date(created.starts_at).getTime() : Date.now();
+
+      // Do not await FCM fan-out — it can take a long time and made Create look broken.
+      if (battleId && startsMs <= Date.now()) {
+        void supabase.functions
+          .invoke('notify-arena-battle-created', { body: { battle_id: battleId } })
+          .then(({ error: pushErr }) => {
+            if (pushErr) console.warn('[AdminArena] new-battle push failed:', pushErr);
+          })
+          .catch((pushErr) => {
+            console.warn('[AdminArena] new-battle push invoke failed:', pushErr);
+          });
+      }
+
       const isScheduled = formData.schedule_type === 'scheduled';
-      toast.success(isScheduled ? 'Market scheduled successfully! It will go live at the set time.' : 'Market created and is now live!');
+      toast.success(
+        isScheduled
+          ? 'Market scheduled successfully! It will go live at the set time.'
+          : 'Market created and is now live!',
+      );
       setShowCreateDialog(false);
       setFormData({
         title: '',

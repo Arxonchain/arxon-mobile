@@ -20,5 +20,8 @@ verify_jwt = false
 [functions.notify-arena-battle-ends]
 verify_jwt = false
 
+[functions.notify-arena-battle-created]
+verify_jwt = false
+
 [functions.apply-arena-notifications-migration]
 verify_jwt = false

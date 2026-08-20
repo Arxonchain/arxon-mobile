@@ -253,22 +253,28 @@ export const usePushNotifications = () => {
     options?: { url?: string; tag?: string; userId?: string },
   ) => {
     if (!user) return;
+    const safeTitle = displayNotificationTitle(title);
+    const safeBody = displayNotificationMessage(body);
+    const showForegroundBanner =
+      isNative && (document.visibilityState === 'visible' || !document.hidden);
+
     try {
       await supabase.functions.invoke('send-push-notification', {
         body: {
           userId: options?.userId || user.id,
-          title,
-          body,
+          title: safeTitle,
+          body: safeBody,
           url: options?.url || '/',
           tag: options?.tag || 'arxon',
         },
       });
-      // Foreground banner on native — FCM often silent while app is open
-      if (isNative && document.visibilityState === 'visible') {
-        await showNativeLocalNotification(title, body);
-      }
     } catch (e) {
-      console.error('[Push] sendServerPush error:', e);
+      console.warn('[Push] sendServerPush edge unavailable:', e);
+    }
+
+    // Always show a native banner while the app is open — FCM is often silent in foreground
+    if (showForegroundBanner) {
+      await showNativeLocalNotification(safeTitle, safeBody);
     }
   }, [user, isNative]);
 
@@ -353,12 +359,15 @@ export const usePushNotifications = () => {
         const data = (n as { data?: { url?: string } }).data;
         const navUrl = data?.url || '/arena';
 
+        // arena_new_battle: server broadcasts FCM (works app-closed). Only show a
+        // foreground local banner here to avoid duplicate tray pushes.
         if (type === 'arena_new_battle' && preferences.arenaLive) {
-          await sendServerPush(
-            displayNotificationTitle(n.title || '⚔️ New Arena Battle!'),
-            displayNotificationMessage(n.message || 'A new battle is live — stake your ARX-P now!'),
-            { url: navUrl, tag: 'arena-live' },
-          );
+          if (isNative && document.visibilityState === 'visible') {
+            await showNativeLocalNotification(
+              displayNotificationTitle(n.title || '⚔️ New Arena Battle!'),
+              displayNotificationMessage(n.message || 'A new battle is live — stake your ARX-P now!'),
+            );
+          }
         } else if (type === 'arena_battle_end' && preferences.arenaLive) {
           await sendServerPush(
             displayNotificationTitle(n.title || '⏱️ Arena Battle Ended'),
@@ -400,7 +409,7 @@ export const usePushNotifications = () => {
         }
       }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush]);
+  }, [user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush, isNative]);
 
   const updatePreferences = useCallback((newPrefs: NotificationPreferences) => {
     const normalized = normalizePrefs(newPrefs as unknown as Record<string, unknown>);

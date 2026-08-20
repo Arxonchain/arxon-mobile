@@ -65,6 +65,10 @@ mustInclude(blob, '/games', ['/games']);
 mustInclude(blob, 'GamingHub or WordForge', [/GamingHub/, /WordForgePage/, '/word-forge']);
 mustInclude(blob, 'Dice', ['DiceHub', '/arena/dice']);
 mustInclude(blob, 'ArenaV2', ['ArenaV2']);
+mustInclude(blob, 'Mining App Supabase project', ['oztccmrhiawleucdluwb']);
+if (blob.includes('knfpmzjghbjnlnarsivs')) {
+  throw new Error('live bundle contains forbidden website Supabase project ref');
+}
 
 console.log('[verify-live-ota-v2] OK', {
   origin: ORIGIN,
