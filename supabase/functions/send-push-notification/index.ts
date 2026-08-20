@@ -131,13 +131,25 @@ async function sendFCMv1(
           data,
           android: {
             priority: "high",
-            notification: { sound: "default", channel_id: "arxon_default", icon: "ic_launcher" },
+            notification: {
+              sound: "default",
+              channel_id: "arxon_default",
+              default_vibrate_timings: true,
+              notification_priority: "PRIORITY_HIGH",
+              visibility: "PUBLIC",
+            },
           },
+          // Ensures the OS shows a tray alert even if the client is force-stopped.
+          // (Foreground display is mirrored via LocalNotifications in the app.)
         },
       }),
     });
     const result = await res.json();
-    if (result.error?.code === 404 || result.error?.status === "UNREGISTERED") return false;
+    if (result.error) {
+      console.error("FCM send error:", JSON.stringify(result.error));
+      if (result.error?.code === 404 || result.error?.status === "UNREGISTERED") return false;
+      return false;
+    }
     return !!result.name;
   } catch {
     return false;

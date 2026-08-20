@@ -56,7 +56,11 @@ function navigateFromPush(url: string) {
   }
 }
 
-async function showNativeLocalNotification(title: string, body: string) {
+async function showNativeLocalNotification(
+  title: string,
+  body: string,
+  options?: { url?: string; tag?: string },
+) {
   if (!isLocalNotificationsAvailable()) return;
   try {
     const { LocalNotifications } = await import('@capacitor/local-notifications');
@@ -71,6 +75,10 @@ async function showNativeLocalNotification(title: string, body: string) {
         smallIcon: ARXON_NOTIF_SMALL_ICON,
         largeIcon: ARXON_NOTIF_LARGE_ICON,
         channelId: ARXON_NOTIF_CHANNEL,
+        extra: {
+          url: options?.url || '/arena/prediction-market',
+          tag: options?.tag || 'arxon',
+        },
       }],
     });
   } catch (e) {
@@ -133,6 +141,21 @@ export const usePushNotifications = () => {
     PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
       const url = action.notification.data?.url;
       if (url) navigateFromPush(url);
+    });
+
+    // Android suppresses the system tray while the WebView is open unless we
+    // mirror FCM into LocalNotifications (same channel as mining reminders).
+    PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+      const title = displayNotificationTitle(
+        notification.title || String(notification.data?.title || 'ARXON'),
+      );
+      const body = displayNotificationMessage(
+        notification.body || String(notification.data?.body || 'New notification'),
+      );
+      await showNativeLocalNotification(title, body, {
+        url: String(notification.data?.url || '/'),
+        tag: String(notification.data?.tag || 'arxon'),
+      });
     });
 
     return () => { PushNotifications.removeAllListeners(); };
@@ -359,22 +382,37 @@ export const usePushNotifications = () => {
         const data = (n as { data?: { url?: string } }).data;
         const navUrl = data?.url || '/arena';
 
-        // arena_new_battle: server broadcasts FCM (works app-closed). Only show a
-        // foreground local banner here to avoid duplicate tray pushes.
+        // Server FCM covers force-closed app. LocalNotifications mirror the phone shade
+        // (same channel as mining) when the WebView is alive.
         if (type === 'arena_new_battle' && preferences.arenaLive) {
-          if (isNative && document.visibilityState === 'visible') {
+          if (isNative) {
             await showNativeLocalNotification(
               displayNotificationTitle(n.title || '⚔️ New Arena Battle!'),
               displayNotificationMessage(n.message || 'A new battle is live — stake your ARX-P now!'),
+              { url: navUrl, tag: 'arena-live' },
             );
           }
         } else if (type === 'arena_battle_end' && preferences.arenaLive) {
+          if (isNative) {
+            await showNativeLocalNotification(
+              displayNotificationTitle(n.title || '⏱️ Arena Battle Ended'),
+              displayNotificationMessage(n.message || 'Staking closed — results coming soon.'),
+              { url: navUrl, tag: 'arena-ended' },
+            );
+          }
           await sendServerPush(
             displayNotificationTitle(n.title || '⏱️ Arena Battle Ended'),
             displayNotificationMessage(n.message || 'Staking closed — results coming soon.'),
             { url: navUrl, tag: 'arena-ended' },
           );
         } else if ((type === 'arena_battle_resolved' || type === 'arena_resolved') && preferences.arenaResults) {
+          if (isNative) {
+            await showNativeLocalNotification(
+              displayNotificationTitle(n.title || '📊 Battle Resolved'),
+              displayNotificationMessage(n.message || 'Arena results are in — tap to view.'),
+              { url: navUrl, tag: 'arena-resolved' },
+            );
+          }
           await sendServerPush(
             displayNotificationTitle(n.title || '📊 Battle Resolved'),
             displayNotificationMessage(n.message || 'Arena results are in — tap to view.'),
@@ -382,12 +420,26 @@ export const usePushNotifications = () => {
           );
         } else if ((type === 'arena_win' || type === 'arena_loss') && preferences.arenaResults) {
           if (type === 'arena_win') {
+            if (isNative) {
+              await showNativeLocalNotification(
+                displayNotificationTitle(n.title || '🏆 You Won!'),
+                displayNotificationMessage(n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`),
+                { url: navUrl, tag: 'arena-win' },
+              );
+            }
             await sendServerPush(
               displayNotificationTitle(n.title || '🏆 You Won!'),
               displayNotificationMessage(n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`),
               { url: navUrl, tag: 'arena-win' },
             );
           } else {
+            if (isNative) {
+              await showNativeLocalNotification(
+                displayNotificationTitle(n.title || '💧 Battle Result'),
+                displayNotificationMessage(n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`),
+                { url: navUrl, tag: 'arena-loss' },
+              );
+            }
             await sendServerPush(
               displayNotificationTitle(n.title || '💧 Battle Result'),
               displayNotificationMessage(n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`),
