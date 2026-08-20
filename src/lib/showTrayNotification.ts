@@ -24,6 +24,13 @@ export async function showTrayNotification(
   const now = Date.now();
   const prev = recentKeys.get(key);
   if (prev && now - prev < DEDUPE_MS) return;
+  // Also collapse same arena-live battle tag within window (title/body can differ slightly).
+  const tagOnly = options?.tag;
+  if (tagOnly?.startsWith('arena-live')) {
+    for (const [k, t] of recentKeys) {
+      if (k.startsWith(`${tagOnly}|`) && now - t < DEDUPE_MS) return;
+    }
+  }
   recentKeys.set(key, now);
   for (const [k, t] of recentKeys) {
     if (now - t > DEDUPE_MS) recentKeys.delete(k);

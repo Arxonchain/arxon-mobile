@@ -314,3 +314,41 @@ export async function pushArenaNewBattleBroadcast(
     errors,
   };
 }
+
+/**
+ * Claim the single FCM slot for a battle (admin + cron race-safe).
+ * force=true re-marks and allows another broadcast.
+ */
+export async function claimArenaCreatedPush(
+  supabase: SupabaseClient,
+  battleId: string,
+  force = false,
+): Promise<boolean> {
+  if (force) {
+    await supabase
+      .from("arena_battles")
+      .update({ created_push_at: new Date().toISOString() })
+      .eq("id", battleId);
+    return true;
+  }
+
+  const { data, error } = await supabase.rpc("claim_arena_battle_created_push", {
+    p_battle_id: battleId,
+  });
+  if (!error && typeof data === "boolean") return data;
+
+  // Fallback if migration not applied yet
+  const { data: row } = await supabase
+    .from("arena_battles")
+    .select("created_push_at")
+    .eq("id", battleId)
+    .maybeSingle();
+  if (row?.created_push_at) return false;
+
+  const { error: updErr } = await supabase
+    .from("arena_battles")
+    .update({ created_push_at: new Date().toISOString() })
+    .eq("id", battleId)
+    .is("created_push_at", null);
+  return !updErr;
+}

@@ -4,7 +4,7 @@ import {
   adminCorsHeaders,
   requireAdminOrService,
 } from "../_shared/adminAuth.ts";
-import { pushArenaNewBattleBroadcast } from "../_shared/arenaNotifications.ts";
+import { pushArenaNewBattleBroadcast, claimArenaCreatedPush } from "../_shared/arenaNotifications.ts";
 
 const corsHeaders = adminCorsHeaders;
 
@@ -59,22 +59,15 @@ serve(async (req) => {
         console.warn("ensure_arena_new_battle_notifications:", ensureErr.message);
       }
 
+      const claimed = await claimArenaCreatedPush(auth.supabase, row.id, false);
+      if (!claimed) continue;
+
       const push = await pushArenaNewBattleBroadcast(
         auth.supabase,
         { id: row.id, title: row.title },
         serviceKey,
         supabaseUrl,
       );
-
-      const { error: markErr } = await auth.supabase.rpc("mark_arena_battle_created_push", {
-        p_battle_id: row.id,
-      });
-      if (markErr) {
-        await auth.supabase
-          .from("arena_battles")
-          .update({ created_push_at: new Date().toISOString() })
-          .eq("id", row.id);
-      }
 
       createdResults.push({
         battle_id: row.id,

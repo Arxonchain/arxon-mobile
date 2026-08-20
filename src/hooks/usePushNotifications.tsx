@@ -125,6 +125,7 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
 
     // Android suppresses the system tray while the WebView is open unless we
     // mirror FCM into LocalNotifications (same channel as mining reminders).
+    // This is the ONLY tray path for arena_new_battle while the app is open.
     PushNotifications.addListener('pushNotificationReceived', async (notification) => {
       const title = displayNotificationTitle(
         notification.title || String(notification.data?.title || 'ARXON'),
@@ -360,16 +361,10 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
         const data = (n as { data?: { url?: string } }).data;
         const navUrl = data?.url || '/arena';
 
-        // Server FCM covers force-closed app. LocalNotifications mirror the phone shade
-        // (same channel as mining) when the WebView is alive.
+        // New battle: server FCM is the single push. Foreground tray comes only from
+        // pushNotificationReceived — do not LocalNotifications here (was triple-firing).
         if (type === 'arena_new_battle' && preferences.arenaLive) {
-          if (isNative) {
-            await showNativeLocalNotification(
-              displayNotificationTitle(n.title || '⚔️ New Arena Battle!'),
-              displayNotificationMessage(n.message || 'A new battle is live — stake your ARX-P now!'),
-              { url: navUrl, tag: 'arena-live' },
-            );
-          }
+          // in-app neon toast is handled by V2NotificationPopup
         } else if (type === 'arena_battle_end' && preferences.arenaLive) {
           if (isNative) {
             await showNativeLocalNotification(
