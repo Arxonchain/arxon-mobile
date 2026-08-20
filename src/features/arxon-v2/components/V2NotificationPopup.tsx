@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Trophy, Swords, Clock, Bell, X } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
+import { showTrayNotification } from '@/lib/showTrayNotification';
 import { useInAppNotifications, type AppNotification } from '@/hooks/useInAppNotifications';
 import { v2 } from '@/features/arxon-v2/design/tokens';
 
@@ -39,6 +41,16 @@ export default function V2NotificationPopup() {
     if (!latest) return;
     seenRef.current.add(latest.id);
     setActive(latest);
+
+    // Neon toast alone is not a phone-shade alert — mirror like mining reminders.
+    if (Capacitor.isNativePlatform() && latest.type.includes('arena')) {
+      void showTrayNotification(
+        displayNotificationTitle(latest.title),
+        displayNotificationMessage(latest.message),
+        { url: routeFor(latest), tag: latest.type },
+      );
+    }
+
     const t = setTimeout(() => setActive(null), 7000);
     return () => clearTimeout(t);
   }, [notifications]);

@@ -5,16 +5,14 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { dispatchAppNavigate } from '@/lib/nativeNavigation';
 import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
-import {
-  ARXON_NOTIF_CHANNEL,
-  ARXON_NOTIF_SMALL_ICON,
-  ARXON_NOTIF_LARGE_ICON,
-  isLocalNotificationsAvailable,
-} from '@/lib/nativeNotifications';
+import { showTrayNotification } from '@/lib/showTrayNotification';
 
 const NOTIFICATION_PREFS_KEY = 'arxon_notification_preferences';
 const VAPID_PUBLIC_KEY = 'BH83wzlnSpDzR3jxVWOmlPVnSWMxzKy6XABCoR5BThesZTX3Lkt_cJZmze_gDsReh5_IeBXIjb-ijbluwf0I2_w';
 const APP_ID = 'xyz.arxonchain.app';
+
+/** Only one mount (PushNotificationInit) should attach FCM/realtime listeners. */
+let nativePushListenersReady = false;
 
 export interface NotificationPreferences {
   miningAlerts: boolean;
@@ -61,29 +59,7 @@ async function showNativeLocalNotification(
   body: string,
   options?: { url?: string; tag?: string },
 ) {
-  if (!isLocalNotificationsAvailable()) return;
-  try {
-    const { LocalNotifications } = await import('@capacitor/local-notifications');
-    const id = (Date.now() % 2147483647) || 1;
-    await LocalNotifications.schedule({
-      notifications: [{
-        id,
-        title,
-        body,
-        schedule: { at: new Date(Date.now() + 300) },
-        sound: 'default',
-        smallIcon: ARXON_NOTIF_SMALL_ICON,
-        largeIcon: ARXON_NOTIF_LARGE_ICON,
-        channelId: ARXON_NOTIF_CHANNEL,
-        extra: {
-          url: options?.url || '/arena/prediction-market',
-          tag: options?.tag || 'arxon',
-        },
-      }],
-    });
-  } catch (e) {
-    console.warn('[Push] Local notification failed:', e);
-  }
+  await showTrayNotification(title, body, options);
 }
 
 function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
@@ -95,7 +71,8 @@ function urlBase64ToUint8Array(base64String: string): ArrayBuffer {
   return outputArray.buffer as ArrayBuffer;
 }
 
-export const usePushNotifications = () => {
+export const usePushNotifications = (options?: { listen?: boolean }) => {
+  const listen = options?.listen === true;
   const { user } = useAuth();
   const [permission, setPermission] = useState<'default' | 'granted' | 'denied'>('default');
   const [preferences, setPreferences] = useState<NotificationPreferences>(defaultPrefs);
@@ -117,7 +94,10 @@ export const usePushNotifications = () => {
   }, []);
 
   useEffect(() => {
-    if (!isNative) return;
+    if (!listen || !isNative) return;
+    // Settings/Profile also call this hook — never tear down global FCM listeners.
+    if (nativePushListenersReady) return;
+    nativePushListenersReady = true;
 
     PushNotifications.addListener('registration', async (token) => {
       setFcmToken(token.value);
@@ -157,12 +137,10 @@ export const usePushNotifications = () => {
         tag: String(notification.data?.tag || 'arxon'),
       });
     });
-
-    return () => { PushNotifications.removeAllListeners(); };
-  }, [isNative]);
+  }, [listen, isNative]);
 
   useEffect(() => {
-    if (isNative) return;
+    if (!listen || isNative) return;
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
     navigator.serviceWorker.register('/sw.js')
       .then(reg => {
@@ -170,11 +148,11 @@ export const usePushNotifications = () => {
         if (Notification.permission === 'granted') setPermission('granted');
       })
       .catch(err => console.error('[Push] SW registration failed:', err));
-  }, [isNative]);
+  }, [listen, isNative]);
 
   // Re-register FCM token when already granted — never auto-prompt (user opts in via Settings/Profile)
   useEffect(() => {
-    if (!isNative || !user) return;
+    if (!listen || !isNative || !user) return;
     const syncRegistration = async () => {
       try {
         const { receive } = await PushNotifications.checkPermissions();
@@ -192,13 +170,13 @@ export const usePushNotifications = () => {
     };
     const t = setTimeout(syncRegistration, 1500);
     return () => clearTimeout(t);
-  }, [user?.id, isNative]);
+  }, [listen, user?.id, isNative]);
 
   useEffect(() => {
-    if (isNative || !user) return;
+    if (!listen || isNative || !user) return;
     if (!('Notification' in window)) return;
     setPermission(Notification.permission as 'default' | 'granted' | 'denied');
-  }, [user, isNative]);
+  }, [listen, user, isNative]);
 
   const requestPermission = useCallback(async () => {
     try {
@@ -302,7 +280,7 @@ export const usePushNotifications = () => {
   }, [user, isNative]);
 
   useEffect(() => {
-    if (!user || !preferences.adminAnnouncements) return;
+    if (!listen || !user || !preferences.adminAnnouncements) return;
     const ch = supabase.channel('announcements-notifs')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'announcements' }, async (payload) => {
         const a = payload.new as { is_active?: boolean; title?: string };
@@ -315,10 +293,10 @@ export const usePushNotifications = () => {
         }
       }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, preferences.adminAnnouncements, sendServerPush]);
+  }, [listen, user, preferences.adminAnnouncements, sendServerPush]);
 
   useEffect(() => {
-    if (!user || (!preferences.miningAlerts && !preferences.claimNotifications)) {
+    if (!listen || !user || (!preferences.miningAlerts && !preferences.claimNotifications)) {
       if (miningSessionCheckRef.current) clearInterval(miningSessionCheckRef.current);
       return;
     }
@@ -366,11 +344,11 @@ export const usePushNotifications = () => {
     return () => {
       if (miningSessionCheckRef.current) clearInterval(miningSessionCheckRef.current);
     };
-  }, [user, preferences.miningAlerts, preferences.claimNotifications, sendServerPush]);
+  }, [listen, user, preferences.miningAlerts, preferences.claimNotifications, sendServerPush]);
 
   // Personal arena win/loss + reward notifications (single source — no duplicate battle UPDATE listener)
   useEffect(() => {
-    if (!user) return;
+    if (!listen || !user) return;
     const ch = supabase.channel('user-personal-notifs')
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'user_notifications',
@@ -461,7 +439,7 @@ export const usePushNotifications = () => {
         }
       }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush, isNative]);
+  }, [listen, user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush, isNative]);
 
   const updatePreferences = useCallback((newPrefs: NotificationPreferences) => {
     const normalized = normalizePrefs(newPrefs as unknown as Record<string, unknown>);

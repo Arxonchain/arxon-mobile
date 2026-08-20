@@ -172,7 +172,8 @@ class AppErrorBoundary extends React.Component<
 }
 
 function PushNotificationInit() {
-  const { preferences } = usePushNotifications();
+  // listen:true — only this mount owns FCM + realtime push side-effects
+  const { preferences } = usePushNotifications({ listen: true });
   useForgeDailyReminder(preferences.wordForgeDaily);
   return ARXON_UI_V2_ENABLED ? <V2NotificationPopup /> : null;
 }

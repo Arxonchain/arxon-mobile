@@ -178,14 +178,27 @@ serve(async (req) => {
       });
     }
 
-    let query = supabase.from("push_subscriptions").select("*");
-    if (!broadcast && userId) query = query.eq("user_id", userId);
-    else if (!broadcast && userIds?.length > 0) query = query.in("user_id", userIds);
+    // PostgREST defaults to max 1000 rows — paginate so broadcasts reach every device.
+    const pageSize = 1000;
+    const subscriptions: Array<{
+      id: string;
+      fcm_token?: string;
+      endpoint?: string;
+      p256dh: string;
+      auth: string;
+    }> = [];
+    for (let from = 0; ; from += pageSize) {
+      let query = supabase.from("push_subscriptions").select("*").range(from, from + pageSize - 1);
+      if (!broadcast && userId) query = query.eq("user_id", userId);
+      else if (!broadcast && userIds?.length > 0) query = query.in("user_id", userIds);
+      const { data: page, error } = await query;
+      if (error) throw error;
+      if (!page?.length) break;
+      subscriptions.push(...page);
+      if (page.length < pageSize) break;
+    }
 
-    const { data: subscriptions, error } = await query;
-    if (error) throw error;
-
-    if (!subscriptions || subscriptions.length === 0) {
+    if (subscriptions.length === 0) {
       return new Response(JSON.stringify({ success: true, sent: 0, message: "No subscriptions found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -214,40 +227,46 @@ serve(async (req) => {
       }
     }
 
-    const results = await Promise.all(
-      subscriptions.map(async (sub: {
-        id: string;
-        fcm_token?: string;
-        endpoint?: string;
-        p256dh: string;
-        auth: string;
-      }) => {
-        const isFCM = !!(sub.fcm_token || sub.endpoint?.startsWith("fcm:"));
-        if (isFCM) {
-          const fcmToken = sub.fcm_token || sub.endpoint?.replace("fcm:", "") || "";
-          if (!fcmToken || !serviceAccount) return false;
-          const ok = await sendFCMv1(
-            fcmToken,
-            title || "ARXON",
-            body || "New notification",
-            dataStrings,
-            firebaseProject,
-            serviceAccount,
-          );
-          if (!ok) await supabase.from("push_subscriptions").delete().eq("id", sub.id);
-          return ok;
-        }
-        if (!vapidPublicKey || !vapidPrivateKey || !sub.endpoint) return false;
-        const ok = await sendWebPush(
-          { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
-          payload,
-          vapidPublicKey,
-          vapidPrivateKey,
+    const sendOne = async (sub: {
+      id: string;
+      fcm_token?: string;
+      endpoint?: string;
+      p256dh: string;
+      auth: string;
+    }) => {
+      const isFCM = !!(sub.fcm_token || sub.endpoint?.startsWith("fcm:"));
+      if (isFCM) {
+        const fcmToken = sub.fcm_token || sub.endpoint?.replace("fcm:", "") || "";
+        if (!fcmToken || !serviceAccount) return false;
+        const ok = await sendFCMv1(
+          fcmToken,
+          title || "ARXON",
+          body || "New notification",
+          dataStrings,
+          firebaseProject,
+          serviceAccount,
         );
         if (!ok) await supabase.from("push_subscriptions").delete().eq("id", sub.id);
         return ok;
-      }),
-    );
+      }
+      if (!vapidPublicKey || !vapidPrivateKey || !sub.endpoint) return false;
+      const ok = await sendWebPush(
+        { endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth },
+        payload,
+        vapidPublicKey,
+        vapidPrivateKey,
+      );
+      if (!ok) await supabase.from("push_subscriptions").delete().eq("id", sub.id);
+      return ok;
+    };
+
+    // Chunk to avoid hammering FCM / edge CPU on large broadcasts.
+    const chunkSize = 80;
+    const results: boolean[] = [];
+    for (let i = 0; i < subscriptions.length; i += chunkSize) {
+      const chunk = subscriptions.slice(i, i + chunkSize);
+      results.push(...(await Promise.all(chunk.map(sendOne))));
+    }
 
     const sent = results.filter(Boolean).length;
     return new Response(JSON.stringify({ success: true, sent, total: subscriptions.length }), {
