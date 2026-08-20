@@ -84,11 +84,14 @@ serve(async (req) => {
     const results: Array<Record<string, unknown>> = [];
 
     for (const battle of targets) {
-      await auth.supabase.rpc("ensure_arena_new_battle_notifications", {
+      const { error: ensureErr } = await auth.supabase.rpc("ensure_arena_new_battle_notifications", {
         p_battle_id: battle.id,
-      }).catch(() => null);
+      });
+      if (ensureErr) {
+        console.warn("ensure_arena_new_battle_notifications:", ensureErr.message);
+      }
 
-      // Fallback ensure if RPC missing
+      // Fallback ensure if RPC missing / failed
       const { count } = await auth.supabase
         .from("user_notifications")
         .select("id", { count: "exact", head: true })
@@ -108,7 +111,10 @@ serve(async (req) => {
         if (rows.length) {
           const chunk = 500;
           for (let i = 0; i < rows.length; i += chunk) {
-            await auth.supabase.from("user_notifications").insert(rows.slice(i, i + chunk));
+            const { error: insErr } = await auth.supabase
+              .from("user_notifications")
+              .insert(rows.slice(i, i + chunk));
+            if (insErr) console.warn("notif insert chunk:", insErr.message);
           }
         }
       }
@@ -120,14 +126,15 @@ serve(async (req) => {
         supabaseUrl,
       );
 
-      await auth.supabase.rpc("mark_arena_battle_created_push", { p_battle_id: battle.id }).catch(
-        async () => {
-          await auth.supabase
-            .from("arena_battles")
-            .update({ created_push_at: new Date().toISOString() })
-            .eq("id", battle.id);
-        },
-      );
+      const { error: markErr } = await auth.supabase.rpc("mark_arena_battle_created_push", {
+        p_battle_id: battle.id,
+      });
+      if (markErr) {
+        await auth.supabase
+          .from("arena_battles")
+          .update({ created_push_at: new Date().toISOString() })
+          .eq("id", battle.id);
+      }
 
       results.push({
         battle_id: battle.id,

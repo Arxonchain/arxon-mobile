@@ -52,9 +52,12 @@ serve(async (req) => {
     }
 
     for (const row of pendingRows) {
-      await auth.supabase.rpc("ensure_arena_new_battle_notifications", {
+      const { error: ensureErr } = await auth.supabase.rpc("ensure_arena_new_battle_notifications", {
         p_battle_id: row.id,
-      }).catch(() => null);
+      });
+      if (ensureErr) {
+        console.warn("ensure_arena_new_battle_notifications:", ensureErr.message);
+      }
 
       const push = await pushArenaNewBattleBroadcast(
         auth.supabase,
@@ -63,14 +66,15 @@ serve(async (req) => {
         supabaseUrl,
       );
 
-      await auth.supabase.rpc("mark_arena_battle_created_push", { p_battle_id: row.id }).catch(
-        async () => {
-          await auth.supabase
-            .from("arena_battles")
-            .update({ created_push_at: new Date().toISOString() })
-            .eq("id", row.id);
-        },
-      );
+      const { error: markErr } = await auth.supabase.rpc("mark_arena_battle_created_push", {
+        p_battle_id: row.id,
+      });
+      if (markErr) {
+        await auth.supabase
+          .from("arena_battles")
+          .update({ created_push_at: new Date().toISOString() })
+          .eq("id", row.id);
+      }
 
       createdResults.push({
         battle_id: row.id,

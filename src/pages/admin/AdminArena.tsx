@@ -272,16 +272,27 @@ const AdminArena = () => {
       const battleId = created?.id;
       const startsMs = created?.starts_at ? new Date(created.starts_at).getTime() : Date.now();
 
-      // Do not await FCM fan-out — it can take a long time and made Create look broken.
+      // Fire notify in background but surface failures (do not block create UX for long).
       if (battleId && startsMs <= Date.now()) {
-        void supabase.functions
-          .invoke('notify-arena-battle-created', { body: { battle_id: battleId } })
-          .then(({ error: pushErr }) => {
-            if (pushErr) console.warn('[AdminArena] new-battle push failed:', pushErr);
-          })
-          .catch((pushErr) => {
+        void (async () => {
+          try {
+            const { data: pushData, error: pushErr } = await supabase.functions.invoke(
+              'notify-arena-battle-created',
+              { body: { battle_id: battleId } },
+            );
+            if (pushErr) {
+              console.warn('[AdminArena] new-battle push failed:', pushErr);
+              toast.error('Market created, but push notify failed — cron may retry.');
+              return;
+            }
+            const sent = pushData?.results?.[0]?.devices_sent;
+            if (typeof sent === 'number') {
+              console.info('[AdminArena] new-battle push devices_sent:', sent);
+            }
+          } catch (pushErr) {
             console.warn('[AdminArena] new-battle push invoke failed:', pushErr);
-          });
+          }
+        })();
       }
 
       const isScheduled = formData.schedule_type === 'scheduled';
