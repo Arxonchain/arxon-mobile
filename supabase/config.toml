@@ -5,9 +5,27 @@ project_id = "oztccmrhiawleucdluwb"
 # Configure with: node scripts/configure-auth-resend.mjs
 # Required secrets for the hook path: RESEND_API_KEY, SEND_EMAIL_HOOK_SECRET, RESEND_FROM_EMAIL
 
+# ── verify_jwt=false: gateway skips JWT; function enforces its own auth ──
+
+# Supabase Auth hook (SEND_EMAIL_HOOK_SECRET webhook signature)
 [functions.send-email]
 verify_jwt = false
 
+# Public auth entrypoints (Turnstile + rate limit in function)
+[functions.auth-signup]
+verify_jwt = false
+
+[functions.auth-recover]
+verify_jwt = false
+
+[functions.send-magic-link]
+verify_jwt = false
+
+# Public read-only proxy (rate limited; keeps RECAPTCHA_SECRET server-side)
+[functions.verify-recaptcha]
+verify_jwt = false
+
+# Service-role / admin manual auth (requireAdminOrService or requireServiceRole)
 [functions.send-push-notification]
 verify_jwt = false
 
@@ -24,4 +42,19 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.apply-arena-notifications-migration]
+verify_jwt = false
+
+[functions.apply-points-migration]
+verify_jwt = false
+
+[functions.cleanup-stale-sessions]
+verify_jwt = false
+
+[functions.auto-resolve-battles]
+verify_jwt = false
+
+[functions.arena-ai-prediction]
+verify_jwt = false
+
+[functions.backfill-uncredited-sessions]
 verify_jwt = false

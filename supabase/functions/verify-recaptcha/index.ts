@@ -1,4 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
+import {
+  checkRateLimit,
+  rateLimitHeaders,
+  rateLimitResponse,
+  RATE_LIMITS,
+} from "../_shared/rateLimiter.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,9 +12,14 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  const ip = (req.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
+  const rl = checkRateLimit(`verify-recaptcha:${ip}`, RATE_LIMITS.auth);
+  if (!rl.allowed) {
+    return rateLimitResponse(rl, corsHeaders);
   }
 
   try {
@@ -17,7 +28,7 @@ serve(async (req) => {
       console.error("Missing RECAPTCHA_SECRET_KEY secret");
       return new Response(JSON.stringify({ success: false, error: "Server misconfigured" }), {
         status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, ...rateLimitHeaders(rl), "Content-Type": "application/json" },
       });
     }
 
@@ -27,7 +38,7 @@ serve(async (req) => {
     if (!token) {
       return new Response(JSON.stringify({ success: false, error: "Missing token" }), {
         status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        headers: { ...corsHeaders, ...rateLimitHeaders(rl), "Content-Type": "application/json" },
       });
     }
 
@@ -64,14 +75,14 @@ serve(async (req) => {
       }),
       {
         status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+        headers: { ...corsHeaders, ...rateLimitHeaders(rl), "Content-Type": "application/json" },
+      },
     );
   } catch (e) {
     console.error("verify-recaptcha error", e);
     return new Response(JSON.stringify({ success: false, error: "Unexpected error" }), {
       status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...corsHeaders, ...rateLimitHeaders(rl), "Content-Type": "application/json" },
     });
   }
 });

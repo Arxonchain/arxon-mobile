@@ -1,9 +1,10 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  adminCorsHeaders,
+  requireAdminOrService,
+  adminAuthResponse,
+} from '../_shared/adminAuth.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const corsHeaders = adminCorsHeaders
 
 /**
  * Backfill function to credit all uncredited mining sessions.
@@ -16,30 +17,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    const auth = await requireAdminOrService(req)
+    if (!auth.ok) return adminAuthResponse(auth)
 
-    // Authenticate admin (optional - can be called via cron or manually)
-    const authHeader = req.headers.get('authorization')
-    let isAdmin = false
-    
-    if (authHeader) {
-      const { data: { user } } = await supabase.auth.getUser(
-        authHeader.replace('Bearer ', '')
-      )
-      
-      if (user) {
-        const { data: role } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', user.id)
-          .eq('role', 'admin')
-          .maybeSingle()
-        
-        isAdmin = !!role
-      }
-    }
+    const supabase = auth.supabase
 
     // Parse body for options
     const body = await req.json().catch(() => ({}))

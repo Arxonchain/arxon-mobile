@@ -1,11 +1,16 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  adminAuthResponse,
+  adminCorsHeaders,
+  requireAdminOrService,
+} from "../_shared/adminAuth.ts";
 import { notifyArenaBattleResolved } from "../_shared/arenaNotifications.ts";
+import {
+  battleHasPayoutRows,
+  releaseStuckResolveLock,
+} from "../_shared/arenaResolveIdempotency.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = adminCorsHeaders;
 
 /**
  * FIXED Reward System (v3):
@@ -24,46 +29,30 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireAdminOrService(req);
+    if (!auth.ok) return adminAuthResponse(auth);
+
+    const supabase = auth.supabase;
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.replace("Bearer ", "");
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const isServiceRole = token === supabaseServiceKey;
-    let isAdmin = false;
-    if (!isServiceRole) {
-      if (!token) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
-      if (authErr || !user) {
-        return new Response(JSON.stringify({ error: "Unauthorized" }), {
-          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      const { data: roleRow } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .eq("role", "admin")
-        .maybeSingle();
-      isAdmin = !!roleRow;
-      if (!isAdmin) {
-        return new Response(JSON.stringify({ error: "Admin access required" }), {
-          status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-    }
 
     const body = await req.json().catch(() => ({}));
     const manualWinner = body.winner_side;
     const battleId = body.battle_id;
     const forceResolve = body.force === true;
     const notificationsOnly = body.notifications_only === true;
+    const dryRun = body.dryRun === true || body.dry_run === true;
+
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dryRun: true,
+          message: "Auth OK — resolve skipped (dry run)",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     console.log("Starting battle resolution...", { manualWinner, battleId, forceResolve, notificationsOnly });
 
@@ -89,13 +78,30 @@ serve(async (req) => {
     let battlesToResolve;
 
     if (battleId && manualWinner) {
-      let query = supabase.from("arena_battles").select("*").eq("id", battleId);
-      if (!forceResolve) {
-        query = query.is("winner_side", null);
-      }
-      const { data, error } = await query.maybeSingle();
+      const { data, error } = await supabase
+        .from("arena_battles")
+        .select("*")
+        .eq("id", battleId)
+        .maybeSingle();
       if (error) throw new Error(`Database error: ${error.message}`);
-      if (!data) throw new Error("Battle not found or already resolved. Use force=true to re-resolve.");
+      if (!data) throw new Error("Battle not found");
+
+      const alreadyPaid = await battleHasPayoutRows(supabase, battleId);
+      if (alreadyPaid || (data.winner_side && !forceResolve)) {
+        return new Response(
+          JSON.stringify({
+            message: "Battle already resolved",
+            results: [{
+              battle: data.title,
+              battleId: data.id,
+              skipped: true,
+              reason: "already_resolved",
+              winner: data.winner_side,
+            }],
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
 
       if (forceResolve && data.total_rewards_distributed && data.total_rewards_distributed > 0) {
         throw new Error(`Battle already has ${data.total_rewards_distributed} rewards distributed. Cannot re-resolve.`);
@@ -221,14 +227,8 @@ serve(async (req) => {
             continue;
           }
 
-          // DEDUP: Check if rewards already exist
-          const { count: existingRewards } = await supabase
-            .from("arena_earnings")
-            .select("id", { count: "exact", head: true })
-            .eq("battle_id", battle.id);
-
-          if ((existingRewards || 0) > 0) {
-            console.log(`Battle ${battle.id} already has ${existingRewards} earnings. Skipping.`);
+          if (await battleHasPayoutRows(supabase, battle.id)) {
+            console.log(`Battle ${battle.id} already has earnings. Skipping.`);
             await supabase.from("arena_battles").update({
               is_active: false,
               winner_side: winnerSide,
@@ -498,6 +498,11 @@ serve(async (req) => {
       } catch (battleErr) {
         const msg = battleErr instanceof Error ? battleErr.message : "Unknown error";
         console.error(`Failed to resolve battle ${battle.id}: ${msg}`);
+        try {
+          await releaseStuckResolveLock(supabase, battle.id);
+        } catch (unlockErr) {
+          console.error(`Failed to release resolve lock for ${battle.id}:`, unlockErr);
+        }
         results.push({ battle: battle.title, battleId: battle.id, error: msg });
       }
     }

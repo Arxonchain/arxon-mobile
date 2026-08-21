@@ -160,4 +160,45 @@ export function adminAuthResponse(result: Extract<AdminAuthResult, { ok: false }
   });
 }
 
+export type ServiceAuthResult =
+  | { ok: true; supabase: SupabaseClient }
+  | { ok: false; status: number; error: string };
+
+/**
+ * Cron / internal callers only: service-role JWT/secret or ADMIN_FUNCTION_SECRET.
+ * Does not accept admin user JWT (use requireAdminOrService for admin UI).
+ */
+export async function requireServiceRole(req: Request): Promise<ServiceAuthResult> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+  const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+  const adminSecret = Deno.env.get("ADMIN_FUNCTION_SECRET") ?? "";
+
+  if (!supabaseUrl || !serviceKey) {
+    return { ok: false, status: 500, error: "Server misconfigured" };
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+  const authHeader = req.headers.get("authorization") ?? "";
+  const token = authHeader.replace(/^Bearer\s+/i, "").trim();
+  const headerSecret = req.headers.get("x-admin-secret") ?? "";
+  const apiKey = (req.headers.get("apikey") ?? "").trim();
+
+  if (adminSecret && headerSecret && headerSecret === adminSecret) {
+    return { ok: true, supabase };
+  }
+
+  if (
+    (await isServiceRoleCredential(token, supabaseUrl)) ||
+    (await isServiceRoleCredential(apiKey, supabaseUrl))
+  ) {
+    return { ok: true, supabase };
+  }
+
+  return { ok: false, status: 401, error: "Unauthorized" };
+}
+
+export function serviceAuthResponse(result: Extract<ServiceAuthResult, { ok: false }>): Response {
+  return adminAuthResponse(result);
+}
+
 export { corsHeaders as adminCorsHeaders };

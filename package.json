@@ -12,6 +12,8 @@
     "verify:ota-v2": "node scripts/verify-ota-v2-build.mjs",
     "verify:ota-v2:live": "node scripts/verify-live-ota-v2.mjs",
     "probe:arena-edges": "node scripts/probe-arena-edges.mjs",
+    "probe:arena-resolve": "node scripts/probe-arena-resolve.mjs",
+    "probe:edge-auth": "node scripts/probe-edge-auth.mjs",
     "probe:push-auth": "node scripts/probe-push-auth.mjs",
     "verify:arena-notifs": "node scripts/verify-arena-notifs.mjs",
     "lock:cf-pages-ota": "node scripts/lock-cloudflare-pages-ota.mjs",

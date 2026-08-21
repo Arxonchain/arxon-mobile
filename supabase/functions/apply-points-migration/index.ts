@@ -1,9 +1,11 @@
 import postgres from 'https://deno.land/x/postgresjs@v3.4.4/mod.js'
+import {
+  adminCorsHeaders,
+  requireServiceRole,
+  serviceAuthResponse,
+} from '../_shared/adminAuth.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+const corsHeaders = adminCorsHeaders
 
 const MIGRATION_SQL = `
 CREATE OR REPLACE FUNCTION public.normalize_user_points_totals()
@@ -116,13 +118,8 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const authHeader = req.headers.get('authorization') ?? ''
-    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    if (!authHeader.includes(serviceKey)) {
-      return new Response(JSON.stringify({ ok: false, error: 'Service role required' }), {
-        status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
+    const auth = await requireServiceRole(req)
+    if (!auth.ok) return serviceAuthResponse(auth)
 
     const dbUrl = Deno.env.get('SUPABASE_DB_URL') ?? Deno.env.get('DATABASE_URL')
     if (!dbUrl) {

@@ -1,10 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  adminCorsHeaders,
+  requireServiceRole,
+  serviceAuthResponse,
+} from "../_shared/adminAuth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = adminCorsHeaders;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -12,17 +13,30 @@ serve(async (req) => {
   }
 
   try {
-    const { requireAdminOrService, adminAuthResponse } = await import("../_shared/adminAuth.ts");
-    const auth = await requireAdminOrService(req);
-    if (!auth.ok) return adminAuthResponse(auth);
+    const auth = await requireServiceRole(req);
+    if (!auth.ok) return serviceAuthResponse(auth);
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
     const supabase = auth.supabase;
+    const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
 
     const body = await req.json().catch(() => ({}));
     const marketId = body.market_id;
+    const dryRun = body.dryRun === true || body.dry_run === true;
+
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dryRun: true,
+          message: "Auth OK — AI prediction skipped (dry run)",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    if (!openAiApiKey) {
+      throw new Error("OPENAI_API_KEY not configured");
+    }
 
     // Fetch the specific market or all live markets
     let markets;
@@ -32,7 +46,7 @@ serve(async (req) => {
         .select("*")
         .eq("id", marketId)
         .single();
-      
+
       if (error) throw error;
       markets = [data];
     } else {
@@ -41,7 +55,7 @@ serve(async (req) => {
         .select("*")
         .eq("is_active", true)
         .gt("ends_at", new Date().toISOString());
-      
+
       if (error) throw error;
       markets = data || [];
     }
@@ -52,7 +66,7 @@ serve(async (req) => {
       const totalPool = market.side_a_power + market.side_b_power;
       const sideAPercent = totalPool > 0 ? (market.side_a_power / totalPool) * 100 : 50;
       const sideBPercent = totalPool > 0 ? (market.side_b_power / totalPool) * 100 : 50;
-      
+
       const now = new Date();
       const endsAt = new Date(market.ends_at);
       const startsAt = new Date(market.starts_at);
@@ -89,17 +103,17 @@ Respond with ONLY a JSON object in this exact format:
 }`;
 
       try {
-        const aiResponse = await fetch(" https://api.openai.com/v1/chat/completions", {
+        const aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
-           "Authorization": `Bearer ${openAiApiKey}`,
+            Authorization: `Bearer ${openAiApiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
             model: "google/gemini-3-flash-preview",
             messages: [
               { role: "system", content: "You are a prediction market analyst. Always respond with valid JSON only." },
-              { role: "user", content: prompt }
+              { role: "user", content: prompt },
             ],
           }),
         });
@@ -111,29 +125,25 @@ Respond with ONLY a JSON object in this exact format:
 
         const aiData = await aiResponse.json();
         const content = aiData.choices?.[0]?.message?.content || "";
-        
-        // Parse JSON from response
+
         let prediction;
         try {
-          // Extract JSON from potential markdown code blocks
           const jsonMatch = content.match(/\{[\s\S]*\}/);
           if (jsonMatch) {
             prediction = JSON.parse(jsonMatch[0]);
           } else {
             throw new Error("No JSON found");
           }
-        } catch (e) {
+        } catch (_e) {
           console.error("Failed to parse AI response:", content);
-          // Default to market sentiment
           prediction = {
             side_a_probability: sideAPercent,
             side_b_probability: sideBPercent,
             confidence: "low",
-            prediction_text: "Analysis based on current market sentiment."
+            prediction_text: "Analysis based on current market sentiment.",
           };
         }
 
-        // Update the market with AI predictions
         const { error: updateError } = await supabase
           .from("arena_battles")
           .update({
@@ -155,7 +165,6 @@ Respond with ONLY a JSON object in this exact format:
           prediction,
           updated: true,
         });
-
       } catch (aiError) {
         console.error(`AI error for market ${market.id}:`, aiError);
         results.push({
@@ -168,15 +177,14 @@ Respond with ONLY a JSON object in this exact format:
 
     return new Response(
       JSON.stringify({ success: true, results }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
-
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     console.error("Error in arena-ai-prediction:", errorMessage);
     return new Response(
       JSON.stringify({ error: errorMessage }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,6 @@ import { usePoints } from '@/hooks/usePoints';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useArenaMembership } from '@/hooks/useArenaMembership';
 import { useArenaMarkets } from '@/hooks/useArenaMarkets';
-import { supabase } from '@/integrations/supabase/client';
 import AnimatedBackground from '@/components/layout/AnimatedBackground';
 import ArenaOnboarding from '@/components/arena/ArenaOnboarding';
 import BattleHero from '@/components/arena/BattleHero';
@@ -87,26 +86,7 @@ const Arena = () => {
     omegaMembers: earningsLeaderboard.filter((e) => e.club === 'omega').length,
   };
 
-  // Trigger AI prediction fetch for live markets periodically
-  useEffect(() => {
-    if (liveMarkets.length === 0) return;
-    
-    const fetchAIPredictions = async () => {
-      try {
-        await supabase.functions.invoke('arena-ai-prediction', {
-          body: {}
-        });
-      } catch (error) {
-        console.error('Failed to fetch AI predictions:', error);
-      }
-    };
-
-    // Fetch predictions on mount and every 5 minutes
-    fetchAIPredictions();
-    const interval = setInterval(fetchAIPredictions, 5 * 60 * 1000);
-    
-    return () => clearInterval(interval);
-  }, [liveMarkets.length]);
+  // AI predictions are refreshed by cron (arena-ai-prediction); no client invoke.
 
   if (!user) {
     return (

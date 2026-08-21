@@ -1,9 +1,10 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  adminCorsHeaders,
+  requireServiceRole,
+  serviceAuthResponse,
+} from "../_shared/adminAuth.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = adminCorsHeaders;
 
 interface StaleSession {
   id: string;
@@ -24,10 +25,10 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
+    const auth = await requireServiceRole(req);
+    if (!auth.ok) return serviceAuthResponse(auth);
+
+    const supabase = auth.supabase;
 
     // Parse request - can optionally specify batch size and dry run
     const { batchSize = 100, dryRun = false } = await req.json().catch(() => ({}));

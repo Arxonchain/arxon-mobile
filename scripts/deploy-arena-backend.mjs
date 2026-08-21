@@ -370,10 +370,12 @@ async function applyMigration() {
 const ARENA_FUNCTIONS = [
   ['send-push-notification', ['_shared/adminAuth.ts'], false],
   ['blast-arena-notifications', ['_shared/adminAuth.ts', '_shared/arenaNotifications.ts'], false],
-  ['apply-arena-notifications-migration', [], false],
+  ['apply-arena-notifications-migration', ['_shared/adminAuth.ts'], false],
   ['notify-arena-battle-ends', ['_shared/adminAuth.ts', '_shared/arenaNotifications.ts'], false],
   ['notify-arena-battle-created', ['_shared/adminAuth.ts', '_shared/arenaNotifications.ts'], false],
-  ['resolve-arena-battle', ['_shared/adminAuth.ts', '_shared/arenaNotifications.ts'], false],
+  ['resolve-arena-battle', ['_shared/adminAuth.ts', '_shared/arenaNotifications.ts', '_shared/arenaResolveIdempotency.ts'], false],
+  ['auto-resolve-battles', ['_shared/adminAuth.ts', '_shared/arenaResolveIdempotency.ts'], false],
+  ['arena-ai-prediction', ['_shared/adminAuth.ts'], false],
 ];
 
 async function main() {

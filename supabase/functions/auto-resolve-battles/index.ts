@@ -1,10 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  adminCorsHeaders,
+  requireServiceRole,
+  serviceAuthResponse,
+} from "../_shared/adminAuth.ts";
+import { battleHasPayoutRows } from "../_shared/arenaResolveIdempotency.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const corsHeaders = adminCorsHeaders;
 
 /**
  * AI-Powered Battle Resolution System
@@ -148,20 +150,27 @@ serve(async (req) => {
   }
 
   try {
+    const auth = await requireServiceRole(req);
+    if (!auth.ok) return serviceAuthResponse(auth);
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const authHeader = req.headers.get("authorization") ?? "";
-    const token = authHeader.replace("Bearer ", "");
-
-    if (token !== supabaseServiceKey) {
-      return new Response(JSON.stringify({ error: "Unauthorized — service role required" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const supabase = auth.supabase;
     const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+
+    const body = await req.json().catch(() => ({}));
+    const dryRun = body.dryRun === true || body.dry_run === true;
+
+    if (dryRun) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          dryRun: true,
+          message: "Auth OK — auto-resolve skipped (dry run)",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
 
     if (!openAiApiKey) {
       throw new Error("OPENAI_API_KEY not configured");
@@ -169,19 +178,38 @@ serve(async (req) => {
 
     console.log("Checking for ended battles to auto-resolve...");
 
-    // Find battles that have ended but not yet resolved
-    const { data: endedBattles, error: fetchError } = await supabase
-      .from("arena_battles")
-      .select("*")
-      .eq("is_active", true)
-      .lt("ends_at", new Date().toISOString())
-      .is("winner_side", null);
+    const endedBefore = new Date().toISOString();
 
-    if (fetchError) {
-      throw new Error(`Error fetching battles: ${fetchError.message}`);
+    // Active-ended battles plus stuck soft-locks (inactive, no winner yet).
+    const [activeEnded, stuckLocked] = await Promise.all([
+      supabase
+        .from("arena_battles")
+        .select("*")
+        .eq("is_active", true)
+        .lt("ends_at", endedBefore)
+        .is("winner_side", null),
+      supabase
+        .from("arena_battles")
+        .select("*")
+        .eq("is_active", false)
+        .lt("ends_at", endedBefore)
+        .is("winner_side", null),
+    ]);
+
+    if (activeEnded.error) {
+      throw new Error(`Error fetching active-ended battles: ${activeEnded.error.message}`);
+    }
+    if (stuckLocked.error) {
+      throw new Error(`Error fetching stuck battles: ${stuckLocked.error.message}`);
     }
 
-    if (!endedBattles || endedBattles.length === 0) {
+    const battleMap = new Map<string, Battle>();
+    for (const row of [...(activeEnded.data ?? []), ...(stuckLocked.data ?? [])]) {
+      battleMap.set(row.id, row as Battle);
+    }
+    const endedBattles = [...battleMap.values()];
+
+    if (endedBattles.length === 0) {
       console.log("No battles need resolution");
       return new Response(
         JSON.stringify({ message: "No battles to resolve", resolved: 0 }),
@@ -197,6 +225,16 @@ serve(async (req) => {
       console.log(`\n=== Processing: ${battle.title} ===`);
 
       try {
+        if (await battleHasPayoutRows(supabase, battle.id)) {
+          console.log(`Battle ${battle.id} already paid — skipping`);
+          results.push({
+            battle: battle.title,
+            battleId: battle.id,
+            status: "already_resolved",
+          });
+          continue;
+        }
+
         // Get AI verdict on the outcome
         const outcome = await getAIOutcomeVerification(battle, openAiApiKey);
         
@@ -268,9 +306,13 @@ serve(async (req) => {
 
         if (resolveResponse.ok) {
           console.log(`Successfully resolved: ${battle.title}`);
+          const skipped = resolveResult?.results?.some?.(
+            (r: { skipped?: boolean; reason?: string }) =>
+              r.skipped && r.reason === "already_resolved",
+          );
           results.push({
             battle: battle.title,
-            status: "resolved",
+            status: skipped ? "already_resolved" : "resolved",
             winner: outcome.winner,
             winnerName: outcome.winner === 'a' ? battle.side_a_name : battle.side_b_name,
             confidence: outcome.confidence,
