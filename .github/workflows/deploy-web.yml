@@ -88,6 +88,22 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: |
+          set -euo pipefail
+          if [ -z "${VITE_SUPABASE_URL}" ]; then
+            echo "::error::Missing secret VITE_SUPABASE_URL"
+            exit 1
+          fi
+          if [ -z "${VITE_SUPABASE_PUBLISHABLE_KEY}" ] && [ -z "${VITE_SUPABASE_ANON_KEY}" ]; then
+            echo "::error::Missing secret VITE_SUPABASE_PUBLISHABLE_KEY (or ANON)"
+            exit 1
+          fi
+          case "${VITE_SUPABASE_URL}" in
+            *oztccmrhiawleucdluwb*) ;;
+            *)
+              echo "::error::VITE_SUPABASE_URL must point at Mining App oztccmrhiawleucdluwb"
+              exit 1
+              ;;
+          esac
           npm ci
           # Disable competing Git-connected Pages builds (classic overwrite race).
           node scripts/lock-cloudflare-pages-ota.mjs || echo "::warning::Could not lock CF Pages Git builds via API — check docs/OTA_V2_LOCK.md"
