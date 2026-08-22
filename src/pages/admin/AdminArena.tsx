@@ -350,6 +350,12 @@ const AdminArena = () => {
 
       const result = data?.results?.[0];
 
+      if (result?.skipped) {
+        throw new Error(result.reason === 'already_resolved' || result.reason === 'already_paid'
+          ? 'Battle already resolved — refresh the page.'
+          : `Resolve skipped: ${result.reason || 'unknown'}`);
+      }
+
       if (result?.error) {
         throw new Error(result.error);
       }

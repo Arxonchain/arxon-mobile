@@ -13,6 +13,7 @@
     "verify:ota-v2:live": "node scripts/verify-live-ota-v2.mjs",
     "probe:arena-edges": "node scripts/probe-arena-edges.mjs",
     "probe:arena-resolve": "node scripts/probe-arena-resolve.mjs",
+    "resolve:battle": "node scripts/invoke-resolve-battle.mjs",
     "probe:edge-auth": "node scripts/probe-edge-auth.mjs",
     "probe:push-auth": "node scripts/probe-push-auth.mjs",
     "loadtest:auth": "powershell -ExecutionPolicy Bypass -File loadtests/k6/run.ps1 auth",

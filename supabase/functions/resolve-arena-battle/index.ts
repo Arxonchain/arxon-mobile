@@ -127,7 +127,7 @@ serve(async (req) => {
       if (!data) throw new Error("Battle not found");
 
       const alreadyPaid = await battleHasPayoutRows(supabase, battleId);
-      if (alreadyPaid || (data.winner_side && !forceResolve)) {
+      if (data.winner_side && !forceResolve) {
         return new Response(
           JSON.stringify({
             message: "Battle already resolved",
@@ -136,6 +136,22 @@ serve(async (req) => {
               battleId: data.id,
               skipped: true,
               reason: "already_resolved",
+              winner: data.winner_side,
+            }],
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+
+      if (alreadyPaid && data.winner_side && !forceResolve) {
+        return new Response(
+          JSON.stringify({
+            message: "Battle already resolved",
+            results: [{
+              battle: data.title,
+              battleId: data.id,
+              skipped: true,
+              reason: "already_paid",
               winner: data.winner_side,
             }],
           }),
@@ -267,11 +283,11 @@ serve(async (req) => {
             continue;
           }
 
-          if (await battleHasPayoutRows(supabase, battle.id)) {
-            console.log(`Battle ${battle.id} already has earnings. Skipping.`);
+          if (battle.winner_side && (await battleHasPayoutRows(supabase, battle.id))) {
+            console.log(`Battle ${battle.id} already resolved with payouts. Skipping.`);
             await supabase.from("arena_battles").update({
               is_active: false,
-              winner_side: winnerSide,
+              winner_side: battle.winner_side,
               outcome_verified: !!battle.verified_winner,
               outcome_verified_at: battle.verified_winner ? new Date().toISOString() : null,
             }).eq("id", battle.id);
