@@ -1501,6 +1501,27 @@ export type Database = {
       generate_nexus_address: { Args: { p_username: string }; Returns: string }
       generate_referral_code: { Args: never; Returns: string }
       get_arena_analytics: { Args: never; Returns: Json }
+      get_admin_arena_vote_stats: {
+        Args: never
+        Returns: {
+          user_id: string
+          vote_count: number
+          total_power_spent: number
+        }[]
+      }
+      get_arena_staker_leaderboard: {
+        Args: { p_limit?: number }
+        Returns: {
+          avatar_url: string | null
+          biggest_stake: number
+          club: string | null
+          total_battles: number
+          total_power_staked: number
+          total_wins: number
+          user_id: string
+          username: string | null
+        }[]
+      }
       get_arena_participation: {
         Args: { p_battle_id: string; p_limit?: number }
         Returns: {

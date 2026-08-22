@@ -169,10 +169,10 @@ const AdminUsers = () => {
 
       if (xError) throw xError;
 
-      // Fetch arena votes aggregated
-      const { data: arenaVotes, error: arenaError } = await supabase
-        .from("arena_votes")
-        .select("user_id, power_spent");
+      // Arena vote totals (server-side aggregate — no full-table client read)
+      const { data: arenaVotes, error: arenaError } = await supabase.rpc(
+        "get_admin_arena_vote_stats"
+      );
 
       if (arenaError) throw arenaError;
 
@@ -203,11 +203,10 @@ const AdminUsers = () => {
 
       // Aggregate arena votes
       const arenaStats = new Map<string, { votes: number; power: number }>();
-      arenaVotes?.forEach(v => {
-        const existing = arenaStats.get(v.user_id) || { votes: 0, power: 0 };
+      arenaVotes?.forEach((v: { user_id: string; vote_count: number; total_power_spent: number }) => {
         arenaStats.set(v.user_id, {
-          votes: existing.votes + 1,
-          power: existing.power + Number(v.power_spent || 0),
+          votes: Number(v.vote_count) || 0,
+          power: Number(v.total_power_spent) || 0,
         });
       });
 

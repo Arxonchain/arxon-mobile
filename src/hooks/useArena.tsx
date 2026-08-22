@@ -213,43 +213,22 @@ export const useArena = () => {
 
   const fetchLeaderboard = useCallback(async () => {
     try {
-      // Prefer earnings aggregate (world-readable) over raw arena_votes (own-only under RLS)
-      const { data: earnings, error: eErr } = await supabase
-        .from('arena_earnings')
-        .select('user_id, stake_amount, total_earned, is_winner');
+      const { data, error: eErr } = await supabase.rpc('get_arena_staker_leaderboard', {
+        p_limit: 50,
+      });
 
       if (eErr) throw eErr;
 
-      const userMap: Record<string, { power: number; wins: number; battles: number; biggest: number }> = {};
-      (earnings || []).forEach((row: any) => {
-        if (!userMap[row.user_id]) userMap[row.user_id] = { power: 0, wins: 0, battles: 0, biggest: 0 };
-        const u = userMap[row.user_id];
-        u.power += Number(row.stake_amount) || 0;
-        u.battles += 1;
-        u.biggest = Math.max(u.biggest, Number(row.stake_amount) || 0);
-        if (row.is_winner) u.wins += 1;
-      });
-
-      const userIds = Object.keys(userMap);
-      if (userIds.length === 0) { setLeaderboard([]); return []; }
-
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('user_id, username, avatar_url')
-        .in('user_id', userIds);
-
-      const profileMap: Record<string, any> = {};
-      (profiles || []).forEach((p: any) => { profileMap[p.user_id] = p; });
-
-      const leaderboardData: LeaderboardEntry[] = userIds.map(uid => ({
-        user_id:           uid,
-        username:          profileMap[uid]?.username || null,
-        avatar_url:        profileMap[uid]?.avatar_url || null,
-        total_power_staked: Math.floor(userMap[uid].power),
-        total_wins:         userMap[uid].wins,
-        total_battles:      userMap[uid].battles,
-        biggest_stake:      Math.floor(userMap[uid].biggest),
-      })).sort((a, b) => b.total_power_staked - a.total_power_staked).slice(0, 50);
+      const leaderboardData: LeaderboardEntry[] = (data || []).map((row: any) => ({
+        user_id:            row.user_id,
+        username:           row.username ?? null,
+        avatar_url:         row.avatar_url ?? null,
+        total_power_staked: Math.floor(Number(row.total_power_staked) || 0),
+        total_wins:         Number(row.total_wins) || 0,
+        total_battles:      Number(row.total_battles) || 0,
+        biggest_stake:      Math.floor(Number(row.biggest_stake) || 0),
+        club:               row.club ?? null,
+      }));
 
       setLeaderboard(leaderboardData);
       return leaderboardData;
