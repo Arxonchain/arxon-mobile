@@ -1,10 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import {
-  checkRateLimit,
   rateLimitHeaders,
   rateLimitResponse,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +17,7 @@ serve(async (req) => {
   }
 
   const ip = (req.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const rl = checkRateLimit(`verify-recaptcha:${ip}`, RATE_LIMITS.auth);
+  const rl = await checkRateLimitDurableKey(`verify-recaptcha:${ip}`, RATE_LIMITS.auth);
   if (!rl.allowed) {
     return rateLimitResponse(rl, corsHeaders);
   }

@@ -1,11 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.89.0";
 import {
-  checkRateLimit,
   rateLimitHeaders,
   rateLimitResponse,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -25,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   const ip = (req.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const rl = checkRateLimit(`send-magic-link:${ip}`, RATE_LIMITS.auth);
+  const rl = await checkRateLimitDurableKey(`send-magic-link:${ip}`, RATE_LIMITS.auth);
   if (!rl.allowed) {
     return rateLimitResponse(rl, corsHeaders);
   }

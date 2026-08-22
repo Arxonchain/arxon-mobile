@@ -1,9 +1,8 @@
 import {
-  checkRateLimit,
   rateLimitHeaders,
   rateLimitResponse,
-  RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 import {
   callerIsAdmin,
   corsPreflight,
@@ -19,7 +18,7 @@ Deno.serve(async (req) => {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("cf-connecting-ip") ||
     "unknown";
-  const rl = checkRateLimit(`delete-my-account:${ip}`, {
+  const rl = await checkRateLimitDurableKey(`delete-my-account:${ip}`, {
     maxRequests: 5,
     windowMs: 60 * 60 * 1000,
   });

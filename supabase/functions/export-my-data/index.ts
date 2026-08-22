@@ -1,9 +1,9 @@
 import {
-  checkRateLimit,
   rateLimitHeaders,
   rateLimitResponse,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 import {
   corsPreflight,
   getAuthenticatedUser,
@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("cf-connecting-ip") ||
     "unknown";
-  const rl = checkRateLimit(`export-my-data:${ip}`, RATE_LIMITS.auth);
+  const rl = await checkRateLimitDurableKey(`export-my-data:${ip}`, RATE_LIMITS.auth);
   if (!rl.allowed) return rateLimitResponse(rl);
 
   if (req.method !== "GET" && req.method !== "POST") {

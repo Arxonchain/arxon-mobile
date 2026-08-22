@@ -1,10 +1,10 @@
 import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import {
-  checkRateLimit,
   rateLimitHeaders,
   rateLimitResponse,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 import { getSignupEmailRejection } from "../_shared/signupEmailPolicy.ts";
 
 /**
@@ -159,7 +159,7 @@ serve(async (req) => {
   }
 
   const ip = (req.headers.get("x-forwarded-for") ?? "unknown").split(",")[0].trim();
-  const rl = checkRateLimit(`auth-signup:${ip}`, RATE_LIMITS.auth);
+  const rl = await checkRateLimitDurableKey(`auth-signup:${ip}`, RATE_LIMITS.auth);
   if (!rl.allowed) {
     return rateLimitResponse(rl, corsHeaders);
   }
