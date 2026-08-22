@@ -57,6 +57,8 @@ const Settings = lazy(() => import("@/pages/Settings"));
 const Notifications = lazy(() => import("@/pages/Notifications"));
 const PointsHistory = lazy(() => import("@/pages/PointsHistory"));
 const Litepaper = lazy(() => import("@/pages/Litepaper"));
+const TermsOfService = lazy(() => import("@/pages/legal/TermsOfService"));
+const PrivacyPolicy = lazy(() => import("@/pages/legal/PrivacyPolicy"));
 const PublicProfile = lazy(() => import("@/pages/PublicProfile"));
 
 const AdminLayout = lazy(() => import("@/components/admin/AdminLayout"));
@@ -242,6 +244,8 @@ function AppRoutes() {
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/change-password" element={<ChangePassword />} />
         <Route path="/litepaper"      element={<Litepaper />} />
+        <Route path="/terms"          element={<TermsOfService />} />
+        <Route path="/privacy"        element={<PrivacyPolicy />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
         <Route path="/ui-preview" element={<AppPreviewShell />}>
           <Route index element={<DashboardNeon preview />} />

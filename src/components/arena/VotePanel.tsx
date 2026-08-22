@@ -4,6 +4,8 @@ import { Flame, Crown, Shield, Fingerprint, CheckCircle, Zap, TrendingUp, AlertT
 import { toast } from 'sonner';
 import type { ArenaBattle, ArenaVote } from '@/hooks/useArena';
 import FingerprintScanner from './FingerprintScanner';
+import StakingDisclaimer from '@/components/legal/StakingDisclaimer';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 
 interface VotePanelProps {
   battle: ArenaBattle | null;
@@ -26,6 +28,7 @@ const VotePanel = ({
   storedFingerprintHash,
   onReregisterFingerprint
 }: VotePanelProps) => {
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const [stakeAmount, setStakeAmount] = useState(1000);
   const [showFingerprint, setShowFingerprint] = useState(false);
   const [pendingAmount, setPendingAmount] = useState(0);
@@ -102,8 +105,10 @@ const VotePanel = ({
 
   const handleConfirmVote = () => {
     if (stakeAmount >= MIN_STAKE && stakeAmount <= Math.min(availablePoints, MAX_STAKE)) {
-      setPendingAmount(stakeAmount);
-      setShowFingerprint(true);
+      gateStakeAction(() => {
+        setPendingAmount(stakeAmount);
+        setShowFingerprint(true);
+      });
     }
   };
 
@@ -235,6 +240,8 @@ const VotePanel = ({
 
   // Vote form
   return (
+    <>
+      {complianceDialog}
     <div className="px-4 py-6 space-y-5">
       {/* Club Badge */}
       <motion.div
@@ -402,6 +409,8 @@ const VotePanel = ({
       )}
 
       {/* Vote Button */}
+      <StakingDisclaimer className="mx-0" />
+
       <button
         type="button"
         onClick={handleConfirmVote}
@@ -425,6 +434,7 @@ const VotePanel = ({
         ⚠️ Stakes are locked until battle ends. Winners take all!
       </p>
     </div>
+    </>
   );
 };
 

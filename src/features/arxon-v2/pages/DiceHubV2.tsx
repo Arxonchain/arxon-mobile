@@ -23,6 +23,8 @@ import {
   dicePotForStake,
   diceAccent,
 } from '@/features/dice/diceTokens';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 
 function FreeRollCard({
   daily,
@@ -249,6 +251,10 @@ function HouseCard({
         </div>
       </div>
 
+      <p style={{ margin: '0 0 10px', fontSize: 9, color: 'rgba(184,239,248,0.45)', lineHeight: 1.45 }}>
+        {STAKING_DISCLAIMER_TEXT}
+      </p>
+
       <motion.button
         type="button"
         whileTap={affordable && !blocked ? { scale: 0.97 } : undefined}
@@ -315,19 +321,21 @@ export default function DiceHubV2() {
   const preview = useIsAppPreview();
   const { points } = usePoints();
   const dice = useDiceGame();
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
 
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
 
   const handleEnterMatch = useCallback((stake: number) => {
-    go(`/arena/dice/house?stake=${stake}`);
-  }, [go]);
+    gateStakeAction(() => go(`/arena/dice/house?stake=${stake}`));
+  }, [gateStakeAction, go]);
 
   const balance = Math.round(points?.total_points ?? 0);
 
   return (
     <V2Page>
+      {complianceDialog}
       <NeonScreenHeader
         eyebrow="Arena · Game 03"
         title="Dice Roll"

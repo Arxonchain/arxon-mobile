@@ -12,6 +12,8 @@ import { NeonScreenHeader, NeonGlassCard, NeonSectionLabel } from '../design/Neo
 import { useDiceDuelLobby, type DuelChallenge } from '@/features/dice/hooks/useDiceDuel';
 import { DICE_STAKE_TIERS, diceAccent, diceDuelPot } from '@/features/dice/diceTokens';
 import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 
 function formatCountdown(expiresAt?: string | null) {
   if (!expiresAt) return null;
@@ -109,6 +111,7 @@ export default function DiceDuelLobbyV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const preview = useIsAppPreview();
   const { points } = usePoints();
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const { challenges, myMatch, blockingMatch, loading, busy, createChallenge, joinChallenge, joinByCode, cancelChallenge, cancelMyOpenMatches } = useDiceDuelLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [joinCode, setJoinCode] = useState('');
@@ -166,14 +169,17 @@ export default function DiceDuelLobbyV2() {
       toast({ title: 'Insufficient ARX-P', description: `You need ${stake} ARX-P to open this challenge.`, variant: 'destructive' });
       return;
     }
-    const res = await createChallenge(stake);
-    if (!res.success) {
-      toast({ title: 'Could not create challenge', description: res.error, variant: 'destructive' });
-      return;
-    }
-    // Stay on persistent lobby slot — navigate into waiting room for this match
-    go(`/arena/dice/duel/${res.matchId}`);
-  }, [balance, stake, createChallenge, go]);
+    gateStakeAction(() => {
+      void (async () => {
+        const res = await createChallenge(stake);
+        if (!res.success) {
+          toast({ title: 'Could not create challenge', description: res.error, variant: 'destructive' });
+          return;
+        }
+        go(`/arena/dice/duel/${res.matchId}`);
+      })();
+    });
+  }, [balance, stake, createChallenge, go, gateStakeAction]);
 
   const handleClearStuck = useCallback(async () => {
     const res = await cancelMyOpenMatches();
@@ -189,23 +195,31 @@ export default function DiceDuelLobbyV2() {
       toast({ title: 'Insufficient ARX-P', description: `You need ${challenge.stake} ARX-P to accept.`, variant: 'destructive' });
       return;
     }
-    const res = await joinChallenge(challenge.id);
-    if (!res.success) {
-      toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
-      return;
-    }
-    go(`/arena/dice/duel/${res.matchId ?? challenge.id}`);
-  }, [balance, joinChallenge, go]);
+    gateStakeAction(() => {
+      void (async () => {
+        const res = await joinChallenge(challenge.id);
+        if (!res.success) {
+          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          return;
+        }
+        go(`/arena/dice/duel/${res.matchId ?? challenge.id}`);
+      })();
+    });
+  }, [balance, joinChallenge, go, gateStakeAction]);
 
   const handleJoinCode = useCallback(async () => {
     if (!joinCode.trim()) return;
-    const res = await joinByCode(joinCode);
-    if (!res.success) {
-      toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
-      return;
-    }
-    go(`/arena/dice/duel/${res.matchId}`);
-  }, [joinCode, joinByCode, go]);
+    gateStakeAction(() => {
+      void (async () => {
+        const res = await joinByCode(joinCode);
+        if (!res.success) {
+          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          return;
+        }
+        go(`/arena/dice/duel/${res.matchId}`);
+      })();
+    });
+  }, [joinCode, joinByCode, go, gateStakeAction]);
 
   const handleCancel = useCallback(async () => {
     if (!myMatch) return;
@@ -215,6 +229,7 @@ export default function DiceDuelLobbyV2() {
 
   return (
     <V2Page>
+      {complianceDialog}
       <NeonScreenHeader
         eyebrow="Dice Roll · Duel"
         title="1v1 Duel"
@@ -395,6 +410,10 @@ export default function DiceDuelLobbyV2() {
                   <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 800, color: diceAccent.win }}>{diceDuelPot(stake) - Math.round(diceDuelPot(stake) * 0.05)} <span style={{ fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>ARX-P</span></p>
                 </div>
               </div>
+
+              <p style={{ margin: '0 0 10px', fontSize: 9, color: 'rgba(184,239,248,0.45)', lineHeight: 1.45 }}>
+                {STAKING_DISCLAIMER_TEXT}
+              </p>
 
               <motion.button
                 type="button"

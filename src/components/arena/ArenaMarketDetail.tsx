@@ -11,6 +11,8 @@ import LivePoolTracker from './LivePoolTracker';
 import LiveActivityFeed from './LiveActivityFeed';
 import BattleVoteExplorer from './BattleVoteExplorer';
 import { useAuth } from '@/contexts/AuthContext';
+import StakingDisclaimer from '@/components/legal/StakingDisclaimer';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 
 interface ArenaMarketDetailProps {
   market: ArenaMarket;
@@ -38,6 +40,7 @@ const ArenaMarketDetail = ({
   onReregisterFingerprint,
 }: ArenaMarketDetailProps) => {
   const { user } = useAuth();
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const [selectedSide, setSelectedSide] = useState<'a' | 'b' | 'c' | null>(null);
   const [stakeAmount, setStakeAmount] = useState(1000);
   const [showFingerprint, setShowFingerprint] = useState(false);
@@ -113,7 +116,7 @@ const ArenaMarketDetail = ({
 
   const handleConfirmBet = () => {
     if (selectedSide && stakeAmount >= MIN_STAKE && stakeAmount <= MAX_STAKE) {
-      setShowFingerprint(true);
+      gateStakeAction(() => setShowFingerprint(true));
     }
   };
 
@@ -172,6 +175,8 @@ const ArenaMarketDetail = ({
   };
 
   return (
+    <>
+      {complianceDialog}
     <div className="min-h-screen bg-background">
       {/* Header - Compact */}
       <header className="sticky top-0 z-20 flex items-center justify-between px-3 py-2.5 border-b border-border/50 bg-background/95 backdrop-blur-xl">
@@ -648,6 +653,8 @@ const ArenaMarketDetail = ({
                   </div>
                 )}
 
+                <StakingDisclaimer className="mb-3" />
+
                 {/* Confirm Button - Enhanced */}
                 <button
                   type="button"
@@ -739,6 +746,7 @@ const ArenaMarketDetail = ({
         </AnimatePresence>
       </div>
     </div>
+    </>
   );
 };
 

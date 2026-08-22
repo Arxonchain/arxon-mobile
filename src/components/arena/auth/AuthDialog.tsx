@@ -11,6 +11,7 @@ import { validatePassword } from "@/lib/passwordValidation";
 import PasswordStrengthMeter from "@/components/auth/PasswordStrengthMeter";
 import { getPasswordResetRedirectUrl } from "@/lib/auth/getRedirectUrl";
 import { TurnstileWidget, isTurnstileConfigured } from "@/components/auth/TurnstileWidget";
+import LegalLinks from "@/components/legal/LegalLinks";
 
 interface AuthDialogProps {
   open: boolean;
@@ -545,7 +546,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
           {/* Footer */}
           <div className="mt-6 text-center">
             <p className="text-xs text-muted-foreground">
-              By continuing, you agree to ARXON's Terms of Service and Privacy Policy
+              By continuing, you agree to ARXON&apos;s <LegalLinks linkClassName="text-primary hover:underline" />.
             </p>
           </div>
         </div>

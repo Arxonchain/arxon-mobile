@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   Zap,
@@ -330,8 +330,8 @@ export default function Landing() {
               <a href={COMMUNITY_LINKS.discord.href} target="_blank" rel="noopener noreferrer" className="text-muted-foreground hover:text-foreground transition-colors"><DiscordIcon className="h-5 w-5" /></a>
             </div>
             <div className="flex items-center gap-6 text-sm">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Privacy</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Terms</a>
+              <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
+              <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
             </div>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProfileSettings from "@/components/settings/ProfileSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
 import SecuritySettings from "@/components/settings/SecuritySettings";
+import LegalLinks from "@/components/legal/LegalLinks";
 
 const settingsSections = [
   {
@@ -144,6 +145,9 @@ const Settings = () => {
     {/* ENH-12: App version display */}
     <div style={{textAlign:'center',padding:'12px 0 4px',color:'hsl(215 14% 28%)',fontSize:10}}>
       ARXON Mining App · v{(import.meta as any).env?.VITE_APP_VERSION || '1.0.0'}
+    </div>
+    <div style={{textAlign:'center',padding:'0 0 12px',color:'hsl(215 14% 28%)',fontSize:10}}>
+      <LegalLinks linkClassName="text-accent hover:underline" />
     </div>
     </div>
   );

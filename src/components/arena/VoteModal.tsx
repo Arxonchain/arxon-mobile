@@ -4,6 +4,8 @@ import { X, Zap, Lock, AlertTriangle, TrendingUp, Shield, Target } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { ArenaBattle } from '@/hooks/useArena';
+import StakingDisclaimer from '@/components/legal/StakingDisclaimer';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 
 interface VoteModalProps {
   isOpen: boolean;
@@ -24,6 +26,7 @@ const VoteModal = ({
   onConfirmVote,
   isVoting,
 }: VoteModalProps) => {
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const [voteAmount, setVoteAmount] = useState(1000);
   const [showSuccess, setShowSuccess] = useState(false);
   const minVote = 1000;
@@ -54,19 +57,25 @@ const VoteModal = ({
     }
   }, [isOpen, maxVote]);
 
-  const handleConfirm = async () => {
-    const success = await onConfirmVote(voteAmount);
-    if (success) {
-      setShowSuccess(true);
-      setTimeout(() => {
-        onClose();
-      }, 2000);
-    }
+  const handleConfirm = () => {
+    gateStakeAction(() => {
+      void (async () => {
+        const success = await onConfirmVote(voteAmount);
+        if (success) {
+          setShowSuccess(true);
+          setTimeout(() => {
+            onClose();
+          }, 2000);
+        }
+      })();
+    });
   };
 
   if (!isOpen) return null;
 
   return (
+    <>
+      {complianceDialog}
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -226,6 +235,8 @@ const VoteModal = ({
               </div>
 
               {/* Lock Warning */}
+              <StakingDisclaimer className="mb-4" />
+
               <div className="flex items-start gap-3 p-3 rounded-lg bg-accent/10 border border-accent/30 mb-6">
                 <Shield className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
                 <div className="text-sm">
@@ -274,6 +285,7 @@ const VoteModal = ({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </>
   );
 };
 

@@ -11,6 +11,7 @@ import {
   V2Page, V2Header, V2Tabs, V2Card, V2Button, V2ButtonGhost, fadeUp, stagger,
 } from '../design/Kit';
 import { v2 } from '../design/tokens';
+import LegalLinks from '@/components/legal/LegalLinks';
 
 type Tab = 'notifications' | 'security';
 
@@ -62,6 +63,9 @@ export default function SettingsV2() {
 
         <p style={{ textAlign: 'center', padding: '24px 0 8px', color: v2.brand.muted, fontSize: 10 }}>
           ARXON · v{(import.meta as any).env?.VITE_APP_VERSION || '1.0.0'}
+        </p>
+        <p style={{ textAlign: 'center', padding: '0 16px 16px', color: v2.brand.muted, fontSize: 10, lineHeight: 1.6 }}>
+          <LegalLinks linkClassName="text-[hsl(215_35%_62%)] hover:underline" />
         </p>
       </motion.div>
     </V2Page>

@@ -13,6 +13,8 @@ import { NeonScreenHeader, NeonGlassCard, NeonSectionLabel } from '../design/Neo
 import { useDiceRumbleLobby, type RumbleLobby } from '@/features/dice/hooks/useDiceRumble';
 import { DICE_STAKE_TIERS, DICE_RUMBLE_LOBBY_SIZES, diceAccent, diceRumblePot, diceRumblePayout } from '@/features/dice/diceTokens';
 import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 
 function formatCountdown(expiresAt?: string | null) {
   if (!expiresAt) return null;
@@ -121,6 +123,7 @@ export default function DiceRumbleLobbyV2() {
   const [searchParams, setSearchParams] = useSearchParams();
   const preview = useIsAppPreview();
   const { points } = usePoints();
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const { lobbies, myMatch, blockingMatch, loading, busy, createLobby, joinLobby, joinByCode, cancelLobby, leaveLobby, cancelMyOpenMatches } = useDiceRumbleLobby();
   const [stake, setStake] = useState<number>(DICE_STAKE_TIERS[1]);
   const [size, setSize] = useState<number>(DICE_RUMBLE_LOBBY_SIZES[1]);
@@ -179,13 +182,17 @@ export default function DiceRumbleLobbyV2() {
       toast({ title: 'Insufficient ARX-P', description: `You need ${stake} ARX-P to open this lobby.`, variant: 'destructive' });
       return;
     }
-    const res = await createLobby(stake, size);
-    if (!res.success) {
-      toast({ title: 'Could not create lobby', description: res.error, variant: 'destructive' });
-      return;
-    }
-    go(`/arena/dice/rumble/${res.matchId}`);
-  }, [balance, stake, size, createLobby, go]);
+    gateStakeAction(() => {
+      void (async () => {
+        const res = await createLobby(stake, size);
+        if (!res.success) {
+          toast({ title: 'Could not create lobby', description: res.error, variant: 'destructive' });
+          return;
+        }
+        go(`/arena/dice/rumble/${res.matchId}`);
+      })();
+    });
+  }, [balance, stake, size, createLobby, go, gateStakeAction]);
 
   const handleClearStuck = useCallback(async () => {
     const res = await cancelMyOpenMatches();
@@ -201,23 +208,31 @@ export default function DiceRumbleLobbyV2() {
       toast({ title: 'Insufficient ARX-P', description: `You need ${lobby.stake} ARX-P to join.`, variant: 'destructive' });
       return;
     }
-    const res = await joinLobby(lobby.id);
-    if (!res.success) {
-      toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
-      return;
-    }
-    go(`/arena/dice/rumble/${res.matchId ?? lobby.id}`);
-  }, [balance, joinLobby, go]);
+    gateStakeAction(() => {
+      void (async () => {
+        const res = await joinLobby(lobby.id);
+        if (!res.success) {
+          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          return;
+        }
+        go(`/arena/dice/rumble/${res.matchId ?? lobby.id}`);
+      })();
+    });
+  }, [balance, joinLobby, go, gateStakeAction]);
 
   const handleJoinCode = useCallback(async () => {
     if (!joinCode.trim()) return;
-    const res = await joinByCode(joinCode);
-    if (!res.success) {
-      toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
-      return;
-    }
-    go(`/arena/dice/rumble/${res.matchId}`);
-  }, [joinCode, joinByCode, go]);
+    gateStakeAction(() => {
+      void (async () => {
+        const res = await joinByCode(joinCode);
+        if (!res.success) {
+          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          return;
+        }
+        go(`/arena/dice/rumble/${res.matchId}`);
+      })();
+    });
+  }, [joinCode, joinByCode, go, gateStakeAction]);
 
   const { user } = useAuth();
   const isHost = !!myMatch && !!user && myMatch.createdBy === user.id;
@@ -236,6 +251,7 @@ export default function DiceRumbleLobbyV2() {
 
   return (
     <V2Page>
+      {complianceDialog}
       <NeonScreenHeader
         eyebrow="Dice Roll · PvP"
         title="Rumble"
@@ -399,6 +415,10 @@ export default function DiceRumbleLobbyV2() {
                   <p style={{ margin: '2px 0 0', fontSize: 13, fontWeight: 800, color: diceAccent.win }}>{diceRumblePayout(stake, size)} <span style={{ fontSize: 9, color: 'rgba(184,239,248,0.5)' }}>ARX-P</span></p>
                 </div>
               </div>
+
+              <p style={{ margin: '0 0 10px', fontSize: 9, color: 'rgba(184,239,248,0.45)', lineHeight: 1.45 }}>
+                {STAKING_DISCLAIMER_TEXT}
+              </p>
 
               <motion.button
                 type="button"

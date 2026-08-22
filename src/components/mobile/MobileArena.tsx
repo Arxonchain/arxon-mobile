@@ -13,6 +13,8 @@ import { toast } from '@/hooks/use-toast';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 
 const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
@@ -243,6 +245,7 @@ function BattleDetail({
   available: number;
   onClose: () => void;
 }) {
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const timer = useTimer(battle.ends_at, !!isActive);
   const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle as any);
   const existingVote = battleUserVote?.side ?? null;
@@ -255,7 +258,7 @@ function BattleDetail({
   const userWon = !!(existingVote && winnerSide && existingVote === winnerSide);
   const winnerLabel = winnerSide ? sideName(battle as any, winnerSide) : null;
 
-  const handleVote = async () => {
+  const handleVote = () => {
     if (!activeSide) return;
     const amt = parseInt(stakeAmt);
     if (isNaN(amt)||amt<1000) {
@@ -266,11 +269,17 @@ function BattleDetail({
       toast({ title: 'Insufficient balance', description: 'Not enough ARX-P to stake', variant: 'destructive' });
       return;
     }
-    const ok = await castVote(battle.id, activeSide, amt);
-    if (ok) { setStakeAmt(''); setLocalSide(null); }
+    gateStakeAction(() => {
+      void (async () => {
+        const ok = await castVote(battle.id, activeSide, amt);
+        if (ok) { setStakeAmt(''); setLocalSide(null); }
+      })();
+    });
   };
 
   return (
+    <>
+      {complianceDialog}
     <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}}
       style={{position:'fixed',inset:0,background:'hsl(225 30% 3%)',zIndex:300,overflowY:'auto',paddingBottom:100,
         fontFamily:"'Creato Display',-apple-system,system-ui,sans-serif"}}>
@@ -474,6 +483,9 @@ function BattleDetail({
                 </button>
               ))}
             </div>
+            <p style={{fontSize:9,color:'hsl(215 14% 38%)',marginBottom:8,lineHeight:1.45}}>
+              {STAKING_DISCLAIMER_TEXT}
+            </p>
             <button onClick={handleVote} disabled={voting||!activeSide||!stakeAmt}
               style={{width:'100%',padding:'15px',borderRadius:16,fontWeight:700,fontSize:14,cursor:'pointer',
                 outline:'none',transition:'all 0.2s',fontFamily:"'Creato Display',-apple-system,sans-serif",
@@ -561,6 +573,7 @@ function BattleDetail({
         )}
       </div>
     </motion.div>
+    </>
   );
 }
 

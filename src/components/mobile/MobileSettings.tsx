@@ -8,6 +8,7 @@ import {
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import LegalLinks from '@/components/legal/LegalLinks';
 
 type Tab = 'notifications' | 'security';
 
@@ -79,6 +80,9 @@ export default function MobileSettings() {
 
       <p style={{ textAlign: 'center', padding: '24px 0 8px', color: 'hsl(215 14% 28%)', fontSize: 10 }}>
         ARXON · v{(import.meta as any).env?.VITE_APP_VERSION || '1.0.0'}
+      </p>
+      <p style={{ textAlign: 'center', padding: '0 16px 16px', color: 'hsl(215 14% 28%)', fontSize: 10, lineHeight: 1.6 }}>
+        <LegalLinks linkClassName="text-[hsl(215_35%_62%)] hover:underline" />
       </p>
     </div>
   );

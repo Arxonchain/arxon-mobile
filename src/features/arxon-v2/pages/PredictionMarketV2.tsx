@@ -13,6 +13,8 @@ import { toast } from '@/hooks/use-toast';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 import {
   V2Page,
@@ -579,6 +581,7 @@ function BattleDetail({
   available: number;
   onClose: () => void;
 }) {
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const timer = useTimer(battle.ends_at, !!isActive);
   const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle);
   const existingVote = (battleUserVote?.side ?? null) as ArenaSide | null;
@@ -600,7 +603,7 @@ function BattleDetail({
       ? ARENA
       : v2.brand.steel;
 
-  const handleVote = async () => {
+  const handleVote = () => {
     if (!activeSide) return;
     const amt = parseInt(stakeAmt);
     if (isNaN(amt) || amt < 1000) {
@@ -611,14 +614,20 @@ function BattleDetail({
       toast({ title: 'Insufficient balance', description: 'Not enough ARX-P to stake', variant: 'destructive' });
       return;
     }
-    const ok = await castVote(battle.id, activeSide, amt);
-    if (ok) {
-      setStakeAmt('');
-      setLocalSide(null);
-    }
+    gateStakeAction(() => {
+      void (async () => {
+        const ok = await castVote(battle.id, activeSide, amt);
+        if (ok) {
+          setStakeAmt('');
+          setLocalSide(null);
+        }
+      })();
+    });
   };
 
   return (
+    <>
+      {complianceDialog}
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -1046,6 +1055,9 @@ function BattleDetail({
                   </button>
                 ))}
               </div>
+              <p style={{ fontSize: 9, color: v2.brand.muted, marginBottom: 10, lineHeight: 1.45, marginTop: 0 }}>
+                {STAKING_DISCLAIMER_TEXT}
+              </p>
               <V2Button
                 accent={ARENA}
                 fullWidth
@@ -1182,6 +1194,7 @@ function BattleDetail({
         </div>
       </V2Page>
     </motion.div>
+    </>
   );
 }
 

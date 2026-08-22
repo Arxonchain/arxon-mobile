@@ -8,6 +8,8 @@ import {
 import type { ArenaMarket, MarketVote } from '@/hooks/useArenaMarkets';
 import FingerprintScanner from './FingerprintScanner';
 import { toast } from 'sonner';
+import StakingDisclaimer from '@/components/legal/StakingDisclaimer';
+import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 
 interface MarketBettingModalProps {
   market: ArenaMarket;
@@ -44,6 +46,7 @@ const MarketBettingModal = ({
   isVoting,
   storedFingerprintHash,
 }: MarketBettingModalProps) => {
+  const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const [selectedSide, setSelectedSide] = useState<'a' | 'b' | null>(null);
   const [stakeAmount, setStakeAmount] = useState(1000);
   const [showFingerprint, setShowFingerprint] = useState(false);
@@ -107,7 +110,7 @@ const MarketBettingModal = ({
 
   const handlePlaceBet = () => {
     if (stakeAmount >= 1000 && selectedSide) {
-      setShowFingerprint(true);
+      gateStakeAction(() => setShowFingerprint(true));
     }
   };
 
@@ -136,6 +139,8 @@ const MarketBettingModal = ({
   // Already has position
   if (userPosition) {
     return (
+      <>
+        {complianceDialog}
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0 }}
@@ -179,12 +184,15 @@ const MarketBettingModal = ({
           </motion.div>
         </motion.div>
       </AnimatePresence>
+      </>
     );
   }
 
   // Fingerprint verification
   if (showFingerprint) {
     return (
+      <>
+        {complianceDialog}
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0 }}
@@ -215,10 +223,13 @@ const MarketBettingModal = ({
           </motion.div>
         </motion.div>
       </AnimatePresence>
+      </>
     );
   }
 
   return (
+    <>
+      {complianceDialog}
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -525,6 +536,8 @@ const MarketBettingModal = ({
                 )}
 
                 {/* Place Bet Button - Enhanced */}
+                <StakingDisclaimer className="mb-3" />
+
                 <button
                   type="button"
                   onClick={handlePlaceBet}
@@ -551,6 +564,7 @@ const MarketBettingModal = ({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+    </>
   );
 };
 
