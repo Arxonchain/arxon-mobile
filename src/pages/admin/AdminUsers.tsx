@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Search, Download, Eye, Activity, Coins, Users, Calendar, Loader2, ChevronDown, ChevronUp, Zap, RefreshCw, CheckCircle2, PlayCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -105,191 +105,109 @@ interface MiningSession {
 
 type SessionFilter = "all" | "active" | "completed" | "never";
 
+const PAGE_SIZE = 50;
+
+const mapAdminUserRow = (row: Record<string, unknown>): UserData => {
+  const xProfile = row.x_profile as Record<string, unknown> | null;
+  return {
+    user_id: String(row.user_id),
+    email: String(row.email || "hidden@email.com"),
+    username: String(row.username || "Anonymous"),
+    created_at: String(row.created_at),
+    wallet: (row.wallet as string | null) ?? null,
+    total_points: Number(row.total_points || 0),
+    mining_points: Number(row.mining_points || 0),
+    task_points: Number(row.task_points || 0),
+    social_points: Number(row.social_points || 0),
+    referral_points: Number(row.referral_points || 0),
+    daily_streak: Number(row.daily_streak || 0),
+    referral_code: (row.referral_code as string | null) ?? null,
+    referral_count: Number(row.referral_count || 0),
+    total_sessions: Number(row.total_sessions || 0),
+    active_session: Boolean(row.active_session),
+    completed_sessions: Number(row.completed_sessions || 0),
+    last_active: row.last_active ? String(row.last_active) : null,
+    total_arx_mined: Number(row.total_arx_mined || 0),
+    x_profile: xProfile ? {
+      id: String(xProfile.id),
+      username: String(xProfile.username),
+      profile_url: String(xProfile.profile_url),
+      boost_percentage: Number(xProfile.boost_percentage || 0),
+      average_engagement: Number(xProfile.average_engagement || 0),
+      viral_bonus: Boolean(xProfile.viral_bonus),
+      qualified_posts_today: Number(xProfile.qualified_posts_today || 0),
+      historical_scanned: Boolean(xProfile.historical_scanned),
+      historical_posts_count: Number(xProfile.historical_posts_count || 0),
+      historical_arx_p_total: Number(xProfile.historical_arx_p_total || 0),
+      historical_boost_total: Number(xProfile.historical_boost_total || 0),
+      last_scanned_at: xProfile.last_scanned_at ? String(xProfile.last_scanned_at) : null,
+      created_at: String(xProfile.created_at),
+    } : null,
+    arena_votes: Number(row.arena_votes || 0),
+    arena_power_spent: Number(row.arena_power_spent || 0),
+    referral_bonus_percentage: Number(row.referral_bonus_percentage || 0),
+    x_post_boost_percentage: Number(row.x_post_boost_percentage || 0),
+  };
+};
+
 const AdminUsers = () => {
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(0);
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sessionFilter, setSessionFilter] = useState<SessionFilter>("all");
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
-  // Helper to fetch all rows from a table (bypasses 1000 row limit)
-  const fetchAllPaginated = async (
-    tableName: 'profiles' | 'user_points' | 'user_wallets' | 'mining_sessions' | 'referrals',
-    selectColumns: string
-  ): Promise<any[]> => {
-    const allData: any[] = [];
-    const pageSize = 1000;
-    let from = 0;
-    let hasMore = true;
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(0);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
-    while (hasMore) {
-      const { data, error } = await supabase
-        .from(tableName)
-        .select(selectColumns)
-        .range(from, from + pageSize - 1);
-      
-      if (error) throw error;
+  useEffect(() => {
+    setPage(0);
+  }, [sessionFilter]);
 
-      if (data && data.length > 0) {
-        allData.push(...data);
-        from += pageSize;
-        hasMore = data.length === pageSize;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    return allData;
-  };
-
-  // Fetch all users with comprehensive data - using pagination to get ALL users
-  const { data: users = [], isLoading } = useQuery({
-    queryKey: ["admin-users-comprehensive"],
+  const { data: sessionCounts = { all: 0, active: 0, completed: 0, never: 0 } } = useQuery({
+    queryKey: ["admin-user-session-counts"],
     queryFn: async () => {
-      // Fetch ALL profiles (not limited to 1000)
-      const profiles = await fetchAllPaginated("profiles", "user_id, username, referral_code, created_at, avatar_url");
-
-      // Fetch ALL user points
-      const points = await fetchAllPaginated("user_points", "*");
-
-      // Fetch ALL wallets
-      const wallets = await fetchAllPaginated("user_wallets", "user_id, wallet_address, is_primary");
-
-      // Fetch ALL mining sessions
-      const sessions = await fetchAllPaginated("mining_sessions", "user_id, arx_mined, is_active, started_at, ended_at");
-
-      // Fetch ALL referrals
-      const referrals = await fetchAllPaginated("referrals", "referrer_id");
-
-      // Fetch X profiles with all data
-      const { data: xProfiles, error: xError } = await supabase
-        .from("x_profiles")
-        .select("*");
-
-      if (xError) throw xError;
-
-      // Arena vote totals (server-side aggregate — no full-table client read)
-      const { data: arenaVotes, error: arenaError } = await supabase.rpc(
-        "get_admin_arena_vote_stats"
-      );
-
-      if (arenaError) throw arenaError;
-
-      // Build lookup maps
-      const pointsMap = new Map(points?.map((p: any) => [p.user_id, p]) || []);
-      const walletMap = new Map(wallets?.filter((w: any) => w.is_primary).map((w: any) => [w.user_id, w.wallet_address]) || []);
-      const xProfileMap = new Map<string, XProfileData>(xProfiles?.map(x => [x.user_id, {
-        id: x.id,
-        username: x.username,
-        profile_url: x.profile_url,
-        boost_percentage: x.boost_percentage,
-        average_engagement: x.average_engagement,
-        viral_bonus: x.viral_bonus,
-        qualified_posts_today: x.qualified_posts_today,
-        historical_scanned: x.historical_scanned,
-        historical_posts_count: x.historical_posts_count,
-        historical_arx_p_total: Number(x.historical_arx_p_total),
-        historical_boost_total: x.historical_boost_total,
-        last_scanned_at: x.last_scanned_at,
-        created_at: x.created_at,
-      }]) || []);
-      
-      // Aggregate referrals by referrer
-      const referralCounts = new Map<string, number>();
-      referrals?.forEach((r: any) => {
-        referralCounts.set(r.referrer_id, (referralCounts.get(r.referrer_id) || 0) + 1);
-      });
-
-      // Aggregate arena votes
-      const arenaStats = new Map<string, { votes: number; power: number }>();
-      arenaVotes?.forEach((v: { user_id: string; vote_count: number; total_power_spent: number }) => {
-        arenaStats.set(v.user_id, {
-          votes: Number(v.vote_count) || 0,
-          power: Number(v.total_power_spent) || 0,
-        });
-      });
-
-      // Aggregate sessions - count both active and completed
-      const sessionStats = new Map<string, {
-        count: number;
-        activeCount: number;
-        completedCount: number;
-        totalMined: number;
-        active: boolean;
-        lastActive: Date | null;
-      }>();
-      sessions?.forEach((s: any) => {
-        const existing = sessionStats.get(s.user_id) || {
-          count: 0,
-          activeCount: 0,
-          completedCount: 0,
-          totalMined: 0,
-          active: false,
-          lastActive: null,
-        };
-        const sessionEnd = s.ended_at ? new Date(s.ended_at) : new Date(s.started_at);
-        sessionStats.set(s.user_id, {
-          count: existing.count + 1,
-          activeCount: existing.activeCount + (s.is_active ? 1 : 0),
-          completedCount: existing.completedCount + (!s.is_active ? 1 : 0),
-          totalMined: existing.totalMined + Number(s.arx_mined || 0),
-          active: existing.active || s.is_active,
-          lastActive: !existing.lastActive || sessionEnd > existing.lastActive ? sessionEnd : existing.lastActive,
-        });
-      });
-
-      // Build user data
-      const userData: UserData[] = (profiles || []).map((profile: any) => {
-        const userPoints = pointsMap.get(profile.user_id) as any;
-        const xProfile = xProfileMap.get(profile.user_id);
-        const arena = arenaStats.get(profile.user_id) || { votes: 0, power: 0 };
-        const sessionData = sessionStats.get(profile.user_id) || {
-          count: 0,
-          activeCount: 0,
-          completedCount: 0,
-          totalMined: 0,
-          active: false,
-          lastActive: null,
-        };
-
-        // Use STORED values from user_points for admin visibility (shows the same as leaderboard)
-        const storedMiningPoints = Number(userPoints?.mining_points || 0);
-        const actualMined = sessionData.totalMined;
-
-        return {
-          user_id: profile.user_id,
-          email: "hidden@email.com",
-          username: profile.username || "Anonymous",
-          created_at: profile.created_at,
-          wallet: walletMap.get(profile.user_id) || null,
-          total_points: Number(userPoints?.total_points || 0),
-          mining_points: storedMiningPoints, // Use stored value to match leaderboard
-          task_points: Number(userPoints?.task_points || 0),
-          social_points: Number(userPoints?.social_points || 0),
-          referral_points: Number(userPoints?.referral_points || 0),
-          daily_streak: userPoints?.daily_streak || 0,
-          referral_code: profile.referral_code,
-          referral_count: referralCounts.get(profile.user_id) || 0,
-          total_sessions: sessionData.count,
-          active_session: sessionData.active,
-          completed_sessions: sessionData.completedCount,
-          last_active: sessionData.lastActive?.toISOString() || null,
-          total_arx_mined: actualMined, // Actual from sessions for comparison
-          x_profile: xProfileMap.get(profile.user_id) || null,
-          arena_votes: arena.votes,
-          arena_power_spent: arena.power,
-          referral_bonus_percentage: userPoints?.referral_bonus_percentage || 0,
-          x_post_boost_percentage: userPoints?.x_post_boost_percentage || 0,
-        };
-      });
-
-      // Sort by total_points descending (matches leaderboard order)
-      return userData.sort((a, b) => b.total_points - a.total_points);
+      const { data, error } = await supabase.rpc("get_admin_user_session_filter_counts" as any);
+      if (error) throw error;
+      return data as { all: number; active: number; completed: number; never: number };
     },
     refetchInterval: 15000,
     staleTime: 5000,
   });
+
+  const { data: usersPage, isLoading } = useQuery({
+    queryKey: ["admin-users", page, debouncedSearch, sessionFilter],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("list_admin_users" as any, {
+        p_limit: PAGE_SIZE,
+        p_offset: page * PAGE_SIZE,
+        p_search: debouncedSearch || null,
+        p_session_filter: sessionFilter,
+      });
+      if (error) throw error;
+      const payload = data as { users?: Record<string, unknown>[]; total_count?: number };
+      return {
+        users: (payload.users || []).map(mapAdminUserRow),
+        totalCount: Number(payload.total_count || 0),
+      };
+    },
+    refetchInterval: 15000,
+    staleTime: 5000,
+  });
+
+  const users = usersPage?.users ?? [];
+  const totalCount = usersPage?.totalCount ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const pageStart = totalCount === 0 ? 0 : page * PAGE_SIZE + 1;
+  const pageEnd = Math.min(totalCount, (page + 1) * PAGE_SIZE);
 
   // Real-time subscription for mining sessions to update active status immediately
   useEffect(() => {
@@ -303,8 +221,8 @@ const AdminUsers = () => {
           table: 'mining_sessions',
         },
         () => {
-          // Invalidate the query to refresh data
-          queryClient.invalidateQueries({ queryKey: ['admin-users-comprehensive'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+          queryClient.invalidateQueries({ queryKey: ['admin-user-session-counts'] });
         }
       )
       .subscribe();
@@ -369,7 +287,9 @@ const AdminUsers = () => {
     onSuccess: () => {
       toast.success('Historical rescan complete! Rewards synced.');
       queryClient.invalidateQueries({ queryKey: ['admin-user-snapshot', selectedUser?.user_id] });
-      queryClient.invalidateQueries({ queryKey: ['admin-users-comprehensive'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-session-counts'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-user-session-counts'] });
     },
     onError: (err: any) => {
       toast.error(err.message || 'Rescan failed');
@@ -378,36 +298,6 @@ const AdminUsers = () => {
 
   // Use centralized admin stats
   const { data: globalStats, isLoading: loadingGlobalStats } = useAdminStats();
-
-  // Filter by session status
-  const sessionFilteredUsers = useMemo(() => {
-    switch (sessionFilter) {
-      case "active":
-        return users.filter(u => u.active_session);
-      case "completed":
-        return users.filter(u => !u.active_session && u.total_sessions > 0);
-      case "never":
-        return users.filter(u => u.total_sessions === 0);
-      default:
-        return users;
-    }
-  }, [users, sessionFilter]);
-
-  // Then filter by search query
-  const filteredUsers = sessionFilteredUsers.filter(user =>
-    user.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.user_id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (user.wallet?.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (user.referral_code?.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
-  
-  // Calculate session counts for tabs
-  const sessionCounts = useMemo(() => ({
-    all: users.length,
-    active: users.filter(u => u.active_session).length,
-    completed: users.filter(u => !u.active_session && u.total_sessions > 0).length,
-    never: users.filter(u => u.total_sessions === 0).length,
-  }), [users]);
 
   const toggleRow = (userId: string) => {
     const newExpanded = new Set(expandedRows);
@@ -584,11 +474,11 @@ const AdminUsers = () => {
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
-        ) : filteredUsers.length === 0 ? (
+        ) : users.length === 0 ? (
           <div className="py-8 text-center text-muted-foreground text-sm">No users found</div>
         ) : isMobile ? (
           <div className="divide-y divide-border/50">
-            {filteredUsers.map((user) => (
+            {users.map((user) => (
               <div key={user.user_id} className="p-3 space-y-2">
                 <div className="flex items-start gap-3" onClick={() => toggleRow(user.user_id)}>
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary text-sm font-bold shrink-0">
@@ -650,14 +540,14 @@ const AdminUsers = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredUsers.length === 0 ? (
+                {users.length === 0 ? (
                   <tr>
                     <td colSpan={7} className="py-8 text-center text-muted-foreground text-sm">
                       No users found
                     </td>
                   </tr>
                 ) : (
-                  filteredUsers.map((user) => (
+                  users.map((user) => (
                     <React.Fragment key={user.user_id}>
                       <tr 
                         className="border-b border-border/50 hover:bg-muted/20 transition-colors cursor-pointer"
@@ -789,6 +679,34 @@ const AdminUsers = () => {
               </tbody>
             </table>
         </div>
+        )}
+        {!isLoading && totalCount > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-border/50 px-4 py-3">
+            <p className="text-xs text-muted-foreground">
+              Showing {pageStart.toLocaleString()}–{pageEnd.toLocaleString()} of {totalCount.toLocaleString()}
+            </p>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page === 0 || isLoading}
+                onClick={() => setPage((p) => Math.max(0, p - 1))}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground min-w-[80px] text-center">
+                Page {page + 1} / {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page + 1 >= totalPages || isLoading}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Next
+              </Button>
+            </div>
+          </div>
         )}
       </div>
 
