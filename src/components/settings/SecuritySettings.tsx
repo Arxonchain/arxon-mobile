@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import PrivacyDataSettings from "@/components/settings/PrivacyDataSettings";
 
 const SecuritySettings = () => {
   const { toast } = useToast();
@@ -136,6 +137,8 @@ const SecuritySettings = () => {
           </Button>
         </div>
       </div>
+
+      <PrivacyDataSettings />
 
       {/* Security Features Info */}
       <div className="space-y-4">

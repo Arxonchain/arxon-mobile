@@ -12,6 +12,7 @@ import {
 } from '../design/Kit';
 import { v2 } from '../design/tokens';
 import LegalLinks from '@/components/legal/LegalLinks';
+import PrivacyDataSettings from '@/components/settings/PrivacyDataSettings';
 
 type Tab = 'notifications' | 'security';
 
@@ -209,38 +210,46 @@ function SecurityPanel() {
   };
 
   return (
-    <V2Card padding="16px">
-      <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, marginBottom: 14 }}>Change Password</p>
+    <>
+      <V2Card padding="16px">
+        <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, marginBottom: 14 }}>Change Password</p>
 
-      {(['newPassword', 'confirmPassword'] as const).map((field, idx) => (
-        <div key={field} style={{ marginBottom: 12, position: 'relative' }}>
-          <input
-            type={(idx === 0 ? showPw : showConfirm) ? 'text' : 'password'}
-            value={passwords[field]}
-            onChange={(e) => setPasswords((p) => ({ ...p, [field]: e.target.value }))}
-            placeholder={idx === 0 ? 'New password' : 'Confirm password'}
-            style={{
-              width: '100%', padding: '14px 44px 14px 16px', borderRadius: v2.radius.sm, boxSizing: 'border-box',
-              background: v2.brand.raised, border: `1px solid ${v2.brand.border}`, outline: 'none',
-              fontSize: 14, color: v2.brand.steelBright, fontFamily: v2.font,
-            }}
-          />
-          <button
-            type="button"
-            onClick={() => (idx === 0 ? setShowPw : setShowConfirm)((v) => !v)}
-            style={{
-              position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-              background: 'none', border: 'none', cursor: 'pointer', color: v2.brand.mutedSoft,
-            }}
-          >
-            {(idx === 0 ? showPw : showConfirm) ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        </div>
-      ))}
+        {(['newPassword', 'confirmPassword'] as const).map((field, idx) => (
+          <div key={field} style={{ marginBottom: 12, position: 'relative' }}>
+            <input
+              type={(idx === 0 ? showPw : showConfirm) ? 'text' : 'password'}
+              value={passwords[field]}
+              onChange={(e) => setPasswords((p) => ({ ...p, [field]: e.target.value }))}
+              placeholder={idx === 0 ? 'New password' : 'Confirm password'}
+              style={{
+                width: '100%', padding: '14px 44px 14px 16px', borderRadius: v2.radius.sm, boxSizing: 'border-box',
+                background: v2.brand.raised, border: `1px solid ${v2.brand.border}`, outline: 'none',
+                fontSize: 14, color: v2.brand.steelBright, fontFamily: v2.font,
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => (idx === 0 ? setShowPw : setShowConfirm)((v) => !v)}
+              style={{
+                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                background: 'none', border: 'none', cursor: 'pointer', color: v2.brand.mutedSoft,
+              }}
+            >
+              {(idx === 0 ? showPw : showConfirm) ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          </div>
+        ))}
 
-      <V2Button accent={v2.brand.steel} fullWidth onClick={handlePasswordChange} disabled={saving}>
-        {saving ? <><Loader2 size={16} className="animate-spin" /> Updating…</> : 'Update Password'}
-      </V2Button>
-    </V2Card>
+        <V2Button accent={v2.brand.steel} fullWidth onClick={handlePasswordChange} disabled={saving}>
+          {saving ? <><Loader2 size={16} className="animate-spin" /> Updating…</> : 'Update Password'}
+        </V2Button>
+      </V2Card>
+
+      <div style={{ marginTop: 14 }}>
+        <V2Card padding="16px">
+          <PrivacyDataSettings />
+        </V2Card>
+      </div>
+    </>
   );
 }
