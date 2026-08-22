@@ -14,35 +14,26 @@ import {
   pushArenaResolvedChunk,
   type BattleRow,
 } from "../_shared/arenaNotifications.ts";
+import { runArenaBattleResolve } from "../_shared/runArenaBattleResolve.ts";
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = adminCorsHeaders;
 const WORKER_ID = `process-background-jobs:${crypto.randomUUID().slice(0, 8)}`;
 
-async function invokeResolveBattle(
-  supabaseUrl: string,
-  serviceKey: string,
-  payload: ArenaResolvePayload,
-): Promise<{ ok: boolean; status: number; body: unknown }> {
-  const res = await fetch(`${supabaseUrl}/functions/v1/resolve-arena-battle`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceKey}`,
-      apikey: serviceKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      battle_id: payload.battle_id,
-      winner_side: payload.winner_side,
-      force: payload.force === true,
-      queue: false,
-      _from_worker: true,
-    }),
-  });
-  const body = await res.json().catch(() => ({}));
-  return { ok: res.ok, status: res.status, body };
-}
+type ClaimedJob = {
+  id: string;
+  job_type: string;
+  payload: Record<string, unknown>;
+};
+
+type JobOutcome = {
+  id: string;
+  job_type: string;
+  ok: boolean;
+  detail?: unknown;
+  error?: string;
+};
 
 async function processArenaResolve(
   supabase: SupabaseClient,
@@ -50,12 +41,26 @@ async function processArenaResolve(
   serviceKey: string,
   payload: ArenaResolvePayload,
 ): Promise<unknown> {
-  const result = await invokeResolveBattle(supabaseUrl, serviceKey, payload);
-  if (!result.ok) {
-    const err = (result.body as { error?: string })?.error || `HTTP ${result.status}`;
-    throw new Error(err);
+  const { message, results } = await runArenaBattleResolve(supabase, {
+    battleId: payload.battle_id,
+    manualWinner: payload.winner_side,
+    forceResolve: payload.force === true,
+    supabaseUrl,
+    serviceKey,
+  });
+
+  const battleResult = results[0];
+  if (battleResult?.error) {
+    throw new Error(String(battleResult.error));
   }
-  return result.body;
+  if (battleResult?.skipped && battleResult?.reason !== "already_distributed") {
+    const reason = String(battleResult.reason || "skipped");
+    if (reason !== "already_resolved" && reason !== "already_paid") {
+      throw new Error(reason);
+    }
+  }
+
+  return { message, results };
 }
 
 async function processArenaPushBlast(
@@ -106,6 +111,67 @@ async function processArenaPushBlast(
   return { inApp: offset === 0, push };
 }
 
+async function runClaimedJobs(
+  supabase: SupabaseClient,
+  supabaseUrl: string,
+  serviceKey: string,
+  claimed: ClaimedJob[],
+  batchSize: number,
+): Promise<JobOutcome[]> {
+  const outcomes: JobOutcome[] = [];
+
+  for (const job of claimed) {
+    try {
+      let detail: unknown;
+      if (job.job_type === "arena_resolve") {
+        detail = await processArenaResolve(
+          supabase,
+          supabaseUrl,
+          serviceKey,
+          job.payload as ArenaResolvePayload,
+        );
+      } else if (job.job_type === "arena_push_blast") {
+        detail = await processArenaPushBlast(
+          supabase,
+          supabaseUrl,
+          serviceKey,
+          job.payload as ArenaPushBlastPayload,
+        );
+      } else {
+        throw new Error(`unknown job_type: ${job.job_type}`);
+      }
+
+      await supabase.rpc("complete_background_job", {
+        p_job_id: job.id,
+        p_result: detail as Record<string, unknown>,
+      });
+      outcomes.push({ id: job.id, job_type: job.job_type, ok: true, detail });
+    } catch (jobErr) {
+      const msg = jobErr instanceof Error ? jobErr.message : "job failed";
+      await supabase.rpc("fail_background_job", {
+        p_job_id: job.id,
+        p_error: msg,
+        p_retry_after_seconds: 90,
+      });
+      outcomes.push({ id: job.id, job_type: job.job_type, ok: false, error: msg });
+    }
+  }
+
+  if (claimed.length >= batchSize) {
+    fetch(`${supabaseUrl}/functions/v1/process-background-jobs`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceKey}`,
+        apikey: serviceKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ batch_size: batchSize }),
+    }).catch(() => {});
+  }
+
+  return outcomes;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -132,62 +198,27 @@ serve(async (req) => {
       throw new Error(claimErr.message);
     }
 
-    const claimed = (jobs || []) as Array<{
-      id: string;
-      job_type: string;
-      payload: Record<string, unknown>;
-    }>;
+    const claimed = (jobs || []) as ClaimedJob[];
 
-    const outcomes: Array<{ id: string; job_type: string; ok: boolean; detail?: unknown; error?: string }> = [];
-
-    for (const job of claimed) {
-      try {
-        let detail: unknown;
-        if (job.job_type === "arena_resolve") {
-          detail = await processArenaResolve(
-            auth.supabase,
-            supabaseUrl,
-            serviceKey,
-            job.payload as ArenaResolvePayload,
-          );
-        } else if (job.job_type === "arena_push_blast") {
-          detail = await processArenaPushBlast(
-            auth.supabase,
-            supabaseUrl,
-            serviceKey,
-            job.payload as ArenaPushBlastPayload,
-          );
-        } else {
-          throw new Error(`unknown job_type: ${job.job_type}`);
-        }
-
-        await auth.supabase.rpc("complete_background_job", {
-          p_job_id: job.id,
-          p_result: detail as Record<string, unknown>,
-        });
-        outcomes.push({ id: job.id, job_type: job.job_type, ok: true, detail });
-      } catch (jobErr) {
-        const msg = jobErr instanceof Error ? jobErr.message : "job failed";
-        await auth.supabase.rpc("fail_background_job", {
-          p_job_id: job.id,
-          p_error: msg,
-          p_retry_after_seconds: 90,
-        });
-        outcomes.push({ id: job.id, job_type: job.job_type, ok: false, error: msg });
-      }
+    if (claimed.length === 0) {
+      return new Response(
+        JSON.stringify({ ok: true, worker: WORKER_ID, claimed: 0, outcomes: [] }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
 
-    if (claimed.length >= batchSize) {
-      fetch(`${supabaseUrl}/functions/v1/process-background-jobs`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ batch_size: batchSize }),
-      }).catch(() => {});
+    const work = runClaimedJobs(auth.supabase, supabaseUrl, serviceKey, claimed, batchSize);
+
+    const edgeRuntime = (globalThis as { EdgeRuntime?: { waitUntil: (p: Promise<unknown>) => void } }).EdgeRuntime;
+    if (edgeRuntime?.waitUntil) {
+      edgeRuntime.waitUntil(work);
+      return new Response(
+        JSON.stringify({ ok: true, worker: WORKER_ID, claimed: claimed.length, async: true }),
+        { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
     }
+
+    const outcomes = await work;
 
     return new Response(
       JSON.stringify({

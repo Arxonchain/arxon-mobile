@@ -334,9 +334,10 @@ const AdminArena = () => {
 
   const handleManualResolve = async (battleId: string, winnerSide: 'a' | 'b' | 'c', force = false) => {
     setResolving(battleId);
+    let queued = false;
     try {
       const { data, error } = await supabase.functions.invoke('resolve-arena-battle', {
-        body: { battle_id: battleId, winner_side: winnerSide, force, queue: false }
+        body: { battle_id: battleId, winner_side: winnerSide, force, queue: true }
       });
 
       if (error) {
@@ -346,6 +347,78 @@ const AdminArena = () => {
       
       if (data?.error) {
         throw new Error(data.error);
+      }
+
+      if (data?.queued) {
+        queued = true;
+        const jobId = data.job_id as string | undefined;
+        toast.info('Resolving in background — large battles can take 1–2 minutes.');
+
+        let pollActive = true;
+        const finishPoll = () => {
+          pollActive = false;
+          setResolving(null);
+        };
+
+        const pollOnce = async (): Promise<boolean> => {
+          const { data: row } = await supabase
+            .from('arena_battles')
+            .select('winner_side, total_rewards_distributed')
+            .eq('id', battleId)
+            .maybeSingle();
+
+          if (row?.winner_side) {
+            const distributed = Number(row.total_rewards_distributed) || 0;
+            toast.success(`✅ Resolved! ${Math.round(distributed).toLocaleString()} ARX-P distributed.`);
+            finishPoll();
+            fetchBattles();
+            return true;
+          }
+
+          if (jobId) {
+            const { data: jobRaw, error: jobErr } = await supabase.rpc('get_background_job' as any, {
+              p_job_id: jobId,
+            });
+            if (!jobErr && jobRaw && typeof jobRaw === 'object') {
+              const job = jobRaw as { status?: string; last_error?: string; result?: { results?: Array<{ error?: string }> } };
+              if (job.status === 'failed') {
+                toast.error(job.last_error || 'Resolve failed');
+                finishPoll();
+                return true;
+              }
+              if (job.status === 'completed') {
+                const jobError = job.result?.results?.[0]?.error;
+                if (jobError) {
+                  toast.error(jobError);
+                  finishPoll();
+                  return true;
+                }
+                fetchBattles();
+              }
+            }
+          }
+
+          return false;
+        };
+
+        const interval = window.setInterval(async () => {
+          const done = await pollOnce();
+          if (done) window.clearInterval(interval);
+        }, 4000);
+
+        window.setTimeout(async () => {
+          window.clearInterval(interval);
+          if (pollActive) {
+            const done = await pollOnce();
+            if (!done) {
+              finishPoll();
+              toast.info('Still resolving — refresh the page in a minute.');
+            }
+          }
+        }, 180000);
+
+        setTimeout(() => pollOnce(), 2000);
+        return;
       }
 
       const result = data?.results?.[0];
@@ -372,7 +445,7 @@ const AdminArena = () => {
       console.error('Error resolving battle:', error);
       toast.error(error.message || 'Failed to resolve market');
     } finally {
-      setResolving(null);
+      if (!queued) setResolving(null);
     }
   };
 
