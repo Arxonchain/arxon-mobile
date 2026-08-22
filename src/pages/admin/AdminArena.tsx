@@ -336,21 +336,41 @@ const AdminArena = () => {
     setResolving(battleId);
     try {
       const { data, error } = await supabase.functions.invoke('resolve-arena-battle', {
-        body: { battle_id: battleId, winner_side: winnerSide, force }
+        body: { battle_id: battleId, winner_side: winnerSide, force, queue: true }
       });
 
       if (error) {
-        // Try to parse the error body for more detail
         const errorBody = typeof error === 'object' && error.message ? error.message : String(error);
         throw new Error(errorBody);
       }
       
-      // Check if the response contains an error
       if (data?.error) {
         throw new Error(data.error);
       }
 
       const result = data?.results?.[0];
+
+      if (result?.queued || data?.queued) {
+        toast.success('Payout queued — processing in background. Refresh in a few seconds.');
+        const poll = window.setInterval(async () => {
+          const { data: row } = await supabase
+            .from('arena_battles')
+            .select('winner_side, total_rewards_distributed')
+            .eq('id', battleId)
+            .maybeSingle();
+          if (row?.winner_side) {
+            window.clearInterval(poll);
+            toast.success(
+              `Resolved! ${Math.round(Number(row.total_rewards_distributed || 0)).toLocaleString()} ARX-P distributed.`
+            );
+            fetchBattles();
+          }
+        }, 4000);
+        window.setTimeout(() => window.clearInterval(poll), 120000);
+        fetchBattles();
+        return;
+      }
+
       if (result?.error) {
         throw new Error(result.error);
       }

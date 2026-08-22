@@ -219,6 +219,79 @@ export async function pushArenaResolvedNotifications(
   return { pushed, attempted: (earnings || []).length, errors: [...new Set(errors)] };
 }
 
+/** Chunked FCM push for large battles (background job worker). */
+export async function pushArenaResolvedChunk(
+  supabase: SupabaseClient,
+  battle: BattleRow,
+  serviceKey: string,
+  supabaseUrl: string,
+  offset = 0,
+  limit = 25,
+): Promise<{ pushed: number; processed: number; hasMore: boolean; errors: string[] }> {
+  const { data: earnings, error } = await supabase
+    .from("arena_earnings")
+    .select("user_id, is_winner, total_earned, stake_amount")
+    .eq("battle_id", battle.id)
+    .order("user_id", { ascending: true })
+    .range(offset, offset + limit - 1);
+
+  if (error) throw error;
+
+  const rows = earnings || [];
+  const winSide = winnerName(battle);
+  let pushed = 0;
+  const errors: string[] = [];
+  const seen = new Set<string>();
+
+  for (const row of rows) {
+    if (!seen.has(row.user_id)) {
+      seen.add(row.user_id);
+      const resolved = await sendPushToUser(supabaseUrl, serviceKey, {
+        userId: row.user_id,
+        title: "📊 Battle Resolved",
+        body: `"${battle.title}" is settled — winner: ${winSide}.`,
+        tag: "arena-resolved",
+      });
+      if (resolved.sent > 0) pushed += 1;
+      if (resolved.error) errors.push(resolved.error);
+    }
+
+    const winPush = row.is_winner
+      ? {
+          title: "🏆 You Won!",
+          body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
+          tag: "arena-win",
+        }
+      : {
+          title: "💧 Battle Result",
+          body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
+          tag: "arena-loss",
+        };
+
+    const result = await sendPushToUser(supabaseUrl, serviceKey, {
+      userId: row.user_id,
+      ...winPush,
+    });
+    if (result.sent > 0) pushed += 1;
+    if (result.error) errors.push(result.error);
+  }
+
+  const { count } = await supabase
+    .from("arena_earnings")
+    .select("user_id", { count: "exact", head: true })
+    .eq("battle_id", battle.id);
+
+  const total = count ?? rows.length;
+  const hasMore = offset + rows.length < total;
+
+  return {
+    pushed,
+    processed: rows.length,
+    hasMore,
+    errors: [...new Set(errors)],
+  };
+}
+
 /** @deprecated use pushArenaResolvedNotifications */
 export async function pushArenaNotifications(
   supabase: SupabaseClient,

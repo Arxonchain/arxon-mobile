@@ -4,7 +4,14 @@ import {
   adminCorsHeaders,
   requireAdminOrService,
 } from "../_shared/adminAuth.ts";
-import { notifyArenaBattleResolved } from "../_shared/arenaNotifications.ts";
+import {
+  blastArenaBattleNotifications,
+  notifyArenaBattleResolved,
+} from "../_shared/arenaNotifications.ts";
+import {
+  enqueueArenaPushBlastJob,
+  enqueueArenaResolveJob,
+} from "../_shared/backgroundJobs.ts";
 import {
   battleHasPayoutRows,
   releaseStuckResolveLock,
@@ -42,6 +49,8 @@ serve(async (req) => {
     const forceResolve = body.force === true;
     const notificationsOnly = body.notifications_only === true;
     const dryRun = body.dryRun === true || body.dry_run === true;
+    const fromWorker = body._from_worker === true;
+    const useQueue = body.queue !== false && !fromWorker && !notificationsOnly;
 
     if (dryRun) {
       return new Response(
@@ -54,7 +63,38 @@ serve(async (req) => {
       );
     }
 
-    console.log("Starting battle resolution...", { manualWinner, battleId, forceResolve, notificationsOnly });
+    console.log("Starting battle resolution...", { manualWinner, battleId, forceResolve, notificationsOnly, fromWorker, useQueue });
+
+    if (battleId && manualWinner && useQueue) {
+      const queued = await enqueueArenaResolveJob(
+        supabase,
+        {
+          battle_id: battleId,
+          winner_side: manualWinner,
+          force: forceResolve,
+        },
+        supabaseUrl,
+        supabaseServiceKey,
+      );
+
+      if (!queued.error?.includes("Could not find the function")) {
+        if (queued.error) throw new Error(queued.error);
+        return new Response(
+          JSON.stringify({
+            message: "Arena resolve queued",
+            queued: true,
+            job_id: queued.jobId,
+            battle_id: battleId,
+            results: [{
+              battleId,
+              queued: true,
+              job_id: queued.jobId,
+            }],
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
 
     if (notificationsOnly && battleId) {
       const { data: battleRow, error: battleErr } = await supabase
@@ -459,17 +499,19 @@ serve(async (req) => {
             totalDistributed: totalRewardsDistributed,
           });
 
-          // In-app + background FCM push (single path)
+          // In-app notifications + queued FCM push chunks (avoids edge timeout)
           try {
-            const notif = await notifyArenaBattleResolved(supabase, {
-              id: battle.id,
-              title: battle.title,
-              winner_side: winnerSide,
-              side_a_name: battle.side_a_name,
-              side_b_name: battle.side_b_name,
-              side_c_name: battle.side_c_name,
-            }, { supabaseUrl, serviceKey: supabaseServiceKey, push: true });
-            results[results.length - 1].notifications = notif;
+            const inApp = await blastArenaBattleNotifications(supabase, battle.id);
+            const pushJob = await enqueueArenaPushBlastJob(
+              supabase,
+              { battle_id: battle.id, offset: 0, limit: 25 },
+              supabaseUrl,
+              supabaseServiceKey,
+            );
+            results[results.length - 1].notifications = {
+              inApp: inApp.detail ?? inApp,
+              push: { queued: true, job_id: pushJob.jobId },
+            };
           } catch (notifErr) {
             console.error(`Notifications failed for ${battle.id}:`, notifErr);
           }

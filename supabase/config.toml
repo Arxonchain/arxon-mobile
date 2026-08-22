@@ -53,6 +53,9 @@ verify_jwt = false
 [functions.auto-resolve-battles]
 verify_jwt = false
 
+[functions.process-background-jobs]
+verify_jwt = false
+
 [functions.arena-ai-prediction]
 verify_jwt = false
 
