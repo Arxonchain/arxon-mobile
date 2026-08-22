@@ -5,6 +5,7 @@ import {
   rateLimitResponse,
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
+import { getSignupEmailRejection } from "../_shared/signupEmailPolicy.ts";
 
 /**
  * Branded signup:
@@ -80,8 +81,8 @@ function brandedConfirmUrl(base: string, tokenHash: string, type: string): strin
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
   const secret = (Deno.env.get("TURNSTILE_SECRET_KEY") || "").trim();
   if (!secret) {
-    // Secret not configured — accept (UI may still require widget).
-    return true;
+    // Fail closed in production — set ALLOW_SIGNUP_WITHOUT_TURNSTILE=true only for local dev.
+    return Deno.env.get("ALLOW_SIGNUP_WITHOUT_TURNSTILE") === "true";
   }
   if (!token) return false;
   const body = new URLSearchParams();
@@ -200,6 +201,19 @@ serve(async (req) => {
     if (password.length < 8) {
       return jsonResponse(
         { success: false, error: "Password must be at least 8 characters." },
+        400,
+        rateLimitHeaders(rl)
+      );
+    }
+
+    const emailReject = getSignupEmailRejection(email);
+    if (emailReject) {
+      return jsonResponse(
+        {
+          success: false,
+          error: emailReject,
+          code: "email_blocked",
+        },
         400,
         rateLimitHeaders(rl)
       );
