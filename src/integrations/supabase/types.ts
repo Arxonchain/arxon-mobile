@@ -1500,8 +1500,9 @@ export type Database = {
       claim_nexus_reward: { Args: { p_transaction_id: string }; Returns: Json }
       generate_nexus_address: { Args: { p_username: string }; Returns: string }
       generate_referral_code: { Args: never; Returns: string }
+      get_arena_analytics: { Args: never; Returns: Json }
       get_arena_participation: {
-        Args: { p_battle_id: string }
+        Args: { p_battle_id: string; p_limit?: number }
         Returns: {
           avatar_url: string
           battle_id: string
@@ -1510,6 +1511,16 @@ export type Database = {
           side: string
           user_id: string
           username: string
+        }[]
+      }
+      get_battle_vote_summary: { Args: { p_battle_id: string }; Returns: Json }
+      get_recent_battle_votes: {
+        Args: { p_battle_id: string; p_limit?: number }
+        Returns: {
+          created_at: string
+          id: string
+          power_spent: number
+          side: string
         }[]
       }
       get_daily_send_count: { Args: { p_user_id: string }; Returns: number }

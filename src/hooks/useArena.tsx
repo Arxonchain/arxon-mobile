@@ -151,7 +151,8 @@ export const useArena = () => {
     try {
       // Type assertion for self-hosted compatibility
       const { data, error } = await supabase.rpc('get_arena_participation' as any, { 
-        p_battle_id: battleId 
+        p_battle_id: battleId,
+        p_limit: 100,
       });
 
       if (error) throw error;
@@ -270,11 +271,13 @@ export const useArena = () => {
       if (error) throw error;
 
       let userVotes: any[] = [];
-      if (user) {
+      if (user && data?.length) {
+        const battleIds = data.map((b: { id: string }) => b.id);
         const { data: votes } = await supabase
           .from('arena_votes')
           .select('battle_id, side, power_spent')
-          .eq('user_id', user.id);
+          .eq('user_id', user.id)
+          .in('battle_id', battleIds);
         userVotes = votes || [];
       }
 
@@ -299,72 +302,40 @@ export const useArena = () => {
 
   const fetchAnalytics = useCallback(async () => {
     try {
-      // Get all battles
-      const { data: battles } = await supabase
-        .from('arena_battles')
-        .select('id');
+      const { data, error } = await supabase.rpc('get_arena_analytics');
 
-      // Get all votes
-      const { data: votes } = await supabase
-        .from('arena_votes')
-        .select('user_id, power_spent, battle_id, side');
+      if (error) throw error;
 
-      // Get unique participants
-      const uniqueUsers = new Set(votes?.map(v => v.user_id) || []);
-      const totalPowerStaked = votes?.reduce((sum, v) => sum + v.power_spent, 0) || 0;
-      const largestStake = Math.max(...(votes?.map(v => v.power_spent) || [0]));
-
-      // Find most active voter
-      const votesByUser = new Map<string, number>();
-      votes?.forEach(v => {
-        votesByUser.set(v.user_id, (votesByUser.get(v.user_id) || 0) + 1);
-      });
-
-      let mostActiveVoter = null;
-      let maxVotes = 0;
-      votesByUser.forEach((count, userId) => {
-        if (count > maxVotes) {
-          maxVotes = count;
-        }
-      });
-
-      // User stats if logged in
-      let userStats = undefined;
-      if (user && votes) {
-        const userVotes = votes.filter(v => v.user_id === user.id);
-        const userBattles = new Set(userVotes.map(v => v.battle_id));
-        
-        // Get user wins from battle history
-        const { data: userBattleResults } = await supabase
-          .from('arena_battles')
-          .select('id, winner_side')
-          .in('id', Array.from(userBattles));
-
-        const userVoteMap = new Map(userVotes.map(v => [v.battle_id, v]));
-        let wins = 0;
-        userBattleResults?.forEach(battle => {
-          const vote = userVoteMap.get(battle.id);
-          if (vote && battle.winner_side && vote.side === battle.winner_side) {
-            wins++;
-          }
-        });
-
-        userStats = {
-          totalBattlesParticipated: userBattles.size,
-          totalWins: wins,
-          totalPowerStaked: userVotes.reduce((sum, v) => sum + v.power_spent, 0),
-          winRate: userBattles.size > 0 ? (wins / userBattles.size) * 100 : 0,
-        };
-      }
+      const payload = data as {
+        total_battles?: number;
+        total_power_staked?: number;
+        total_participants?: number;
+        average_stake_per_voter?: number;
+        largest_single_stake?: number;
+        most_active_voter?: { username: string; votes: number } | null;
+        user_stats?: {
+          total_battles_participated: number;
+          total_wins: number;
+          total_power_staked: number;
+          win_rate: number;
+        } | null;
+      } | null;
 
       const analyticsData: ArenaAnalyticsData = {
-        totalBattles: battles?.length || 0,
-        totalPowerStaked,
-        totalParticipants: uniqueUsers.size,
-        averageStakePerVoter: uniqueUsers.size > 0 ? Math.round(totalPowerStaked / uniqueUsers.size) : 0,
-        largestSingleStake: largestStake,
-        mostActiveVoter: maxVotes > 0 ? { username: 'Top Voter', votes: maxVotes } : null,
-        userStats,
+        totalBattles: Number(payload?.total_battles) || 0,
+        totalPowerStaked: Number(payload?.total_power_staked) || 0,
+        totalParticipants: Number(payload?.total_participants) || 0,
+        averageStakePerVoter: Number(payload?.average_stake_per_voter) || 0,
+        largestSingleStake: Number(payload?.largest_single_stake) || 0,
+        mostActiveVoter: payload?.most_active_voter ?? null,
+        userStats: payload?.user_stats
+          ? {
+              totalBattlesParticipated: Number(payload.user_stats.total_battles_participated) || 0,
+              totalWins: Number(payload.user_stats.total_wins) || 0,
+              totalPowerStaked: Number(payload.user_stats.total_power_staked) || 0,
+              winRate: Number(payload.user_stats.win_rate) || 0,
+            }
+          : undefined,
       };
 
       setAnalytics(analyticsData);
@@ -373,7 +344,7 @@ export const useArena = () => {
       console.error('Error fetching analytics:', error);
       return null;
     }
-  }, [user?.id]);
+  }, []);
 
   const castVote = async (battleId: string, side: 'a' | 'b', powerAmount: number) => {
     if (!user) {

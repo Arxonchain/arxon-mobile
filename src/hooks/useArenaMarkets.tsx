@@ -163,7 +163,9 @@ export const useArenaMarkets = () => {
       const { data: votes, error } = await supabase
         .from('arena_votes')
         .select('*')
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(500);
 
       if (error) throw error;
 
@@ -428,18 +430,7 @@ export const useArenaMarkets = () => {
         },
         () => {
           fetchMarkets();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'arena_votes',
-        },
-        () => {
-          fetchMarkets();
-          fetchEarningsLeaderboard(); // Refresh leaderboard when new votes come in
+          fetchEarningsLeaderboard();
           if (user) fetchUserPositions();
         }
       )

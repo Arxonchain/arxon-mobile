@@ -39,18 +39,16 @@ const LiveActivityFeed = ({
   useEffect(() => {
     // Fetch initial recent votes
     const fetchRecentVotes = async () => {
-      const { data, error } = await supabase
-        .from('arena_votes')
-        .select('id, side, power_spent, created_at')
-        .eq('battle_id', battleId)
-        .order('created_at', { ascending: false })
-        .limit(maxItems);
+      const { data, error } = await supabase.rpc('get_recent_battle_votes', {
+        p_battle_id: battleId,
+        p_limit: maxItems,
+      });
 
       if (!error && data) {
         const mapped = data.map((v) => ({
           id: v.id,
           side: v.side as 'a' | 'b',
-          power_spent: v.power_spent,
+          power_spent: Number(v.power_spent),
           created_at: v.created_at,
           sideAName,
           sideBName,
@@ -63,36 +61,52 @@ const LiveActivityFeed = ({
 
     fetchRecentVotes();
 
-    // Subscribe to real-time vote inserts
+    // Battle power updates fire on every vote; refetch bounded activity via RPC.
     const channel = supabase
       .channel(`live-activity-${battleId}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'arena_votes',
-          filter: `battle_id=eq.${battleId}`,
+          table: 'arena_battles',
+          filter: `id=eq.${battleId}`,
         },
-        (payload) => {
-          const newVote = payload.new as any;
+        async () => {
+          const { data } = await supabase.rpc('get_recent_battle_votes', {
+            p_battle_id: battleId,
+            p_limit: maxItems,
+          });
+
+          if (!data?.length) return;
+
+          const latest = data[0];
           const activity: ActivityItem = {
-            id: newVote.id,
-            side: newVote.side as 'a' | 'b',
-            power_spent: newVote.power_spent,
-            created_at: newVote.created_at,
+            id: latest.id,
+            side: latest.side as 'a' | 'b',
+            power_spent: Number(latest.power_spent),
+            created_at: latest.created_at,
             sideAName,
             sideBName,
             sideAColor,
             sideBColor,
           };
 
-          // Show notification animation
           setNewActivity(activity);
           setTimeout(() => setNewActivity(null), 3000);
 
-          // Add to feed
-          setActivities((prev) => [activity, ...prev].slice(0, maxItems));
+          setActivities(
+            data.slice(0, maxItems).map((v) => ({
+              id: v.id,
+              side: v.side as 'a' | 'b',
+              power_spent: Number(v.power_spent),
+              created_at: v.created_at,
+              sideAName,
+              sideBName,
+              sideAColor,
+              sideBColor,
+            }))
+          );
         }
       )
       .subscribe();

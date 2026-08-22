@@ -32,8 +32,10 @@ const BattleVoteExplorer = ({ market, currentUserId }: BattleVoteExplorerProps) 
       setLoading(true);
       try {
         // Use the RPC function that returns votes with profile info (type assertion for self-hosted)
-        const { data, error } = await supabase
-          .rpc('get_arena_participation' as any, { p_battle_id: market.id });
+        const { data, error } = await supabase.rpc('get_arena_participation', {
+          p_battle_id: market.id,
+          p_limit: 100,
+        });
 
         if (error) throw error;
 
@@ -59,16 +61,16 @@ const BattleVoteExplorer = ({ market, currentUserId }: BattleVoteExplorerProps) 
 
     fetchVotes();
 
-    // Real-time subscription for new votes
+    // Battle totals update on each vote; refetch bounded participation via RPC.
     const channel = supabase
       .channel(`battle-votes-${market.id}`)
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: 'UPDATE',
           schema: 'public',
-          table: 'arena_votes',
-          filter: `battle_id=eq.${market.id}`,
+          table: 'arena_battles',
+          filter: `id=eq.${market.id}`,
         },
         () => {
           fetchVotes();
