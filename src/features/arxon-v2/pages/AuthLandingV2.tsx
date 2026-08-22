@@ -14,6 +14,7 @@ import authCrystal from '@/assets/v2-auth-crystal.jpg';
 import authEarth from '@/assets/v2-auth-earth-cyan.png';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
+import LegalLinks from '@/components/legal/LegalLinks';
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
 function isAlreadyRegisteredError(message?: string) {
@@ -366,6 +367,13 @@ export default function AuthLandingV2() {
                 ? 'Create Account'
                 : 'Send Reset Link'}
             </Button>
+
+            {(mode === 'signin' || mode === 'signup') && (
+              <p className="text-xs text-center text-muted-foreground pt-1">
+                By continuing, you agree to our{' '}
+                <LegalLinks linkClassName="text-accent hover:underline" separator=" and " />
+              </p>
+            )}
           </form>
 
           <div className="mt-6 text-center">

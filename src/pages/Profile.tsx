@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
-import { User, Wallet, Zap, Clock, Calendar, Trophy, History, Edit2, Check, Copy, ArrowLeftRight, ArrowLeft } from "lucide-react";
+import { User, Wallet, Zap, Clock, Calendar, Trophy, History, Edit2, Check, Copy, ArrowLeftRight, ArrowLeft, FileText, Shield } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePoints } from "@/hooks/usePoints";
@@ -382,6 +383,33 @@ const Profile = () => {
             </Button>
           </div>
         )}
+      </div>
+
+      {/* Legal */}
+      <div className="glass-card p-5">
+        <h3 className="font-semibold text-foreground mb-4">Legal</h3>
+        <div className="space-y-2">
+          <Link
+            to="/terms"
+            className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-foreground">Terms of Service</span>
+            </div>
+            <ArrowLeftRight className="h-4 w-4 text-muted-foreground rotate-90" />
+          </Link>
+          <Link
+            to="/privacy"
+            className="flex items-center justify-between p-3 bg-secondary/30 rounded-lg hover:bg-secondary/50 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm text-foreground">Privacy Policy</span>
+            </div>
+            <ArrowLeftRight className="h-4 w-4 text-muted-foreground rotate-90" />
+          </Link>
+        </div>
       </div>
 
       {/* Mining History */}

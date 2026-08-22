@@ -3,6 +3,7 @@ import Header from "./Header";
 import Sidebar from "./Sidebar";
 import AnimatedBackground from "./AnimatedBackground";
 import { useCountryDetection } from "@/hooks/useCountryDetection";
+import LegalFooterBar from "@/components/legal/LegalFooterBar";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -24,6 +25,7 @@ const DashboardLayout = memo(({ children }: DashboardLayoutProps) => {
           <div className="glow-orb glow-orb-white w-24 sm:w-32 md:w-48 lg:w-64 h-24 sm:h-32 md:h-48 lg:h-64 top-1/3 right-5 lg:right-10 opacity-40" />
           <div className="glow-orb glow-orb-blue w-28 sm:w-40 md:w-56 lg:w-80 h-28 sm:h-40 md:h-56 lg:h-80 bottom-10 lg:bottom-20 left-1/4 opacity-50" />
           <div className="relative z-10">{children}</div>
+          <LegalFooterBar className="hidden lg:flex mt-8 pb-2" />
         </main>
       </div>
     </div>

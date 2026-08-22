@@ -2,6 +2,7 @@ import { memo } from "react";
 import { LayoutDashboard, Trophy, Settings, LogOut, Swords, Send, Pickaxe, Target, Users, User } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import LegalFooterBar from "@/components/legal/LegalFooterBar";
 
 // Main navigation (always visible)
 const navItems = [
@@ -58,8 +59,9 @@ const Sidebar = memo(() => {
         ))}
       </nav>
 
-      {/* Bottom section with Settings and Logout */}
+      {/* Bottom section with Legal, Settings and Logout */}
       <div className="px-2 xl:px-3 space-y-0.5 xl:space-y-1 mt-auto">
+        <LegalFooterBar className="py-2 xl:py-3" linkClassName="text-muted-foreground hover:text-foreground hover:underline" />
         {bottomItems.map((item) => (
           <NavLink
             key={item.path}

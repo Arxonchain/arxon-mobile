@@ -65,6 +65,11 @@ const MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent
   { Icon: Settings, label: 'App Settings', sub: 'Notifications & display', path: '/settings', accent: 'rgba(184,239,248,0.45)' },
 ];
 
+const LEGAL_MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string }[] = [
+  { Icon: Scale, label: 'Terms of Service', sub: 'Usage & eligibility', path: '/terms', accent: 'rgba(184,239,248,0.55)' },
+  { Icon: Shield, label: 'Privacy Policy', sub: 'How we handle your data', path: '/privacy', accent: neon.purple },
+];
+
 const ADMIN_MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string }[] = [
   { Icon: LayoutDashboard, label: 'Dashboard', sub: 'Platform overview', path: '/admin', accent: neon.cyan },
   { Icon: BarChart3, label: 'Analytics', sub: 'Deep metrics', path: '/admin/analytics', accent: neon.teal },
@@ -438,6 +443,15 @@ export default function ProfileV2() {
         <motion.div variants={fadeUp}>
           <NeonMenuGroup title="Account">
             {MENU.map((item) => (
+              <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
+            ))}
+          </NeonMenuGroup>
+        </motion.div>
+
+        {/* Legal */}
+        <motion.div variants={fadeUp} style={{ marginTop: 4 }}>
+          <NeonMenuGroup title="Legal">
+            {LEGAL_MENU.map((item) => (
               <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
             ))}
           </NeonMenuGroup>

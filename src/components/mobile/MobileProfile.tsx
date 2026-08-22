@@ -7,7 +7,7 @@ import { useAdmin } from '@/hooks/useAdmin';
 import { useState, useRef, useEffect } from 'react';
 import {
   Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks,
-  ChevronRight, ChevronLeft, Users, Wallet, Camera,
+  ChevronRight, ChevronLeft, Users, Wallet, Camera, FileText,
   LayoutDashboard, Trophy, History, Scale, User2,
   CalendarDays, FileDown, Globe, Zap, Receipt, Upload, Link2,
   BarChart3, Megaphone, RotateCcw, Coins,
@@ -446,6 +446,29 @@ export default function MobileProfile() {
         <p style={{fontSize:10, textTransform:'uppercase', letterSpacing:'0.15em',
           color:'hsl(215 14% 30%)', fontWeight:700, marginBottom:12, marginTop:20}}>Account</p>
         {MENU.map((item, i) => (
+          <motion.div key={i} whileTap={{scale:0.98, x:2}} onClick={() => navigate(item.path)}
+            className="glass-card press card-lift"
+            style={{display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
+              borderRadius:18, marginBottom:8, cursor:'pointer'}}>
+            <div style={{width:40, height:40, borderRadius:13, background:item.bg,
+              flexShrink:0, display:'flex', alignItems:'center', justifyContent:'center'}}>
+              <item.Icon size={18} color={item.col}/>
+            </div>
+            <div style={{flex:1}}>
+              <p style={{fontSize:13, fontWeight:600, color:'hsl(215 18% 88%)'}}>{item.label}</p>
+              <p style={{fontSize:10, color:'hsl(215 14% 38%)', marginTop:2}}>{item.sub}</p>
+            </div>
+            <ChevronRight size={15} color="hsl(215 14% 30%)"/>
+          </motion.div>
+        ))}
+
+        {/* Legal */}
+        <p style={{fontSize:10, textTransform:'uppercase', letterSpacing:'0.15em',
+          color:'hsl(215 14% 30%)', fontWeight:700, marginBottom:12, marginTop:20}}>Legal</p>
+        {[
+          {Icon: FileText, label:'Terms of Service', sub:'Usage & eligibility', path:'/terms', col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
+          {Icon: Shield,   label:'Privacy Policy',   sub:'How we handle your data', path:'/privacy', col:'hsl(255 50% 65%)', bg:'hsl(255 50% 65%/0.1)'},
+        ].map((item, i) => (
           <motion.div key={i} whileTap={{scale:0.98, x:2}} onClick={() => navigate(item.path)}
             className="glass-card press card-lift"
             style={{display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
