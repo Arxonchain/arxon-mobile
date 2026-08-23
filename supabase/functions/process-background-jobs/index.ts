@@ -6,15 +6,19 @@ import {
 } from "../_shared/adminAuth.ts";
 import {
   enqueueArenaPushBlastJob,
+  type ArenaAutoResolvePayload,
   type ArenaPushBlastPayload,
   type ArenaResolvePayload,
+  type DistributeRewardsPayload,
 } from "../_shared/backgroundJobs.ts";
 import {
   blastArenaBattleNotifications,
   pushArenaResolvedChunk,
   type BattleRow,
 } from "../_shared/arenaNotifications.ts";
+import { runArenaAutoResolveForBattle } from "../_shared/runArenaAutoResolve.ts";
 import { runArenaBattleResolve } from "../_shared/runArenaBattleResolve.ts";
+import { runDistributeRewards } from "../_shared/runDistributeRewards.ts";
 
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -111,6 +115,30 @@ async function processArenaPushBlast(
   return { inApp: offset === 0, push };
 }
 
+async function processArenaAutoResolve(
+  supabase: SupabaseClient,
+  supabaseUrl: string,
+  serviceKey: string,
+  payload: ArenaAutoResolvePayload,
+): Promise<unknown> {
+  const openAiApiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openAiApiKey) throw new Error("OPENAI_API_KEY not configured");
+  return runArenaAutoResolveForBattle(
+    supabase,
+    payload.battle_id,
+    supabaseUrl,
+    serviceKey,
+    openAiApiKey,
+  );
+}
+
+async function processDistributeRewards(
+  supabase: SupabaseClient,
+  payload: DistributeRewardsPayload,
+): Promise<unknown> {
+  return runDistributeRewards(supabase, payload);
+}
+
 async function runClaimedJobs(
   supabase: SupabaseClient,
   supabaseUrl: string,
@@ -136,6 +164,18 @@ async function runClaimedJobs(
           supabaseUrl,
           serviceKey,
           job.payload as ArenaPushBlastPayload,
+        );
+      } else if (job.job_type === "arena_auto_resolve") {
+        detail = await processArenaAutoResolve(
+          supabase,
+          supabaseUrl,
+          serviceKey,
+          job.payload as ArenaAutoResolvePayload,
+        );
+      } else if (job.job_type === "distribute_rewards") {
+        detail = await processDistributeRewards(
+          supabase,
+          job.payload as DistributeRewardsPayload,
         );
       } else {
         throw new Error(`unknown job_type: ${job.job_type}`);

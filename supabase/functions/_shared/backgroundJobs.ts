@@ -1,6 +1,20 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-export type BackgroundJobType = "arena_resolve" | "arena_push_blast";
+export type BackgroundJobType =
+  | "arena_resolve"
+  | "arena_push_blast"
+  | "arena_auto_resolve"
+  | "distribute_rewards";
+
+export type ArenaAutoResolvePayload = {
+  battle_id: string;
+};
+
+export type DistributeRewardsPayload = {
+  action: "rumble_rewards" | "inflation_compensation" | "create_announcement";
+  dry_run?: boolean;
+  emails?: string[];
+};
 
 export type ArenaResolvePayload = {
   battle_id: string;
@@ -75,6 +89,30 @@ export async function enqueueArenaPushBlastJob(
     { ...payload, offset, limit: payload.limit ?? 25 },
     key,
   );
+  if (result.jobId) triggerBackgroundWorker(supabaseUrl, serviceKey);
+  return result;
+}
+
+export async function enqueueArenaAutoResolveJob(
+  supabase: SupabaseClient,
+  payload: ArenaAutoResolvePayload,
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<{ jobId: string | null; error?: string }> {
+  const key = `arena_auto_resolve:${payload.battle_id}`;
+  const result = await enqueueBackgroundJob(supabase, "arena_auto_resolve", payload, key);
+  if (result.jobId) triggerBackgroundWorker(supabaseUrl, serviceKey);
+  return result;
+}
+
+export async function enqueueDistributeRewardsJob(
+  supabase: SupabaseClient,
+  payload: DistributeRewardsPayload,
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<{ jobId: string | null; error?: string }> {
+  const key = `distribute_rewards:${payload.action}:${payload.dry_run ? "dry" : "live"}`;
+  const result = await enqueueBackgroundJob(supabase, "distribute_rewards", payload, key);
   if (result.jobId) triggerBackgroundWorker(supabaseUrl, serviceKey);
   return result;
 }
