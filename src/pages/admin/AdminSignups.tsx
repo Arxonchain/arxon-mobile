@@ -92,28 +92,6 @@ const AdminSignups = () => {
     refetchOnWindowFocus: true,
   });
 
-  // Real-time subscription for new signups
-  useEffect(() => {
-    const channel = supabase
-      .channel("new-signups-admin")
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "profiles",
-        },
-        () => {
-          setRealtimeSignups((prev) => prev + 1);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, []);
-
   const handleRefresh = () => {
     setRealtimeSignups(0);
     refetch();

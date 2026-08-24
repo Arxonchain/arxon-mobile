@@ -192,21 +192,10 @@ export function useDiceRumbleLobby() {
 
   useEffect(() => {
     if (!user) return;
-    // Note: dice_match_players has no `mode` column to filter on directly, so this leg
-    // necessarily also fires for house/duel player rows — debounced above to avoid
-    // refetch storms when the table is busy.
-    const channel = supabase
-      .channel('dice-rumble-lobby')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dice_matches', filter: 'mode=eq.rumble' }, () => {
-        debouncedRefresh();
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dice_match_players' }, () => {
-        debouncedRefresh();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const interval = setInterval(() => {
+      debouncedRefresh();
+    }, 10_000);
+    return () => clearInterval(interval);
   }, [user, debouncedRefresh]);
 
   const createLobby = useCallback(async (stake: number, maxPlayers: number): Promise<ActionResult> => {

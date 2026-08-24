@@ -1040,7 +1040,7 @@ export const useMining = (options?: UseMiningOptions) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, sessionId]);
+  }, [user]);
 
   // Use refs to track current values for the realtime callback
   const isMiningRef = useRef(isMining);

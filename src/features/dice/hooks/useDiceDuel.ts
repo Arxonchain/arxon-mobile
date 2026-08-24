@@ -182,15 +182,10 @@ export function useDiceDuelLobby() {
 
   useEffect(() => {
     if (!user) return;
-    const channel = supabase
-      .channel('dice-duel-lobby')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'dice_matches', filter: 'mode=eq.duel' }, () => {
-        debouncedRefresh();
-      })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const interval = setInterval(() => {
+      debouncedRefresh();
+    }, 10_000);
+    return () => clearInterval(interval);
   }, [user, debouncedRefresh]);
 
   const createChallenge = useCallback(async (stake: number): Promise<ActionResult> => {

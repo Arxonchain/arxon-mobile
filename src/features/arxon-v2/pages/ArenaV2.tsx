@@ -333,11 +333,8 @@ export default function ArenaV2() {
       setLiveBattles(live.length);
     };
     void fetchLive();
-    const channel = supabase
-      .channel('arena-hub-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_battles' }, () => { void fetchLive(); })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(() => { void fetchLive(); }, 60_000);
+    return () => clearInterval(interval);
   }, []);
 
   const balance = Math.round(points?.total_points ?? (preview ? 34766 : 0));

@@ -209,30 +209,6 @@ const AdminUsers = () => {
   const pageStart = totalCount === 0 ? 0 : page * PAGE_SIZE + 1;
   const pageEnd = Math.min(totalCount, (page + 1) * PAGE_SIZE);
 
-  // Real-time subscription for mining sessions to update active status immediately
-  useEffect(() => {
-    const channel = supabase
-      .channel('admin-mining-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'mining_sessions',
-        },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-          queryClient.invalidateQueries({ queryKey: ['admin-user-session-counts'] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
-
-
   // Fetch detailed user snapshot via admin endpoint
   const { data: userSnapshot, isLoading: loadingSnapshot } = useQuery({
     queryKey: ["admin-user-snapshot", selectedUser?.user_id],

@@ -411,57 +411,18 @@ export const useArenaMarkets = () => {
       }
     };
 
-    // Check every 15s for upcoming → live transitions (realtime handles most updates)
-    const interval = setInterval(checkMarketTransitions, 15000);
-    
+    // Poll for market/leaderboard updates (replaces unfiltered arena_battles /
+    // arena_members / arena_earnings realtime — every vote updated arena_battles
+    // and fanned out to all arena viewers).
+    const interval = setInterval(() => {
+      checkMarketTransitions();
+      fetchMarkets();
+      fetchEarningsLeaderboard();
+      if (user) fetchUserPositions();
+    }, 30_000);
+
     return () => clearInterval(interval);
-  }, [upcomingMarkets, fetchMarkets]);
-
-  // Real-time subscription for market updates and leaderboard
-  useEffect(() => {
-    const channel = supabase
-      .channel('arena-markets-updates')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'arena_battles',
-        },
-        () => {
-          fetchMarkets();
-          fetchEarningsLeaderboard();
-          if (user) fetchUserPositions();
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'arena_members',
-        },
-        () => {
-          fetchEarningsLeaderboard(); // Refresh leaderboard when members change
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'arena_earnings',
-        },
-        () => {
-          fetchEarningsLeaderboard(); // Refresh leaderboard when earnings are distributed
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchMarkets, fetchUserPositions, fetchEarningsLeaderboard, user]);
+  }, [upcomingMarkets, fetchMarkets, fetchEarningsLeaderboard, fetchUserPositions, user]);
 
   return {
     liveMarkets,

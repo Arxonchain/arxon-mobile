@@ -10,7 +10,6 @@ import { usePoints } from '@/hooks/usePoints';
 import { useProfile } from '@/hooks/useProfile';
 import { useMining } from '@/hooks/useMining';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
-import { useRealtimePoints } from '@/hooks/useRealtimePoints';
 import { supabase } from '@/integrations/supabase/client';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { mobileTopPadding } from '@/lib/mobileLayout';
@@ -73,7 +72,6 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   const { profile } = useProfile();
   const mining = useMining({ tickMs: 1000 });
   const { unread: notifUnread } = useInAppNotifications();
-  useRealtimePoints();
 
   const [previewMining, setPreviewMining] = useState(false);
   const [previewEarn, setPreviewEarn] = useState(0);
@@ -224,13 +222,10 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   useEffect(() => { fetchActivityData(); fetchDashBattles(); }, [fetchActivityData, fetchDashBattles]);
 
   useEffect(() => {
-    const channel = supabase
-      .channel('dash-arena-live')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_battles' }, () => {
-        void fetchDashBattles();
-      })
-      .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(() => {
+      void fetchDashBattles();
+    }, 60_000);
+    return () => clearInterval(interval);
   }, [fetchDashBattles]);
 
   useEffect(() => {

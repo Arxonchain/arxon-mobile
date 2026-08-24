@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { cacheGet, cacheSet } from '@/lib/localCache';
@@ -284,14 +284,9 @@ export const useReferrals = (user: User | null) => {
     void fetchReferrals();
   }, [user, fetchReferralCode, fetchReferrals]);
 
-  // Real-time subscription for referrals and mining sessions (for active miners count)
-  // Use a ref for referredIds so new referral data doesn't tear down and
-  // recreate the realtime channel on every single fetch (channel churn).
-  const referredIdsRef = useRef<string[]>([]);
-  useEffect(() => {
-    referredIdsRef.current = referrals.map(r => r.referred_id).filter(Boolean);
-  }, [referrals]);
-
+  // Realtime INSERT on referrals only (filtered). Active-miner counts refresh via
+  // polling — an unfiltered mining_sessions subscription delivered every global
+  // session change to every referrals viewer (major Realtime volume driver).
   useEffect(() => {
     if (!user) return;
 
@@ -309,28 +304,23 @@ export const useReferrals = (user: User | null) => {
           void fetchReferrals();
         }
       )
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'mining_sessions',
-        },
-        (payload) => {
-          // Only refresh if this mining session belongs to one of our referrals
-          const sessionUserId = (payload.new as any)?.user_id || (payload.old as any)?.user_id;
-          const referredIds = referredIdsRef.current;
-          if (referredIds.length === 0 || referredIds.includes(sessionUserId)) {
-            void fetchReferrals();
-          }
-        }
-      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [user, fetchReferrals]);
+
+  // Poll active-miner stats (replaces global mining_sessions realtime fan-out).
+  useEffect(() => {
+    if (!user || referrals.length === 0) return;
+
+    const interval = setInterval(() => {
+      void fetchReferrals();
+    }, 60_000);
+
+    return () => clearInterval(interval);
+  }, [user, referrals.length, fetchReferrals]);
 
   const getReferralLink = () => {
     if (!referralCode) return '';

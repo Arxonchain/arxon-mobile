@@ -70,12 +70,7 @@ const ArenaBattleBanner = () => {
     fetchActiveBattles();
     const interval = setInterval(fetchActiveBattles, 60000);
 
-    const channel = supabase
-      .channel('battle-banner')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'arena_battles' }, fetchActiveBattles)
-      .subscribe();
-
-    return () => { clearInterval(interval); supabase.removeChannel(channel); };
+    return () => { clearInterval(interval); };
   }, []);
 
   useEffect(() => {

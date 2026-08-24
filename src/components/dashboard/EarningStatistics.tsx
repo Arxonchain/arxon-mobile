@@ -163,41 +163,13 @@ const EarningStatistics = memo(() => {
     };
   }, [fetchEarnings, user]);
 
-  // Single consolidated real-time subscription with debounce
+  // Poll earnings chart (replaces four-table realtime bundle on mining_sessions,
+  // daily_checkins, user_tasks, social_submissions).
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase
-      .channel('earnings-all')
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'mining_sessions',
-        filter: `user_id=eq.${user.id}`
-      }, debouncedFetch)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'daily_checkins',
-        filter: `user_id=eq.${user.id}`
-      }, debouncedFetch)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'user_tasks',
-        filter: `user_id=eq.${user.id}`
-      }, debouncedFetch)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'social_submissions',
-        filter: `user_id=eq.${user.id}`
-      }, debouncedFetch)
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    const interval = setInterval(debouncedFetch, 90_000);
+    return () => clearInterval(interval);
   }, [user, debouncedFetch]);
 
   // Memoize computed values

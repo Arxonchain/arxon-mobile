@@ -10,7 +10,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Bell, ChevronRight, Zap, Share2 } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
-import { useRealtimePoints } from '@/hooks/useRealtimePoints';
 import { toast } from '@/hooks/use-toast';
 import arxonLogo from '@/assets/arxon-icon.svg';
 import arxonLogoDark from '@/assets/arxon-icon-dark.svg';
@@ -136,8 +135,6 @@ export default function MobileDashboard() {
   const { isMining, refetch: refetchMining }     = useMiningStatus();
   const MAX_MINING_SECONDS = 8 * 3600;
   const { unread: notifUnread }                  = useInAppNotifications();
-  // ENH-16: Realtime points subscription
-  useRealtimePoints();
   const [todayPts,  setTodayPts]  = useState(0);
   const [weekPts,   setWeekPts]   = useState(0);
   const [liveEarn,  setLiveEarn]  = useState(0);
