@@ -38,6 +38,13 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   ) {
     return "Security check failed or expired. Complete the verification again, then tap Create Account.";
   }
+  if (
+    m.includes("disposable email") ||
+    m.includes("email provider is not allowed") ||
+    m.includes("temporary or disposable")
+  ) {
+    return message;
+  }
   if (m.includes("signups not allowed") || m.includes("signup is disabled") || m.includes("disable_signup")) {
     return "Signups are currently disabled. Please try again later.";
   }

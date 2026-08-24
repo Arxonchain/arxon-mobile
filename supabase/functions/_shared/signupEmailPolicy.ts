@@ -1,5 +1,7 @@
 /**
  * Signup email domain policy — blocks disposable / farm domains observed in production.
+ * Keep in sync with src/lib/auth/signupEmailPolicy.ts and
+ * supabase/migrations/*_block_disposable_signup_emails.sql
  */
 
 /** Exact domains blocked (lowercase). Extend as abuse patterns appear. */
@@ -21,6 +23,11 @@ const BLOCKED_DOMAINS = new Set([
   "fakeinbox.com",
   "trashmail.com",
   "sharklasers.com",
+  "mailnesia.com",
+  "mintemail.com",
+  "temp-mail.org",
+  "emailondeck.com",
+  "discard.email",
   // Observed signup-farm clusters (Arxon production)
   "cico.my.id",
   "theeditai.com",

@@ -1,6 +1,7 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { getEmailConfirmRedirectUrl } from "./getRedirectUrl";
 import { mapAuthError } from "./authErrors";
+import { getSignupEmailRejection } from "./signupEmailPolicy";
 
 type SignUpResult = { error: Error | null; user: User | null };
 
@@ -27,6 +28,11 @@ export async function signUpWithFallback(
   captchaToken?: string
 ): Promise<SignUpResult> {
   const normalizedEmail = email.trim().toLowerCase();
+  const emailReject = getSignupEmailRejection(normalizedEmail);
+  if (emailReject) {
+    return { error: new Error(emailReject), user: null };
+  }
+
   const timeoutMs = 45_000;
   const token = typeof captchaToken === "string" ? captchaToken.trim() : "";
 
@@ -80,6 +86,9 @@ export async function signUpWithFallback(
     if (!data?.success) {
       if (data?.code === "already_registered" || /already exists|already registered/i.test(data?.error || "")) {
         return { error: new Error(ALREADY_REGISTERED), user: null };
+      }
+      if (data?.code === "email_blocked" && data?.error) {
+        return { error: new Error(data.error), user: null };
       }
       const friendly = mapAuthError(data?.error || "Sign up failed", "signup");
       return { error: new Error(friendly), user: null };
