@@ -242,7 +242,7 @@ BEGIN
         bonus_earned = EXCLUDED.bonus_earned,
         pool_share_earned = EXCLUDED.pool_share_earned,
         streak_bonus = EXCLUDED.streak_bonus,
-        total_earned = EXCLUDED.total_reward,
+        total_earned = EXCLUDED.total_earned,
         is_winner = true;
 
     INSERT INTO public.arena_staking_rewards (
