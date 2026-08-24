@@ -14,6 +14,8 @@
     "probe:arena-edges": "node scripts/probe-arena-edges.mjs",
     "probe:arena-resolve": "node scripts/probe-arena-resolve.mjs",
     "resolve:battle": "node scripts/invoke-resolve-battle.mjs",
+    "backfill:arena-battle": "node scripts/backfill-arena-battle.mjs",
+    "backfill:arena-all": "node scripts/backfill-all-mismatched-arena-battles.mjs",
     "probe:edge-auth": "node scripts/probe-edge-auth.mjs",
     "probe:push-auth": "node scripts/probe-push-auth.mjs",
     "loadtest:auth": "powershell -ExecutionPolicy Bypass -File loadtests/k6/run.ps1 auth",

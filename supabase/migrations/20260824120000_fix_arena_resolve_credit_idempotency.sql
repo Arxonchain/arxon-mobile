@@ -310,27 +310,7 @@ WHERE ae.total_earned > 0
       ) > 1
   );
 
--- Backfill battles with payout mismatch (includes Arsenal 0bf8f1a9-9188-418e-bfe4-0f20dab4c7e0).
-DO $$
-DECLARE
-  v_battle_id UUID;
-  v_result jsonb;
-BEGIN
-  FOR v_battle_id IN
-    SELECT b.id
-    FROM public.arena_battles b
-    WHERE b.winner_side IS NOT NULL
-      AND b.winner_side <> 'none'
-      AND ABS(
-        COALESCE(b.total_rewards_distributed, 0) - (
-          SELECT COALESCE(SUM(ae.total_earned), 0)
-          FROM public.arena_earnings ae
-          WHERE ae.battle_id = b.id AND ae.is_winner = true
-        )
-      ) > 1
-  LOOP
-    v_result := public.backfill_undercredited_arena_battle(v_battle_id);
-    RAISE NOTICE 'Arena payout backfill: %', v_result;
-  END LOOP;
-END;
-$$;
+-- Bulk backfill: run outside SQL editor (statement timeout). Examples:
+--   node scripts/backfill-arena-battle.mjs 0bf8f1a9-9188-418e-bfe4-0f20dab4c7e0
+--   node scripts/backfill-all-mismatched-arena-battles.mjs
+-- Or one battle in SQL: SELECT public.backfill_undercredited_arena_battle('<battle_id>'::uuid);
