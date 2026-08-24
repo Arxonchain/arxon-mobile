@@ -8,10 +8,10 @@ COMMENT ON COLUMN public.arena_battles.resolved_push_at IS
 
 -- Battles fully resolved before this deploy already received in-app + FCM.
 UPDATE public.arena_battles
-SET resolved_push_at = COALESCE(resolved_notified_at, outcome_verified_at, updated_at)
+SET resolved_push_at = COALESCE(resolved_notified_at, outcome_verified_at, created_at)
 WHERE winner_side IS NOT NULL
   AND resolved_push_at IS NULL
-  AND COALESCE(resolved_notified_at, outcome_verified_at, updated_at) < date '2026-08-24';
+  AND COALESCE(resolved_notified_at, outcome_verified_at, created_at) < date '2026-08-24';
 
 CREATE OR REPLACE FUNCTION public.claim_arena_battle_resolved_push(p_battle_id uuid)
 RETURNS boolean
