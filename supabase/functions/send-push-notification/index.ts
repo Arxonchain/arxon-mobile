@@ -7,6 +7,53 @@ import {
 
 const corsHeaders = adminCorsHeaders;
 
+type PushSubscriptionRow = {
+  id: string;
+  user_id?: string;
+  fcm_token?: string;
+  endpoint?: string;
+  p256dh: string;
+  auth: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+/** Drop duplicate FCM tokens; for targeted sends keep only the newest device token. */
+function dedupePushSubscriptions(
+  subs: PushSubscriptionRow[],
+  targetedUser = false,
+): PushSubscriptionRow[] {
+  const web: PushSubscriptionRow[] = [];
+  const fcmByToken = new Map<string, PushSubscriptionRow>();
+
+  for (const sub of subs) {
+    const isFCM = !!(sub.fcm_token || sub.endpoint?.startsWith("fcm:"));
+    if (!isFCM) {
+      web.push(sub);
+      continue;
+    }
+    const token = sub.fcm_token || sub.endpoint?.replace("fcm:", "") || "";
+    if (!token) continue;
+    const existing = fcmByToken.get(token);
+    const subTs = String(sub.updated_at || sub.created_at || "");
+    const existingTs = String(existing?.updated_at || existing?.created_at || "");
+    if (!existing || subTs >= existingTs) {
+      fcmByToken.set(token, sub);
+    }
+  }
+
+  let fcmSubs = [...fcmByToken.values()];
+  if (targetedUser && fcmSubs.length > 1) {
+    fcmSubs = fcmSubs
+      .sort((a, b) =>
+        String(b.updated_at || b.created_at || "").localeCompare(String(a.updated_at || a.created_at || ""))
+      )
+      .slice(0, 1);
+  }
+
+  return [...fcmSubs, ...web];
+}
+
 async function generateVapidAuthHeader(
   endpoint: string,
   vapidPublicKey: string,
@@ -118,6 +165,7 @@ async function sendFCMv1(
   data: Record<string, string>,
   projectId: string,
   serviceAccount: Record<string, string>,
+  notificationTag?: string,
 ): Promise<boolean> {
   try {
     const accessToken = await getAccessToken(serviceAccount);
@@ -137,6 +185,7 @@ async function sendFCMv1(
               default_vibrate_timings: true,
               notification_priority: "PRIORITY_HIGH",
               visibility: "PUBLIC",
+              tag: notificationTag || data.tag || "arxon",
             },
           },
           // Ensures the OS shows a tray alert even if the client is force-stopped.
@@ -180,13 +229,7 @@ serve(async (req) => {
 
     // PostgREST defaults to max 1000 rows — paginate so broadcasts reach every device.
     const pageSize = 1000;
-    const subscriptions: Array<{
-      id: string;
-      fcm_token?: string;
-      endpoint?: string;
-      p256dh: string;
-      auth: string;
-    }> = [];
+    const subscriptions: PushSubscriptionRow[] = [];
     for (let from = 0; ; from += pageSize) {
       let query = supabase.from("push_subscriptions").select("*").range(from, from + pageSize - 1);
       if (!broadcast && userId) query = query.eq("user_id", userId);
@@ -194,11 +237,14 @@ serve(async (req) => {
       const { data: page, error } = await query;
       if (error) throw error;
       if (!page?.length) break;
-      subscriptions.push(...page);
+      subscriptions.push(...(page as PushSubscriptionRow[]));
       if (page.length < pageSize) break;
     }
 
-    if (subscriptions.length === 0) {
+    const targetedUser = !broadcast && !!userId;
+    const uniqueSubs = dedupePushSubscriptions(subscriptions, targetedUser);
+
+    if (uniqueSubs.length === 0) {
       return new Response(JSON.stringify({ success: true, sent: 0, message: "No subscriptions found" }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -232,13 +278,7 @@ serve(async (req) => {
       }
     }
 
-    const sendOne = async (sub: {
-      id: string;
-      fcm_token?: string;
-      endpoint?: string;
-      p256dh: string;
-      auth: string;
-    }) => {
+    const sendOne = async (sub: PushSubscriptionRow) => {
       const isFCM = !!(sub.fcm_token || sub.endpoint?.startsWith("fcm:"));
       if (isFCM) {
         const fcmToken = sub.fcm_token || sub.endpoint?.replace("fcm:", "") || "";
@@ -250,6 +290,7 @@ serve(async (req) => {
           dataStrings,
           firebaseProject,
           serviceAccount,
+          tag || dataStrings.tag,
         );
         if (!ok) await supabase.from("push_subscriptions").delete().eq("id", sub.id);
         return ok;
@@ -268,13 +309,13 @@ serve(async (req) => {
     // Chunk to avoid hammering FCM / edge CPU on large broadcasts.
     const chunkSize = 80;
     const results: boolean[] = [];
-    for (let i = 0; i < subscriptions.length; i += chunkSize) {
-      const chunk = subscriptions.slice(i, i + chunkSize);
+    for (let i = 0; i < uniqueSubs.length; i += chunkSize) {
+      const chunk = uniqueSubs.slice(i, i + chunkSize);
       results.push(...(await Promise.all(chunk.map(sendOne))));
     }
 
     const sent = results.filter(Boolean).length;
-    return new Response(JSON.stringify({ success: true, sent, total: subscriptions.length }), {
+    return new Response(JSON.stringify({ success: true, sent, total: uniqueSubs.length }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

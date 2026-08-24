@@ -7,11 +7,19 @@ import {
 } from '@/lib/nativeNotifications';
 
 const recentKeys = new Map<string, number>();
-const DEDUPE_MS = 8_000;
+const DEDUPE_MS = 60_000;
+
+function tagToNotificationId(tag: string): number {
+  let h = 0;
+  for (let i = 0; i < tag.length; i++) {
+    h = ((h << 5) - h + tag.charCodeAt(i)) | 0;
+  }
+  return (Math.abs(h) % 2147483646) + 1;
+}
 
 /**
  * Show a system-tray alert the same way mining reminders do (LocalNotifications).
- * Safe to call from multiple paths — short dedupe prevents double banners.
+ * Safe to call from multiple paths — dedupe by tag/battle prevents double banners.
  */
 export async function showTrayNotification(
   title: string,
@@ -23,7 +31,7 @@ export async function showTrayNotification(
   const dedupeTag = options?.battleId
     ? `${options.tag || 'arxon'}:${options.battleId}`
     : (options?.tag || 'arxon');
-  const key = `${dedupeTag}|${title}|${body}`;
+  const key = options?.battleId ? dedupeTag : `${dedupeTag}|${title}|${body}`;
   const now = Date.now();
   const prev = recentKeys.get(key);
   if (prev && now - prev < DEDUPE_MS) return;
@@ -39,13 +47,13 @@ export async function showTrayNotification(
 
     await ensureArxonNotificationChannel();
 
-    const id = (now % 2147483647) || 1;
+    const id = tagToNotificationId(dedupeTag);
     await LocalNotifications.schedule({
       notifications: [{
         id,
         title,
         body,
-        schedule: { at: new Date(now + 1500), allowWhileIdle: true },
+        schedule: { at: new Date(now + 300), allowWhileIdle: true },
         sound: 'default',
         smallIcon: ARXON_NOTIF_SMALL_ICON,
         largeIcon: ARXON_NOTIF_LARGE_ICON,

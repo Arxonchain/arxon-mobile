@@ -104,9 +104,16 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
       setPermission('granted');
       const currentUser = userRef.current;
       if (!currentUser) return;
+      const endpoint = `fcm:${token.value}`;
+      // Drop stale FCM rows for this user so resolve pushes are not fan-out to old tokens.
+      await supabase.from('push_subscriptions')
+        .delete()
+        .eq('user_id', currentUser.id)
+        .like('endpoint', 'fcm:%')
+        .neq('endpoint', endpoint);
       await supabase.from('push_subscriptions').upsert({
         user_id: currentUser.id,
-        endpoint: `fcm:${token.value}`,
+        endpoint,
         p256dh: token.value,
         auth: Capacitor.getPlatform(),
         fcm_token: token.value,
@@ -127,18 +134,19 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
     // mirror FCM into LocalNotifications (same channel as mining reminders).
     // This is the ONLY tray path for arena_new_battle while the app is open.
     PushNotifications.addListener('pushNotificationReceived', async (notification) => {
+      const tag = String(notification.data?.tag || 'arxon');
+      const battleId = notification.data?.battle_id
+        ? String(notification.data.battle_id)
+        : undefined;
       const title = displayNotificationTitle(
         notification.title || String(notification.data?.title || 'ARXON'),
       );
       const body = displayNotificationMessage(
         notification.body || String(notification.data?.body || 'New notification'),
       );
-      const battleId = notification.data?.battle_id
-        ? String(notification.data.battle_id)
-        : undefined;
       await showNativeLocalNotification(title, body, {
         url: String(notification.data?.url || '/'),
-        tag: String(notification.data?.tag || 'arxon'),
+        tag,
         battleId,
       });
     });

@@ -144,10 +144,31 @@ type PushTarget = {
   body: string;
   tag: string;
   battleId: string;
+  dataType?: "arena_win" | "arena_loss" | "arena_battle_resolved";
 };
 
-function arenaResolvedPushTag(kind: "resolved" | "win" | "loss", battleId: string): string {
-  return `arena-${kind}-${battleId}`;
+/** One FCM tag per battle result — Android replaces instead of stacking duplicates. */
+function arenaResultPushTag(battleId: string): string {
+  return `arena-result-${battleId}`;
+}
+
+function buildArenaResultPush(
+  battle: BattleRow,
+  row: { is_winner: boolean; total_earned: number; stake_amount: number },
+  winSide: string,
+): { title: string; body: string; dataType: "arena_win" | "arena_loss" } {
+  if (row.is_winner) {
+    return {
+      title: "🏆 Arena Victory!",
+      body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}" (${winSide}).`,
+      dataType: "arena_win",
+    };
+  }
+  return {
+    title: "💧 Arena Battle Result",
+    body: `"${battle.title}" settled — winner: ${winSide}. ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
+    dataType: "arena_loss",
+  };
 }
 
 export async function sendPushToUser(
@@ -168,7 +189,7 @@ export async function sendPushToUser(
       body: target.body,
       url: ARENA_URL,
       tag: target.tag,
-      data: { battle_id: target.battleId, type: "arena_battle_resolved" },
+      data: { battle_id: target.battleId, type: target.dataType || "arena_battle_resolved" },
     }),
   });
   const json = await res.json().catch(() => ({}));
@@ -198,38 +219,17 @@ export async function pushArenaResolvedNotifications(
   const winSide = winnerName(battle);
   let pushed = 0;
   const errors: string[] = [];
-  const seen = new Set<string>();
+  const tag = arenaResultPushTag(battle.id);
 
   for (const row of earnings || []) {
-    if (!seen.has(row.user_id)) {
-      seen.add(row.user_id);
-      const resolved = await sendPushToUser(supabaseUrl, serviceKey, {
-        userId: row.user_id,
-        title: "📊 Battle Resolved",
-        body: `"${battle.title}" is settled — winner: ${winSide}.`,
-        tag: arenaResolvedPushTag("resolved", battle.id),
-        battleId: battle.id,
-      });
-      if (resolved.sent > 0) pushed += 1;
-      if (resolved.error) errors.push(resolved.error);
-    }
-
-    const winPush = row.is_winner
-      ? {
-          title: "🏆 You Won!",
-          body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
-          tag: arenaResolvedPushTag("win", battle.id),
-        }
-      : {
-          title: "💧 Battle Result",
-          body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
-          tag: arenaResolvedPushTag("loss", battle.id),
-        };
-
+    const content = buildArenaResultPush(battle, row, winSide);
     const result = await sendPushToUser(supabaseUrl, serviceKey, {
       userId: row.user_id,
-      ...winPush,
+      title: content.title,
+      body: content.body,
+      tag,
       battleId: battle.id,
+      dataType: content.dataType,
     });
     if (result.sent > 0) pushed += 1;
     if (result.error) errors.push(result.error);
@@ -268,38 +268,17 @@ export async function pushArenaResolvedChunk(
   const winSide = winnerName(battle);
   let pushed = 0;
   const errors: string[] = [];
-  const seen = new Set<string>();
+  const tag = arenaResultPushTag(battle.id);
 
   for (const row of rows) {
-    if (!seen.has(row.user_id)) {
-      seen.add(row.user_id);
-      const resolved = await sendPushToUser(supabaseUrl, serviceKey, {
-        userId: row.user_id,
-        title: "📊 Battle Resolved",
-        body: `"${battle.title}" is settled — winner: ${winSide}.`,
-        tag: arenaResolvedPushTag("resolved", battle.id),
-        battleId: battle.id,
-      });
-      if (resolved.sent > 0) pushed += 1;
-      if (resolved.error) errors.push(resolved.error);
-    }
-
-    const winPush = row.is_winner
-      ? {
-          title: "🏆 You Won!",
-          body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
-          tag: arenaResolvedPushTag("win", battle.id),
-        }
-      : {
-          title: "💧 Battle Result",
-          body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
-          tag: arenaResolvedPushTag("loss", battle.id),
-        };
-
+    const content = buildArenaResultPush(battle, row, winSide);
     const result = await sendPushToUser(supabaseUrl, serviceKey, {
       userId: row.user_id,
-      ...winPush,
+      title: content.title,
+      body: content.body,
+      tag,
       battleId: battle.id,
+      dataType: content.dataType,
     });
     if (result.sent > 0) pushed += 1;
     if (result.error) errors.push(result.error);
