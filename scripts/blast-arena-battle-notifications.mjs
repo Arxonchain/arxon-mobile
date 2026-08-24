@@ -191,7 +191,7 @@ async function main() {
       targets.push({
         title: '📊 Battle Resolved',
         body: `"${battle.title}" is settled — winner: ${winSide}.`,
-        tag: 'arena-resolved',
+        tag: `arena-resolved-${battleId}`,
       });
     }
 
@@ -199,12 +199,12 @@ async function main() {
       ? {
           title: '🏆 You Won!',
           body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
-          tag: 'arena-win',
+          tag: `arena-win-${battleId}`,
         }
       : {
           title: '💧 Battle Result',
           body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
-          tag: 'arena-loss',
+          tag: `arena-loss-${battleId}`,
         });
 
     for (const t of targets) {
@@ -217,6 +217,7 @@ async function main() {
           body: t.body,
           url: '/arena/prediction-market',
           tag: t.tag,
+          data: { battle_id: battleId, type: 'arena_battle_resolved' },
         }),
       });
       const json = res.ok ? await res.json() : { error: await res.text() };

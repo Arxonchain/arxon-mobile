@@ -57,7 +57,7 @@ function navigateFromPush(url: string) {
 async function showNativeLocalNotification(
   title: string,
   body: string,
-  options?: { url?: string; tag?: string },
+  options?: { url?: string; tag?: string; battleId?: string },
 ) {
   await showTrayNotification(title, body, options);
 }
@@ -133,9 +133,13 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
       const body = displayNotificationMessage(
         notification.body || String(notification.data?.body || 'New notification'),
       );
+      const battleId = notification.data?.battle_id
+        ? String(notification.data.battle_id)
+        : undefined;
       await showNativeLocalNotification(title, body, {
         url: String(notification.data?.url || '/'),
         tag: String(notification.data?.tag || 'arxon'),
+        battleId,
       });
     });
   }, [listen, isNative]);

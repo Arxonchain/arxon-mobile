@@ -49,6 +49,7 @@ serve(async (req) => {
       supabaseUrl,
       serviceKey,
       push: body.push !== false,
+      forcePush: body.force === true,
     });
 
     return new Response(JSON.stringify({ ok: true, battle_id: battleId, ...result }), {

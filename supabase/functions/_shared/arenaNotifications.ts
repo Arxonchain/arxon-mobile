@@ -138,7 +138,17 @@ export async function notifyArenaParticipantsResolved(
   };
 }
 
-type PushTarget = { userId: string; title: string; body: string; tag: string };
+type PushTarget = {
+  userId: string;
+  title: string;
+  body: string;
+  tag: string;
+  battleId: string;
+};
+
+function arenaResolvedPushTag(kind: "resolved" | "win" | "loss", battleId: string): string {
+  return `arena-${kind}-${battleId}`;
+}
 
 export async function sendPushToUser(
   supabaseUrl: string,
@@ -158,6 +168,7 @@ export async function sendPushToUser(
       body: target.body,
       url: ARENA_URL,
       tag: target.tag,
+      data: { battle_id: target.battleId, type: "arena_battle_resolved" },
     }),
   });
   const json = await res.json().catch(() => ({}));
@@ -172,7 +183,13 @@ export async function pushArenaResolvedNotifications(
   battle: BattleRow,
   serviceKey: string,
   supabaseUrl: string,
-): Promise<{ pushed: number; attempted: number; errors: string[] }> {
+  options?: { forcePush?: boolean },
+): Promise<{ pushed: number; attempted: number; errors: string[]; skipped?: boolean }> {
+  const claimed = await claimArenaResolvedPush(supabase, battle.id, options?.forcePush === true);
+  if (!claimed) {
+    return { pushed: 0, attempted: 0, errors: [], skipped: true };
+  }
+
   const { data: earnings } = await supabase
     .from("arena_earnings")
     .select("user_id, is_winner, total_earned, stake_amount")
@@ -190,7 +207,8 @@ export async function pushArenaResolvedNotifications(
         userId: row.user_id,
         title: "📊 Battle Resolved",
         body: `"${battle.title}" is settled — winner: ${winSide}.`,
-        tag: "arena-resolved",
+        tag: arenaResolvedPushTag("resolved", battle.id),
+        battleId: battle.id,
       });
       if (resolved.sent > 0) pushed += 1;
       if (resolved.error) errors.push(resolved.error);
@@ -200,17 +218,18 @@ export async function pushArenaResolvedNotifications(
       ? {
           title: "🏆 You Won!",
           body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
-          tag: "arena-win",
+          tag: arenaResolvedPushTag("win", battle.id),
         }
       : {
           title: "💧 Battle Result",
           body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
-          tag: "arena-loss",
+          tag: arenaResolvedPushTag("loss", battle.id),
         };
 
     const result = await sendPushToUser(supabaseUrl, serviceKey, {
       userId: row.user_id,
       ...winPush,
+      battleId: battle.id,
     });
     if (result.sent > 0) pushed += 1;
     if (result.error) errors.push(result.error);
@@ -227,7 +246,15 @@ export async function pushArenaResolvedChunk(
   supabaseUrl: string,
   offset = 0,
   limit = 25,
-): Promise<{ pushed: number; processed: number; hasMore: boolean; errors: string[] }> {
+  options?: { forcePush?: boolean },
+): Promise<{ pushed: number; processed: number; hasMore: boolean; errors: string[]; skipped?: boolean }> {
+  if (offset === 0) {
+    const claimed = await claimArenaResolvedPush(supabase, battle.id, options?.forcePush === true);
+    if (!claimed) {
+      return { pushed: 0, processed: 0, hasMore: false, errors: [], skipped: true };
+    }
+  }
+
   const { data: earnings, error } = await supabase
     .from("arena_earnings")
     .select("user_id, is_winner, total_earned, stake_amount")
@@ -250,7 +277,8 @@ export async function pushArenaResolvedChunk(
         userId: row.user_id,
         title: "📊 Battle Resolved",
         body: `"${battle.title}" is settled — winner: ${winSide}.`,
-        tag: "arena-resolved",
+        tag: arenaResolvedPushTag("resolved", battle.id),
+        battleId: battle.id,
       });
       if (resolved.sent > 0) pushed += 1;
       if (resolved.error) errors.push(resolved.error);
@@ -260,17 +288,18 @@ export async function pushArenaResolvedChunk(
       ? {
           title: "🏆 You Won!",
           body: `You won ${Number(row.total_earned).toLocaleString()} ARX-P in "${battle.title}"!`,
-          tag: "arena-win",
+          tag: arenaResolvedPushTag("win", battle.id),
         }
       : {
           title: "💧 Battle Result",
           body: `"${battle.title}" — ${Number(row.stake_amount).toLocaleString()} ARX-P stake was not returned.`,
-          tag: "arena-loss",
+          tag: arenaResolvedPushTag("loss", battle.id),
         };
 
     const result = await sendPushToUser(supabaseUrl, serviceKey, {
       userId: row.user_id,
       ...winPush,
+      battleId: battle.id,
     });
     if (result.sent > 0) pushed += 1;
     if (result.error) errors.push(result.error);
@@ -306,8 +335,8 @@ export async function pushArenaNotifications(
 export async function notifyArenaBattleResolved(
   supabase: SupabaseClient,
   battle: BattleRow,
-  options: { supabaseUrl: string; serviceKey: string; push?: boolean },
-): Promise<{ inApp: unknown; push?: { pushed: number; attempted: number; errors: string[] } }> {
+  options: { supabaseUrl: string; serviceKey: string; push?: boolean; forcePush?: boolean },
+): Promise<{ inApp: unknown; push?: { pushed: number; attempted: number; errors: string[]; skipped?: boolean } }> {
   const rpc = await blastArenaBattleNotifications(supabase, battle.id);
   let inApp: unknown = rpc.detail;
   if (!rpc.ok && rpc.error?.includes("Could not find the function")) {
@@ -316,13 +345,14 @@ export async function notifyArenaBattleResolved(
     throw new Error(rpc.error || "notify failed");
   }
 
-  let push: { pushed: number; attempted: number; errors: string[] } | undefined;
+  let push: { pushed: number; attempted: number; errors: string[]; skipped?: boolean } | undefined;
   if (options.push !== false) {
     push = await pushArenaResolvedNotifications(
       supabase,
       battle,
       options.serviceKey,
       options.supabaseUrl,
+      { forcePush: options.forcePush === true },
     );
   }
   return { inApp, push };
@@ -331,8 +361,8 @@ export async function notifyArenaBattleResolved(
 export async function blastArenaBattleWithPush(
   supabase: SupabaseClient,
   battleId: string,
-  options: { supabaseUrl: string; serviceKey: string; push?: boolean },
-): Promise<{ inApp: unknown; push?: { pushed: number; attempted: number; errors: string[] } }> {
+  options: { supabaseUrl: string; serviceKey: string; push?: boolean; forcePush?: boolean },
+): Promise<{ inApp: unknown; push?: { pushed: number; attempted: number; errors: string[]; skipped?: boolean } }> {
   const { data: battle, error } = await supabase
     .from("arena_battles")
     .select("id, title, winner_side, side_a_name, side_b_name, side_c_name")
@@ -423,5 +453,39 @@ export async function claimArenaCreatedPush(
     .update({ created_push_at: new Date().toISOString() })
     .eq("id", battleId)
     .is("created_push_at", null);
+  return !updErr;
+}
+
+/** Claim the single FCM resolved-push slot per battle (stale job safe). */
+export async function claimArenaResolvedPush(
+  supabase: SupabaseClient,
+  battleId: string,
+  force = false,
+): Promise<boolean> {
+  if (force) {
+    await supabase
+      .from("arena_battles")
+      .update({ resolved_push_at: new Date().toISOString() })
+      .eq("id", battleId);
+    return true;
+  }
+
+  const { data, error } = await supabase.rpc("claim_arena_battle_resolved_push", {
+    p_battle_id: battleId,
+  });
+  if (!error && typeof data === "boolean") return data;
+
+  const { data: row } = await supabase
+    .from("arena_battles")
+    .select("resolved_push_at")
+    .eq("id", battleId)
+    .maybeSingle();
+  if (row?.resolved_push_at) return false;
+
+  const { error: updErr } = await supabase
+    .from("arena_battles")
+    .update({ resolved_push_at: new Date().toISOString() })
+    .eq("id", battleId)
+    .is("resolved_push_at", null);
   return !updErr;
 }

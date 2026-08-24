@@ -16,21 +16,17 @@ const DEDUPE_MS = 8_000;
 export async function showTrayNotification(
   title: string,
   body: string,
-  options?: { url?: string; tag?: string },
+  options?: { url?: string; tag?: string; battleId?: string },
 ) {
   if (!isLocalNotificationsAvailable()) return;
 
-  const key = `${options?.tag || 'arxon'}|${title}|${body}`;
+  const dedupeTag = options?.battleId
+    ? `${options.tag || 'arxon'}:${options.battleId}`
+    : (options?.tag || 'arxon');
+  const key = `${dedupeTag}|${title}|${body}`;
   const now = Date.now();
   const prev = recentKeys.get(key);
   if (prev && now - prev < DEDUPE_MS) return;
-  // Collapse same tag within window (title/body can differ slightly between FCM paths).
-  const tagOnly = options?.tag;
-  if (tagOnly && tagOnly !== 'arxon') {
-    for (const [k, t] of recentKeys) {
-      if (k.startsWith(`${tagOnly}|`) && now - t < DEDUPE_MS) return;
-    }
-  }
   recentKeys.set(key, now);
   for (const [k, t] of recentKeys) {
     if (now - t > DEDUPE_MS) recentKeys.delete(k);
@@ -57,6 +53,7 @@ export async function showTrayNotification(
         extra: {
           url: options?.url || '/arena/prediction-market',
           tag: options?.tag || 'arxon',
+          battle_id: options?.battleId,
         },
       }],
     });

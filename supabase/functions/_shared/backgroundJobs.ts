@@ -26,6 +26,7 @@ export type ArenaPushBlastPayload = {
   battle_id: string;
   offset?: number;
   limit?: number;
+  force?: boolean;
 };
 
 export async function enqueueBackgroundJob(

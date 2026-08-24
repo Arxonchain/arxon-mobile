@@ -100,6 +100,7 @@ serve(async (req) => {
         supabaseUrl,
         serviceKey: supabaseServiceKey,
         push: body.push !== false,
+        forcePush: body.force === true,
       });
       return new Response(JSON.stringify({ message: "Arena notifications blasted", battleId, notif }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

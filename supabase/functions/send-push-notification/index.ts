@@ -216,6 +216,11 @@ serve(async (req) => {
       tag: tag || "arxon",
       title: title || "ARXON",
       body: body || "New notification",
+      ...(data && typeof data === "object"
+        ? Object.fromEntries(
+            Object.entries(data as Record<string, unknown>).map(([k, v]) => [k, String(v)]),
+          )
+        : {}),
     };
 
     let serviceAccount: Record<string, string> | null = null;

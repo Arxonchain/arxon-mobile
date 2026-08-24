@@ -71,11 +71,12 @@ async function processArenaPushBlast(
   supabase: SupabaseClient,
   supabaseUrl: string,
   serviceKey: string,
-  payload: ArenaPushBlastPayload,
+  payload: ArenaPushBlastPayload & { force?: boolean },
 ): Promise<unknown> {
   const battleId = payload.battle_id;
   const offset = Number(payload.offset) || 0;
   const limit = Number(payload.limit) || 25;
+  const forcePush = payload.force === true;
 
   const { data: battle, error } = await supabase
     .from("arena_battles")
@@ -85,6 +86,10 @@ async function processArenaPushBlast(
 
   if (error || !battle?.winner_side) {
     throw new Error(error?.message || "battle_not_resolved");
+  }
+
+  if (battle.id !== battleId) {
+    throw new Error("battle_id_mismatch");
   }
 
   if (offset === 0) {
@@ -101,7 +106,12 @@ async function processArenaPushBlast(
     supabaseUrl,
     offset,
     limit,
+    { forcePush },
   );
+
+  if (push.skipped) {
+    return { inApp: offset === 0, push, skipped: true, reason: "resolved_push_already_sent" };
+  }
 
   if (push.hasMore) {
     await enqueueArenaPushBlastJob(
