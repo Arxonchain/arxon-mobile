@@ -148,22 +148,23 @@ BEGIN
   FOR r IN
     SELECT
       av.user_id,
-      av.power_spent,
-      COALESCE(av.early_stake_multiplier, 1.0) AS early_stake_multiplier,
-      COALESCE(am.current_win_streak, 0) AS current_win_streak
+      SUM(av.power_spent) AS power_spent,
+      SUM(av.power_spent * COALESCE(av.early_stake_multiplier, 1.0)) AS weight,
+      COALESCE(MAX(am.current_win_streak), 0) AS current_win_streak
     FROM public.arena_votes av
     LEFT JOIN public.arena_members am ON am.user_id = av.user_id
     WHERE av.battle_id = p_battle_id AND av.side = v_battle.winner_side
-    ORDER BY av.power_spent DESC, av.created_at ASC
+    GROUP BY av.user_id
+    ORDER BY SUM(av.power_spent) DESC
   LOOP
     INSERT INTO _arena_bf_payout (user_id, power_spent, weight, current_streak)
     VALUES (
       r.user_id,
       r.power_spent,
-      r.power_spent * r.early_stake_multiplier,
+      r.weight,
       r.current_win_streak + 1
     );
-    v_total_weight := v_total_weight + (r.power_spent * r.early_stake_multiplier);
+    v_total_weight := v_total_weight + r.weight;
   END LOOP;
 
   IF v_total_weight <= 0 THEN
