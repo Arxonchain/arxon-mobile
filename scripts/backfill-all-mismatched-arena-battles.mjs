@@ -48,7 +48,7 @@ for (const b of battles) {
   const rows = await sumRes.json();
   const sum = rows.reduce((s, r) => s + Number(r.total_earned || 0), 0);
   const expected = Number(b.total_rewards_distributed || 0);
-  if (Math.abs(expected - sum) > 1) {
+  if (Math.abs(expected - sum) > 1 && expected > sum) {
     mismatched.push({ ...b, sum_earned: sum, gap: expected - sum });
   }
 }

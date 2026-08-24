@@ -181,7 +181,8 @@ BEGIN
             WHEN p.current_streak >= 3 THEN 0.25
             ELSE 0
           END
-      );
+      )
+  WHERE p.user_id IS NOT NULL;
 
   SELECT COALESCE(SUM(base_reward), 0), COALESCE(SUM(desired_streak), 0)
   INTO v_sum_base, v_sum_desired_streak
@@ -192,9 +193,10 @@ BEGIN
     v_streak_scale := LEAST(1.0, v_leftover / v_sum_desired_streak);
   END IF;
 
-  UPDATE _arena_bf_payout
-  SET streak_bonus = FLOOR(desired_streak * v_streak_scale),
-      total_reward = base_reward + FLOOR(desired_streak * v_streak_scale);
+  UPDATE _arena_bf_payout p
+  SET streak_bonus = FLOOR(p.desired_streak * v_streak_scale),
+      total_reward = p.base_reward + FLOOR(p.desired_streak * v_streak_scale)
+  WHERE p.user_id IS NOT NULL;
 
   SELECT COALESCE(SUM(total_reward), 0) INTO v_total_distributed FROM _arena_bf_payout;
 
