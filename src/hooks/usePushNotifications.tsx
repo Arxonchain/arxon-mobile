@@ -5,7 +5,6 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { dispatchAppNavigate } from '@/lib/nativeNavigation';
 import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
-import { formatPointsDisplay } from '@/lib/formatPoints';
 import { showTrayNotification } from '@/lib/showTrayNotification';
 
 const NOTIFICATION_PREFS_KEY = 'arxon_notification_preferences';
@@ -258,8 +257,7 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
     if (!user) return;
     const safeTitle = displayNotificationTitle(title);
     const safeBody = displayNotificationMessage(body);
-    const showForegroundBanner =
-      isNative && (document.visibilityState === 'visible' || !document.hidden);
+    const tag = options?.tag || 'arxon';
 
     try {
       await supabase.functions.invoke('send-push-notification', {
@@ -268,18 +266,15 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
           title: safeTitle,
           body: safeBody,
           url: options?.url || '/',
-          tag: options?.tag || 'arxon',
+          tag,
         },
       });
     } catch (e) {
       console.warn('[Push] sendServerPush edge unavailable:', e);
     }
 
-    // Always show a native banner while the app is open — FCM is often silent in foreground
-    if (showForegroundBanner) {
-      await showNativeLocalNotification(safeTitle, safeBody);
-    }
-  }, [user, isNative]);
+    // Native foreground tray is mirrored once in pushNotificationReceived — do not duplicate here.
+  }, [user]);
 
   useEffect(() => {
     if (!listen || !user || !preferences.adminAnnouncements) return;
@@ -362,64 +357,22 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
         const data = (n as { data?: { url?: string } }).data;
         const navUrl = data?.url || '/arena';
 
-        // New battle: server FCM is the single push. Foreground tray comes only from
-        // pushNotificationReceived — do not LocalNotifications here (was triple-firing).
+        // Server-managed arena types: backend FCM is the only tray path (mirrored in
+        // pushNotificationReceived while foreground). Realtime here is in-app history only.
         if (type === 'arena_new_battle' && preferences.arenaLive) {
           // in-app neon toast is handled by V2NotificationPopup
         } else if (type === 'arena_battle_end' && preferences.arenaLive) {
-          if (isNative) {
-            await showNativeLocalNotification(
-              displayNotificationTitle(n.title || '⏱️ Arena Battle Ended'),
-              displayNotificationMessage(n.message || 'Staking closed — results coming soon.'),
-              { url: navUrl, tag: 'arena-ended' },
-            );
-          }
+          // No backend FCM for battle end — client sends once via edge function.
           await sendServerPush(
             displayNotificationTitle(n.title || '⏱️ Arena Battle Ended'),
             displayNotificationMessage(n.message || 'Staking closed — results coming soon.'),
             { url: navUrl, tag: 'arena-ended' },
           );
-        } else if ((type === 'arena_battle_resolved' || type === 'arena_resolved') && preferences.arenaResults) {
-          if (isNative) {
-            await showNativeLocalNotification(
-              displayNotificationTitle(n.title || '📊 Battle Resolved'),
-              displayNotificationMessage(n.message || 'Arena results are in — tap to view.'),
-              { url: navUrl, tag: 'arena-resolved' },
-            );
-          }
-          await sendServerPush(
-            displayNotificationTitle(n.title || '📊 Battle Resolved'),
-            displayNotificationMessage(n.message || 'Arena results are in — tap to view.'),
-            { url: navUrl, tag: 'arena-resolved' },
-          );
-        } else if ((type === 'arena_win' || type === 'arena_loss') && preferences.arenaResults) {
-          if (type === 'arena_win') {
-            if (isNative) {
-              await showNativeLocalNotification(
-                displayNotificationTitle(n.title || '🏆 You Won!'),
-                displayNotificationMessage(n.message || `You won ${formatPointsDisplay(n.amount)} ARX-P!`),
-                { url: navUrl, tag: 'arena-win' },
-              );
-            }
-            await sendServerPush(
-              displayNotificationTitle(n.title || '🏆 You Won!'),
-              displayNotificationMessage(n.message || `You won ${formatPointsDisplay(n.amount)} ARX-P!`),
-              { url: navUrl, tag: 'arena-win' },
-            );
-          } else {
-            if (isNative) {
-              await showNativeLocalNotification(
-                displayNotificationTitle(n.title || '💧 Battle Result'),
-                displayNotificationMessage(n.message || `Your team lost. ${formatPointsDisplay(Math.abs(n.amount || 0))} ARX-P stake was not returned.`),
-                { url: navUrl, tag: 'arena-loss' },
-              );
-            }
-            await sendServerPush(
-              displayNotificationTitle(n.title || '💧 Battle Result'),
-              displayNotificationMessage(n.message || `Your team lost. ${formatPointsDisplay(Math.abs(n.amount || 0))} ARX-P stake was not returned.`),
-              { url: navUrl, tag: 'arena-loss' },
-            );
-          }
+        } else if (
+          (type === 'arena_battle_resolved' || type === 'arena_resolved' || type === 'arena_win' || type === 'arena_loss')
+          && (preferences.arenaResults || preferences.arenaLive)
+        ) {
+          // Backend resolve flow already sends FCM — skip client push/tray.
         } else if (type === 'announcement' && preferences.adminAnnouncements) {
           await sendServerPush(
             '📢 ' + (n.title || 'Arxon Announcement'),
@@ -435,7 +388,7 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
         }
       }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [listen, user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush, isNative]);
+  }, [listen, user, preferences.arenaLive, preferences.arenaResults, preferences.adminAnnouncements, preferences.rewardUpdates, sendServerPush]);
 
   const updatePreferences = useCallback((newPrefs: NotificationPreferences) => {
     const normalized = normalizePrefs(newPrefs as unknown as Record<string, unknown>);

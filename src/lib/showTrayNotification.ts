@@ -24,9 +24,9 @@ export async function showTrayNotification(
   const now = Date.now();
   const prev = recentKeys.get(key);
   if (prev && now - prev < DEDUPE_MS) return;
-  // Also collapse same arena-live battle tag within window (title/body can differ slightly).
+  // Collapse same tag within window (title/body can differ slightly between FCM paths).
   const tagOnly = options?.tag;
-  if (tagOnly?.startsWith('arena-live')) {
+  if (tagOnly && tagOnly !== 'arxon') {
     for (const [k, t] of recentKeys) {
       if (k.startsWith(`${tagOnly}|`) && now - t < DEDUPE_MS) return;
     }
