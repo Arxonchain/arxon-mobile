@@ -257,6 +257,7 @@ export type Database = {
           created_at: string
           id: string
           is_winner: boolean
+          points_credited_amount: number
           pool_share_earned: number
           stake_amount: number
           streak_bonus: number
@@ -269,6 +270,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_winner?: boolean
+          points_credited_amount?: number
           pool_share_earned?: number
           stake_amount?: number
           streak_bonus?: number
@@ -281,6 +283,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_winner?: boolean
+          points_credited_amount?: number
           pool_share_earned?: number
           stake_amount?: number
           streak_bonus?: number
@@ -1498,6 +1501,14 @@ export type Database = {
       }
       calculate_streak_bonus: { Args: { win_streak: number }; Returns: number }
       claim_nexus_reward: { Args: { p_transaction_id: string }; Returns: Json }
+      credit_arena_battle_earnings: {
+        Args: { p_battle_id: string; p_total_earned: number; p_user_id: string }
+        Returns: number
+      }
+      backfill_undercredited_arena_battle: {
+        Args: { p_battle_id: string }
+        Returns: Json
+      }
       generate_nexus_address: { Args: { p_username: string }; Returns: string }
       generate_referral_code: { Args: never; Returns: string }
       get_arena_analytics: { Args: never; Returns: Json }

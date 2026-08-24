@@ -285,7 +285,7 @@ export async function runArenaBattleResolve(
           }, { onConflict: "battle_id,user_id", ignoreDuplicates: true });
           if (stakeErr) throw new Error(`Staking reward insert failed: ${stakeErr.message}`);
 
-          const { data: earnRow, error: earnErr } = await supabase.from("arena_earnings").upsert({
+          const { error: earnErr } = await supabase.from("arena_earnings").upsert({
             battle_id: battle.id,
             user_id: vote.user_id,
             stake_amount: vote.power_spent,
@@ -294,30 +294,26 @@ export async function runArenaBattleResolve(
             streak_bonus: streakBonus,
             total_earned: totalReward,
             is_winner: true,
-          }, { onConflict: "battle_id,user_id", ignoreDuplicates: true }).select("id").maybeSingle();
+          }, { onConflict: "battle_id,user_id" });
           if (earnErr) throw new Error(`Earnings insert failed: ${earnErr.message}`);
 
-          if (earnRow) {
-            if (memberData) {
-              const { error: memberErr } = await supabase.from("arena_members").update({
-                current_win_streak: currentStreak,
-                best_win_streak: bestStreak,
-                total_wins: (memberData.total_wins || 0) + 1,
-              }).eq("user_id", vote.user_id);
-              if (memberErr) throw new Error(`Member update failed: ${memberErr.message}`);
-            }
+          const { data: creditedAmount, error: creditErr } = await supabase.rpc(
+            "credit_arena_battle_earnings",
+            {
+              p_battle_id: battle.id,
+              p_user_id: vote.user_id,
+              p_total_earned: totalReward,
+            },
+          );
+          if (creditErr) throw new Error(`Points credit failed: ${creditErr.message}`);
 
-            let remainingReward = totalReward;
-            while (remainingReward > 0) {
-              const increment = Math.min(remainingReward, 500);
-              const { error: rpcErr } = await supabase.rpc("increment_user_points", {
-                p_user_id: vote.user_id,
-                p_amount: increment,
-                p_type: "arena",
-              });
-              if (rpcErr) throw new Error(`Points credit failed: ${rpcErr.message}`);
-              remainingReward -= increment;
-            }
+          if (Number(creditedAmount) > 0 && memberData) {
+            const { error: memberErr } = await supabase.from("arena_members").update({
+              current_win_streak: currentStreak,
+              best_win_streak: bestStreak,
+              total_wins: (memberData.total_wins || 0) + 1,
+            }).eq("user_id", vote.user_id);
+            if (memberErr) throw new Error(`Member update failed: ${memberErr.message}`);
           }
 
           const streakText = currentStreak >= 3 ? ` 🔥 ${currentStreak}-Win Streak!` : "";
