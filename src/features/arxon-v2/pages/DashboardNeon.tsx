@@ -13,6 +13,7 @@ import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { supabase } from '@/integrations/supabase/client';
 import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { mobileTopPadding } from '@/lib/mobileLayout';
+import { formatPointsDisplay } from '@/lib/formatPoints';
 import { DashboardActivityCarousel } from '@/components/mobile/DashboardActivityCarousel';
 import MobileRewardAlerts from '@/components/mobile/MobileRewardAlerts';
 import {
@@ -177,7 +178,7 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
         kind,
         label: row.description || ACTIVITY_FALLBACK_LABEL[kind],
         sub: relTime(row.created_at),
-        val: `${isCredit ? '+' : ''}${Math.round(amount).toLocaleString()}`,
+        val: `${isCredit ? '+' : ''}${formatPointsDisplay(Math.round(amount))}`,
         accent: activityAccent(kind, isCredit),
         time: row.created_at,
         isCredit,

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, Trophy, X } from 'lucide-react';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
+import { formatPointsDisplay } from '@/lib/formatPoints';
 
 /** Compact reward/arena alerts for the mobile dashboard (web RewardNotifications equivalent). */
 export default function MobileRewardAlerts() {
@@ -59,12 +60,12 @@ export default function MobileRewardAlerts() {
                   {n.amount && n.amount > 0 && (
                     <p style={{ fontSize: 13, fontWeight: 800, marginTop: 4,
                       color: isRumble ? 'hsl(38 55% 58%)' : 'hsl(215 35% 72%)' }}>
-                      +{n.amount.toLocaleString()} ARX-P
+                      +{formatPointsDisplay(n.amount)} ARX-P
                     </p>
                   )}
                   {n.amount && n.amount < 0 && (
                     <p style={{ fontSize: 13, fontWeight: 800, marginTop: 4, color: 'hsl(215 14% 50%)' }}>
-                      {n.amount.toLocaleString()} ARX-P stake
+                      {formatPointsDisplay(n.amount)} ARX-P stake
                     </p>
                   )}
                 </div>

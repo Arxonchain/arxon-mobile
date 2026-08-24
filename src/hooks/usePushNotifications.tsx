@@ -5,6 +5,7 @@ import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { dispatchAppNavigate } from '@/lib/nativeNavigation';
 import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
+import { formatPointsDisplay } from '@/lib/formatPoints';
 import { showTrayNotification } from '@/lib/showTrayNotification';
 
 const NOTIFICATION_PREFS_KEY = 'arxon_notification_preferences';
@@ -396,26 +397,26 @@ export const usePushNotifications = (options?: { listen?: boolean }) => {
             if (isNative) {
               await showNativeLocalNotification(
                 displayNotificationTitle(n.title || '🏆 You Won!'),
-                displayNotificationMessage(n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`),
+                displayNotificationMessage(n.message || `You won ${formatPointsDisplay(n.amount)} ARX-P!`),
                 { url: navUrl, tag: 'arena-win' },
               );
             }
             await sendServerPush(
               displayNotificationTitle(n.title || '🏆 You Won!'),
-              displayNotificationMessage(n.message || `You won ${n.amount?.toLocaleString() || ''} ARX-P!`),
+              displayNotificationMessage(n.message || `You won ${formatPointsDisplay(n.amount)} ARX-P!`),
               { url: navUrl, tag: 'arena-win' },
             );
           } else {
             if (isNative) {
               await showNativeLocalNotification(
                 displayNotificationTitle(n.title || '💧 Battle Result'),
-                displayNotificationMessage(n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`),
+                displayNotificationMessage(n.message || `Your team lost. ${formatPointsDisplay(Math.abs(n.amount || 0))} ARX-P stake was not returned.`),
                 { url: navUrl, tag: 'arena-loss' },
               );
             }
             await sendServerPush(
               displayNotificationTitle(n.title || '💧 Battle Result'),
-              displayNotificationMessage(n.message || `Your team lost. ${Math.abs(n.amount || 0).toLocaleString()} ARX-P stake was not returned.`),
+              displayNotificationMessage(n.message || `Your team lost. ${formatPointsDisplay(Math.abs(n.amount || 0))} ARX-P stake was not returned.`),
               { url: navUrl, tag: 'arena-loss' },
             );
           }

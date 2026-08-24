@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, Trophy, X, Bell } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { formatPointsDisplay } from '@/lib/formatPoints';
 
 interface Notification {
   id: string;
@@ -116,7 +117,7 @@ const RewardNotifications = () => {
                   <p className={`text-sm font-bold mt-1 ${
                     notif.notification_type === 'rumble_reward' ? 'text-amber-500' : 'text-primary'
                   }`}>
-                    +{notif.amount.toLocaleString()} ARX-P
+                    +{formatPointsDisplay(notif.amount)} ARX-P
                   </p>
                 )}
               </div>
