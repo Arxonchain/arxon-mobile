@@ -133,6 +133,7 @@ BEGIN
                 + COALESCE(v_battle.side_b_power, 0)
                 + COALESCE(v_battle.side_c_power, 0);
 
+  DROP TABLE IF EXISTS _arena_bf_payout;
   CREATE TEMP TABLE _arena_bf_payout (
     user_id UUID PRIMARY KEY,
     power_spent NUMERIC NOT NULL,
@@ -143,7 +144,6 @@ BEGIN
     streak_bonus NUMERIC NOT NULL DEFAULT 0,
     total_reward NUMERIC NOT NULL DEFAULT 0
   ) ON COMMIT DROP;
-  DELETE FROM _arena_bf_payout;
 
   FOR r IN
     SELECT
