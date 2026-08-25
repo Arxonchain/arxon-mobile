@@ -2,4 +2,5 @@
 <resources>
     <color name="notification_accent">#7C93C3</color>
     <color name="arxon_primary">#7C93C3</color>
+    <color name="arxon_webview_bg">#02060e</color>
 </resources>

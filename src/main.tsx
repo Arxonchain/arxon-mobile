@@ -3,31 +3,60 @@ import "./index.css";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { Capacitor } from "@capacitor/core";
 import { ensureArxonNotificationChannel } from "@/lib/nativeNotifications";
+import { markBootFailed } from "@/lib/bootState";
+import AppLoadFailureScreen from "@/components/system/AppLoadFailureScreen";
+import type { LoadFailureKind } from "@/components/system/failureCatalog";
+
+const SLOW_LOAD_MS = 2800;
+
+function inferLoadFailureKind(message: string): LoadFailureKind {
+  const m = message.toLowerCase();
+  if (/err_name_not_resolved|enotfound|dns|name not resolved/.test(m)) return "dns";
+  if (/network|offline|failed to fetch|net::/.test(m)) return "network";
+  if (/timeout|timed out|took too long/.test(m)) return "timeout";
+  if (/5\d\d|server|unavailable|503|502/.test(m)) return "server";
+  return "unknown";
+}
+
+function renderLoadFailure(kind: LoadFailureKind, detail?: string) {
+  window.__ARXON_DISMISS_BOOT__?.();
+  markBootFailed(detail);
+
+  let mount = document.getElementById("root");
+  if (!mount) {
+    mount = document.createElement("div");
+    mount.id = "root";
+    document.body.appendChild(mount);
+  }
+
+  createRoot(mount).render(
+    <AppLoadFailureScreen kind={kind} detail={detail} />,
+  );
+}
 
 function showFatal(message: string, details?: unknown) {
-  const el = document.createElement("div");
-  el.style.cssText =
-    "position:fixed;inset:0;background:#020617;color:#e2e8f0;padding:16px;z-index:999999;font-family:monospace;overflow:auto;";
-  const title = document.createElement("h2");
-  title.textContent = "Arxon startup error";
-  title.style.margin = "0 0 12px 0";
-  const msg = document.createElement("pre");
-  msg.style.whiteSpace = "pre-wrap";
-  msg.textContent = `${message}\n\n${details ? String((details as any)?.stack || details) : ""}`;
-  el.appendChild(title);
-  el.appendChild(msg);
-  document.body.innerHTML = "";
-  document.body.appendChild(el);
+  const detail =
+    details instanceof Error
+      ? details.message
+      : details
+        ? String((details as { stack?: string }).stack || details)
+        : message;
+  const kind = inferLoadFailureKind(`${message} ${detail}`);
+  renderLoadFailure(kind, detail.slice(0, 280));
 }
 
 window.addEventListener("error", (e) => {
+  const target = (e as ErrorEvent).target;
+  if (target && target instanceof HTMLElement && target.tagName === "SCRIPT") {
+    showFatal("script load failed", (e as ErrorEvent).message);
+    return;
+  }
   showFatal("window error", (e as ErrorEvent).error || (e as ErrorEvent).message);
 });
 
 window.addEventListener("unhandledrejection", (e) => {
   const reason = (e as PromiseRejectionEvent).reason;
   const msg = String((reason as Error)?.message || reason || "");
-  // Capacitor plugin missing in APK — log only, don't kill the app
   if (/not implemented|nativebiometric|localnotifications|haptics/i.test(msg)) {
     console.warn("[startup] ignored plugin rejection:", reason);
     e.preventDefault();
@@ -37,6 +66,13 @@ window.addEventListener("unhandledrejection", (e) => {
 });
 
 void (async () => {
+  const slowTimer = window.setTimeout(() => {
+    const slow = document.getElementById("arxon-boot-slow");
+    if (slow && !window.__ARXON_BOOT_OK__) {
+      slow.style.display = "block";
+    }
+  }, SLOW_LOAD_MS);
+
   try {
     if (Capacitor.isNativePlatform()) {
       try {
@@ -45,18 +81,19 @@ void (async () => {
         console.warn("CapacitorUpdater.notifyAppReady failed:", e);
       }
 
-      // Non-blocking: do not delay first paint / App mount on notification channel setup.
       void ensureArxonNotificationChannel().catch((e) => {
-        console.warn('LocalNotifications channel setup failed:', e);
+        console.warn("LocalNotifications channel setup failed:", e);
       });
     }
 
     const { default: App } = await import("./App.tsx");
 
+    window.clearTimeout(slowTimer);
     const rootEl = document.getElementById("root");
     if (!rootEl) throw new Error("Missing #root element");
     createRoot(rootEl).render(<App />);
   } catch (e) {
+    window.clearTimeout(slowTimer);
     showFatal("bootstrap failure", e);
   }
 })();

@@ -1,16 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { WifiOff } from 'lucide-react';
+import AppFailureScreen from './AppFailureScreen';
+import { isBootOk, onBootOk } from '@/lib/bootState';
+import { errorUi } from './errorUiTokens';
 
-/** Sticky banner when native app loses network (remote UI requires connectivity). */
+const ESCALATE_MS = 2500;
+
+/** Sticky banner when native app loses network; full-screen when offline blocks initial load. */
 export default function NetworkOfflineBanner() {
   const [offline, setOffline] = useState(
     () => typeof navigator !== 'undefined' && !navigator.onLine,
   );
+  const [bootOk, setBootOk] = useState(isBootOk);
+  const [escalate, setEscalate] = useState(false);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
-    const onOnline  = () => setOffline(false);
+    const onOnline = () => setOffline(false);
     const onOffline = () => setOffline(true);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
@@ -20,20 +26,50 @@ export default function NetworkOfflineBanner() {
     };
   }, []);
 
+  useEffect(() => onBootOk(() => setBootOk(true)), []);
+
+  useEffect(() => {
+    if (!offline || bootOk || !Capacitor.isNativePlatform()) {
+      setEscalate(false);
+      return;
+    }
+    const t = window.setTimeout(() => setEscalate(true), ESCALATE_MS);
+    return () => window.clearTimeout(t);
+  }, [offline, bootOk]);
+
   if (!offline || !Capacitor.isNativePlatform()) return null;
 
+  if (!bootOk && escalate) {
+    return (
+      <AppFailureScreen
+        failureType="offline"
+        onPrimary={() => window.location.reload()}
+      />
+    );
+  }
+
   return (
-    <div style={{
-      position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9998,
-      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-      padding: '10px 16px',
-      background: 'hsl(38 55% 52%/0.15)',
-      borderBottom: '1px solid hsl(38 55% 52%/0.35)',
-      color: 'hsl(38 55% 68%)',
-      fontSize: 12, fontWeight: 600,
-      fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif",
-    }}>
-      <WifiOff size={14} />
+    <div
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: errorUi.overlayZ - 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        padding: '10px 16px',
+        background: `${errorUi.warn}22`,
+        borderBottom: `1px solid ${errorUi.warn}55`,
+        color: errorUi.warn,
+        fontSize: 12,
+        fontWeight: 600,
+        fontFamily: errorUi.font,
+      }}
+    >
+      <span aria-hidden>📡</span>
       <span>No connection — check your network and reload</span>
     </div>
   );

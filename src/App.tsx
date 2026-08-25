@@ -1,4 +1,4 @@
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -23,6 +23,11 @@ import PushNavListener from "@/components/system/PushNavListener";
 import AppDeepLinkListener from "@/components/system/AppDeepLinkListener";
 import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
+import AppFailureScreen from "@/components/system/AppFailureScreen";
+import SlowLoadOverlay from "@/components/system/SlowLoadOverlay";
+import BrandedSpinner from "@/components/system/BrandedSpinner";
+import { markBootOk } from "@/lib/bootState";
+import { errorUi } from "@/components/system/errorUiTokens";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 import AppPreviewShell, { PreviewSpinner } from "@/features/arxon-v2/preview/AppPreviewShell";
@@ -137,9 +142,8 @@ const queryClient = new QueryClient({
 const isNative = Capacitor.isNativePlatform();
 
 const Spinner = () => (
-  <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ width: 44, height: 44, borderRadius: '50%', border: '3px solid hsl(215 35% 62%/0.2)', borderTopColor: 'hsl(215 35% 62%)', animation: 'spin 1s linear infinite' }} />
-    <style>{'@keyframes spin{to{transform:rotate(360deg)}}'}</style>
+  <div style={{ minHeight: '100vh', background: errorUi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+    <BrandedSpinner label="Loading…" />
   </div>
 );
 
@@ -156,17 +160,15 @@ class AppErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ minHeight: '100vh', background: 'hsl(225 30% 3%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'system-ui,sans-serif' }}>
-          <div style={{ fontSize: 40, marginBottom: 16 }}>⚡</div>
-          <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 20% 88%)', marginBottom: 8 }}>Something went wrong</p>
-          <p style={{ fontSize: 12, color: 'hsl(215 14% 40%)', marginBottom: 24, textAlign: 'center', maxWidth: 320, lineHeight: 1.5 }}>
-            {this.state.error?.message || 'Unexpected runtime error'}
-          </p>
-          <button onClick={() => { this.setState({ hasError: false, error: null }); window.location.hash = '#/'; }}
-            style={{ padding: '12px 28px', borderRadius: 14, background: 'hsl(215 35% 62%/0.15)', border: '1px solid hsl(215 35% 62%/0.35)', color: 'hsl(215 35% 72%)', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
-            Reload App
-          </button>
-        </div>
+        <AppFailureScreen
+          failureType="unknown"
+          onPrimary={() => {
+            this.setState({ hasError: false, error: null });
+            window.location.hash = '#/';
+            window.location.reload();
+          }}
+          devError={this.state.error}
+        />
       );
     }
     return this.props.children;
@@ -226,9 +228,21 @@ function AppRoutes() {
   const [splashDone, setSplashDone] = useState(!isNative);
 
   if (isNative && !splashDone) {
-    return <MobileSplash isAppReady={!loading} onFinish={() => setSplashDone(true)} />;
+    return (
+      <>
+        <MobileSplash isAppReady={!loading} onFinish={() => setSplashDone(true)} />
+        <SlowLoadOverlay loading={loading} delayMs={2500} message="Starting Arxon…" />
+      </>
+    );
   }
-  if (loading) return <Spinner />;
+  if (loading) {
+    return (
+      <>
+        <Spinner />
+        <SlowLoadOverlay loading delayMs={2500} message="Still loading…" />
+      </>
+    );
+  }
 
   return (
     <>
@@ -500,6 +514,10 @@ function RouterShell({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  useEffect(() => {
+    markBootOk();
+  }, []);
+
   return (
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
