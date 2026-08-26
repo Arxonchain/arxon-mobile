@@ -3,7 +3,8 @@ import "./index.css";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { Capacitor } from "@capacitor/core";
 import { ensureArxonNotificationChannel } from "@/lib/nativeNotifications";
-import { markBootFailed } from "@/lib/bootState";
+import { markBootFailed, markBootOk } from "@/lib/bootState";
+import { isDevPublicPath, resolveAppPath } from "@/lib/devPublicRoutes";
 import AppLoadFailureScreen from "@/components/system/AppLoadFailureScreen";
 import type { LoadFailureKind } from "@/components/system/failureCatalog";
 
@@ -86,11 +87,19 @@ void (async () => {
       });
     }
 
-    const { default: App } = await import("./App.tsx");
-
     window.clearTimeout(slowTimer);
     const rootEl = document.getElementById("root");
     if (!rootEl) throw new Error("Missing #root element");
+
+    const path = resolveAppPath();
+    if (isDevPublicPath(path)) {
+      const { default: FailureUiPreview } = await import("./pages/dev/FailureUiPreview");
+      createRoot(rootEl).render(<FailureUiPreview />);
+      markBootOk();
+      return;
+    }
+
+    const { default: App } = await import("./App.tsx");
     createRoot(rootEl).render(<App />);
   } catch (e) {
     window.clearTimeout(slowTimer);

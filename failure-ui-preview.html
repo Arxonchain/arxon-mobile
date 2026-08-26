@@ -1,0 +1,808 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!--
+    Double-click to open in browser — no login, no server.
+    Arxon failure & error UI preview — static carousel, 390×844 phone frames.
+  -->
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arxon — Failure UI Preview</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font: 'Creato Display', -apple-system, system-ui, sans-serif;
+      --cyan: #4FD8EB;
+      --cyan-glow: rgba(79, 216, 235, 0.55);
+      --teal: #7FE7C4;
+      --purple: #a855f7;
+      --deep: #02060e;
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text: #e8fcff;
+      --text-muted: rgba(232, 252, 255, 0.55);
+      --danger: #f87171;
+      --danger-glow: rgba(248, 113, 113, 0.35);
+      --glass-overlay: rgba(2, 6, 14, 0.78);
+      --glass-panel: rgba(255, 255, 255, 0.06);
+      --glass-border: rgba(255, 255, 255, 0.12);
+      --glass-badge: rgba(255, 255, 255, 0.08);
+      --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+      --glass-glow: 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 48px rgba(79, 216, 235, 0.18), 0 0 96px rgba(168, 85, 247, 0.08);
+    }
+
+    @keyframes arxonSpin { to { transform: rotate(360deg); } }
+    @keyframes logoPulse {
+      0%, 100% { box-shadow: var(--glass-highlight), 0 0 20px rgba(79, 216, 235, 0.2); }
+      50% { box-shadow: var(--glass-highlight), 0 0 48px var(--cyan-glow); }
+    }
+    @keyframes meshShift {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.85; transform: scale(1.03); }
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: var(--font);
+      color: var(--text);
+      background: radial-gradient(ellipse 80% 60% at 50% 0%, #0a1628 0%, #030508 55%, #010204 100%);
+      user-select: none;
+    }
+
+    /* Full-viewport shell: header + scrollable main + fixed bottom nav */
+    .preview-shell {
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      min-height: 100vh;
+      max-height: 100dvh;
+      overflow: hidden;
+    }
+
+    .preview-main {
+      flex: 1 1 auto;
+      min-height: 280px;
+      overflow: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 20px;
+    }
+
+    .phone-wrap {
+      flex: 0 0 auto;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-footer {
+      flex-shrink: 0;
+      background: rgba(2, 6, 14, 0.92);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .header {
+      text-align: center;
+      padding: 12px 20px 6px;
+      flex-shrink: 0;
+    }
+    .header-tag {
+      margin-bottom: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--cyan);
+    }
+    .header h1 {
+      margin-bottom: 4px;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.03em;
+    }
+    .header-meta {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+    .header-meta span { opacity: 0.4; margin: 0 8px; }
+
+    /* Phone frame — explicit 390×844; width drives height via aspect-ratio */
+    .phone {
+      --phone-w: min(390px, calc(100vw - 48px));
+      --phone-h: min(844px, calc(100dvh - 240px), calc(var(--phone-w) * 844 / 390));
+      width: var(--phone-w);
+      height: var(--phone-h);
+      min-width: 280px;
+      min-height: 520px;
+      flex-shrink: 0;
+      border-radius: 44px;
+      overflow: hidden;
+      position: relative;
+      border: 10px solid #141820;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65), inset 0 0 0 1px rgba(255, 255, 255, 0.06);
+      background: var(--deep);
+    }
+
+    .phone-screen {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(ellipse 70% 50% at 50% 15%, rgba(79, 216, 235, 0.08), transparent 60%),
+        linear-gradient(180deg, #0a1628 0%, var(--deep) 45%, #010204 100%);
+    }
+    .phone-notch {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 96px;
+      height: 28px;
+      border-radius: 20px;
+      background: #0a0e14;
+      z-index: 50;
+      pointer-events: none;
+    }
+
+    .slide {
+      display: none;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+    .slide.active { display: block; }
+
+    /* AppFailureScreen — glass overlay */
+    .failure-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      background: var(--glass-overlay);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 24px;
+      overflow: auto;
+    }
+    @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+      .failure-screen { background: rgba(2, 6, 14, 0.94); }
+      .failure-content { background: rgba(18, 28, 42, 0.92); }
+      .slow-overlay { background: rgba(2, 6, 14, 0.88); }
+      .slow-panel, .page-error-card { background: rgba(18, 28, 42, 0.92); }
+    }
+    .failure-screen::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% 20%, rgba(79, 216, 235, 0.12), transparent 55%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(168, 85, 247, 0.09), transparent 50%),
+        radial-gradient(ellipse 50% 35% at 20% 70%, rgba(79, 216, 235, 0.08), transparent 45%);
+      pointer-events: none;
+      animation: meshShift 8s ease-in-out infinite;
+    }
+    .failure-content {
+      position: relative;
+      text-align: center;
+      max-width: 340px;
+      width: 100%;
+      padding: 32px 28px 28px;
+      background: var(--glass-panel);
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-highlight), var(--glass-glow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .logo-wrap {
+      width: 80px;
+      height: 80px;
+      border-radius: 20px;
+      overflow: hidden;
+      margin: 0 auto 20px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: var(--glass-highlight), 0 0 36px var(--cyan-glow);
+      background: #0a1628;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-wrap svg { width: 100%; height: 100%; }
+    .icon-badge {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(248, 113, 113, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: var(--glass-highlight), 0 0 28px var(--danger-glow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .icon-badge svg { width: 24px; height: 24px; stroke: var(--danger); fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+    .failure-title {
+      margin-bottom: 10px;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: 0.04em;
+    }
+    .failure-message {
+      margin-bottom: 8px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+    .failure-detail {
+      margin-bottom: 24px;
+      font-size: 11px;
+      color: rgba(232, 252, 255, 0.35);
+      font-family: ui-monospace, monospace;
+      word-break: break-word;
+    }
+    .spacer-24 { height: 24px; }
+    .btn-primary {
+      width: 100%;
+      padding: 16px 20px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: linear-gradient(135deg, var(--cyan), var(--teal));
+      color: var(--deep);
+      font-size: 15px;
+      font-weight: 800;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: var(--glass-highlight), 0 8px 32px var(--cyan-glow);
+      margin-bottom: 12px;
+      cursor: default;
+    }
+    .btn-primary svg { width: 18px; height: 18px; stroke: var(--deep); fill: none; stroke-width: 2.5; }
+    .btn-secondary {
+      width: 100%;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid var(--glass-border);
+      background: var(--glass-panel);
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+      cursor: default;
+      box-shadow: var(--glass-highlight);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .btn-secondary svg { width: 14px; height: 14px; stroke: var(--text-muted); fill: none; stroke-width: 2; }
+    .dev-details {
+      margin-top: 20px;
+      text-align: left;
+      font-size: 11px;
+      color: var(--text-muted);
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid var(--glass-border);
+      background: rgba(0, 0, 0, 0.2);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .dev-details summary { cursor: pointer; font-weight: 600; }
+    .dev-details pre {
+      margin-top: 8px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: ui-monospace, monospace;
+    }
+
+    /* Mock page shell */
+    .page-shell {
+      position: absolute;
+      inset: 0;
+      background: var(--deep);
+      display: flex;
+      flex-direction: column;
+    }
+    .page-header {
+      padding: 52px 20px 16px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(9, 26, 48, 0.6);
+    }
+    .page-header .bar1 { height: 10px; width: 80px; border-radius: 4px; background: rgba(79, 216, 235, 0.2); margin-bottom: 8px; }
+    .page-header .bar2 { height: 14px; width: 140px; border-radius: 4px; background: rgba(232, 252, 255, 0.133); }
+    .page-body { flex: 1; overflow: auto; }
+
+    /* Slow load overlay — frosted floating panel */
+    .slow-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: rgba(2, 6, 14, 0.65);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+    .slow-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      padding: 36px 40px;
+      max-width: 280px;
+      background: var(--glass-panel);
+      border-radius: 20px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-highlight), var(--glass-glow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .slow-logo {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      animation: logoPulse 2s ease-in-out infinite;
+      background: #0a1628;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .slow-logo svg { width: 72px; height: 72px; }
+    .spinner-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .spinner {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 3px solid rgba(79, 216, 235, 0.2);
+      border-top-color: var(--cyan);
+      animation: arxonSpin 0.9s linear infinite;
+    }
+    .spinner-label {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .ghost-text {
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 13px;
+      opacity: 0.4;
+    }
+
+    /* PageErrorState — inline glass card */
+    .page-error {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 32px 20px;
+      min-height: min(420px, 50vh);
+    }
+    .page-error-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 36px 28px;
+      max-width: 360px;
+      width: 100%;
+      background: var(--glass-panel);
+      border-radius: 24px;
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-highlight), var(--glass-glow);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+    .page-error .icon-badge { margin-bottom: 16px; }
+    .page-error h2 {
+      margin-bottom: 8px;
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: 0.03em;
+    }
+    .page-error p {
+      margin-bottom: 20px;
+      max-width: 320px;
+      font-size: 14px;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+    .btn-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 20px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: var(--glass-panel);
+      color: var(--cyan);
+      font-size: 13px;
+      font-weight: 700;
+      font-family: inherit;
+      box-shadow: var(--glass-highlight), 0 4px 20px rgba(79, 216, 235, 0.133);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      cursor: default;
+    }
+    .btn-inline svg { width: 14px; height: 14px; stroke: var(--cyan); fill: none; stroke-width: 2.5; }
+
+    /* Slide caption + bottom carousel nav (grouped footer) */
+    .slide-info {
+      text-align: center;
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 10px 20px 0;
+    }
+    .slide-info h2 { margin-bottom: 4px; font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+    .slide-info p {
+      margin: 0;
+      font-size: 12px;
+      color: var(--text-muted);
+      line-height: 1.45;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    nav.carousel {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 10px 20px max(10px, env(safe-area-inset-bottom));
+    }
+
+    @media (max-height: 720px) {
+      .header { padding: 8px 16px 4px; }
+      .header h1 { font-size: 18px; }
+      .header-meta { font-size: 12px; }
+      .slide-info { padding-top: 8px; }
+      .slide-info h2 { font-size: 15px; }
+      .slide-info p { -webkit-line-clamp: 1; }
+    }
+    .nav-btn {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(79, 216, 235, 0.267);
+      background: rgba(0, 212, 255, 0.08);
+      color: var(--cyan);
+      font-size: 20px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: inherit;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .nav-btn:disabled {
+      border-color: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-muted);
+      cursor: default;
+    }
+    .dots { display: flex; align-items: center; gap: 8px; }
+    .dot {
+      height: 8px;
+      border-radius: 4px;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      background: rgba(255, 255, 255, 0.22);
+      transition: width 0.2s, background 0.2s;
+      width: 8px;
+    }
+    .dot.active { width: 22px; background: var(--cyan); }
+  </style>
+</head>
+<body>
+  <div class="preview-shell">
+    <header class="header">
+      <p class="header-tag">Static preview</p>
+      <h1>Failure &amp; error UI</h1>
+      <p class="header-meta">
+        <span id="counter">1 / 11</span>
+        <span>·</span>
+        <span style="font-size:12px">← → keys · swipe on touch</span>
+      </p>
+    </header>
+
+    <main class="preview-main">
+      <div class="phone-wrap">
+        <div class="phone" id="phone">
+          <div class="phone-notch"></div>
+          <div class="phone-screen" id="phone-screen">
+            <!-- Slides injected by JS -->
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <footer class="preview-footer">
+      <div class="slide-info">
+        <h2 id="slide-title"></h2>
+        <p id="slide-desc"></p>
+      </div>
+      <nav class="carousel" aria-label="Carousel navigation">
+        <button class="nav-btn" id="prev" aria-label="Previous slide">‹</button>
+        <div class="dots" id="dots"></div>
+        <button class="nav-btn" id="next" aria-label="Next slide">›</button>
+      </nav>
+    </footer>
+  </div>
+
+  <script>
+    const ARXON_LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none"><rect x="62" y="48" width="76" height="28" rx="14" fill="#B8CCEE"/><rect x="26" y="90" width="74" height="28" rx="14" fill="#B8CCEE"/><rect x="108" y="90" width="74" height="28" rx="14" fill="#B8CCEE"/><rect x="14" y="132" width="172" height="34" rx="17" fill="#B8CCEE"/><circle cx="100" cy="147" r="6.5" fill="#0a0a0f"/><rect x="96.5" y="151.5" width="7" height="8.5" rx="1.5" fill="#0a0a0f"/></svg>`;
+
+    const ICONS = {
+      globe: '<path d="M21.54 15H17a2 2 0 0 0-2 2v4.54"/><path d="M7 3.34V5a3 3 0 0 0 3 3a2 2 0 0 1 2 2c0 1.1.9 2 2 2h2.54"/><path d="M11 21.95V18a2 2 0 0 1 2-2h4.54"/><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>',
+      wifiOff: '<path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 5.17-2.69"/><path d="M19 12.859a10 10 0 0 0-2.007-1.523"/><path d="M2 8.82a15 15 0 0 1 4.177-2.643"/><path d="M22 8.82a15 15 0 0 0-11.288-3.764"/><path d="m2 2 20 20"/>',
+      serverCrash: '<path d="M6 10H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2"/><path d="M6 14H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2"/><path d="M6 6h.01"/><path d="M6 18h.01"/><path d="m13 6-4 6h6l-4 6"/>',
+      shieldOff: '<path d="m2 2 20 20"/><path d="M5.45 5.11 2 12v6c0 5.5 3.8 10.7 9 12 1.01-.22 1.95-.62 2.78-1.17"/><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A6.96 6.96 0 0 0 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/>',
+      clock: '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>',
+      wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
+      download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+      alertTriangle: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+      refreshCw: '<path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>',
+      rotateCcw: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+    };
+
+    function icon(name) {
+      return `<svg viewBox="0 0 24 24">${ICONS[name]}</svg>`;
+    }
+
+    function failureScreen({ iconName, title, message, detail, primary, secondary, showLogo = true, devError }) {
+      return `
+        <div class="failure-screen">
+          <div class="failure-content">
+            ${showLogo ? `<div class="logo-wrap">${ARXON_LOGO}</div>` : ''}
+            <div class="icon-badge">${icon(iconName)}</div>
+            <h1 class="failure-title">${title}</h1>
+            <p class="failure-message">${message}</p>
+            ${detail ? `<p class="failure-detail">${detail}</p>` : '<div class="spacer-24"></div>'}
+            <button class="btn-primary" type="button">${icon('refreshCw')}${primary}</button>
+            ${secondary ? `<button class="btn-secondary" type="button">${icon('rotateCcw')}${secondary}</button>` : ''}
+            ${devError ? `<details class="dev-details"><summary>Error details</summary><pre>${devError}</pre></details>` : ''}
+          </div>
+        </div>`;
+    }
+
+    function pageShell(inner) {
+      return `
+        <div class="page-shell">
+          <div class="page-header">
+            <div class="bar1"></div>
+            <div class="bar2"></div>
+          </div>
+          <div class="page-body">${inner}</div>
+        </div>`;
+    }
+
+    const scenarios = [
+      {
+        id: 'ota-dns',
+        title: 'OTA / bundle load failed',
+        description: 'DNS resolution failed loading the web bundle (ERR_NAME_NOT_RESOLVED). Shown before the app boots.',
+        html: failureScreen({
+          iconName: 'globe',
+          title: "Can't reach Arxon",
+          message: 'The app could not load its latest version. Check your internet connection or try again in a moment.',
+          detail: 'ERR_NAME_NOT_RESOLVED · arxon-mobile.pages.dev',
+          primary: 'Retry',
+          secondary: 'Restart app',
+        }),
+      },
+      {
+        id: 'offline',
+        title: 'Offline / no internet',
+        description: 'Full-screen state when the device has no network connectivity.',
+        html: failureScreen({
+          iconName: 'wifiOff',
+          title: 'No connection',
+          message: 'Arxon needs an internet connection to load and sync. Check Wi‑Fi or mobile data, then retry.',
+          primary: 'Retry',
+        }),
+      },
+      {
+        id: 'slow-load',
+        title: 'Slow loading overlay',
+        description: 'Non-blocking overlay while auth or boot takes longer than expected. Page content stays visible underneath.',
+        html: `
+          ${pageShell('<div class="ghost-text">Dashboard content loading…</div>')}
+          <div class="slow-overlay">
+            <div class="slow-panel">
+              <div class="slow-logo">${ARXON_LOGO}</div>
+              <div class="spinner-wrap">
+                <div class="spinner"></div>
+                <p class="spinner-label">Still loading…</p>
+              </div>
+            </div>
+          </div>`,
+      },
+      {
+        id: 'backend',
+        title: 'Backend / service down',
+        description: 'API or Supabase unreachable — user can retry without leaving the app.',
+        html: failureScreen({
+          iconName: 'serverCrash',
+          title: 'Service unavailable',
+          message: 'Our servers are temporarily unreachable. Your account is safe — please try again shortly.',
+          primary: 'Retry now',
+        }),
+      },
+      {
+        id: 'session',
+        title: 'Session expired',
+        description: 'JWT or refresh token invalid — prompts re-authentication.',
+        html: failureScreen({
+          iconName: 'shieldOff',
+          title: 'Session expired',
+          message: 'Your session has ended. Sign in again to continue mining and playing.',
+          primary: 'Sign in',
+        }),
+      },
+      {
+        id: 'timeout',
+        title: 'API timeout',
+        description: 'Request exceeded the timeout threshold. Includes optional restart for native builds.',
+        html: failureScreen({
+          iconName: 'clock',
+          title: 'Taking too long',
+          message: 'The app is loading slowly or the connection timed out. Retry or restart the app.',
+          primary: 'Retry',
+          secondary: 'Restart app',
+        }),
+      },
+      {
+        id: 'maintenance',
+        title: 'Maintenance mode',
+        description: "Server-side maintenance flag active — informational, retry available.",
+        html: failureScreen({
+          iconName: 'wrench',
+          title: 'Maintenance in progress',
+          message: "We're upgrading Arxon. Mining continues in the background — check back in a few minutes.",
+          primary: 'Retry',
+        }),
+      },
+      {
+        id: 'update',
+        title: 'App update required',
+        description: 'Native build below minimum version — directs user to the store.',
+        html: failureScreen({
+          iconName: 'download',
+          title: 'Update required',
+          message: 'A new version of Arxon is available. Update from the store to continue.',
+          primary: 'Update app',
+        }),
+      },
+      {
+        id: '404',
+        title: 'Page not found (404)',
+        description: 'Unknown route within the app shell.',
+        html: failureScreen({
+          iconName: 'alertTriangle',
+          title: 'Page not found',
+          message: "This page doesn't exist or has moved. Head back to the dashboard.",
+          primary: 'Go home',
+        }),
+      },
+      {
+        id: 'crash',
+        title: 'Unknown / crash',
+        description: 'ErrorBoundary catch-all with optional dev stack trace.',
+        html: failureScreen({
+          iconName: 'alertTriangle',
+          title: 'Something went wrong',
+          message: 'An unexpected error occurred. Refresh the app and try again.',
+          primary: 'Refresh',
+          devError: 'TypeError: Cannot read properties of undefined (reading "balance")',
+        }),
+      },
+      {
+        id: 'partial',
+        title: 'Partial page error',
+        description: 'Inline PageErrorState when one section fails but the rest of the page is usable.',
+        html: pageShell(`
+          <div class="page-error">
+            <div class="page-error-card">
+              <div class="icon-badge">${icon('serverCrash')}</div>
+              <h2>Service unavailable</h2>
+              <p>Could not load arena matches. Your balance is still up to date.</p>
+              <button class="btn-inline" type="button">${icon('refreshCw')}Retry now</button>
+            </div>
+          </div>`),
+      },
+    ];
+
+    let index = 0;
+    const phoneScreen = document.getElementById('phone-screen');
+    const counter = document.getElementById('counter');
+    const slideTitle = document.getElementById('slide-title');
+    const slideDesc = document.getElementById('slide-desc');
+    const dotsEl = document.getElementById('dots');
+    const prevBtn = document.getElementById('prev');
+    const nextBtn = document.getElementById('next');
+
+    scenarios.forEach((s, i) => {
+      const slide = document.createElement('div');
+      slide.className = 'slide' + (i === 0 ? ' active' : '');
+      slide.dataset.index = i;
+      slide.innerHTML = s.html;
+      phoneScreen.appendChild(slide);
+
+      const dot = document.createElement('button');
+      dot.className = 'dot' + (i === 0 ? ' active' : '');
+      dot.type = 'button';
+      dot.setAttribute('aria-label', `Go to slide ${i + 1}: ${s.title}`);
+      dot.addEventListener('click', () => goTo(i));
+      dotsEl.appendChild(dot);
+    });
+
+    function render() {
+      phoneScreen.querySelectorAll('.slide').forEach((el, i) => el.classList.toggle('active', i === index));
+      dotsEl.querySelectorAll('.dot').forEach((el, i) => el.classList.toggle('active', i === index));
+      counter.textContent = `${index + 1} / ${scenarios.length}`;
+      slideTitle.textContent = scenarios[index].title;
+      slideDesc.textContent = scenarios[index].description;
+      prevBtn.disabled = index === 0;
+      nextBtn.disabled = index === scenarios.length - 1;
+    }
+
+    function goTo(i) {
+      index = Math.max(0, Math.min(scenarios.length - 1, i));
+      render();
+    }
+
+    prevBtn.addEventListener('click', () => goTo(index - 1));
+    nextBtn.addEventListener('click', () => goTo(index + 1));
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowLeft') goTo(index - 1);
+      if (e.key === 'ArrowRight') goTo(index + 1);
+    });
+
+    let touchStartX = null;
+    const phone = document.getElementById('phone');
+    phone.addEventListener('touchstart', (e) => { touchStartX = e.touches[0]?.clientX ?? null; }, { passive: true });
+    phone.addEventListener('touchend', (e) => {
+      if (touchStartX == null) return;
+      const delta = (e.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+      touchStartX = null;
+      if (delta > 48) goTo(index - 1);
+      else if (delta < -48) goTo(index + 1);
+    }, { passive: true });
+
+    render();
+  </script>
+</body>
+</html>

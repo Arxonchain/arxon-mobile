@@ -3,7 +3,14 @@ import { Capacitor } from '@capacitor/core';
 import { motion } from 'framer-motion';
 import { RefreshCw, RotateCcw, type LucideIcon } from 'lucide-react';
 import arxonLogo from '@/assets/arxon-icon.svg';
-import { errorUi } from './errorUiTokens';
+import {
+  errorUi,
+  glassBadgeStyle,
+  glassMeshBackground,
+  glassPanelStyle,
+  glassPrimaryButtonStyle,
+  glassSecondaryButtonStyle,
+} from './errorUiTokens';
 import {
   getFailureCopy,
   type FailureType,
@@ -25,7 +32,7 @@ export interface AppFailureScreenProps {
   devError?: Error | null;
 }
 
-/** Reusable full-screen branded failure card — dark neon Arxon V2 aesthetic. */
+/** Reusable full-screen glass failure overlay — dark neon Arxon V2 aesthetic. */
 export default function AppFailureScreen({
   failureType = 'unknown',
   icon,
@@ -73,6 +80,7 @@ export default function AppFailureScreen({
   };
 
   const showSecondary = Boolean(secondary && (onSecondary || showRestart || preset.secondaryLabel));
+  const g = errorUi.glass;
 
   return (
     <div
@@ -80,7 +88,9 @@ export default function AppFailureScreen({
         position: 'fixed',
         inset: 0,
         zIndex: errorUi.criticalZ,
-        background: errorUi.bg,
+        background: g.overlayBgStrong,
+        backdropFilter: g.blurStrong,
+        WebkitBackdropFilter: g.blurStrong,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -90,33 +100,42 @@ export default function AppFailureScreen({
         overflow: 'auto',
       }}
     >
+      <div style={glassMeshBackground()} />
+
+      {/* Subtle noise texture overlay */}
       <div
+        aria-hidden
         style={{
           position: 'absolute',
           inset: 0,
-          background: `
-            radial-gradient(ellipse 80% 60% at 50% 20%, ${errorUi.cyan}18, transparent 55%),
-            radial-gradient(ellipse 60% 40% at 50% 100%, ${errorUi.purple}12, transparent 50%)
-          `,
+          opacity: 0.035,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
           pointerEvents: 'none',
         }}
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        style={{ position: 'relative', textAlign: 'center', maxWidth: 340, width: '100%' }}
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+        style={{
+          ...glassPanelStyle(),
+          textAlign: 'center',
+          padding: '32px 28px 28px',
+        }}
       >
         {showLogo ? (
           <div
             style={{
-              width: 88,
-              height: 88,
-              borderRadius: 22,
+              width: 80,
+              height: 80,
+              borderRadius: 20,
               overflow: 'hidden',
-              margin: '0 auto 24px',
-              border: `2px solid ${errorUi.panelBorder}`,
-              boxShadow: `0 0 40px ${errorUi.cyanGlow}`,
+              margin: '0 auto 20px',
+              border: `1px solid ${g.badgeBorder}`,
+              boxShadow: `${g.innerHighlight}, 0 0 36px ${errorUi.cyanGlow}`,
+              backdropFilter: g.badgeBlur,
+              WebkitBackdropFilter: g.badgeBlur,
             }}
           >
             <img src={arxonLogo} alt="Arxon" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -125,16 +144,11 @@ export default function AppFailureScreen({
 
         <div
           style={{
+            ...glassBadgeStyle(errorUi.danger, errorUi.dangerGlow),
             width: 52,
             height: 52,
-            borderRadius: 16,
+            borderRadius: '50%',
             margin: '0 auto 20px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: `${errorUi.danger}18`,
-            border: `1px solid ${errorUi.danger}44`,
-            boxShadow: `0 0 24px ${errorUi.dangerGlow}`,
           }}
         >
           <Icon size={24} color={errorUi.danger} />
@@ -185,22 +199,8 @@ export default function AppFailureScreen({
           onClick={() => void handlePrimary()}
           disabled={busy}
           style={{
-            width: '100%',
-            padding: '16px 20px',
-            borderRadius: 16,
-            border: 'none',
-            background: `linear-gradient(135deg, ${errorUi.cyan}, ${errorUi.teal})`,
-            color: errorUi.deep,
-            fontSize: 15,
-            fontWeight: 800,
-            cursor: busy ? 'wait' : 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 10,
-            boxShadow: `0 8px 28px ${errorUi.cyanGlow}`,
+            ...glassPrimaryButtonStyle(busy),
             marginBottom: showSecondary ? 12 : 0,
-            opacity: busy ? 0.75 : 1,
           }}
         >
           <RefreshCw size={18} style={busy ? { animation: 'arxonSpin 0.9s linear infinite' } : undefined} />
@@ -211,22 +211,7 @@ export default function AppFailureScreen({
           <button
             type="button"
             onClick={handleSecondary}
-            style={{
-              width: '100%',
-              padding: '14px',
-              borderRadius: 14,
-              border: `1px solid ${errorUi.panelBorder}`,
-              background: 'transparent',
-              color: errorUi.textMuted,
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-              marginTop: 12,
-            }}
+            style={{ ...glassSecondaryButtonStyle(), marginTop: 12 }}
           >
             <RotateCcw size={14} />
             {secondary}
@@ -242,8 +227,10 @@ export default function AppFailureScreen({
               color: errorUi.textMuted,
               padding: 12,
               borderRadius: 12,
-              border: `1px solid ${errorUi.panelBorder}`,
-              background: 'rgba(0,0,0,0.25)',
+              border: `1px solid ${g.panelBorder}`,
+              background: 'rgba(0,0,0,0.2)',
+              backdropFilter: g.badgeBlur,
+              WebkitBackdropFilter: g.badgeBlur,
             }}
           >
             <summary style={{ cursor: 'pointer', fontWeight: 600 }}>Error details</summary>

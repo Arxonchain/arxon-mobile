@@ -2,7 +2,7 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
@@ -27,10 +27,12 @@ import AppFailureScreen from "@/components/system/AppFailureScreen";
 import SlowLoadOverlay from "@/components/system/SlowLoadOverlay";
 import BrandedSpinner from "@/components/system/BrandedSpinner";
 import { markBootOk } from "@/lib/bootState";
+import { isDevPublicPath } from "@/lib/devPublicRoutes";
 import { errorUi } from "@/components/system/errorUiTokens";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 import AppPreviewShell, { PreviewSpinner } from "@/features/arxon-v2/preview/AppPreviewShell";
+const FailureUiPreview = lazy(() => import("@/pages/dev/FailureUiPreview"));
 import {
   PreviewWordForgePage,
   PreviewForgeStatsPage,
@@ -223,9 +225,25 @@ function MobilePage({ children }: { children: React.ReactNode }) {
   );
 }
 
+function DevPublicRoutes() {
+  return (
+    <Suspense fallback={<Spinner />}>
+      <Routes>
+        <Route path="/dev/failure-ui" element={<FailureUiPreview />} />
+        <Route path="/dev/*" element={<Navigate to="/dev/failure-ui" replace />} />
+      </Routes>
+    </Suspense>
+  );
+}
+
 function AppRoutes() {
+  const location = useLocation();
   const { user, loading } = useAuth();
   const [splashDone, setSplashDone] = useState(!isNative);
+
+  if (isDevPublicPath(location.pathname)) {
+    return <DevPublicRoutes />;
+  }
 
   if (isNative && !splashDone) {
     return (
@@ -325,7 +343,6 @@ function AppRoutes() {
             <WordForgePreviewPage />
           </Suspense>
         } />
-
         <Route path="/admin" element={<AdminLayout />}>
           <Route index                  element={<AdminDashboard />} />
           <Route path="users"           element={<AdminUsers />} />
