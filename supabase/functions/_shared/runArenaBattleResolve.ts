@@ -270,8 +270,22 @@ export async function runArenaBattleResolve(
           totalRewardsDistributed += dust;
         }
 
+        const { data: existingEarnings } = await supabase
+          .from("arena_earnings")
+          .select("user_id, total_earned, points_credited_amount")
+          .eq("battle_id", battle.id)
+          .eq("is_winner", true);
+
+        const creditedByUser = new Map(
+          (existingEarnings ?? []).map((row) => [
+            row.user_id,
+            Number(row.points_credited_amount ?? 0) >= Number(row.total_earned ?? 0),
+          ]),
+        );
+
         for (const p of payouts) {
           const { vote, memberData, currentStreak, bestStreak, streakBonus, totalReward } = p;
+          const alreadyCredited = creditedByUser.get(vote.user_id) === true;
 
           const { error: stakeErr } = await supabase.from("arena_staking_rewards").upsert({
             battle_id: battle.id,
@@ -307,6 +321,10 @@ export async function runArenaBattleResolve(
           );
           if (creditErr) throw new Error(`Points credit failed: ${creditErr.message}`);
 
+          if (alreadyCredited && Number(creditedAmount) <= 0) {
+            continue;
+          }
+
           if (Number(creditedAmount) > 0 && memberData) {
             const { error: memberErr } = await supabase.from("arena_members").update({
               current_win_streak: currentStreak,
@@ -316,23 +334,25 @@ export async function runArenaBattleResolve(
             if (memberErr) throw new Error(`Member update failed: ${memberErr.message}`);
           }
 
-          const streakText = currentStreak >= 3 ? ` 🔥 ${currentStreak}-Win Streak!` : "";
-          await supabase.from("user_badges").insert({
-            user_id: vote.user_id,
-            badge_type: "winner",
-            badge_name: `${winnerSideName} Champion`,
-            description: `Won ${totalReward} ARX-P in "${battle.title}"${streakText}`,
-            battle_id: battle.id,
-          });
+          if (!alreadyCredited) {
+            const streakText = currentStreak >= 3 ? ` 🔥 ${currentStreak}-Win Streak!` : "";
+            await supabase.from("user_badges").insert({
+              user_id: vote.user_id,
+              badge_type: "winner",
+              badge_name: `${winnerSideName} Champion`,
+              description: `Won ${totalReward} ARX-P in "${battle.title}"${streakText}`,
+              battle_id: battle.id,
+            });
 
-          const boostExpiry = new Date();
-          boostExpiry.setDate(boostExpiry.getDate() + 7);
-          await supabase.from("arena_boosts").upsert({
-            user_id: vote.user_id,
-            battle_id: battle.id,
-            boost_percentage: 25,
-            expires_at: boostExpiry.toISOString(),
-          });
+            const boostExpiry = new Date();
+            boostExpiry.setDate(boostExpiry.getDate() + 7);
+            await supabase.from("arena_boosts").upsert({
+              user_id: vote.user_id,
+              battle_id: battle.id,
+              boost_percentage: 25,
+              expires_at: boostExpiry.toISOString(),
+            });
+          }
         }
 
         for (const vote of losingVotes) {

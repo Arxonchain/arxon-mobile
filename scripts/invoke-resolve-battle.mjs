@@ -2,7 +2,7 @@
 /**
  * Invoke resolve-arena-battle (CLI v2.90 has no `functions invoke`).
  *
- *   node scripts/invoke-resolve-battle.mjs <battle_id> <winner_side> [--force]
+ *   node scripts/invoke-resolve-battle.mjs <battle_id> <winner_side> [--force] [--sync]
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -25,13 +25,14 @@ function getEnv(text, key) {
   return m ? m[1].trim().replace(/^["']|["']$/g, '') : '';
 }
 
-const args = process.argv.slice(2).filter((a) => a !== '--force');
+const args = process.argv.slice(2).filter((a) => a !== '--force' && a !== '--sync');
 const force = process.argv.includes('--force');
+const sync = process.argv.includes('--sync');
 const battleId = args[0];
 const winnerSide = args[1] || 'a';
 
 if (!battleId) {
-  console.error('Usage: node scripts/invoke-resolve-battle.mjs <battle_id> <a|b|c> [--force]');
+  console.error('Usage: node scripts/invoke-resolve-battle.mjs <battle_id> <a|b|c> [--force] [--sync]');
   process.exit(1);
 }
 
@@ -44,7 +45,37 @@ if (!url || !serviceKey) {
   process.exit(1);
 }
 
-console.log(`Resolve ${battleId} winner=${winnerSide} queue=false force=${force}`);
+const useQueue = !sync;
+console.log(`Resolve ${battleId} winner=${winnerSide} queue=${useQueue} force=${force}`);
+
+async function pollJob(jobId) {
+  for (let i = 0; i < 60; i++) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const jobRes = await fetch(
+      `${url}/rest/v1/background_jobs?select=id,status,last_error,result&id=eq.${jobId}`,
+      { headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } },
+    );
+    const rows = await jobRes.json();
+    const job = rows?.[0];
+    if (!job) continue;
+    console.log(`Job ${jobId}: ${job.status}`);
+    if (job.status === 'completed') return job.result;
+    if (job.status === 'failed') throw new Error(job.last_error || 'background job failed');
+  }
+  throw new Error('Timed out waiting for background job');
+}
+
+async function triggerWorker() {
+  await fetch(`${url}/functions/v1/process-background-jobs`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${serviceKey}`,
+      apikey: serviceKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ batch_size: 5 }),
+  }).catch(() => {});
+}
 
 const countRes = await fetch(
   `${url}/rest/v1/arena_votes?select=id&battle_id=eq.${battleId}`,
@@ -78,17 +109,42 @@ const res = await fetch(`${url}/functions/v1/resolve-arena-battle`, {
   body: JSON.stringify({
     battle_id: battleId,
     winner_side: winnerSide,
-    queue: false,
+    queue: useQueue,
     force,
   }),
 });
 
 const text = await res.text();
 console.log(`\nHTTP ${res.status} in ${Math.round(performance.now() - t0)} ms`);
+let parsed;
 try {
-  console.log(JSON.stringify(JSON.parse(text), null, 2));
+  parsed = JSON.parse(text);
+  console.log(JSON.stringify(parsed, null, 2));
 } catch {
   console.log(text.slice(0, 4000));
+  process.exit(res.ok ? 0 : 1);
 }
 
-process.exit(res.ok ? 0 : 1);
+if (res.ok && useQueue && parsed?.job_id) {
+  await triggerWorker();
+  try {
+    const result = await pollJob(parsed.job_id);
+    console.log('Job result:', JSON.stringify(result, null, 2));
+  } catch (pollErr) {
+    console.error(pollErr.message);
+    process.exit(1);
+  }
+}
+
+const battleAfter = await fetch(
+  `${url}/rest/v1/arena_battles?select=id,title,winner_side,is_active,total_rewards_distributed&id=eq.${battleId}`,
+  { headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } },
+);
+console.log('Battle after:', JSON.stringify((await battleAfter.json())?.[0], null, 2));
+
+const resultError = parsed?.results?.find?.((r) => r.error)?.error;
+if (!res.ok || resultError) {
+  process.exit(1);
+}
+
+process.exit(0);
