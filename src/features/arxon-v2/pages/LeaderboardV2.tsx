@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { AlertCircle, Crown, Medal, Award, User, Sparkles, Trophy } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
+import { formatPointsDisplay } from '@/lib/formatPoints';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { supabase } from '@/integrations/supabase/client';
@@ -146,7 +147,7 @@ export default function LeaderboardV2() {
             label="Your Balance"
             stats={[
               { label: 'Rank', value: userRank ? `#${userRank}` : '—', accent: neon.gold },
-              { label: 'ARX-P', value: totalPts.toLocaleString(), accent: neon.cyan },
+              { label: 'ARX-P', value: formatPointsDisplay(totalPts), accent: neon.cyan },
               { label: 'Streak', value: `${points?.daily_streak ?? 0}d`, accent: neon.teal },
             ]}
           />
@@ -276,7 +277,7 @@ export default function LeaderboardV2() {
                     accent={accent}
                     title={isMe ? `${entry.username || 'Miner'} (You)` : entry.username || 'Miner'}
                     subtitle={isTop3 ? PODIUM[idx].label : undefined}
-                    value={entry.total_points.toLocaleString()}
+                    value={formatPointsDisplay(entry.total_points)}
                     valueLabel="ARX-P"
                     highlight={isMe}
                     onClick={!isMe ? () => navigate(`/profile/${entry.user_id}`) : undefined}

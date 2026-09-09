@@ -5,6 +5,7 @@ import { Zap, Trophy, ArrowLeft, Medal, Crown, Award } from "lucide-react";
  import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
  import { useLeaderboard } from "@/hooks/useLeaderboard";
  import { usePoints } from "@/hooks/usePoints";
+ import { formatPointsDisplay } from "@/lib/formatPoints";
  import { useAuth } from "@/contexts/AuthContext";
  import ResendBackground from "@/components/effects/ResendBackground";
  import ScrollReveal from "@/components/effects/ScrollReveal";
@@ -17,15 +18,7 @@ import { Zap, Trophy, ArrowLeft, Medal, Crown, Award } from "lucide-react";
    return <span className="text-xs font-bold text-muted-foreground">#{index + 1}</span>;
  };
  
- const formatPoints = (value: number | string | undefined | null): string => {
-   if (value === undefined || value === null) return "0";
-   const num = typeof value === "string" ? parseFloat(value) : value;
-   if (!isFinite(num) || isNaN(num)) return "0";
-   const capped = Math.min(Math.max(num, 0), 1_000_000_000);
-   return capped.toLocaleString();
- };
- 
- const MinerEntry = memo(({ user, index }: { user: any; index: number }) => {
+const MinerEntry = memo(({ user, index }: { user: any; index: number }) => {
    const isTop3 = index < 3;
    
    return (
@@ -80,7 +73,7 @@ import { Zap, Trophy, ArrowLeft, Medal, Crown, Award } from "lucide-react";
            <div className="flex items-center gap-1.5">
             <Zap className={`w-3.5 h-3.5 ${isTop3 ? 'text-primary' : 'text-muted-foreground'}`} />
             <span className={`font-bold text-sm ${isTop3 ? 'text-foreground' : 'text-foreground/90'}`}>
-               {formatPoints(user.total_points)}
+               {formatPointsDisplay(user.total_points)}
              </span>
            </div>
          </div>
@@ -136,7 +129,7 @@ import { Zap, Trophy, ArrowLeft, Medal, Crown, Award } from "lucide-react";
                   <p className="text-xs text-muted-foreground">Points</p>
                   <p className="text-lg sm:text-xl font-bold text-primary flex items-center gap-1 justify-end">
                     <Zap className="h-4 w-4" />
-                     {formatPoints(points.total_points)}
+                     {formatPointsDisplay(points.total_points)}
                    </p>
                  </div>
                </div>
