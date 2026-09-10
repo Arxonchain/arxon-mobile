@@ -7,6 +7,7 @@ export type BattleRow = {
   side_a_name?: string;
   side_b_name?: string;
   side_c_name?: string | null;
+  vote_options?: unknown;
 };
 
 type EarningsRow = {
@@ -16,18 +17,29 @@ type EarningsRow = {
   stake_amount: number;
 };
 
+function optionNameFromBattle(battle: BattleRow, sideId: string): string | undefined {
+  if (!Array.isArray(battle.vote_options)) return undefined;
+  const match = battle.vote_options.find(
+    (row) => row && typeof row === "object" && (row as { id?: string }).id === sideId,
+  ) as { name?: string } | undefined;
+  return match?.name;
+}
+
 export function winnerName(battle: BattleRow): string {
-  switch (battle.winner_side) {
+  const side = battle.winner_side;
+  if (!side) return "Unknown";
+  if (side === "none") return "Void / Tie";
+  const fromOptions = optionNameFromBattle(battle, side);
+  if (fromOptions) return fromOptions;
+  switch (side) {
     case "a":
       return battle.side_a_name || "Side A";
     case "b":
       return battle.side_b_name || "Side B";
     case "c":
       return battle.side_c_name || "Draw";
-    case "none":
-      return "Void / Tie";
     default:
-      return "Unknown";
+      return `Option ${side.toUpperCase()}`;
   }
 }
 

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from 'sonner';
+import { getBattleOptions, type ArenaSideId } from '@/lib/arenaOptions';
 
 export interface ArenaMarket {
   id: string;
@@ -31,6 +32,7 @@ export interface ArenaMarket {
   category: string;
   resolution_source: string | null;
   total_participants: number;
+  vote_options?: unknown;
   // AI predictions
   ai_side_a_probability: number;
   ai_side_b_probability: number;
@@ -43,7 +45,7 @@ export interface MarketVote {
   id: string;
   battle_id: string;
   user_id: string;
-  side: 'a' | 'b' | 'c';
+  side: ArenaSideId;
   power_spent: number;
   locked_until: string;
   created_at: string;
@@ -234,23 +236,13 @@ export const useArenaMarkets = () => {
   // No artificial multipliers or bonus percentages applied
   const calculatePotentialReturns = useCallback((
     market: ArenaMarket,
-    side: 'a' | 'b' | 'c',
+    side: ArenaSideId,
     stakeAmount: number
   ) => {
-    // Get my pool and other pools
-    let myPool: number;
-    let otherPools: number;
-    
-    if (side === 'a') {
-      myPool = market.side_a_power;
-      otherPools = market.side_b_power + (market.side_c_power || 0);
-    } else if (side === 'c') {
-      myPool = market.side_c_power || 0;
-      otherPools = market.side_a_power + market.side_b_power;
-    } else {
-      myPool = market.side_b_power;
-      otherPools = market.side_a_power + (market.side_c_power || 0);
-    }
+    const options = getBattleOptions(market);
+    const myOption = options.find((o) => o.id === side);
+    const myPool = myOption?.power ?? 0;
+    const otherPools = options.filter((o) => o.id !== side).reduce((sum, o) => sum + o.power, 0);
     
     const newMyPool = myPool + stakeAmount;
     const totalStakes = newMyPool + otherPools;
@@ -303,7 +295,7 @@ export const useArenaMarkets = () => {
   }, []);
 
   // Place a vote on a market (atomic server RPC)
-  const placeVote = async (marketId: string, side: 'a' | 'b' | 'c', amount: number): Promise<boolean> => {
+  const placeVote = async (marketId: string, side: ArenaSideId, amount: number): Promise<boolean> => {
     if (!user) {
       toast.error('Please sign in to cast your vote');
       return false;

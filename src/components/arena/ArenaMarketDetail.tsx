@@ -13,14 +13,16 @@ import BattleVoteExplorer from './BattleVoteExplorer';
 import { useAuth } from '@/contexts/AuthContext';
 import StakingDisclaimer from '@/components/legal/StakingDisclaimer';
 import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { getOptionName, type ArenaSideId } from '@/lib/arenaOptions';
+import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 
 interface ArenaMarketDetailProps {
   market: ArenaMarket;
   userPosition?: MarketVote;
   availablePoints: number;
   onClose: () => void;
-  onPlaceBet: (marketId: string, side: 'a' | 'b' | 'c', amount: number) => Promise<boolean>;
-  calculateReturns: (market: ArenaMarket, side: 'a' | 'b' | 'c', amount: number) => any;
+  onPlaceBet: (marketId: string, side: ArenaSideId, amount: number) => Promise<boolean>;
+  calculateReturns: (market: ArenaMarket, side: ArenaSideId, amount: number) => any;
   isVoting: boolean;
   storedFingerprintHash?: string | null;
   onReregisterFingerprint?: (newHash: string) => Promise<{ success: boolean; error?: string }>;
@@ -41,7 +43,7 @@ const ArenaMarketDetail = ({
 }: ArenaMarketDetailProps) => {
   const { user } = useAuth();
   const { gateStakeAction, complianceDialog } = useStakeCompliance();
-  const [selectedSide, setSelectedSide] = useState<'a' | 'b' | 'c' | null>(null);
+  const [selectedSide, setSelectedSide] = useState<ArenaSideId | null>(null);
   const [stakeAmount, setStakeAmount] = useState(1000);
   const [showFingerprint, setShowFingerprint] = useState(false);
   const [isReregistering, setIsReregistering] = useState(false);
@@ -49,11 +51,7 @@ const ArenaMarketDetail = ({
   const [activeDetailTab, setActiveDetailTab] = useState<DetailTab>('pools');
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  const hasSideC = !!market.side_c_name;
-  const totalPool = market.side_a_power + market.side_b_power + (market.side_c_power || 0);
-  const sideAPercent = totalPool > 0 ? (market.side_a_power / totalPool) * 100 : hasSideC ? 33.33 : 50;
-  const sideBPercent = totalPool > 0 ? (market.side_b_power / totalPool) * 100 : hasSideC ? 33.33 : 50;
-  const sideCPercent = totalPool > 0 && hasSideC ? ((market.side_c_power || 0) / totalPool) * 100 : 33.33;
+  const poolStats = useMemo(() => getArenaPoolStats(market), [market]);
 
   // Recalculate status based on current time (updates every second)
   const isEnded = !!market.winner_side || new Date(market.ends_at) < currentTime;
@@ -162,7 +160,7 @@ const ArenaMarketDetail = ({
   const handleShare = async () => {
     if (navigator.share) {
       try {
-        const sideName = selectedSide === 'a' ? market.side_a_name : selectedSide === 'c' ? market.side_c_name : market.side_b_name;
+        const sideName = selectedSide ? getOptionName(market, selectedSide) : '';
         await navigator.share({
           title: `Arxon Arena - ${market.title}`,
           text: `I'm predicting ${sideName}! Join me and stake your prediction!`,
@@ -386,7 +384,7 @@ const ArenaMarketDetail = ({
                     : userPosition.power_spent.toLocaleString()} ARX-P
                 </p>
                 <p className="text-[10px] text-muted-foreground">
-                  on {userPosition.side === 'a' ? market.side_a_name : userPosition.side === 'c' ? market.side_c_name : market.side_b_name}
+                  on {getOptionName(market, userPosition.side)}
                   {!isEnded || !market.winner_side ? ' · Awaiting results' : ''}
                 </p>
               </div>
@@ -423,7 +421,7 @@ const ArenaMarketDetail = ({
               <div>
                 <p className="text-[10px] text-muted-foreground">Resolved · Winner</p>
                 <p className="text-sm font-bold text-amber-500">
-                  {market.winner_side === 'a' ? market.side_a_name : market.winner_side === 'c' ? market.side_c_name : market.side_b_name}
+                  {getOptionName(market, market.winner_side)}
                 </p>
               </div>
             </div>
@@ -436,118 +434,45 @@ const ArenaMarketDetail = ({
             <div className="space-y-3">
               <p className="text-sm font-medium text-muted-foreground">Select your prediction:</p>
               
-              {/* Side A */}
-              <button
-                type="button"
-                onClick={() => setSelectedSide('a')}
-                className={`
-                  w-full p-4 rounded-xl border-2 transition-all duration-200
-                  touch-manipulation select-none active:scale-[0.98]
-                  ${selectedSide === 'a' 
-                    ? 'shadow-lg' 
-                    : 'border-border/40 hover:border-border'
-                  }
-                `}
-                style={{ 
-                  borderColor: selectedSide === 'a' ? market.side_a_color : undefined,
-                  backgroundColor: selectedSide === 'a' ? `${market.side_a_color}15` : undefined,
-                  boxShadow: selectedSide === 'a' ? `0 8px 24px ${market.side_a_color}30` : undefined
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: `${market.side_a_color}20` }}
-                    >
-                      <TrendingUp className="w-5 h-5" style={{ color: market.side_a_color }} />
-                    </div>
-                    <div className="text-left">
-                      <span className="font-bold text-base text-foreground block">{market.side_a_name}</span>
-                      <span className="text-xs text-muted-foreground">{market.side_a_power.toLocaleString()} staked</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black" style={{ color: market.side_a_color }}>{sideAPercent.toFixed(0)}%</span>
-                  </div>
-                </div>
-              </button>
-
-              {/* Side C (Draw) - Only if exists */}
-              {hasSideC && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedSide('c')}
-                  className={`
-                    w-full p-4 rounded-xl border-2 transition-all duration-200
-                    touch-manipulation select-none active:scale-[0.98]
-                    ${selectedSide === 'c' 
-                      ? 'shadow-lg' 
-                      : 'border-border/40 hover:border-border'
-                    }
-                  `}
-                  style={{ 
-                    borderColor: selectedSide === 'c' ? (market.side_c_color || '#888888') : undefined,
-                    backgroundColor: selectedSide === 'c' ? `${market.side_c_color || '#888888'}15` : undefined,
-                    boxShadow: selectedSide === 'c' ? `0 8px 24px ${market.side_c_color || '#888888'}30` : undefined
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div 
-                        className="w-10 h-10 rounded-xl flex items-center justify-center"
-                        style={{ backgroundColor: `${market.side_c_color || '#888888'}20` }}
-                      >
-                        <Target className="w-5 h-5" style={{ color: market.side_c_color || '#888888' }} />
+              {poolStats.options.map((opt) => {
+                const isSelected = selectedSide === opt.id;
+                const Icon = opt.id === 'c' ? Target : TrendingUp;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setSelectedSide(opt.id)}
+                    className={`
+                      w-full p-4 rounded-xl border-2 transition-all duration-200
+                      touch-manipulation select-none active:scale-[0.98]
+                      ${isSelected ? 'shadow-lg' : 'border-border/40 hover:border-border'}
+                    `}
+                    style={{
+                      borderColor: isSelected ? opt.color : undefined,
+                      backgroundColor: isSelected ? `${opt.color}15` : undefined,
+                      boxShadow: isSelected ? `0 8px 24px ${opt.color}30` : undefined,
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-10 h-10 rounded-xl flex items-center justify-center"
+                          style={{ backgroundColor: `${opt.color}20` }}
+                        >
+                          <Icon className="w-5 h-5" style={{ color: opt.color }} />
+                        </div>
+                        <div className="text-left">
+                          <span className="font-bold text-base text-foreground block">{opt.name}</span>
+                          <span className="text-xs text-muted-foreground">{opt.power.toLocaleString()} staked</span>
+                        </div>
                       </div>
-                      <div className="text-left">
-                        <span className="font-bold text-base text-foreground block">{market.side_c_name}</span>
-                        <span className="text-xs text-muted-foreground">{(market.side_c_power || 0).toLocaleString()} staked</span>
+                      <div className="text-right">
+                        <span className="text-2xl font-black" style={{ color: opt.color }}>{opt.pct}%</span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <span className="text-2xl font-black" style={{ color: market.side_c_color || '#888888' }}>{sideCPercent.toFixed(0)}%</span>
-                    </div>
-                  </div>
-                </button>
-              )}
-
-              {/* Side B */}
-              <button
-                type="button"
-                onClick={() => setSelectedSide('b')}
-                className={`
-                  w-full p-4 rounded-xl border-2 transition-all duration-200
-                  touch-manipulation select-none active:scale-[0.98]
-                  ${selectedSide === 'b' 
-                    ? 'shadow-lg' 
-                    : 'border-border/40 hover:border-border'
-                  }
-                `}
-                style={{ 
-                  borderColor: selectedSide === 'b' ? market.side_b_color : undefined,
-                  backgroundColor: selectedSide === 'b' ? `${market.side_b_color}15` : undefined,
-                  boxShadow: selectedSide === 'b' ? `0 8px 24px ${market.side_b_color}30` : undefined
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div 
-                      className="w-10 h-10 rounded-xl flex items-center justify-center"
-                      style={{ backgroundColor: `${market.side_b_color}20` }}
-                    >
-                      <TrendingUp className="w-5 h-5" style={{ color: market.side_b_color }} />
-                    </div>
-                    <div className="text-left">
-                      <span className="font-bold text-base text-foreground block">{market.side_b_name}</span>
-                      <span className="text-xs text-muted-foreground">{market.side_b_power.toLocaleString()} staked</span>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-2xl font-black" style={{ color: market.side_b_color }}>{sideBPercent.toFixed(0)}%</span>
-                  </div>
-                </div>
-              </button>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Stake Amount - Enhanced */}
@@ -700,7 +625,7 @@ const ArenaMarketDetail = ({
                   onVerified={handleFingerprintVerified}
                   isVerifying={isVoting}
                   title="Confirm Your Vote"
-                  subtitle={`Stake ${stakeAmount.toLocaleString()} ARX-P on ${selectedSide === 'a' ? market.side_a_name : selectedSide === 'c' ? market.side_c_name : market.side_b_name}`}
+                  subtitle={`Stake ${stakeAmount.toLocaleString()} ARX-P on ${selectedSide ? getOptionName(market, selectedSide) : ''}`}
                 />
                 <button
                   onClick={() => setShowFingerprint(false)}

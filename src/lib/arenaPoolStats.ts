@@ -1,23 +1,26 @@
-export function getArenaPoolStats(battle: {
-  side_a_power?: number;
-  side_b_power?: number;
-  side_c_power?: number | null;
-  side_c_name?: string | null;
-}) {
-  const hasSideC = !!battle.side_c_name;
-  const powC = hasSideC ? Number(battle.side_c_power ?? 0) : 0;
-  const powA = Number(battle.side_a_power ?? 0);
-  const powB = Number(battle.side_b_power ?? 0);
-  const total = powA + powB + powC;
-  if (total <= 0) {
-    return { total: 0, pctA: hasSideC ? 33 : 50, pctB: hasSideC ? 33 : 50, pctC: hasSideC ? 34 : 0, hasSideC, powC };
-  }
+import { getBattleOptions, type ArenaBattleOptionsSource } from './arenaOptions';
+
+export function getArenaPoolStats(battle: ArenaBattleOptionsSource) {
+  const options = getBattleOptions(battle);
+  const total = options.reduce((sum, o) => sum + o.power, 0);
+  const equalPct = options.length > 0 ? Math.round(100 / options.length) : 50;
+
+  const withPct = options.map((o) => ({
+    ...o,
+    pct: total > 0 ? Math.round((o.power / total) * 100) : equalPct,
+  }));
+
+  const optA = withPct.find((o) => o.id === 'a');
+  const optB = withPct.find((o) => o.id === 'b');
+  const optC = withPct.find((o) => o.id === 'c');
+
   return {
     total,
-    pctA: Math.round((powA / total) * 100),
-    pctB: Math.round((powB / total) * 100),
-    pctC: hasSideC ? Math.round((powC / total) * 100) : 0,
-    hasSideC,
-    powC,
+    options: withPct,
+    hasSideC: options.length > 2,
+    pctA: optA?.pct ?? (options.length > 2 ? equalPct : 50),
+    pctB: optB?.pct ?? (options.length > 2 ? equalPct : 50),
+    pctC: optC?.pct ?? 0,
+    powC: optC?.power ?? 0,
   };
 }

@@ -15,6 +15,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import {
+  buildBattleOptionsPayload,
+  createEmptyOptionDrafts,
+  draftsFromBattle,
+  getBattleOptions,
+  getTotalBattlePower,
+  nextOptionId,
+  type ArenaOptionDraft,
+  type ArenaSideId,
+} from '@/lib/arenaOptions';
 
 interface ArenaBattle {
   id: string;
@@ -29,6 +39,10 @@ interface ArenaBattle {
   banner_image: string | null;
   side_a_power: number;
   side_b_power: number;
+  side_c_name?: string | null;
+  side_c_color?: string | null;
+  side_c_power?: number | null;
+  vote_options?: unknown;
   starts_at: string;
   ends_at: string;
   is_active: boolean;
@@ -52,6 +66,68 @@ const CATEGORIES = [
 
 const HOUR_OPTIONS = [0, 1, 2, 3, 4, 6, 12, 24, 48, 72, 168];
 const MINUTE_OPTIONS = [0, 5, 10, 15, 30, 45];
+
+function VoteOptionsEditor({
+  options,
+  onChange,
+  minOptions = 2,
+}: {
+  options: ArenaOptionDraft[];
+  onChange: (next: ArenaOptionDraft[]) => void;
+  minOptions?: number;
+}) {
+  const updateOption = (index: number, patch: Partial<ArenaOptionDraft>) => {
+    onChange(options.map((opt, i) => (i === index ? { ...opt, ...patch } : opt)));
+  };
+
+  const addOption = () => {
+    if (options.length >= 26) return;
+    const id = nextOptionId(options.map((o) => o.id));
+    onChange([...options, { id, name: '', color: '#60a5fa' }]);
+  };
+
+  const removeOption = (index: number) => {
+    if (options.length <= minOptions) return;
+    onChange(options.filter((_, i) => i !== index));
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label>Vote Options *</Label>
+        <Button type="button" variant="outline" size="sm" onClick={addOption}>
+          <Plus className="w-3 h-3 mr-1" /> Add option
+        </Button>
+      </div>
+      {options.map((opt, index) => (
+        <div key={opt.id} className="flex gap-2 items-start p-3 rounded-lg border border-border bg-muted/10">
+          <div className="flex-1 space-y-2">
+            <Input
+              placeholder={`Option ${opt.id.toUpperCase()} name`}
+              value={opt.name}
+              onChange={(e) => updateOption(index, { name: e.target.value })}
+            />
+            <div className="flex items-center gap-2">
+              <input
+                type="color"
+                value={opt.color}
+                onChange={(e) => updateOption(index, { color: e.target.value })}
+                className="w-8 h-8 rounded cursor-pointer"
+              />
+              <span className="text-xs text-muted-foreground">Color · ID {opt.id}</span>
+            </div>
+          </div>
+          {options.length > minOptions && (
+            <Button type="button" variant="ghost" size="icon" onClick={() => removeOption(index)} className="shrink-0 text-destructive">
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      ))}
+      <p className="text-xs text-muted-foreground">Minimum {minOptions} options. Users pick one option to stake on.</p>
+    </div>
+  );
+}
 
 const AdminArena = () => {
   const [battles, setBattles] = useState<ArenaBattle[]>([]);
@@ -125,13 +201,12 @@ const AdminArena = () => {
   };
   
   // Form state
+  const [createOptions, setCreateOptions] = useState<ArenaOptionDraft[]>(createEmptyOptionDrafts(2));
+  const [editOptions, setEditOptions] = useState<ArenaOptionDraft[]>(createEmptyOptionDrafts(2));
+
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    side_a_name: '',
-    side_a_color: '#4ade80',
-    side_b_name: '',
-    side_b_color: '#f87171',
     banner_image: '',
     category: 'crypto',
     duration_hours: '24',
@@ -149,10 +224,6 @@ const AdminArena = () => {
   const [editFormData, setEditFormData] = useState({
     title: '',
     description: '',
-    side_a_name: '',
-    side_a_color: '#4ade80',
-    side_b_name: '',
-    side_b_color: '#f87171',
     banner_image: '',
     category: 'crypto',
     prize_pool: '0',
@@ -187,8 +258,8 @@ const AdminArena = () => {
   }, []);
 
   const handleCreate = async () => {
-    if (!formData.title || !formData.side_a_name || !formData.side_b_name) {
-      toast.error('Please fill in all required fields');
+    if (!formData.title || createOptions.filter((o) => o.name.trim()).length < 2) {
+      toast.error('Please fill in title and at least 2 vote options');
       return;
     }
 
@@ -247,16 +318,15 @@ const AdminArena = () => {
       }
       
       const endsAt = new Date(startsAt.getTime() + totalDurationMs);
+      const optionsPayload = buildBattleOptionsPayload(createOptions);
 
       const { data: created, error } = await supabase.from('arena_battles').insert({
         title: formData.title,
         description: formData.description || null,
-        side_a_name: formData.side_a_name,
-        side_a_color: formData.side_a_color,
+        ...optionsPayload,
         side_a_image: null,
-        side_b_name: formData.side_b_name,
-        side_b_color: formData.side_b_color,
         side_b_image: null,
+        side_c_image: null,
         banner_image: formData.banner_image || null,
         category: formData.category,
         duration_hours: hours,
@@ -302,13 +372,10 @@ const AdminArena = () => {
           : 'Market created and is now live!',
       );
       setShowCreateDialog(false);
+      setCreateOptions(createEmptyOptionDrafts(2));
       setFormData({
         title: '',
         description: '',
-        side_a_name: '',
-        side_a_color: '#4ade80',
-        side_b_name: '',
-        side_b_color: '#f87171',
         banner_image: '',
         category: 'crypto',
         duration_hours: '24',
@@ -332,7 +399,7 @@ const AdminArena = () => {
 
   const [resolving, setResolving] = useState<string | null>(null);
 
-  const handleManualResolve = async (battleId: string, winnerSide: 'a' | 'b' | 'c', force = false) => {
+  const handleManualResolve = async (battleId: string, winnerSide: ArenaSideId, force = false) => {
     setResolving(battleId);
     let queued = false;
     try {
@@ -493,13 +560,10 @@ const AdminArena = () => {
     if (h > 12) h -= 12;
     if (h === 0) h = 12;
     const dateStr = `${endsAt.getUTCFullYear()}-${String(endsAt.getUTCMonth() + 1).padStart(2, '0')}-${String(endsAt.getUTCDate()).padStart(2, '0')}`;
+    setEditOptions(draftsFromBattle(battle));
     setEditFormData({
       title: battle.title,
       description: battle.description || '',
-      side_a_name: battle.side_a_name,
-      side_a_color: battle.side_a_color,
-      side_b_name: battle.side_b_name,
-      side_b_color: battle.side_b_color,
       banner_image: battle.banner_image || '',
       category: battle.category,
       prize_pool: String(battle.prize_pool || 0),
@@ -515,8 +579,8 @@ const AdminArena = () => {
   const handleUpdate = async () => {
     if (!editingBattle) return;
     
-    if (!editFormData.title || !editFormData.side_a_name || !editFormData.side_b_name) {
-      toast.error('Please fill in all required fields');
+    if (!editFormData.title || editOptions.filter((o) => o.name.trim()).length < 2) {
+      toast.error('Please fill in title and at least 2 vote options');
       return;
     }
 
@@ -528,18 +592,18 @@ const AdminArena = () => {
       else if (editFormData.ends_at_period === 'AM' && hour24 === 12) hour24 = 0;
       const timeStr = `${hour24.toString().padStart(2, '0')}:${editFormData.ends_at_minute}:00`;
       const newEndsAt = new Date(`${editFormData.ends_at_date}T${timeStr}Z`);
+      const existingPower = Object.fromEntries(getBattleOptions(editingBattle).map((o) => [o.id, o.power]));
+      const optionsPayload = buildBattleOptionsPayload(editOptions, existingPower);
 
       const { error } = await supabase
         .from('arena_battles')
         .update({
           title: editFormData.title,
           description: editFormData.description || null,
-          side_a_name: editFormData.side_a_name,
-          side_a_color: editFormData.side_a_color,
+          ...optionsPayload,
           side_a_image: null,
-          side_b_name: editFormData.side_b_name,
-          side_b_color: editFormData.side_b_color,
           side_b_image: null,
+          side_c_image: null,
           banner_image: editFormData.banner_image || null,
           category: editFormData.category,
           prize_pool: parseFloat(editFormData.prize_pool) || 0,
@@ -609,7 +673,7 @@ const AdminArena = () => {
   const liveCount = battles.filter(b => b.is_active && !b.winner_side && new Date(b.starts_at) <= now && new Date(b.ends_at) > now).length;
   const pendingCount = battles.filter(b => !b.winner_side && new Date(b.ends_at) < now).length;
   const resolvedCount = battles.filter(b => b.winner_side).length;
-  const totalStaked = battles.reduce((sum, b) => sum + b.side_a_power + b.side_b_power, 0);
+  const totalStaked = battles.reduce((sum, b) => sum + getTotalBattlePower(b), 0);
 
   return (
     <div className="space-y-6">
@@ -659,44 +723,7 @@ const AdminArena = () => {
                   />
                 </div>
 
-                {/* Sides */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Side A (YES) *</Label>
-                    <Input
-                      placeholder="YES - It will hit"
-                      value={formData.side_a_name}
-                      onChange={(e) => setFormData({ ...formData, side_a_name: e.target.value })}
-                    />
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={formData.side_a_color}
-                        onChange={(e) => setFormData({ ...formData, side_a_color: e.target.value })}
-                        className="w-8 h-8 rounded cursor-pointer"
-                      />
-                      <span className="text-xs text-muted-foreground">Color</span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Side B (NO) *</Label>
-                    <Input
-                      placeholder="NO - It won't"
-                      value={formData.side_b_name}
-                      onChange={(e) => setFormData({ ...formData, side_b_name: e.target.value })}
-                    />
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="color"
-                        value={formData.side_b_color}
-                        onChange={(e) => setFormData({ ...formData, side_b_color: e.target.value })}
-                        className="w-8 h-8 rounded cursor-pointer"
-                      />
-                      <span className="text-xs text-muted-foreground">Color</span>
-                    </div>
-                  </div>
-                </div>
-
+                <VoteOptionsEditor options={createOptions} onChange={setCreateOptions} />
 
                 {/* ── Banner Image Upload ── */}
                 <div className="space-y-3 p-4 rounded-xl border border-border bg-muted/10">
@@ -1046,14 +1073,12 @@ const AdminArena = () => {
                       </div>
                       <h3 className="font-medium text-foreground text-sm sm:text-base leading-snug">{battle.title}</h3>
                       <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1 sm:gap-4 mt-2 text-xs sm:text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1">
-                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: battle.side_a_color }} />
-                          {battle.side_a_name}: {battle.side_a_power.toLocaleString()}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: battle.side_b_color }} />
-                          {battle.side_b_name}: {battle.side_b_power.toLocaleString()}
-                        </span>
+                        {getBattleOptions(battle).map((opt) => (
+                          <span key={opt.id} className="flex items-center gap-1">
+                            <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: opt.color }} />
+                            {opt.name}: {opt.power.toLocaleString()}
+                          </span>
+                        ))}
                       </div>
                       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5 text-[10px] sm:text-xs text-muted-foreground">
                         <span><Users className="w-3 h-3 inline mr-1" />{battle.total_participants} voters</span>
@@ -1069,50 +1094,22 @@ const AdminArena = () => {
                     
                     <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:max-w-[280px] sm:justify-end">
                       {/* Resolution buttons */}
-                      {!battle.winner_side && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={resolving === battle.id}
-                            onClick={() => {
-                              if (!confirm(`Resolve: Winner = ${battle.side_a_name} (Side A)?\n\nThis will distribute rewards immediately.`)) return;
-                              handleManualResolve(battle.id, 'a');
-                            }}
-                            className="text-xs flex-1 sm:flex-none min-w-0"
-                            style={{ borderColor: battle.side_a_color, color: battle.side_a_color }}
-                          >
-                            {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_a_name} Wins`}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={resolving === battle.id}
-                            onClick={() => {
-                              if (!confirm(`Resolve: Winner = ${battle.side_b_name} (Side B)?\n\nThis will distribute rewards immediately.`)) return;
-                              handleManualResolve(battle.id, 'b');
-                            }}
-                            className="text-xs flex-1 sm:flex-none min-w-0"
-                            style={{ borderColor: battle.side_b_color, color: battle.side_b_color }}
-                          >
-                            {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_b_name} Wins`}
-                          </Button>
-                          {battle.side_c_name && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={resolving === battle.id}
-                              onClick={() => {
-                                if (!confirm(`Resolve: Winner = ${battle.side_c_name} (Side C)?\n\nThis will distribute rewards immediately.`)) return;
-                                handleManualResolve(battle.id, 'c');
-                              }}
-                              className="text-xs flex-1 sm:flex-none min-w-0"
-                            >
-                              {resolving === battle.id ? '⏳ Resolving...' : `${battle.side_c_name} Wins`}
-                            </Button>
-                          )}
-                        </>
-                      )}
+                      {!battle.winner_side && getBattleOptions(battle).map((opt) => (
+                        <Button
+                          key={opt.id}
+                          size="sm"
+                          variant="outline"
+                          disabled={resolving === battle.id}
+                          onClick={() => {
+                            if (!confirm(`Resolve: Winner = ${opt.name}?\n\nThis will distribute rewards immediately.`)) return;
+                            handleManualResolve(battle.id, opt.id);
+                          }}
+                          className="text-xs flex-1 sm:flex-none min-w-0"
+                          style={{ borderColor: opt.color, color: opt.color }}
+                        >
+                          {resolving === battle.id ? '⏳ Resolving...' : `${opt.name} Wins`}
+                        </Button>
+                      ))}
                       {/* Force re-resolve for battles with winner but no rewards */}
                       {battle.winner_side && (!battle.total_rewards_distributed || battle.total_rewards_distributed === 0) && (
                         <Button
@@ -1121,7 +1118,7 @@ const AdminArena = () => {
                           disabled={resolving === battle.id}
                           onClick={() => {
                             if (!confirm(`Force re-resolve "${battle.title}"?\n\nThis battle was partially resolved (no rewards distributed). This will retry reward distribution.`)) return;
-                            handleManualResolve(battle.id, battle.winner_side as 'a' | 'b', true);
+                            handleManualResolve(battle.id, battle.winner_side as ArenaSideId, true);
                           }}
                           className="text-xs"
                         >
@@ -1206,43 +1203,7 @@ const AdminArena = () => {
               />
             </div>
 
-            {/* Sides */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Side A Name *</Label>
-                <Input
-                  placeholder="YES - It will hit"
-                  value={editFormData.side_a_name}
-                  onChange={(e) => setEditFormData({ ...editFormData, side_a_name: e.target.value })}
-                />
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={editFormData.side_a_color}
-                    onChange={(e) => setEditFormData({ ...editFormData, side_a_color: e.target.value })}
-                    className="w-8 h-8 rounded cursor-pointer"
-                  />
-                  <span className="text-xs text-muted-foreground">Color</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>Side B Name *</Label>
-                <Input
-                  placeholder="NO - It won't"
-                  value={editFormData.side_b_name}
-                  onChange={(e) => setEditFormData({ ...editFormData, side_b_name: e.target.value })}
-                />
-                <div className="flex items-center gap-2">
-                  <input
-                    type="color"
-                    value={editFormData.side_b_color}
-                    onChange={(e) => setEditFormData({ ...editFormData, side_b_color: e.target.value })}
-                    className="w-8 h-8 rounded cursor-pointer"
-                  />
-                  <span className="text-xs text-muted-foreground">Color</span>
-                </div>
-              </div>
-            </div>
+            <VoteOptionsEditor options={editOptions} onChange={setEditOptions} />
 
             {/* Category */}
             <div className="space-y-2">

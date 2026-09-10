@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from '@/hooks/use-toast';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
+import { getOptionName, type ArenaSideId } from '@/lib/arenaOptions';
 import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
 import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
@@ -24,16 +25,14 @@ const CSS = `
 @keyframes shimmer{0%{left:-100%}100%{left:200%}}
 `;
 
-type ArenaSide = 'a' | 'b' | 'c';
+type ArenaSide = ArenaSideId;
 
 function getPoolStats(battle: Parameters<typeof getArenaPoolStats>[0]) {
   return getArenaPoolStats(battle);
 }
 
-function sideName(battle: { side_a_name: string; side_b_name: string; side_c_name?: string | null }, side: ArenaSide) {
-  if (side === 'a') return battle.side_a_name;
-  if (side === 'c') return battle.side_c_name || 'Draw';
-  return battle.side_b_name;
+function sideName(battle: Parameters<typeof getOptionName>[0], side: ArenaSide) {
+  return getOptionName(battle, side);
 }
 
 type Tab = 'battles' | 'leaderboard' | 'my-stakes';
@@ -247,7 +246,7 @@ function BattleDetail({
 }) {
   const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const timer = useTimer(battle.ends_at, !!isActive);
-  const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle as any);
+  const { total: totalPow, options: poolOptions } = getPoolStats(battle as any);
   const existingVote = battleUserVote?.side ?? null;
 
   const [localSide, setLocalSide] = useState<ArenaSide|null>(null);
@@ -377,66 +376,69 @@ function BattleDetail({
             />
           </div>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 40px 1fr',gap:10,alignItems:'stretch',marginBottom:14}}>
-            {/* Side A */}
-            <motion.div whileTap={{scale:0.97}}
-              onClick={()=>isActive&&!existingVote&&setLocalSide('a')}
-              style={{borderRadius:16,padding:'16px 12px',display:'flex',flexDirection:'column',alignItems:'center',gap:10,
-                cursor:isActive&&!existingVote?'pointer':'default',transition:'all 0.2s',
-                background:activeSide==='a'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
-                border:`2px solid ${activeSide==='a'?'hsl(215 35% 62%/0.45)':battle.winner_side==='a'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
-              }}>
-              <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)',textAlign:'center'}}>{battle.side_a_name}</p>
-              <div style={{fontSize:24,fontWeight:800,color:battle.winner_side==='a'?'hsl(38 55% 58%)':activeSide==='a'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctA}%</div>
-              <p style={{fontSize:10,color:'hsl(215 14% 40%)',textAlign:'center'}}>{battle.side_a_power.toLocaleString()} ARX-P</p>
-              {battle.winner_side==='a' && <div style={{fontSize:10,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</div>}
-              {activeSide==='a'&&isActive && <div style={{fontSize:10,fontWeight:700,color:'hsl(155 45% 55%)'}}>✓ Your pick</div>}
-            </motion.div>
-
-            {/* VS */}
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <div style={{fontWeight:900,fontSize:12,color:'hsl(215 18% 38%)'}}>VS</div>
-            </div>
-
-            {/* Side B */}
-            <motion.div whileTap={{scale:0.97}}
-              onClick={()=>isActive&&!existingVote&&setLocalSide('b')}
-              style={{borderRadius:16,padding:'16px 12px',display:'flex',flexDirection:'column',alignItems:'center',gap:10,
-                cursor:isActive&&!existingVote?'pointer':'default',transition:'all 0.2s',
-                background:activeSide==='b'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
-                border:`2px solid ${activeSide==='b'?'hsl(215 35% 62%/0.45)':battle.winner_side==='b'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
-              }}>
-              <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)',textAlign:'center'}}>{battle.side_b_name}</p>
-              <div style={{fontSize:24,fontWeight:800,color:battle.winner_side==='b'?'hsl(38 55% 58%)':activeSide==='b'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctB}%</div>
-              <p style={{fontSize:10,color:'hsl(215 14% 40%)',textAlign:'center'}}>{battle.side_b_power.toLocaleString()} ARX-P</p>
-              {battle.winner_side==='b' && <div style={{fontSize:10,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</div>}
-              {activeSide==='b'&&isActive && <div style={{fontSize:10,fontWeight:700,color:'hsl(155 45% 55%)'}}>✓ Your pick</div>}
-            </motion.div>
+          <div style={{
+            display: poolOptions.length === 2 ? 'grid' : 'flex',
+            gridTemplateColumns: poolOptions.length === 2 ? '1fr 40px 1fr' : undefined,
+            flexDirection: poolOptions.length === 2 ? undefined : 'column',
+            gap: 10,
+            alignItems: 'stretch',
+            marginBottom: 14,
+          }}>
+            {poolOptions.length === 2 ? (
+              <>
+                {[poolOptions[0], null, poolOptions[1]].map((opt, idx) => {
+                  if (!opt) {
+                    return (
+                      <div key="vs" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ fontWeight: 900, fontSize: 12, color: 'hsl(215 18% 38%)' }}>VS</div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <motion.div key={opt.id} whileTap={{ scale: 0.97 }}
+                      onClick={() => isActive && !existingVote && setLocalSide(opt.id as ArenaSide)}
+                      style={{
+                        borderRadius: 16, padding: '16px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                        cursor: isActive && !existingVote ? 'pointer' : 'default', transition: 'all 0.2s',
+                        background: activeSide === opt.id ? 'hsl(215 35% 62%/0.12)' : 'hsl(215 26% 11%)',
+                        border: `2px solid ${activeSide === opt.id ? 'hsl(215 35% 62%/0.45)' : battle.winner_side === opt.id ? 'hsl(38 55% 52%/0.4)' : 'hsl(215 22% 18%)'}`,
+                      }}>
+                      <p style={{ fontSize: 12, fontWeight: 700, color: 'hsl(215 18% 82%)', textAlign: 'center' }}>{opt.name}</p>
+                      <div style={{ fontSize: 24, fontWeight: 800, color: battle.winner_side === opt.id ? 'hsl(38 55% 58%)' : activeSide === opt.id ? 'hsl(215 35% 72%)' : 'hsl(215 20% 90%)' }}>{opt.pct}%</div>
+                      <p style={{ fontSize: 10, color: 'hsl(215 14% 40%)', textAlign: 'center' }}>{opt.power.toLocaleString()} ARX-P</p>
+                      {battle.winner_side === opt.id && <div style={{ fontSize: 10, fontWeight: 700, color: 'hsl(38 55% 58%)' }}>👑 Winner</div>}
+                      {activeSide === opt.id && isActive && <div style={{ fontSize: 10, fontWeight: 700, color: 'hsl(155 45% 55%)' }}>✓ Your pick</div>}
+                    </motion.div>
+                  );
+                })}
+              </>
+            ) : (
+              poolOptions.map((opt) => (
+                <motion.div key={opt.id} whileTap={{ scale: 0.97 }}
+                  onClick={() => isActive && !existingVote && setLocalSide(opt.id as ArenaSide)}
+                  style={{
+                    borderRadius: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    cursor: isActive && !existingVote ? 'pointer' : 'default',
+                    background: activeSide === opt.id ? 'hsl(215 35% 62%/0.12)' : 'hsl(215 26% 11%)',
+                    border: `2px solid ${activeSide === opt.id ? 'hsl(215 35% 62%/0.45)' : battle.winner_side === opt.id ? 'hsl(38 55% 52%/0.4)' : 'hsl(215 22% 18%)'}`,
+                  }}>
+                  <div>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: 'hsl(215 18% 82%)' }}>{opt.name}</p>
+                    <p style={{ fontSize: 10, color: 'hsl(215 14% 40%)', marginTop: 2 }}>{opt.power.toLocaleString()} ARX-P</p>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, color: battle.winner_side === opt.id ? 'hsl(38 55% 58%)' : activeSide === opt.id ? 'hsl(215 35% 72%)' : 'hsl(215 20% 90%)' }}>{opt.pct}%</div>
+                    {battle.winner_side === opt.id && <div style={{ fontSize: 10, fontWeight: 700, color: 'hsl(38 55% 58%)' }}>👑 Winner</div>}
+                    {activeSide === opt.id && isActive && <div style={{ fontSize: 10, fontWeight: 700, color: 'hsl(155 45% 55%)' }}>✓ Your pick</div>}
+                  </div>
+                </motion.div>
+              ))
+            )}
           </div>
-
-          {hasSideC && (
-            <motion.div whileTap={{scale:0.97}}
-              onClick={()=>isActive&&!existingVote&&setLocalSide('c')}
-              style={{borderRadius:16,padding:'14px 16px',marginBottom:14,display:'flex',alignItems:'center',justifyContent:'space-between',
-                cursor:isActive&&!existingVote?'pointer':'default',
-                background:activeSide==='c'?'hsl(215 35% 62%/0.12)':'hsl(215 26% 11%)',
-                border:`2px solid ${activeSide==='c'?'hsl(215 35% 62%/0.45)':battle.winner_side==='c'?'hsl(38 55% 52%/0.4)':'hsl(215 22% 18%)'}`,
-              }}>
-              <div>
-                <p style={{fontSize:12,fontWeight:700,color:'hsl(215 18% 82%)'}}>{battle.side_c_name}</p>
-                <p style={{fontSize:10,color:'hsl(215 14% 40%)',marginTop:2}}>{powC.toLocaleString()} ARX-P</p>
-              </div>
-              <div style={{textAlign:'right'}}>
-                <div style={{fontSize:22,fontWeight:800,color:battle.winner_side==='c'?'hsl(38 55% 58%)':activeSide==='c'?'hsl(215 35% 72%)':'hsl(215 20% 90%)'}}>{pctC}%</div>
-                {battle.winner_side==='c' && <div style={{fontSize:10,fontWeight:700,color:'hsl(38 55% 58%)'}}>👑 Winner</div>}
-                {activeSide==='c'&&isActive && <div style={{fontSize:10,fontWeight:700,color:'hsl(155 45% 55%)'}}>✓ Your pick</div>}
-              </div>
-            </motion.div>
-          )}
 
           {/* Progress */}
           <div style={{height:5,borderRadius:3,background:'hsl(215 26% 12%)',overflow:'hidden',marginBottom:8}}>
-            <motion.div initial={{width:0}} animate={{width:`${pctA}%`}} transition={{duration:0.8,ease:'easeOut'}}
+            <motion.div initial={{width:0}} animate={{width:`${poolOptions[0]?.pct ?? 50}%`}} transition={{duration:0.8,ease:'easeOut'}}
               style={{height:'100%',borderRadius:3,background:'linear-gradient(90deg,hsl(215 35% 50%),hsl(215 45% 65%))'}}/>
           </div>
           <div style={{display:'flex',justifyContent:'space-between',fontSize:10,color:'hsl(215 14% 35%)'}}>

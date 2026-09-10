@@ -126,6 +126,7 @@ export type Database = {
           title: string
           total_participants: number | null
           total_rewards_distributed: number | null
+          vote_options: Json | null
           winner_boost_percentage: number
           winner_side: string | null
         }
@@ -168,6 +169,7 @@ export type Database = {
           title: string
           total_participants?: number | null
           total_rewards_distributed?: number | null
+          vote_options?: Json | null
           winner_boost_percentage?: number
           winner_side?: string | null
         }
@@ -209,6 +211,7 @@ export type Database = {
           starts_at?: string
           title?: string
           total_participants?: number | null
+          vote_options?: Json | null
           total_rewards_distributed?: number | null
           winner_boost_percentage?: number
           winner_side?: string | null

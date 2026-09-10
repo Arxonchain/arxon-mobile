@@ -12,6 +12,7 @@ import ArenaOnboarding from '@/components/arena/ArenaOnboarding';
 import { toast } from '@/hooks/use-toast';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
+import { getOptionName, type ArenaSideId } from '@/lib/arenaOptions';
 import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
 import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
@@ -38,7 +39,7 @@ const CSS = `
 @keyframes spin{to{transform:rotate(360deg)}}
 `;
 
-type ArenaSide = 'a' | 'b' | 'c';
+type ArenaSide = ArenaSideId;
 type Tab = 'battles' | 'leaderboard' | 'my-stakes';
 type BattleFilter = 'live' | 'upcoming' | 'ended';
 
@@ -51,12 +52,10 @@ function getPoolStats(battle: Parameters<typeof getArenaPoolStats>[0]) {
 }
 
 function sideName(
-  battle: { side_a_name: string; side_b_name: string; side_c_name?: string | null },
+  battle: Parameters<typeof getOptionName>[0],
   side: ArenaSide,
 ) {
-  if (side === 'a') return battle.side_a_name;
-  if (side === 'c') return battle.side_c_name || 'Draw';
-  return battle.side_b_name;
+  return getOptionName(battle, side);
 }
 
 function useTimer(endsAt: string | null, active: boolean) {
@@ -583,7 +582,7 @@ function BattleDetail({
 }) {
   const { gateStakeAction, complianceDialog } = useStakeCompliance();
   const timer = useTimer(battle.ends_at, !!isActive);
-  const { total: totalPow, pctA, pctB, pctC, hasSideC, powC } = getPoolStats(battle);
+  const { total: totalPow, options: poolOptions } = getPoolStats(battle);
   const existingVote = (battleUserVote?.side ?? null) as ArenaSide | null;
   const [localSide, setLocalSide] = useState<ArenaSide | null>(null);
   const [stakeAmt, setStakeAmt] = useState('');
@@ -823,133 +822,78 @@ function BattleDetail({
 
                 <div
                   style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 36px 1fr',
+                    display: poolOptions.length === 2 ? 'grid' : 'flex',
+                    gridTemplateColumns: poolOptions.length === 2 ? '1fr 36px 1fr' : undefined,
+                    flexDirection: poolOptions.length === 2 ? undefined : 'column',
                     gap: 12,
                     alignItems: 'stretch',
                     marginBottom: 14,
                     padding: '2px 2px 6px',
                   }}
                 >
-                  <BattleDetailSide
-                    name={battle.side_a_name}
-                    pct={pctA}
-                    power={battle.side_a_power}
-                    side="a"
-                    activeSide={activeSide}
-                    winnerSide={battle.winner_side}
-                    isActive={isActive}
-                    existingVote={existingVote}
-                    onSelect={setLocalSide}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 999,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontWeight: 900,
-                        fontSize: 10,
-                        letterSpacing: '0.04em',
-                        color: ARENA,
-                        background: 'rgba(0,0,0,0.35)',
-                        border: `1px solid ${ARENA}55`,
-                        boxShadow: `0 6px 16px rgba(0,0,0,0.4), 0 0 12px ${ARENA}33`,
-                      }}
-                    >
-                      VS
-                    </div>
-                  </div>
-                  <BattleDetailSide
-                    name={battle.side_b_name}
-                    pct={pctB}
-                    power={battle.side_b_power}
-                    side="b"
-                    activeSide={activeSide}
-                    winnerSide={battle.winner_side}
-                    isActive={isActive}
-                    existingVote={existingVote}
-                    onSelect={setLocalSide}
-                  />
-                </div>
-
-                {hasSideC && (
-                  <motion.div
-                    whileTap={isActive && !existingVote ? { scale: 0.97, y: 1 } : undefined}
-                    onClick={() => isActive && !existingVote && setLocalSide('c')}
-                    role={isActive && !existingVote ? 'button' : undefined}
-                    style={{
-                      borderRadius: 18,
-                      padding: '14px 16px',
-                      marginBottom: 14,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      cursor: isActive && !existingVote ? 'pointer' : 'default',
-                      touchAction: 'manipulation',
-                      background:
-                        activeSide === 'c'
-                          ? `linear-gradient(165deg, hsl(255 45% 22%) 0%, hsl(225 28% 9%) 55%, hsl(225 30% 6%) 100%)`
-                          : `linear-gradient(165deg, hsl(225 26% 14%) 0%, hsl(225 28% 8%) 60%, hsl(225 30% 5%) 100%)`,
-                      border: `1.5px solid ${
-                        activeSide === 'c'
-                          ? `${ARENA}aa`
-                          : battle.winner_side === 'c'
-                            ? `${v2.accent.gold}88`
-                            : `${v2.brand.steel}55`
-                      }`,
-                      boxShadow:
-                        activeSide === 'c'
-                          ? `0 14px 32px rgba(0,0,0,0.55), 0 0 28px ${ARENA}40, inset 0 1px 0 rgba(255,255,255,0.12)`
-                          : `0 12px 28px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)`,
-                      transform: activeSide === 'c' ? 'translateY(-2px)' : undefined,
-                    }}
-                  >
-                    <div>
-                      <p style={{ fontSize: 12, fontWeight: 700, color: v2.brand.steelLight, margin: 0 }}>{battle.side_c_name}</p>
-                      <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 2 }}>{powC.toLocaleString()} ARX-P</p>
-                    </div>
-                    <div style={{ textAlign: 'right' }}>
-                      <div
-                        style={{
-                          fontSize: 22,
-                          fontWeight: 800,
-                          color:
-                            battle.winner_side === 'c'
-                              ? v2.accent.gold
-                              : activeSide === 'c'
-                                ? ARENA
-                                : v2.brand.steelBright,
-                        }}
-                      >
-                        {pctC}%
-                      </div>
-                      {battle.winner_side === 'c' && (
-                        <div style={{ fontSize: 10, fontWeight: 800, color: v2.accent.gold, marginTop: 4 }}>👑 Winner</div>
-                      )}
-                      {activeSide === 'c' && isActive && (
+                  {poolOptions.length === 2 ? (
+                    <>
+                      <BattleDetailSide
+                        name={poolOptions[0].name}
+                        pct={poolOptions[0].pct}
+                        power={poolOptions[0].power}
+                        side={poolOptions[0].id as ArenaSide}
+                        activeSide={activeSide}
+                        winnerSide={battle.winner_side}
+                        isActive={isActive}
+                        existingVote={existingVote}
+                        onSelect={setLocalSide}
+                      />
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <div
                           style={{
-                            marginTop: 4,
-                            display: 'inline-block',
-                            fontSize: 10,
-                            fontWeight: 800,
-                            color: v2.accent.success,
-                            padding: '3px 8px',
+                            width: 32,
+                            height: 32,
                             borderRadius: 999,
-                            background: `${v2.accent.success}18`,
-                            border: `1px solid ${v2.accent.success}55`,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontWeight: 900,
+                            fontSize: 10,
+                            letterSpacing: '0.04em',
+                            color: ARENA,
+                            background: 'rgba(0,0,0,0.35)',
+                            border: `1px solid ${ARENA}55`,
+                            boxShadow: `0 6px 16px rgba(0,0,0,0.4), 0 0 12px ${ARENA}33`,
                           }}
                         >
-                          ✓ Your pick
+                          VS
                         </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
+                      </div>
+                      <BattleDetailSide
+                        name={poolOptions[1].name}
+                        pct={poolOptions[1].pct}
+                        power={poolOptions[1].power}
+                        side={poolOptions[1].id as ArenaSide}
+                        activeSide={activeSide}
+                        winnerSide={battle.winner_side}
+                        isActive={isActive}
+                        existingVote={existingVote}
+                        onSelect={setLocalSide}
+                      />
+                    </>
+                  ) : (
+                    poolOptions.map((opt) => (
+                      <BattleDetailSide
+                        key={opt.id}
+                        name={opt.name}
+                        pct={opt.pct}
+                        power={opt.power}
+                        side={opt.id as ArenaSide}
+                        activeSide={activeSide}
+                        winnerSide={battle.winner_side}
+                        isActive={isActive}
+                        existingVote={existingVote}
+                        onSelect={setLocalSide}
+                      />
+                    ))
+                  )}
+                </div>
 
                 <div
                   style={{

@@ -1,5 +1,37 @@
 import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { blastArenaBattleNotifications } from "./arenaNotifications.ts";
+
+type BattleOption = { id: string; name: string; power: number };
+
+function parseBattleOptions(battle: Record<string, unknown>): BattleOption[] {
+  const raw = battle.vote_options;
+  if (Array.isArray(raw) && raw.length >= 2) {
+    const parsed = raw
+      .map((row) => {
+        if (!row || typeof row !== "object") return null;
+        const r = row as Record<string, unknown>;
+        const id = typeof r.id === "string" ? r.id : "";
+        const name = typeof r.name === "string" ? r.name : "";
+        if (!id || !name) return null;
+        return { id, name, power: Number(r.power) || 0 };
+      })
+      .filter((o): o is BattleOption => o !== null);
+    if (parsed.length >= 2) return parsed;
+  }
+
+  const options: BattleOption[] = [
+    { id: "a", name: String(battle.side_a_name || "A"), power: Number(battle.side_a_power) || 0 },
+    { id: "b", name: String(battle.side_b_name || "B"), power: Number(battle.side_b_power) || 0 },
+  ];
+  if (battle.side_c_name && String(battle.side_c_name).trim()) {
+    options.push({
+      id: "c",
+      name: String(battle.side_c_name),
+      power: Number(battle.side_c_power) || 0,
+    });
+  }
+  return options;
+}
 import { enqueueArenaPushBlastJob } from "./backgroundJobs.ts";
 import { battleHasPayoutRows, releaseStuckResolveLock } from "./arenaResolveIdempotency.ts";
 
@@ -85,10 +117,6 @@ export async function runArenaBattleResolve(
     try {
       console.log(`Resolving battle: ${battle.title} (${battle.id})`);
 
-      const sideAPower = Number(battle.side_a_power) || 0;
-      const sideBPower = Number(battle.side_b_power) || 0;
-      const sideCPower = Number(battle.side_c_power) || 0;
-
       let winnerSide: string | null = null;
       if (battle.verified_winner) {
         winnerSide = battle.verified_winner;
@@ -103,9 +131,17 @@ export async function runArenaBattleResolve(
         continue;
       }
 
-      if (!["a", "b", "c", "none"].includes(winnerSide)) {
+      if (winnerSide !== "none" && (!winnerSide || !/^[a-z]+$/.test(winnerSide))) {
         throw new Error(`Invalid winner_side: ${winnerSide}`);
       }
+
+      const battleOptions = parseBattleOptions(battle);
+      const optionIds = new Set(battleOptions.map((o) => o.id));
+      if (winnerSide !== "none" && !optionIds.has(winnerSide)) {
+        throw new Error(`Winner side "${winnerSide}" is not a valid option for this market`);
+      }
+
+      const totalStakes = battleOptions.reduce((sum, o) => sum + o.power, 0);
 
       const { error: lockErr } = await supabase.rpc("lock_arena_battle_for_resolve", {
         p_battle_id: battle.id,
@@ -121,13 +157,11 @@ export async function runArenaBattleResolve(
       }
 
       const prizePool = Number(battle.prize_pool) || 0;
-      const totalStakes = sideAPower + sideBPower + sideCPower;
       const TOTAL_POOL = prizePool + totalStakes;
 
-      const winnerSideName = winnerSide === "a" ? battle.side_a_name :
-                             winnerSide === "c" ? (battle.side_c_name || "Draw") :
-                             winnerSide === "none" ? "Void" :
-                             battle.side_b_name;
+      const winnerSideName = winnerSide === "none"
+        ? "Void"
+        : (battleOptions.find((o) => o.id === winnerSide)?.name || winnerSide);
 
       console.log(`Winner: ${winnerSide} (${winnerSideName}), TOTAL POOL: ${TOTAL_POOL}`);
 
