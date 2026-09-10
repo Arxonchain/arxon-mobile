@@ -68,8 +68,16 @@ function normalizeOption(raw: unknown): ArenaVoteOption | null {
 }
 
 export function parseVoteOptions(raw: unknown): ArenaVoteOption[] | null {
-  if (!Array.isArray(raw) || raw.length === 0) return null;
-  const parsed = raw.map(normalizeOption).filter((o): o is ArenaVoteOption => o !== null);
+  let list: unknown = raw;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch {
+      return null;
+    }
+  }
+  if (!Array.isArray(list) || list.length === 0) return null;
+  const parsed = list.map(normalizeOption).filter((o): o is ArenaVoteOption => o !== null);
   return parsed.length >= 2 ? parsed : null;
 }
 
@@ -78,16 +86,19 @@ export function getBattleOptions(battle: ArenaBattleOptionsSource): ArenaVoteOpt
   const fromJson = parseVoteOptions(battle.vote_options);
   if (fromJson) return fromJson;
 
+  const sideAName = (battle.side_a_name ?? '').trim() || 'Option A';
+  const sideBName = (battle.side_b_name ?? '').trim() || 'Option B';
+
   const options: ArenaVoteOption[] = [
     {
       id: 'a',
-      name: battle.side_a_name,
+      name: sideAName,
       color: battle.side_a_color || defaultColorForIndex(0),
       power: Number(battle.side_a_power) || 0,
     },
     {
       id: 'b',
-      name: battle.side_b_name,
+      name: sideBName,
       color: battle.side_b_color || defaultColorForIndex(1),
       power: Number(battle.side_b_power) || 0,
     },

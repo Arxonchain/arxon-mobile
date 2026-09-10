@@ -906,7 +906,7 @@ function BattleDetail({
                 >
                   <motion.div
                     initial={{ width: 0 }}
-                    animate={{ width: `${pctA}%` }}
+                    animate={{ width: `${poolOptions[0]?.pct ?? 50}%` }}
                     transition={{ duration: 0.8, ease: 'easeOut' }}
                     style={{
                       height: '100%',
