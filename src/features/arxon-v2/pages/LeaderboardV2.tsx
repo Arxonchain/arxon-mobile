@@ -6,7 +6,7 @@ import { usePoints } from '@/hooks/usePoints';
 import { formatPointsDisplay } from '@/lib/formatPoints';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchGlobalLeaderboard } from '@/lib/fetchGlobalLeaderboard';
 import { V2Page, fadeUp, stagger } from '../design/Kit';
 import { neon } from '../design/neonTokens';
 import {
@@ -66,61 +66,14 @@ export default function LeaderboardV2() {
     setLoading(true);
     setRlsBlocked(false);
 
-    const { data: pts, error: ptsErr } = await supabase
-      .from('user_points')
-      .select('user_id, total_points')
-      .order('total_points', { ascending: false })
-      .limit(100);
-
-    if (ptsErr || !pts?.length) {
-      const { data: profileData, error: profileErr } = await supabase
-        .from('profiles')
-        .select('user_id, username, avatar_url')
-        .limit(100);
-
-      if (profileErr || !profileData?.length) {
-        setRlsBlocked(true);
-        setLoading(false);
-        return;
-      }
-
-      const { data: rpcData } = await (supabase as { rpc: (name: string, args: object) => Promise<{ data: unknown }> }).rpc(
-        'get_leaderboard',
-        { limit_count: 100 },
-      );
-
-      if (rpcData && Array.isArray(rpcData)) {
-        const result: Entry[] = (rpcData as Record<string, unknown>[]).map((r) => ({
-          user_id: (r.user_id || r.id) as string,
-          username: (r.username as string) || null,
-          avatar_url: (r.avatar_url as string) || null,
-          total_points: Math.round(Number(r.total_points) || 0),
-        }));
-        setLeaders(result.filter((e) => e.total_points > 0 || result.length <= 10));
-        setLoading(false);
-        return;
-      }
-
+    const { entries, blocked } = await fetchGlobalLeaderboard(100);
+    if (blocked) {
       setRlsBlocked(true);
       setLoading(false);
       return;
     }
 
-    const userIds = pts.map((p) => p.user_id);
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id, username, avatar_url')
-      .in('user_id', userIds);
-
-    const profMap = new Map((profiles || []).map((p) => [p.user_id, p]));
-    const result: Entry[] = pts.map((p) => ({
-      user_id: p.user_id,
-      username: profMap.get(p.user_id)?.username || null,
-      avatar_url: profMap.get(p.user_id)?.avatar_url || null,
-      total_points: Math.round(Number(p.total_points) || 0),
-    }));
-
-    setLeaders(result);
+    setLeaders(entries);
     setLoading(false);
   };
 

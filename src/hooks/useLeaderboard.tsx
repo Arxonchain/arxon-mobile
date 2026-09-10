@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 import { cacheGet, cacheSet } from '@/lib/localCache';
 import { throttle } from '@/lib/requestDeduplication';
 import { formatPoints } from '@/lib/formatPoints';
+import { fetchGlobalLeaderboard } from '@/lib/fetchGlobalLeaderboard';
 
 interface LeaderboardEntry {
   user_id: string;
@@ -23,27 +23,22 @@ export const useLeaderboard = (limit: number = 100) => {
   const mountedRef = useRef(true);
   const inFlightRef = useRef(false);
 
-  const cacheKey = `arxon:leaderboard:miners:v7:${limit}`;
+  const cacheKey = `arxon:leaderboard:miners:v8:${limit}`;
 
   const fetchLeaderboard = useCallback(async () => {
     if (inFlightRef.current) return;
     inFlightRef.current = true;
 
     try {
-      const { data, error } = await supabase
-        .from('leaderboard_view')
-        .select('user_id, username, avatar_url, total_points, daily_streak')
-        .order('total_points', { ascending: false })
-        .limit(limit);
-
-      if (error) throw error;
+      const { entries, blocked } = await fetchGlobalLeaderboard(limit);
+      if (blocked) throw new Error('Leaderboard unavailable');
       if (!mountedRef.current) return;
 
-      const leaderboardWithRanks: LeaderboardEntry[] = (data || []).map((entry, index) => ({
-        user_id: entry.user_id || '',
+      const leaderboardWithRanks: LeaderboardEntry[] = entries.map((entry, index) => ({
+        user_id: entry.user_id,
         total_points: formatPoints(entry.total_points),
-        daily_streak: entry.daily_streak || 0,
-        username: entry.username || `Miner${(entry.user_id || '').slice(0, 4)}`,
+        daily_streak: entry.daily_streak ?? 0,
+        username: entry.username || `Miner${entry.user_id.slice(0, 4)}`,
         avatar_url: entry.avatar_url || undefined,
         rank: index + 1,
       }));

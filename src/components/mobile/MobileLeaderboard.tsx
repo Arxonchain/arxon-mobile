@@ -4,7 +4,7 @@ import { usePoints } from '@/hooks/usePoints';
 import { useAuth } from '@/hooks/useAuth';
 import { useAdmin } from '@/hooks/useAdmin';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { fetchGlobalLeaderboard } from '@/lib/fetchGlobalLeaderboard';
 import { ChevronLeft, Crown, Trophy, AlertCircle } from 'lucide-react';
 
 interface Entry {
@@ -59,65 +59,14 @@ export default function MobileLeaderboard() {
     setLoading(true);
     setRlsBlocked(false);
 
-    // Strategy 1: Try user_points table (works if RLS allows public read)
-    const { data: pts, error: ptsErr } = await supabase
-      .from('user_points')
-      .select('user_id, total_points')
-      .order('total_points', { ascending: false })
-      .limit(100);
-
-    if (ptsErr || !pts?.length) {
-      // Strategy 2: RLS is blocking — try fetching via profiles joined with points
-      // This works if profiles are public but user_points is restricted
-      const { data: profileData, error: profileErr } = await supabase
-        .from('profiles')
-        .select('user_id, username, avatar_url')
-        .limit(100);
-
-      if (profileErr || !profileData?.length) {
-        setRlsBlocked(true);
-        setLoading(false);
-        return;
-      }
-
-      // Try getting points for each user via a different approach
-      // Fetch via rpc if available, otherwise show profiles sorted by username
-      const { data: rpcData } = await (supabase as any).rpc('get_leaderboard', { limit_count: 100 });
-
-      if (rpcData && Array.isArray(rpcData)) {
-        const result: Entry[] = rpcData.map((r: any) => ({
-          user_id: r.user_id || r.id,
-          username: r.username || null,
-          avatar_url: r.avatar_url || null,
-          total_points: Math.round(Number(r.total_points) || 0),
-        }));
-        setLeaders(result.filter(e => e.total_points > 0 || result.length <= 10));
-        setLoading(false);
-        return;
-      }
-
-      // Last resort: show profiles without points data, indicate RLS issue
+    const { entries, blocked } = await fetchGlobalLeaderboard(100);
+    if (blocked) {
       setRlsBlocked(true);
       setLoading(false);
       return;
     }
 
-    // user_points fetched — now get profile data
-    const userIds = pts.map(p => p.user_id);
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('user_id, username, avatar_url')
-      .in('user_id', userIds);
-
-    const profMap = new Map((profiles || []).map(p => [p.user_id, p]));
-    const result: Entry[] = pts.map(p => ({
-      user_id: p.user_id,
-      username: (profMap.get(p.user_id) as any)?.username || null,
-      avatar_url: (profMap.get(p.user_id) as any)?.avatar_url || null,
-      total_points: Math.round(Number(p.total_points) || 0),
-    }));
-
-    setLeaders(result);
+    setLeaders(entries);
     setLoading(false);
   };
 
