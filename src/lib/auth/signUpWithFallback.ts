@@ -3,6 +3,25 @@ import { getEmailConfirmRedirectUrl } from "./getRedirectUrl";
 import { mapAuthError } from "./authErrors";
 import { getSignupEmailRejection } from "./signupEmailPolicy";
 
+const CAPTCHA_CODES = new Set([
+  "captcha_failed",
+  "captcha_missing",
+  "captcha_expired",
+  "captcha_duplicate",
+  "captcha_misconfigured",
+]);
+
+function captchaErrorFromPayload(payload: {
+  error?: string;
+  code?: string;
+} | null | undefined): string | null {
+  const code = payload?.code;
+  if (code && CAPTCHA_CODES.has(code) && payload?.error) {
+    return payload.error;
+  }
+  return null;
+}
+
 type SignUpResult = { error: Error | null; user: User | null };
 
 const ALREADY_REGISTERED =
@@ -41,7 +60,8 @@ export async function signUpWithFallback(
       email: normalizedEmail,
       password,
       referral_code: referralCode ? referralCode.trim().toUpperCase() : undefined,
-      captcha_token: token || undefined,
+      // Always send the field when present — never rely on undefined omission.
+      ...(token ? { captcha_token: token } : {}),
       redirect_to: getEmailConfirmRedirectUrl(),
     },
   });
@@ -59,15 +79,21 @@ export async function signUpWithFallback(
     if (result.error) {
       const ctx = (result.error as any)?.context;
       let serverMsg = "";
+      let serverPayload: { error?: string; code?: string } | null = null;
       try {
         if (ctx && typeof ctx.json === "function") {
           const j = await ctx.json();
+          serverPayload = j;
           serverMsg = j?.error || j?.message || "";
         } else if (typeof result.error.message === "string") {
           serverMsg = result.error.message;
         }
       } catch {
         serverMsg = result.error.message || "";
+      }
+      const captchaMsg = captchaErrorFromPayload(serverPayload);
+      if (captchaMsg) {
+        return { error: new Error(captchaMsg), user: null };
       }
       if (/already exists|already registered/i.test(serverMsg)) {
         return { error: new Error(ALREADY_REGISTERED), user: null };
@@ -89,6 +115,10 @@ export async function signUpWithFallback(
       }
       if (data?.code === "email_blocked" && data?.error) {
         return { error: new Error(data.error), user: null };
+      }
+      const captchaMsg = captchaErrorFromPayload(data);
+      if (captchaMsg) {
+        return { error: new Error(captchaMsg), user: null };
       }
       const friendly = mapAuthError(data?.error || "Sign up failed", "signup");
       return { error: new Error(friendly), user: null };

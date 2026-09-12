@@ -79,6 +79,7 @@ Dashboard → **Edge Functions → Secrets** on Mining App (`oztccmrhiawleucdluw
 |------|-------|
 | `RESEND_API_KEY` | Mining App Resend API key (not the website project key) |
 | `RESEND_FROM_EMAIL` | `Arxon <security@arxonchain.xyz>` (optional) |
+| `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile **secret** matching `VITE_TURNSTILE_SITE_KEY` (required for signup + password-reset edge functions) |
 
 Optional Send Email hook (covers GoTrue-native mailers if enabled):
 

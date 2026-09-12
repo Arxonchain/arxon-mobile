@@ -5,6 +5,10 @@ import {
   RATE_LIMITS,
 } from "../_shared/rateLimiter.ts";
 import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
+import {
+  turnstileFailureMessage,
+  verifyTurnstile,
+} from "../_shared/verifyTurnstile.ts";
 
 /**
  * Branded password recovery email (no *.supabase.co/auth/v1/verify links).
@@ -61,26 +65,6 @@ function allowedConfirmBase(raw: string): string {
   } catch {
     return fallback;
   }
-}
-
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
-  const secret = (Deno.env.get("TURNSTILE_SECRET_KEY") || "").trim();
-  if (!secret) return true;
-  if (!token) return false;
-  const body = new URLSearchParams();
-  body.set("secret", secret);
-  body.set("response", token);
-  if (ip && ip !== "unknown") body.set("remoteip", ip);
-  const res = await fetch(
-    "https://challenges.cloudflare.com/turnstile/v0/siteverify",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body,
-    }
-  );
-  const json = (await res.json().catch(() => null)) as { success?: boolean } | null;
-  return !!json?.success;
 }
 
 async function sendBrandedEmail(opts: {
@@ -161,16 +145,18 @@ serve(async (req) => {
       );
     }
 
-    const captchaOk = await verifyTurnstile(captchaToken, ip);
-    if (!captchaOk) {
+    const captcha = await verifyTurnstile(captchaToken, ip, {
+      failClosed: true,
+      logPrefix: "auth-recover",
+    });
+    if (!captcha.ok) {
       return jsonResponse(
         {
           success: false,
-          error:
-            "Security check failed or expired. Complete the verification again, then retry.",
-          code: "captcha_failed",
+          error: turnstileFailureMessage(captcha.code),
+          code: captcha.code === "missing_secret" ? "captcha_misconfigured" : "captcha_failed",
         },
-        400,
+        captcha.code === "missing_secret" ? 503 : 400,
         rateLimitHeaders(rl)
       );
     }

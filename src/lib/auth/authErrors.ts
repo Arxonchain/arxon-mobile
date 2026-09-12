@@ -34,9 +34,13 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
     m.includes("captcha") ||
     m.includes("timeout-or-duplicate") ||
     m.includes("invalid-input-response") ||
-    m.includes("no captcha_token")
+    m.includes("no captcha_token") ||
+    m.includes("security check")
   ) {
     return "Security check failed or expired. Complete the verification again, then tap Create Account.";
+  }
+  if (m.includes("temporarily unavailable") && context === "signup") {
+    return "Signup is temporarily unavailable. Please try again in a few minutes.";
   }
   if (
     m.includes("disposable email") ||

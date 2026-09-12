@@ -6,6 +6,10 @@ import {
 } from "../_shared/rateLimiter.ts";
 import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 import { getSignupEmailRejection } from "../_shared/signupEmailPolicy.ts";
+import {
+  turnstileFailureMessage,
+  verifyTurnstile,
+} from "../_shared/verifyTurnstile.ts";
 
 /**
  * Branded signup:
@@ -78,24 +82,21 @@ function brandedConfirmUrl(base: string, tokenHash: string, type: string): strin
   return u.toString();
 }
 
-async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
-  const secret = (Deno.env.get("TURNSTILE_SECRET_KEY") || "").trim();
-  if (!secret) {
-    // Fail closed in production — set ALLOW_SIGNUP_WITHOUT_TURNSTILE=true only for local dev.
-    return Deno.env.get("ALLOW_SIGNUP_WITHOUT_TURNSTILE") === "true";
+function captchaResponseCode(
+  verifyCode: string,
+): "captcha_missing" | "captcha_misconfigured" | "captcha_expired" | "captcha_duplicate" | "captcha_failed" {
+  switch (verifyCode) {
+    case "missing_token":
+      return "captcha_missing";
+    case "missing_secret":
+      return "captcha_misconfigured";
+    case "expired":
+      return "captcha_expired";
+    case "duplicate":
+      return "captcha_duplicate";
+    default:
+      return "captcha_failed";
   }
-  if (!token) return false;
-  const body = new URLSearchParams();
-  body.set("secret", secret);
-  body.set("response", token);
-  if (ip && ip !== "unknown") body.set("remoteip", ip);
-  const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
-  const json = (await res.json().catch(() => null)) as { success?: boolean } | null;
-  return !!json?.success;
 }
 
 /**
@@ -219,16 +220,19 @@ serve(async (req) => {
       );
     }
 
-    const captchaOk = await verifyTurnstile(captchaToken, ip);
-    if (!captchaOk) {
+    const captcha = await verifyTurnstile(captchaToken, ip, {
+      failClosed: true,
+      logPrefix: "auth-signup",
+    });
+    if (!captcha.ok) {
+      const responseCode = captchaResponseCode(captcha.code);
       return jsonResponse(
         {
           success: false,
-          error:
-            "Security check failed or expired. Complete the verification again, then retry.",
-          code: "captcha_failed",
+          error: turnstileFailureMessage(captcha.code),
+          code: responseCode,
         },
-        400,
+        responseCode === "captcha_misconfigured" ? 503 : 400,
         rateLimitHeaders(rl)
       );
     }

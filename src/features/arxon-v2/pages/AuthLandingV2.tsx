@@ -15,6 +15,7 @@ import authEarth from '@/assets/v2-auth-earth-cyan.png';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
 import LegalLinks from '@/components/legal/LegalLinks';
+import { captchaStaleMessage, isCaptchaTokenStale } from '@/lib/auth/captchaToken';
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
 function isAlreadyRegisteredError(message?: string) {
@@ -34,6 +35,7 @@ export default function AuthLandingV2() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaVerifiedAt, setCaptchaVerifiedAt] = useState<number | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   const { signIn, signUp, resetPassword } = useAuth();
@@ -44,7 +46,13 @@ export default function AuthLandingV2() {
   /** Clear token + remount widget so Success UI never outlives a consumed/expired token. */
   const invalidateCaptcha = useCallback(() => {
     setCaptchaToken(null);
+    setCaptchaVerifiedAt(null);
     setCaptchaResetKey((k) => k + 1);
+  }, []);
+
+  const handleCaptchaVerify = useCallback((token: string) => {
+    setCaptchaToken(token);
+    setCaptchaVerifiedAt(Date.now());
   }, []);
 
   useEffect(() => {
@@ -93,6 +101,15 @@ export default function AuthLandingV2() {
       toast({
         title: 'Security check required',
         description: 'Complete the verification below (or tap Retry), then try again.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (captchaRequired && isCaptchaTokenStale(captchaVerifiedAt)) {
+      invalidateCaptcha();
+      toast({
+        title: 'Security check expired',
+        description: captchaStaleMessage(),
         variant: 'destructive',
       });
       return;
@@ -337,9 +354,9 @@ export default function AuthLandingV2() {
               key={`${mode}-${captchaResetKey}`}
               action={mode}
               resetKey={captchaResetKey}
-              onVerify={setCaptchaToken}
-              onExpire={() => setCaptchaToken(null)}
-              onError={() => setCaptchaToken(null)}
+              onVerify={handleCaptchaVerify}
+              onExpire={invalidateCaptcha}
+              onError={invalidateCaptcha}
             />
 
             {mode === 'signin' && (
