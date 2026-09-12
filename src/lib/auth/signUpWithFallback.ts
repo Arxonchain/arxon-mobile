@@ -3,25 +3,6 @@ import { getEmailConfirmRedirectUrl } from "./getRedirectUrl";
 import { mapAuthError } from "./authErrors";
 import { getSignupEmailRejection } from "./signupEmailPolicy";
 
-const CAPTCHA_CODES = new Set([
-  "captcha_failed",
-  "captcha_missing",
-  "captcha_expired",
-  "captcha_duplicate",
-  "captcha_misconfigured",
-]);
-
-function captchaErrorFromPayload(payload: {
-  error?: string;
-  code?: string;
-} | null | undefined): string | null {
-  const code = payload?.code;
-  if (code && CAPTCHA_CODES.has(code) && payload?.error) {
-    return payload.error;
-  }
-  return null;
-}
-
 type SignUpResult = { error: Error | null; user: User | null };
 
 const ALREADY_REGISTERED =
@@ -35,9 +16,9 @@ function toError(e: unknown, fallback = "Sign up failed"): Error {
 }
 
 /**
- * Sign up via auth-signup edge function.
- * That path creates the user + emails a branded /auth/confirm?token_hash link
- * (never *.supabase.co/auth/v1/verify).
+ * Sign up via GoTrue (same Turnstile path as sign-in).
+ * Captcha is verified by Supabase Auth Attack Protection — not the auth-signup edge function.
+ * Disposable domains are blocked client-side and by auth.users INSERT trigger.
  */
 export async function signUpWithFallback(
   supabase: SupabaseClient,
@@ -54,21 +35,21 @@ export async function signUpWithFallback(
 
   const timeoutMs = 45_000;
   const token = typeof captchaToken === "string" ? captchaToken.trim() : "";
+  const ref = referralCode ? referralCode.trim().toUpperCase() : "";
 
-  const invokePromise = supabase.functions.invoke("auth-signup", {
-    body: {
-      email: normalizedEmail,
-      password,
-      referral_code: referralCode ? referralCode.trim().toUpperCase() : undefined,
-      // Always send the field when present — never rely on undefined omission.
-      ...(token ? { captcha_token: token } : {}),
-      redirect_to: getEmailConfirmRedirectUrl(),
+  const signUpPromise = supabase.auth.signUp({
+    email: normalizedEmail,
+    password,
+    options: {
+      emailRedirectTo: getEmailConfirmRedirectUrl(),
+      ...(token ? { captchaToken: token } : {}),
+      ...(ref ? { data: { referral_code: ref } } : {}),
     },
   });
 
   try {
-    const result = await Promise.race([
-      invokePromise,
+    const { data, error } = await Promise.race([
+      signUpPromise,
       new Promise<never>((_, reject) => {
         setTimeout(() => {
           reject(new Error("Connection timed out. Please try again."));
@@ -76,52 +57,19 @@ export async function signUpWithFallback(
       }),
     ]);
 
-    if (result.error) {
-      const ctx = (result.error as any)?.context;
-      let serverMsg = "";
-      let serverPayload: { error?: string; code?: string } | null = null;
-      try {
-        if (ctx && typeof ctx.json === "function") {
-          const j = await ctx.json();
-          serverPayload = j;
-          serverMsg = j?.error || j?.message || "";
-        } else if (typeof result.error.message === "string") {
-          serverMsg = result.error.message;
-        }
-      } catch {
-        serverMsg = result.error.message || "";
-      }
-      const captchaMsg = captchaErrorFromPayload(serverPayload);
-      if (captchaMsg) {
-        return { error: new Error(captchaMsg), user: null };
-      }
-      if (/already exists|already registered/i.test(serverMsg)) {
+    if (error) {
+      const msg = error.message || "Sign up failed";
+      if (/already exists|already registered|user already/i.test(msg)) {
         return { error: new Error(ALREADY_REGISTERED), user: null };
       }
-      const friendly = mapAuthError(serverMsg || toError(result.error).message, "signup");
+      const friendly = mapAuthError(msg, "signup");
       return { error: new Error(friendly), user: null };
     }
 
-    const data = result.data as {
-      success?: boolean;
-      error?: string;
-      code?: string;
-      user?: User | null;
-    } | null;
-
-    if (!data?.success) {
-      if (data?.code === "already_registered" || /already exists|already registered/i.test(data?.error || "")) {
-        return { error: new Error(ALREADY_REGISTERED), user: null };
-      }
-      if (data?.code === "email_blocked" && data?.error) {
-        return { error: new Error(data.error), user: null };
-      }
-      const captchaMsg = captchaErrorFromPayload(data);
-      if (captchaMsg) {
-        return { error: new Error(captchaMsg), user: null };
-      }
-      const friendly = mapAuthError(data?.error || "Sign up failed", "signup");
-      return { error: new Error(friendly), user: null };
+    // GoTrue may return an empty identities array for existing emails (no leak).
+    const identities = data.user?.identities;
+    if (Array.isArray(identities) && identities.length === 0) {
+      return { error: new Error(ALREADY_REGISTERED), user: null };
     }
 
     // No local session after signup — email confirmation required.

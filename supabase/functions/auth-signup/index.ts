@@ -6,10 +6,6 @@ import {
 } from "../_shared/rateLimiter.ts";
 import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 import { getSignupEmailRejection } from "../_shared/signupEmailPolicy.ts";
-import {
-  turnstileFailureMessage,
-  verifyTurnstile,
-} from "../_shared/verifyTurnstile.ts";
 
 /**
  * Branded signup:
@@ -80,23 +76,6 @@ function brandedConfirmUrl(base: string, tokenHash: string, type: string): strin
   u.searchParams.set("token_hash", tokenHash);
   u.searchParams.set("type", type);
   return u.toString();
-}
-
-function captchaResponseCode(
-  verifyCode: string,
-): "captcha_missing" | "captcha_misconfigured" | "captcha_expired" | "captcha_duplicate" | "captcha_failed" {
-  switch (verifyCode) {
-    case "missing_token":
-      return "captcha_missing";
-    case "missing_secret":
-      return "captcha_misconfigured";
-    case "expired":
-      return "captcha_expired";
-    case "duplicate":
-      return "captcha_duplicate";
-    default:
-      return "captcha_failed";
-  }
 }
 
 /**
@@ -220,21 +199,11 @@ serve(async (req) => {
       );
     }
 
-    const captcha = await verifyTurnstile(captchaToken, ip, {
-      failClosed: true,
-      logPrefix: "auth-signup",
-    });
-    if (!captcha.ok) {
-      const responseCode = captchaResponseCode(captcha.code);
-      return jsonResponse(
-        {
-          success: false,
-          error: turnstileFailureMessage(captcha.code),
-          code: responseCode,
-        },
-        responseCode === "captcha_misconfigured" ? 503 : 400,
-        rateLimitHeaders(rl)
-      );
+    // Turnstile is enforced by GoTrue on the client signUp path (Attack Protection secret).
+    // Legacy callers may still POST captcha_token; it is ignored here to avoid a separate
+    // Edge Functions TURNSTILE_SECRET_KEY that often diverges from Auth settings.
+    if (captchaToken) {
+      console.log("auth-signup: captcha_token ignored (use GoTrue signUp captchaToken)");
     }
 
     const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/$/, "");
