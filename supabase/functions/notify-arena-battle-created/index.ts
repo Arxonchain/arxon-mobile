@@ -6,6 +6,7 @@ import {
 } from "../_shared/adminAuth.ts";
 import {
   claimArenaCreatedPush,
+  listPendingArenaCreatedPushBattles,
   pushArenaNewBattleBroadcast,
   type BattleRow,
 } from "../_shared/arenaNotifications.ts";
@@ -58,27 +59,9 @@ serve(async (req) => {
       }
       targets.push(battle);
     } else {
-      const { data: pending, error } = await auth.supabase.rpc(
-        "list_arena_battles_pending_created_push",
-        { p_limit: limit },
-      );
-      if (error) {
-        // Migration not applied yet — fall back to direct query
-        const { data: rows, error: qErr } = await auth.supabase
-          .from("arena_battles")
-          .select("id, title, winner_side, side_a_name, side_b_name, side_c_name")
-          .eq("is_active", true)
-          .is("winner_side", null)
-          .is("created_push_at", null)
-          .lte("starts_at", new Date().toISOString())
-          .order("starts_at", { ascending: true })
-          .limit(limit);
-        if (qErr) throw qErr;
-        for (const row of rows || []) targets.push(row);
-      } else {
-        for (const row of pending || []) {
-          targets.push({ id: row.id, title: row.title });
-        }
+      const pending = await listPendingArenaCreatedPushBattles(auth.supabase, limit);
+      for (const row of pending) {
+        targets.push({ id: row.id, title: row.title });
       }
     }
 

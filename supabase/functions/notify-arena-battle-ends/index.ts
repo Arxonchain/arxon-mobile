@@ -4,7 +4,11 @@ import {
   adminCorsHeaders,
   requireAdminOrService,
 } from "../_shared/adminAuth.ts";
-import { pushArenaNewBattleBroadcast, claimArenaCreatedPush } from "../_shared/arenaNotifications.ts";
+import {
+  claimArenaCreatedPush,
+  listPendingArenaCreatedPushBattles,
+  pushArenaNewBattleBroadcast,
+} from "../_shared/arenaNotifications.ts";
 
 const corsHeaders = adminCorsHeaders;
 
@@ -32,24 +36,7 @@ serve(async (req) => {
     }
 
     const createdResults: Array<Record<string, unknown>> = [];
-    const { data: pending, error: pendingErr } = await auth.supabase.rpc(
-      "list_arena_battles_pending_created_push",
-      { p_limit: 10 },
-    );
-
-    let pendingRows = pending || [];
-    if (pendingErr) {
-      const { data: rows } = await auth.supabase
-        .from("arena_battles")
-        .select("id, title")
-        .eq("is_active", true)
-        .is("winner_side", null)
-        .is("created_push_at", null)
-        .lte("starts_at", new Date().toISOString())
-        .order("starts_at", { ascending: true })
-        .limit(10);
-      pendingRows = rows || [];
-    }
+    const pendingRows = await listPendingArenaCreatedPushBattles(auth.supabase, 10);
 
     for (const row of pendingRows) {
       const { error: ensureErr } = await auth.supabase.rpc("ensure_arena_new_battle_notifications", {

@@ -49,6 +49,34 @@ function battleData(battleId: string, extra: Record<string, unknown> = {}) {
   return { battle_id: battleId, url: ARENA_URL, ...extra };
 }
 
+/** Live battles that still need the new-battle FCM broadcast (cron + admin recovery). */
+export async function listPendingArenaCreatedPushBattles(
+  supabase: SupabaseClient,
+  limit = 10,
+): Promise<Array<{ id: string; title: string }>> {
+  const capped = Math.min(Math.max(limit, 1), 50);
+  const { data: pending, error } = await supabase.rpc(
+    "list_arena_battles_pending_created_push",
+    { p_limit: capped },
+  );
+  if (!error && pending?.length) {
+    return pending.map((row: { id: string; title: string }) => ({ id: row.id, title: row.title }));
+  }
+
+  // RPC missing or still requires created_notified_at — direct query is source of truth.
+  const { data: rows, error: qErr } = await supabase
+    .from("arena_battles")
+    .select("id, title")
+    .eq("is_active", true)
+    .is("winner_side", null)
+    .is("created_push_at", null)
+    .lte("starts_at", new Date().toISOString())
+    .order("starts_at", { ascending: true })
+    .limit(capped);
+  if (qErr) throw qErr;
+  return rows || [];
+}
+
 /** Idempotent in-app notifications via DB RPC (migration 20260816201500). */
 export async function blastArenaBattleNotifications(
   supabase: SupabaseClient,
