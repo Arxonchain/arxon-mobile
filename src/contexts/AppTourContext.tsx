@@ -25,12 +25,15 @@ import {
 
 const SKIP_PATHS = ['/auth', '/admin', '/reset-password', '/change-password', '/auth/confirm'];
 
+type StartTourOptions = { replay?: boolean };
+
 type AppTourContextValue = {
   active: boolean;
+  isReplay: boolean;
   step: TourStepConfig | null;
   stepIndex: number;
   totalSteps: number;
-  startTour: () => void;
+  startTour: (options?: StartTourOptions) => void;
   skipTour: () => void;
   nextStep: () => void;
 };
@@ -58,9 +61,10 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   const mining = useMining({ tickMs: 2000 });
 
   const [active, setActive] = useState(false);
+  const [isReplay, setIsReplay] = useState(false);
   const [currentStepId, setCurrentStepId] = useState<TourStepId>('welcome');
   const [booted, setBooted] = useState(false);
-  const tasksCompletedDuringStep = useRef(false);
+  const replayModeRef = useRef(false);
 
   const verifyDone = verification.isComplete;
   const tasksDone = !canCheckin && !checkinLoading;
@@ -68,7 +72,7 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
 
   const shouldSkipStep = useCallback(
     (id: TourStepId) => {
-      if (id === 'welcome') return false;
+      if (replayModeRef.current || id === 'welcome') return false;
       if (id === 'verify' && verifyDone) return true;
       if (id === 'tasks' && tasksDone) return true;
       if (id === 'mining' && miningDone) return true;
@@ -78,28 +82,34 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   );
 
   const visibleSteps = useMemo(
-    () => TOUR_STEPS.filter((s) => !shouldSkipStep(s.id)),
-    [shouldSkipStep],
+    () => (isReplay ? TOUR_STEPS : TOUR_STEPS.filter((s) => !shouldSkipStep(s.id))),
+    [shouldSkipStep, isReplay],
   );
 
   const step = TOUR_STEPS.find((s) => s.id === currentStepId) ?? null;
   const stepIndex = Math.max(0, visibleSteps.findIndex((s) => s.id === currentStepId));
   const totalSteps = visibleSteps.length;
 
+  const endTour = useCallback(() => {
+    replayModeRef.current = false;
+    setIsReplay(false);
+    setAppTourActive(false);
+  }, []);
+
   const finishTour = useCallback(
     (last: TourStepId) => {
       if (user) markTourFinished(user.id, last);
       setActive(false);
-      setAppTourActive(false);
+      endTour();
     },
-    [user],
+    [user, endTour],
   );
 
   const skipTour = useCallback(() => {
     if (user) markTourSkipped(user.id, step?.id ?? null);
     setActive(false);
-    setAppTourActive(false);
-  }, [user, step?.id]);
+    endTour();
+  }, [user, step?.id, endTour]);
 
   const nextStep = useCallback(() => {
     const nextId = nextTourStepId(currentStepId, shouldSkipStep);
@@ -110,13 +120,18 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
     setCurrentStepId(nextId);
   }, [currentStepId, shouldSkipStep, finishTour]);
 
-  const startTour = useCallback(() => {
-    if (!user || pathBlocked(location.pathname)) return;
-    tasksCompletedDuringStep.current = false;
-    setCurrentStepId('welcome');
-    setActive(true);
-    setAppTourActive(true);
-  }, [user, location.pathname]);
+  const startTour = useCallback(
+    (options?: StartTourOptions) => {
+      if (!user || pathBlocked(location.pathname)) return;
+      const replay = Boolean(options?.replay);
+      replayModeRef.current = replay;
+      setIsReplay(replay);
+      setCurrentStepId('welcome');
+      setActive(true);
+      setAppTourActive(true);
+    },
+    [user, location.pathname],
+  );
 
   useEffect(() => {
     if (authLoading || !user || booted) return;
@@ -127,7 +142,8 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
     }
     const bootDelay = Capacitor.isNativePlatform() ? 3200 : 1400;
     const timer = window.setTimeout(() => {
-      tasksCompletedDuringStep.current = false;
+      replayModeRef.current = false;
+      setIsReplay(false);
       setCurrentStepId('welcome');
       setActive(true);
       setAppTourActive(true);
@@ -144,7 +160,7 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   }, [active, step, location.pathname, location.search, navigate]);
 
   useEffect(() => {
-    if (!active || !step || step.id === 'welcome') return;
+    if (!active || !step || step.id === 'welcome' || isReplay) return;
 
     if (step.id === 'verify' && verifyDone) {
       nextStep();
@@ -159,14 +175,11 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
     if (step.id === 'mining' && miningDone) {
       finishTour('mining');
     }
-  }, [active, step, verifyDone, tasksDone, miningDone, nextStep, finishTour]);
+  }, [active, step, isReplay, verifyDone, tasksDone, miningDone, nextStep, finishTour]);
 
   useEffect(() => {
     if (!active || step?.id !== 'tasks') return;
-    const onTaskClaimed = () => {
-      tasksCompletedDuringStep.current = true;
-      nextStep();
-    };
+    const onTaskClaimed = () => nextStep();
     window.addEventListener('arxon-tour-task-claimed', onTaskClaimed);
     return () => window.removeEventListener('arxon-tour-task-claimed', onTaskClaimed);
   }, [active, step?.id, nextStep]);
@@ -181,6 +194,7 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       active,
+      isReplay,
       step,
       stepIndex,
       totalSteps,
@@ -188,7 +202,7 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
       skipTour,
       nextStep,
     }),
-    [active, step, stepIndex, totalSteps, startTour, skipTour, nextStep],
+    [active, isReplay, step, stepIndex, totalSteps, startTour, skipTour, nextStep],
   );
 
   return <AppTourContext.Provider value={value}>{children}</AppTourContext.Provider>;

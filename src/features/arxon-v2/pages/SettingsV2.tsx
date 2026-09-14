@@ -195,7 +195,7 @@ function VerificationPanel() {
   const replayGuide = () => {
     if (!user) return;
     resetTourProgress(user.id);
-    tour?.startTour();
+    tour?.startTour({ replay: true });
   };
 
   return (

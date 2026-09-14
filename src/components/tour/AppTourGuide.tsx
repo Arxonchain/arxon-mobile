@@ -252,11 +252,35 @@ export default function AppTourGuide() {
                   <ChevronRight size={16} />
                 </button>
               ) : (
-                <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: accent, textAlign: 'right' }}>
-                  {step.id === 'verify' && 'Complete verification above ↑'}
-                  {step.id === 'tasks' && 'Check in or claim a task above ↑'}
-                  {step.id === 'mining' && 'Tap the mining orb ↑'}
-                </p>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+                  {!tour.isReplay && (
+                    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: accent, textAlign: 'right' }}>
+                      {step.id === 'verify' && 'Complete verification above ↑'}
+                      {step.id === 'tasks' && 'Check in or claim a task above ↑'}
+                      {step.id === 'mining' && 'Tap the mining orb ↑'}
+                    </p>
+                  )}
+                  <button
+                    type="button"
+                    onClick={tour.nextStep}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '10px 16px',
+                      borderRadius: 99,
+                      border: `1px solid ${accent}55`,
+                      cursor: 'pointer',
+                      fontSize: 12,
+                      fontWeight: 800,
+                      color: accent,
+                      background: `${accent}14`,
+                    }}
+                  >
+                    {step.id === 'mining' ? 'Finish' : 'Continue'}
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
               )}
             </div>
           </div>
