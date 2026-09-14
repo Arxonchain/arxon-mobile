@@ -133,7 +133,7 @@ export function useVerification() {
     async (countryCode: string) => {
       if (!user) throw new Error('Not signed in');
       const c = countryByCode(countryCode);
-      if (!c || c.code === 'OTHER') throw new Error('Select a country');
+      if (!c) throw new Error('Select a country');
       const now = new Date().toISOString();
       const { error } = await supabase
         .from('profiles')

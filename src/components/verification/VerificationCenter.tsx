@@ -208,7 +208,7 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
             style={{ ...inputStyle, appearance: 'none', paddingRight: 36 }}
           >
             <option value="">Select country</option>
-            {COUNTRIES.filter((c) => c.code !== 'OTHER').map((c) => (
+            {COUNTRIES.map((c) => (
               <option key={c.code} value={c.code}>{c.name}</option>
             ))}
           </select>
