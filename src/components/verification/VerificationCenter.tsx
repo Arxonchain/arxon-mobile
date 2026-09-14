@@ -112,7 +112,7 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
   };
 
   return (
-    <div>
+    <div data-tour="verify-panel">
       <motion.div variants={fadeUp} initial="hidden" animate="show" style={{ marginBottom: 16 }}>
         {isMobileStyle ? (
           <div style={{ ...cardStyle, marginBottom: 16 }}>

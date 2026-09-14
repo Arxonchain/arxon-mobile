@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useVerification } from '@/hooks/useVerification';
 import { v2 } from '@/features/arxon-v2/design/tokens';
 import arxonIcon from '@/assets/arxon-icon.svg';
+import { isAppTourBlockingOverlays } from '@/lib/tour/tourStorage';
 
 const SKIP_PATHS = ['/auth', '/admin', '/reset-password', '/change-password', '/auth/confirm'];
 
@@ -25,7 +26,8 @@ export default function VerificationDailyPrompt() {
     !loading &&
     !isComplete &&
     promptVisible &&
-    !pathSkipped(location.pathname),
+    !pathSkipped(location.pathname) &&
+    !isAppTourBlockingOverlays(),
   );
 
   const remaining = steps.filter((s) => !s.done && !s.comingSoon && !s.optional);

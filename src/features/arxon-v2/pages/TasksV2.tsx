@@ -142,6 +142,7 @@ export default function TasksV2() {
       });
       if (awarded > 0) {
         triggerConfetti();
+        window.dispatchEvent(new CustomEvent('arxon-tour-task-claimed'));
         toast({ title: '🎉 Task Completed!', description: `+${awarded.toLocaleString()} ARX-P added to your balance!` });
       } else {
         toast({ title: 'Already Completed', description: 'Points were already credited for this task' });
@@ -197,7 +198,7 @@ export default function TasksV2() {
             </motion.div>
 
             {user && (
-              <motion.div variants={fadeUp} style={{ marginBottom: 16 }}>
+              <motion.div variants={fadeUp} style={{ marginBottom: 16 }} data-tour="tasks-claim">
                 <V2HeroCard
                   eyebrow="Daily Check-in"
                   title={currentStreak > 0 ? `${currentStreak}-Day Streak` : 'Start Your Streak'}

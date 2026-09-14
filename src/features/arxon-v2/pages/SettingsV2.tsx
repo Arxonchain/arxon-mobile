@@ -5,6 +5,9 @@ import {
   Bell, Shield, Zap, Gift, Trophy, AlertCircle, Swords, Flame, Eye, EyeOff, Loader2,
 } from 'lucide-react';
 import VerificationCenter from '@/components/verification/VerificationCenter';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAppTourOptional } from '@/contexts/AppTourContext';
+import { resetTourProgress } from '@/lib/tour/tourStorage';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -186,9 +189,23 @@ function NotificationsPanel() {
 }
 
 function VerificationPanel() {
+  const { user } = useAuth();
+  const tour = useAppTourOptional();
+
+  const replayGuide = () => {
+    if (!user) return;
+    resetTourProgress(user.id);
+    tour?.startTour();
+  };
+
   return (
     <motion.div variants={fadeUp} initial="hidden" animate="show">
       <VerificationCenter variant="v2" />
+      {tour && (
+        <V2ButtonGhost onClick={replayGuide} style={{ width: '100%', marginTop: 12, fontSize: 12 }}>
+          Replay Arxon setup guide
+        </V2ButtonGhost>
+      )}
     </motion.div>
   );
 }

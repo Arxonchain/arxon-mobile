@@ -75,6 +75,7 @@ export const useCheckin = () => {
       setCanCheckin(false);
       setStreakBoost(result.streak_boost);
       triggerConfetti();
+      window.dispatchEvent(new CustomEvent('arxon-tour-task-claimed'));
 
       // Show success with streak info
       const streakEmoji = result.streak_day >= 7 ? '🔥' : result.streak_day >= 3 ? '⚡' : '✨';

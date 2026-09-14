@@ -169,7 +169,7 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
   const slide = slides[index];
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div data-tour="play-carousel" style={{ position: 'relative' }}>
       <AnimatePresence mode="wait">
         <motion.div
           key={slide.id}

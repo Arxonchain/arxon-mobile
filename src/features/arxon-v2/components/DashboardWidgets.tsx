@@ -629,7 +629,7 @@ export function MiningPillWidget({
   );
 
   return (
-    <div style={{ position: 'relative', width: '100%' }}>
+    <div data-tour="mining-start" style={{ position: 'relative', width: '100%' }}>
       <style>{MINING_PILL_CSS}</style>
 
       <div style={{ position: 'relative', borderRadius: 999 }}>

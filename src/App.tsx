@@ -45,6 +45,8 @@ import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
 import V2NotificationPopup from "@/features/arxon-v2/components/V2NotificationPopup";
 import VerificationDailyPrompt from "@/components/verification/VerificationDailyPrompt";
+import { AppTourProvider } from "@/contexts/AppTourContext";
+import AppTourGuide from "@/components/tour/AppTourGuide";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
@@ -270,6 +272,7 @@ function AppRoutes() {
       <SessionRecovery />
       <PushNotificationInit />
       <VerificationDailyPrompt />
+      <AppTourGuide />
       <WebBundleRefreshInit />
       <Suspense fallback={<Spinner />}>
       <Routes>
@@ -547,9 +550,11 @@ function App() {
               <NetworkOfflineBanner />
               <AppUpdateOverlay />
               <RouterShell>
-                <MobileNavProvider>
-                  <AppRoutes />
-                </MobileNavProvider>
+                <AppTourProvider>
+                  <MobileNavProvider>
+                    <AppRoutes />
+                  </MobileNavProvider>
+                </AppTourProvider>
               </RouterShell>
             </TooltipProvider>
           </PointsProvider>

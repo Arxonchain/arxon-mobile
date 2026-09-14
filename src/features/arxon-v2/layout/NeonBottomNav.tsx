@@ -72,6 +72,7 @@ function NavTabLink({
     <NavLink
       to={to}
       end={end}
+      data-tour={`nav-${tab.id}`}
       style={{
         flex: 1,
         display: 'flex',
