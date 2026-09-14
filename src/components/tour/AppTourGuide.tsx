@@ -138,7 +138,13 @@ export default function AppTourGuide() {
                 <img
                   src={arxonRobot}
                   alt="Arxon robot guide"
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    display: 'block',
+                    transform: 'scaleX(-1)',
+                  }}
                 />
               </div>
 
@@ -250,7 +256,6 @@ export default function AppTourGuide() {
                   {step.id === 'verify' && 'Complete verification above ↑'}
                   {step.id === 'tasks' && 'Check in or claim a task above ↑'}
                   {step.id === 'mining' && 'Tap the mining orb ↑'}
-                  {step.id === 'play' && 'Open Arena or Word Forge ↑'}
                 </p>
               )}
             </div>

@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'arxon_app_tour_v1';
 const ACTIVE_KEY = 'arxon_app_tour_active';
 
-export type TourStepId = 'welcome' | 'verify' | 'tasks' | 'mining' | 'play';
+export type TourStepId = 'welcome' | 'verify' | 'tasks' | 'mining';
 
 export type TourProgress = {
   version: 1;
@@ -76,7 +76,6 @@ export function setAppTourActive(active: boolean) {
   }
 }
 
-/** True while the activation tour is running — blocks competing overlays. */
 export function isAppTourBlockingOverlays(): boolean {
   try {
     return sessionStorage.getItem(ACTIVE_KEY) === '1';

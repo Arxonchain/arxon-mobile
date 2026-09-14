@@ -14,7 +14,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useVerification } from '@/hooks/useVerification';
 import { useCheckin } from '@/hooks/useCheckin';
 import { useMining } from '@/hooks/useMining';
-import { TOUR_STEPS, type TourStepConfig } from '@/lib/tour/steps';
+import { TOUR_STEPS, nextTourStepId, type TourStepConfig } from '@/lib/tour/steps';
 import {
   isTourFinished,
   markTourFinished,
@@ -41,19 +41,6 @@ function pathBlocked(pathname: string) {
   return SKIP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-function filterSteps(opts: {
-  verifyDone: boolean;
-  tasksDone: boolean;
-  miningDone: boolean;
-}): TourStepConfig[] {
-  return TOUR_STEPS.filter((s) => {
-    if (s.id === 'verify' && opts.verifyDone) return false;
-    if (s.id === 'tasks' && opts.tasksDone) return false;
-    if (s.id === 'mining' && opts.miningDone) return false;
-    return true;
-  });
-}
-
 function routeMatches(stepRoute: string, pathname: string, search: string) {
   if (stepRoute.includes('?')) {
     const [path, query] = stepRoute.split('?');
@@ -73,20 +60,31 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(false);
   const [currentStepId, setCurrentStepId] = useState<TourStepId>('welcome');
   const [booted, setBooted] = useState(false);
-  const prevCanCheckin = useRef<boolean | null>(null);
+  const tasksCompletedDuringStep = useRef(false);
 
   const verifyDone = verification.isComplete;
   const tasksDone = !canCheckin && !checkinLoading;
   const miningDone = mining.isMining;
 
-  const steps = useMemo(
-    () => filterSteps({ verifyDone, tasksDone, miningDone }),
+  const shouldSkipStep = useCallback(
+    (id: TourStepId) => {
+      if (id === 'welcome') return false;
+      if (id === 'verify' && verifyDone) return true;
+      if (id === 'tasks' && tasksDone) return true;
+      if (id === 'mining' && miningDone) return true;
+      return false;
+    },
     [verifyDone, tasksDone, miningDone],
   );
 
-  const stepIndex = Math.max(0, steps.findIndex((s) => s.id === currentStepId));
-  const step = steps[stepIndex] ?? steps[0] ?? null;
-  const totalSteps = steps.length;
+  const visibleSteps = useMemo(
+    () => TOUR_STEPS.filter((s) => !shouldSkipStep(s.id)),
+    [shouldSkipStep],
+  );
+
+  const step = TOUR_STEPS.find((s) => s.id === currentStepId) ?? null;
+  const stepIndex = Math.max(0, visibleSteps.findIndex((s) => s.id === currentStepId));
+  const totalSteps = visibleSteps.length;
 
   const finishTour = useCallback(
     (last: TourStepId) => {
@@ -104,27 +102,21 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   }, [user, step?.id]);
 
   const nextStep = useCallback(() => {
-    const idx = steps.findIndex((s) => s.id === currentStepId);
-    const next = idx >= 0 ? steps[idx + 1] : steps[0];
-    if (!next) {
+    const nextId = nextTourStepId(currentStepId, shouldSkipStep);
+    if (!nextId) {
       finishTour(currentStepId);
       return;
     }
-    setCurrentStepId(next.id);
-  }, [steps, currentStepId, finishTour]);
+    setCurrentStepId(nextId);
+  }, [currentStepId, shouldSkipStep, finishTour]);
 
   const startTour = useCallback(() => {
     if (!user || pathBlocked(location.pathname)) return;
+    tasksCompletedDuringStep.current = false;
     setCurrentStepId('welcome');
     setActive(true);
     setAppTourActive(true);
   }, [user, location.pathname]);
-
-  useEffect(() => {
-    if (!steps.some((s) => s.id === currentStepId) && steps[0]) {
-      setCurrentStepId(steps[0].id);
-    }
-  }, [steps, currentStepId]);
 
   useEffect(() => {
     if (authLoading || !user || booted) return;
@@ -135,6 +127,7 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
     }
     const bootDelay = Capacitor.isNativePlatform() ? 3200 : 1400;
     const timer = window.setTimeout(() => {
+      tasksCompletedDuringStep.current = false;
       setCurrentStepId('welcome');
       setActive(true);
       setAppTourActive(true);
@@ -151,59 +144,39 @@ export function AppTourProvider({ children }: { children: ReactNode }) {
   }, [active, step, location.pathname, location.search, navigate]);
 
   useEffect(() => {
-    if (!active || !step) return;
-    if (step.id === 'welcome') return;
+    if (!active || !step || step.id === 'welcome') return;
 
-    if (step.id === 'verify' && verification.isComplete) {
+    if (step.id === 'verify' && verifyDone) {
       nextStep();
       return;
     }
 
-    if (step.id === 'tasks') {
-      if (prevCanCheckin.current === true && !canCheckin) {
-        nextStep();
-        return;
-      }
-      if (tasksDone) {
-        nextStep();
-      }
-    }
-
-    if (step.id === 'mining' && mining.isMining) {
+    if (step.id === 'tasks' && tasksDone) {
       nextStep();
       return;
     }
 
-    if (step.id === 'play') {
-      const onPlayRoute = /^\/(arena|games|word-forge)(\/|$)/.test(location.pathname);
-      if (onPlayRoute) finishTour('play');
+    if (step.id === 'mining' && miningDone) {
+      finishTour('mining');
     }
-  }, [
-    active,
-    step,
-    verification.isComplete,
-    canCheckin,
-    tasksDone,
-    mining.isMining,
-    location.pathname,
-    nextStep,
-    finishTour,
-  ]);
-
-  useEffect(() => {
-    if (!checkinLoading && prevCanCheckin.current === null) {
-      prevCanCheckin.current = canCheckin;
-    } else if (!checkinLoading) {
-      prevCanCheckin.current = canCheckin;
-    }
-  }, [canCheckin, checkinLoading]);
+  }, [active, step, verifyDone, tasksDone, miningDone, nextStep, finishTour]);
 
   useEffect(() => {
     if (!active || step?.id !== 'tasks') return;
-    const onTaskClaimed = () => nextStep();
+    const onTaskClaimed = () => {
+      tasksCompletedDuringStep.current = true;
+      nextStep();
+    };
     window.addEventListener('arxon-tour-task-claimed', onTaskClaimed);
     return () => window.removeEventListener('arxon-tour-task-claimed', onTaskClaimed);
   }, [active, step?.id, nextStep]);
+
+  useEffect(() => {
+    if (!active || step?.id !== 'mining') return;
+    const onMiningStarted = () => finishTour('mining');
+    window.addEventListener('arxon-tour-mining-started', onMiningStarted);
+    return () => window.removeEventListener('arxon-tour-mining-started', onMiningStarted);
+  }, [active, step?.id, finishTour]);
 
   const value = useMemo(
     () => ({

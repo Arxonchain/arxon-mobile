@@ -4,18 +4,17 @@ export type TourStepConfig = {
   id: TourStepId;
   title: string;
   message: string;
-  /** Route to open when this step starts */
   route?: string;
-  /** `[data-tour="…"]` selector */
   target?: string;
   accent: string;
 };
 
+/** Fixed order — verify → tasks → mining (3 action steps after welcome). */
 export const TOUR_STEPS: TourStepConfig[] = [
   {
     id: 'welcome',
     title: 'Welcome to Arxon',
-    message: 'I\'ll walk you through the essentials — verify, earn, mine, and play. Tap Start when you\'re ready.',
+    message: 'Three quick stops: verify, claim tasks, then start mining. Tap Start when you\'re ready.',
     accent: 'hsl(215 55% 62%)',
   },
   {
@@ -42,16 +41,20 @@ export const TOUR_STEPS: TourStepConfig[] = [
     target: 'mining-start',
     accent: 'hsl(190 85% 55%)',
   },
-  {
-    id: 'play',
-    title: 'Arena or games',
-    message: 'Jump into Arena battles or play Word Forge from here. Pick one to explore.',
-    route: '/',
-    target: 'play-carousel',
-    accent: 'hsl(255 55% 68%)',
-  },
 ];
 
 export function tourTargetSelector(target?: string) {
   return target ? `[data-tour="${target}"]` : null;
+}
+
+export function nextTourStepId(
+  currentId: TourStepId,
+  shouldSkip: (id: TourStepId) => boolean,
+): TourStepId | null {
+  const idx = TOUR_STEPS.findIndex((s) => s.id === currentId);
+  for (let i = idx + 1; i < TOUR_STEPS.length; i++) {
+    const id = TOUR_STEPS[i].id;
+    if (!shouldSkip(id)) return id;
+  }
+  return null;
 }

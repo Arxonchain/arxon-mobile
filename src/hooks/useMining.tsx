@@ -481,6 +481,7 @@ export const useMining = (options?: UseMiningOptions) => {
 
     setSessionId(pendingId);
     setIsMining(true);
+    window.dispatchEvent(new CustomEvent('arxon-tour-mining-started'));
     setElapsedTime(0);
     setEarnedPoints(0);
     lastDbPointsRef.current = 0;
