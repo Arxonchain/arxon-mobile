@@ -845,40 +845,58 @@ export type Database = {
       }
       profiles: {
         Row: {
+          age_confirmed_at: string | null
           avatar_url: string | null
           country: string | null
           country_code: string | null
+          country_declared_at: string | null
           created_at: string
+          email_change_count: number
+          email_locked_at: string | null
           id: string
           nexus_address: string | null
+          phone_verified_at: string | null
           referral_code: string | null
           updated_at: string
           user_id: string
           username: string | null
+          verification_completed_at: string | null
         }
         Insert: {
+          age_confirmed_at?: string | null
           avatar_url?: string | null
           country?: string | null
           country_code?: string | null
+          country_declared_at?: string | null
           created_at?: string
+          email_change_count?: number
+          email_locked_at?: string | null
           id?: string
           nexus_address?: string | null
+          phone_verified_at?: string | null
           referral_code?: string | null
           updated_at?: string
           user_id: string
           username?: string | null
+          verification_completed_at?: string | null
         }
         Update: {
+          age_confirmed_at?: string | null
           avatar_url?: string | null
           country?: string | null
           country_code?: string | null
+          country_declared_at?: string | null
           created_at?: string
+          email_change_count?: number
+          email_locked_at?: string | null
           id?: string
           nexus_address?: string | null
+          phone_verified_at?: string | null
           referral_code?: string | null
           updated_at?: string
           user_id?: string
           username?: string | null
+          verification_completed_at?: string | null
         }
         Relationships: []
       }

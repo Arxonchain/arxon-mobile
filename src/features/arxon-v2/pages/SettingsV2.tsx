@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import {
   Bell, Shield, Zap, Gift, Trophy, AlertCircle, Swords, Flame, Eye, EyeOff, Loader2,
 } from 'lucide-react';
+import VerificationCenter from '@/components/verification/VerificationCenter';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +15,7 @@ import { v2 } from '../design/tokens';
 import LegalLinks from '@/components/legal/LegalLinks';
 import PrivacyDataSettings from '@/components/settings/PrivacyDataSettings';
 
-type Tab = 'notifications' | 'security';
+type Tab = 'notifications' | 'security' | 'verification';
 
 const NOTIF_OPTIONS: {
   key: keyof NotificationPreferences;
@@ -34,24 +35,27 @@ const NOTIF_OPTIONS: {
 export default function SettingsV2() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'security' ? 'security' : 'notifications';
+  const tabParam = searchParams.get('tab');
+  const initialTab: Tab =
+    tabParam === 'security' ? 'security' : tabParam === 'verification' ? 'verification' : 'notifications';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t === 'security' || t === 'notifications') setTab(t);
+    if (t === 'security' || t === 'notifications' || t === 'verification') setTab(t);
   }, [searchParams]);
 
   return (
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header eyebrow="Settings" title="Preferences" subtitle="Notifications & security" onBack={() => navigate(-1)} />
+        <V2Header eyebrow="Settings" title="Preferences" subtitle="Notifications, security & verification" onBack={() => navigate(-1)} />
 
         <div style={{ padding: '0 16px' }}>
           <motion.div variants={fadeUp} style={{ marginBottom: 18 }}>
             <V2Tabs
               tabs={[
-                { id: 'notifications' as Tab, label: 'Notifications' },
+                { id: 'notifications' as Tab, label: 'Alerts' },
+                { id: 'verification' as Tab, label: 'Verify' },
                 { id: 'security' as Tab, label: 'Security' },
               ]}
               active={tab}
@@ -59,7 +63,7 @@ export default function SettingsV2() {
             />
           </motion.div>
 
-          {tab === 'notifications' ? <NotificationsPanel /> : <SecurityPanel />}
+          {tab === 'notifications' ? <NotificationsPanel /> : tab === 'verification' ? <VerificationPanel /> : <SecurityPanel />}
         </div>
 
         <p style={{ textAlign: 'center', padding: '24px 0 8px', color: v2.brand.muted, fontSize: 10 }}>
@@ -178,6 +182,14 @@ function NotificationsPanel() {
         );
       })}
     </div>
+  );
+}
+
+function VerificationPanel() {
+  return (
+    <motion.div variants={fadeUp} initial="hidden" animate="show">
+      <VerificationCenter variant="v2" />
+    </motion.div>
   );
 }
 

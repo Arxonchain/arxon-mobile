@@ -2,15 +2,16 @@ import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  ChevronLeft, Bell, Shield, Zap, Gift, Trophy, AlertCircle, Swords, Flame,
+  ChevronLeft, Bell, Shield, ShieldCheck, Zap, Gift, Trophy, AlertCircle, Swords, Flame,
   Eye, EyeOff, Loader2,
 } from 'lucide-react';
+import VerificationCenter from '@/components/verification/VerificationCenter';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import LegalLinks from '@/components/legal/LegalLinks';
 
-type Tab = 'notifications' | 'security';
+type Tab = 'notifications' | 'security' | 'verification';
 
 const NOTIF_OPTIONS: {
   key: keyof NotificationPreferences;
@@ -30,12 +31,14 @@ const NOTIF_OPTIONS: {
 export default function MobileSettings() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'security' ? 'security' : 'notifications';
+  const tabParam = searchParams.get('tab');
+  const initialTab: Tab =
+    tabParam === 'security' ? 'security' : tabParam === 'verification' ? 'verification' : 'notifications';
   const [tab, setTab] = useState<Tab>(initialTab);
 
   useEffect(() => {
     const t = searchParams.get('tab');
-    if (t === 'security' || t === 'notifications') setTab(t);
+    if (t === 'security' || t === 'notifications' || t === 'verification') setTab(t);
   }, [searchParams]);
 
   return (
@@ -52,13 +55,14 @@ export default function MobileSettings() {
         </button>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 700, color: 'hsl(215 20% 93%)' }}>Settings</h1>
-          <p style={{ fontSize: 10, color: 'hsl(215 14% 38%)', marginTop: 2 }}>Notifications & security</p>
+          <p style={{ fontSize: 10, color: 'hsl(215 14% 38%)', marginTop: 2 }}>Notifications, verification & security</p>
         </div>
       </div>
 
       <div style={{ display: 'flex', gap: 8, padding: '0 20px', marginBottom: 18 }}>
         {([
-          { id: 'notifications' as Tab, label: 'Notifications', icon: Bell },
+          { id: 'notifications' as Tab, label: 'Alerts', icon: Bell },
+          { id: 'verification' as Tab, label: 'Verify', icon: ShieldCheck },
           { id: 'security' as Tab, label: 'Security', icon: Shield },
         ]).map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
@@ -75,7 +79,7 @@ export default function MobileSettings() {
       </div>
 
       <div style={{ padding: '0 20px' }}>
-        {tab === 'notifications' ? <NotificationsPanel /> : <SecurityPanel />}
+        {tab === 'notifications' ? <NotificationsPanel /> : tab === 'verification' ? <VerificationCenter variant="mobile" /> : <SecurityPanel />}
       </div>
 
       <p style={{ textAlign: 'center', padding: '24px 0 8px', color: 'hsl(215 14% 28%)', fontSize: 10 }}>

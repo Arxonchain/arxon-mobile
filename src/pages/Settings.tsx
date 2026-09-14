@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { User, Bell, Shield, ChevronRight, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { User, Bell, Shield, ShieldCheck, ChevronRight, ArrowLeft } from "lucide-react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import VerificationCenter from "@/components/verification/VerificationCenter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProfileSettings from "@/components/settings/ProfileSettings";
 import NotificationSettings from "@/components/settings/NotificationSettings";
@@ -26,11 +27,26 @@ const settingsSections = [
     title: "Security",
     description: "Update password and security settings",
   },
+  {
+    id: "verification",
+    icon: ShieldCheck,
+    title: "Verification",
+    description: "Email, country & age confirmation",
+  },
 ];
 
 const Settings = () => {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const [activeSection, setActiveSection] = useState<string | null>(
+    searchParams.get("tab") === "verification" ? "verification" : null,
+  );
+
+  useEffect(() => {
+    if (searchParams.get("tab") === "verification") {
+      setActiveSection("verification");
+    }
+  }, [searchParams]);
 
   // Mobile: Show section list or specific section
   // Desktop: Show tabs layout
@@ -65,6 +81,7 @@ const Settings = () => {
             {activeSection === "profile" && <ProfileSettings />}
             {activeSection === "notifications" && <NotificationSettings />}
             {activeSection === "security" && <SecuritySettings />}
+            {activeSection === "verification" && <VerificationCenter variant="web" />}
           </div>
         </div>
       );
@@ -116,6 +133,9 @@ const Settings = () => {
         </TabsContent>
         <TabsContent value="security" className="mt-0">
           <SecuritySettings />
+        </TabsContent>
+        <TabsContent value="verification" className="mt-0">
+          <VerificationCenter variant="web" />
         </TabsContent>
       </div>
     </Tabs>

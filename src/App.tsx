@@ -44,6 +44,7 @@ import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
 import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
 import V2NotificationPopup from "@/features/arxon-v2/components/V2NotificationPopup";
+import VerificationDailyPrompt from "@/components/verification/VerificationDailyPrompt";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
@@ -268,6 +269,7 @@ function AppRoutes() {
       <AppDeepLinkListener />
       <SessionRecovery />
       <PushNotificationInit />
+      <VerificationDailyPrompt />
       <WebBundleRefreshInit />
       <Suspense fallback={<Spinner />}>
       <Routes>
