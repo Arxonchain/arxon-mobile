@@ -30,6 +30,8 @@ import { markBootOk } from "@/lib/bootState";
 import { isDevPublicPath } from "@/lib/devPublicRoutes";
 import { errorUi } from "@/components/system/errorUiTokens";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
+import SentryUserSync from "@/components/system/SentryUserSync";
+import { Sentry } from "@/lib/sentry";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
 import AppPreviewShell, { PreviewSpinner } from "@/features/arxon-v2/preview/AppPreviewShell";
 const FailureUiPreview = lazy(() => import("@/pages/dev/FailureUiPreview"));
@@ -161,7 +163,10 @@ class AppErrorBoundary extends React.Component<
     this.state = { hasError: false, error: null };
   }
   static getDerivedStateFromError(error: Error) { return { hasError: true, error }; }
-  componentDidCatch(error: Error) { console.error('[AppErrorBoundary]', error); }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[AppErrorBoundary]', error);
+    Sentry.captureException(error, { extra: { componentStack: info.componentStack } });
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -544,6 +549,7 @@ function App() {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
+          <SentryUserSync />
           <PointsProvider>
             <TooltipProvider>
               <Toaster />

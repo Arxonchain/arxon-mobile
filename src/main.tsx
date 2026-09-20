@@ -7,6 +7,9 @@ import { markBootFailed, markBootOk } from "@/lib/bootState";
 import { isDevPublicPath, resolveAppPath } from "@/lib/devPublicRoutes";
 import AppLoadFailureScreen from "@/components/system/AppLoadFailureScreen";
 import type { LoadFailureKind } from "@/components/system/failureCatalog";
+import { initSentry, captureBootFailure } from "@/lib/sentry";
+
+initSentry();
 
 const SLOW_LOAD_MS = 2800;
 
@@ -36,6 +39,7 @@ function renderLoadFailure(kind: LoadFailureKind, detail?: string) {
 }
 
 function showFatal(message: string, details?: unknown) {
+  captureBootFailure(message, details);
   const detail =
     details instanceof Error
       ? details.message
