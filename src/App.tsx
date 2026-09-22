@@ -49,9 +49,13 @@ import V2NotificationPopup from "@/features/arxon-v2/components/V2NotificationPo
 import VerificationDailyPrompt from "@/components/verification/VerificationDailyPrompt";
 import { AppTourProvider } from "@/contexts/AppTourContext";
 import AppTourGuide from "@/components/tour/AppTourGuide";
+import { gamesRouteContent as g } from "@/components/system/gamesRoute";
+import GamesMaintenanceScreen from "@/components/system/GamesMaintenanceScreen";
+import { GAMES_MAINTENANCE_MODE } from "@/lib/gamesMaintenance";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
+  if (GAMES_MAINTENANCE_MODE) return <GamesMaintenanceScreen />;
   return <Navigate to={lobbyPathForDiceInvite(mode, code)} replace />;
 }
 
@@ -188,7 +192,7 @@ class AppErrorBoundary extends React.Component<
 function PushNotificationInit() {
   // listen:true — only this mount owns FCM + realtime push side-effects
   const { preferences } = usePushNotifications({ listen: true });
-  useForgeDailyReminder(preferences.wordForgeDaily);
+  useForgeDailyReminder(preferences.wordForgeDaily && !GAMES_MAINTENANCE_MODE);
   return ARXON_UI_V2_ENABLED ? <V2NotificationPopup /> : null;
 }
 
@@ -293,12 +297,12 @@ function AppRoutes() {
           <Route index element={<DashboardNeon preview />} />
           <Route path="mining" element={<Navigate to="/ui-preview" replace />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
-          <Route path="arena/dice" element={<DiceHubV2 />} />
-          <Route path="arena/dice/house" element={<DiceMatchV2 />} />
-          <Route path="arena/dice/duel" element={<DiceDuelLobbyV2 />} />
-          <Route path="arena/dice/duel/:matchId" element={<DiceDuelMatchV2 />} />
-          <Route path="arena/dice/rumble" element={<DiceRumbleLobbyV2 />} />
-          <Route path="arena/dice/rumble/:matchId" element={<DiceRumbleMatchV2 />} />
+          <Route path="arena/dice" element={g(<DiceHubV2 />)} />
+          <Route path="arena/dice/house" element={g(<DiceMatchV2 />)} />
+          <Route path="arena/dice/duel" element={g(<DiceDuelLobbyV2 />)} />
+          <Route path="arena/dice/duel/:matchId" element={g(<DiceDuelMatchV2 />)} />
+          <Route path="arena/dice/rumble" element={g(<DiceRumbleLobbyV2 />)} />
+          <Route path="arena/dice/rumble/:matchId" element={g(<DiceRumbleMatchV2 />)} />
           <Route path="arena" element={<ArenaV2 />} />
           <Route path="leaderboard" element={<LeaderboardV2 />} />
           <Route path="profile" element={<ProfileV2 />} />
@@ -312,7 +316,7 @@ function AppRoutes() {
           {WORD_FORGE_ENABLED && GamingHubPage && (
             <Route path="games" element={
               <Suspense fallback={<PreviewSpinner />}>
-                <GamingHubPage />
+                {g(<GamingHubPage />)}
               </Suspense>
             } />
           )}
@@ -320,27 +324,27 @@ function AppRoutes() {
             <>
               <Route path="word-forge" element={
                 <Suspense fallback={<PreviewSpinner />}>
-                  <PreviewWordForgePage />
+                  {g(<PreviewWordForgePage />)}
                 </Suspense>
               } />
               {PreviewForgeStatsPage && (
                 <Route path="word-forge/stats" element={
                   <Suspense fallback={<PreviewSpinner />}>
-                    <PreviewForgeStatsPage />
+                    {g(<PreviewForgeStatsPage />)}
                   </Suspense>
                 } />
               )}
               {PreviewSectorMapPage && (
                 <Route path="word-forge/map" element={
                   <Suspense fallback={<PreviewSpinner />}>
-                    <PreviewSectorMapPage />
+                    {g(<PreviewSectorMapPage />)}
                   </Suspense>
                 } />
               )}
               {PreviewWordForgeLeaderboardPage && (
                 <Route path="word-forge/leaderboard" element={
                   <Suspense fallback={<PreviewSpinner />}>
-                    <PreviewWordForgeLeaderboardPage />
+                    {g(<PreviewWordForgeLeaderboardPage />)}
                   </Suspense>
                 } />
               )}
@@ -350,7 +354,7 @@ function AppRoutes() {
         </Route>
         <Route path="/word-forge-preview" element={
           <Suspense fallback={<Spinner />}>
-            <WordForgePreviewPage />
+            {g(<WordForgePreviewPage />)}
           </Suspense>
         } />
         <Route path="/admin" element={<AdminLayout />}>
@@ -379,7 +383,7 @@ function AppRoutes() {
               <Route path="/games" element={
                 <ProtectedRoute>
                   <Suspense fallback={<Spinner />}>
-                    <GamingHubPage />
+                    {g(<GamingHubPage />)}
                   </Suspense>
                 </ProtectedRoute>
               } />
@@ -397,12 +401,12 @@ function AppRoutes() {
               }
             />
             <Route path="/arena/prediction-market" element={ARXON_UI_V2_ENABLED ? <PredictionMarketV2 /> : <MobileArena />} />
-            <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceHubV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/duel" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceDuelLobbyV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/duel/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceDuelMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/rumble" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceRumbleLobbyV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/rumble/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <DiceRumbleMatchV2 /> : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceHubV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/duel" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceDuelLobbyV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/duel/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceDuelMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/rumble" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceRumbleLobbyV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
+            <Route path="/arena/dice/rumble/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceRumbleMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             {/* Short brand invite paths → existing ?code= join UX (if Capacitor/HashRouter ever receives them) */}
             <Route path="/d/:code" element={<DiceShortInviteRedirect mode="duel" />} />
             <Route path="/r/:code" element={<DiceShortInviteRedirect mode="rumble" />} />
@@ -422,7 +426,7 @@ function AppRoutes() {
                 <Route path="/word-forge" element={
                   <ProtectedRoute>
                     <Suspense fallback={<Spinner />}>
-                      <WordForgePage />
+                      {g(<WordForgePage />)}
                     </Suspense>
                   </ProtectedRoute>
                 } />
@@ -430,7 +434,7 @@ function AppRoutes() {
                   <Route path="/word-forge/stats" element={
                     <ProtectedRoute>
                       <Suspense fallback={<Spinner />}>
-                        <ForgeStatsPage />
+                        {g(<ForgeStatsPage />)}
                       </Suspense>
                     </ProtectedRoute>
                   } />
@@ -439,7 +443,7 @@ function AppRoutes() {
                   <Route path="/word-forge/map" element={
                     <ProtectedRoute>
                       <Suspense fallback={<Spinner />}>
-                        <SectorMapPage />
+                        {g(<SectorMapPage />)}
                       </Suspense>
                     </ProtectedRoute>
                   } />
@@ -448,7 +452,7 @@ function AppRoutes() {
                   <Route path="/word-forge/leaderboard" element={
                     <ProtectedRoute>
                       <Suspense fallback={<Spinner />}>
-                        <WordForgeLeaderboardPage />
+                        {g(<WordForgeLeaderboardPage />)}
                       </Suspense>
                     </ProtectedRoute>
                   } />
@@ -474,7 +478,7 @@ function AppRoutes() {
                 <ProtectedRoute>
                   <DashboardLayout>
                     <Suspense fallback={<Spinner />}>
-                      <GamingHubPage />
+                      {g(<GamingHubPage />)}
                     </Suspense>
                   </DashboardLayout>
                 </ProtectedRoute>
@@ -485,7 +489,7 @@ function AppRoutes() {
                 <Route path="/word-forge" element={
                   <ProtectedRoute>
                     <Suspense fallback={<Spinner />}>
-                      <WordForgePage />
+                      {g(<WordForgePage />)}
                     </Suspense>
                   </ProtectedRoute>
                 } />
@@ -494,7 +498,7 @@ function AppRoutes() {
                     <ProtectedRoute>
                       <DashboardLayout>
                         <Suspense fallback={<Spinner />}>
-                          <ForgeStatsPage />
+                          {g(<ForgeStatsPage />)}
                         </Suspense>
                       </DashboardLayout>
                     </ProtectedRoute>
@@ -505,7 +509,7 @@ function AppRoutes() {
                     <ProtectedRoute>
                       <DashboardLayout>
                         <Suspense fallback={<Spinner />}>
-                          <SectorMapPage />
+                          {g(<SectorMapPage />)}
                         </Suspense>
                       </DashboardLayout>
                     </ProtectedRoute>
@@ -516,7 +520,7 @@ function AppRoutes() {
                     <ProtectedRoute>
                       <DashboardLayout>
                         <Suspense fallback={<Spinner />}>
-                          <WordForgeLeaderboardPage />
+                          {g(<WordForgeLeaderboardPage />)}
                         </Suspense>
                       </DashboardLayout>
                     </ProtectedRoute>

@@ -53,6 +53,8 @@ if (!uiV2 || !wordForge) {
   process.exit(1);
 }
 
+const gamesMaintenance = process.env.VITE_GAMES_MAINTENANCE === 'true';
+
 const payload = {
   version: gitSha,
   builtAt: new Date().toISOString(),
@@ -60,6 +62,7 @@ const payload = {
   uiV2: true,
   wordForge: true,
   mode: 'v2-games',
+  gamesMaintenance,
 };
 
 writeFileSync('public/web-bundle-version.json', `${JSON.stringify(payload, null, 2)}\n`);
