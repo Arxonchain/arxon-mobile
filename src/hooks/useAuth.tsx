@@ -6,6 +6,12 @@ import { signUpWithFallback } from '@/lib/auth/signUpWithFallback';
 import { getPasswordResetRedirectUrl } from '@/lib/auth/getRedirectUrl';
 import { markPasswordRecovery } from '@/lib/auth/passwordRecoveryGate';
 import { mapAuthError } from '@/lib/auth/authErrors';
+import {
+  backupAuthSession,
+  clearAuthSessionBackup,
+  readBestLocalSession,
+  sessionStillValid,
+} from '@/lib/auth/sessionBackup';
 
 interface AuthContextType {
   user: User | null;
@@ -25,6 +31,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const lastAutoXSyncUserId = useRef<string | null>(null);
+  const userInitiatedSignOut = useRef(false);
+
+  const applySession = (next: Session | null) => {
+    if (next && sessionStillValid(next)) {
+      backupAuthSession(next);
+    }
+    setSession(next);
+    setUser(next?.user ?? null);
+  };
+
+  const hydrateFromLocal = (local: Session) => {
+    applySession(local);
+    void supabase.auth
+      .setSession({
+        access_token: local.access_token,
+        refresh_token: local.refresh_token,
+      })
+      .catch(() => {});
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -45,7 +70,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Fail-safe: never block the whole app on a hung network request.
     // Reduced to 2.5s for faster fallback to landing page when backend is down.
     const failSafe = window.setTimeout(() => {
-      if (mounted) setLoading(false);
+      if (!mounted) return;
+      const local = readBestLocalSession();
+      if (local) hydrateFromLocal(local);
+      setLoading(false);
     }, 2500);
 
     // Set up auth state listener BEFORE getSession() to avoid missing the initial session
@@ -54,13 +82,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      
+
+      if (event === 'SIGNED_OUT') {
+        if (!userInitiatedSignOut.current) {
+          const local = readBestLocalSession();
+          if (local) {
+            hydrateFromLocal(local);
+            setLoading(false);
+            window.clearTimeout(failSafe);
+            return;
+          }
+        }
+        userInitiatedSignOut.current = false;
+        clearAuthSessionBackup();
+        applySession(null);
+        setLoading(false);
+        window.clearTimeout(failSafe);
+        return;
+      }
+
       // Recovery session: only after email link — gate full app until password update.
       if (event === 'PASSWORD_RECOVERY' && session) {
         console.log('useAuth: PASSWORD_RECOVERY event received');
         markPasswordRecovery();
-        setSession(session);
-        setUser(session.user);
+        applySession(session);
         setLoading(false);
         window.clearTimeout(failSafe);
 
@@ -80,15 +125,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (recoveryInUrl) {
           markPasswordRecovery();
         }
-        setSession(session);
-        setUser(session.user);
+        applySession(session);
         setLoading(false);
         window.clearTimeout(failSafe);
         return;
       }
-      
-      setSession(session);
-      setUser(session?.user ?? null);
+
+      if (!session) {
+        const local = readBestLocalSession();
+        if (local) {
+          hydrateFromLocal(local);
+          setLoading(false);
+          window.clearTimeout(failSafe);
+          return;
+        }
+      }
+
+      applySession(session);
       setLoading(false);
       window.clearTimeout(failSafe);
     });
@@ -98,13 +151,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       .getSession()
       .then(({ data: { session } }) => {
         if (!mounted) return;
-        setSession(session);
-        setUser(session?.user ?? null);
+        if (session) {
+          applySession(session);
+        } else {
+          const local = readBestLocalSession();
+          if (local) hydrateFromLocal(local);
+        }
         setLoading(false);
         window.clearTimeout(failSafe);
       })
       .catch(() => {
-        if (mounted) setLoading(false);
+        if (!mounted) return;
+        const local = readBestLocalSession();
+        if (local) hydrateFromLocal(local);
+        setLoading(false);
         window.clearTimeout(failSafe);
       });
 
@@ -115,10 +175,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
 
-  // Auto-sync X rewards/boosts on login (non-blocking, fire-and-forget)
+  // Auto-sync X rewards/boosts on login (non-blocking; skip under games maintenance / load shedding)
   useEffect(() => {
     const userId = session?.user?.id;
     if (!userId) return;
+    if (import.meta.env.VITE_GAMES_MAINTENANCE === 'true') return;
     if (lastAutoXSyncUserId.current === userId) return;
     lastAutoXSyncUserId.current = userId;
 
@@ -157,28 +218,44 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string, captchaToken?: string) => {
-    try {
-      const { error } = await withTimeout(
-        supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-          options: captchaToken ? { captchaToken } : undefined,
-        }),
-        15_000,
-        'Connection timed out. The server may be busy - please try again.'
-      );
+    const payload = {
+      email: email.trim(),
+      password,
+      options: captchaToken ? { captchaToken } : undefined,
+    };
+    let lastError: Error | null = null;
 
-      if (error) {
-        return { error: new Error(mapAuthError(error.message, 'signin')) };
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const { data, error } = await withTimeout(
+          supabase.auth.signInWithPassword(payload),
+          25_000,
+          'Connection timed out. The server may be busy — please try again in a moment.',
+        );
+
+        if (error) {
+          lastError = new Error(mapAuthError(error.message, 'signin'));
+          const retryable = /timeout|fetch|network|503|502|504|busy|rate/i.test(error.message);
+          if (!retryable || attempt === 2) return { error: lastError };
+          await new Promise((r) => window.setTimeout(r, 800 * (attempt + 1)));
+          continue;
+        }
+
+        if (data.session) applySession(data.session);
+        return { error: null };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'Sign in failed';
+        lastError = new Error(mapAuthError(msg, 'signin'));
+        if (attempt === 2) return { error: lastError };
+        await new Promise((r) => window.setTimeout(r, 800 * (attempt + 1)));
       }
-      return { error: null };
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Sign in failed';
-      return { error: new Error(mapAuthError(msg, 'signin')) };
     }
+    return { error: lastError ?? new Error('Sign in failed') };
   };
 
   const signOut = async () => {
+    userInitiatedSignOut.current = true;
+    clearAuthSessionBackup();
     await supabase.auth.signOut();
   };
 
