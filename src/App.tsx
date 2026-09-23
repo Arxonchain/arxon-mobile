@@ -52,6 +52,8 @@ import AppTourGuide from "@/components/tour/AppTourGuide";
 import { gamesRouteContent as g } from "@/components/system/gamesRoute";
 import GamesMaintenanceScreen from "@/components/system/GamesMaintenanceScreen";
 import { GAMES_MAINTENANCE_MODE } from "@/lib/gamesMaintenance";
+import { APP_MAINTENANCE_MODE } from "@/lib/appMaintenance";
+import AppMaintenanceScreen from "@/components/system/AppMaintenanceScreen";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
@@ -548,6 +550,10 @@ function App() {
   useEffect(() => {
     markBootOk();
   }, []);
+
+  if (APP_MAINTENANCE_MODE) {
+    return <AppMaintenanceScreen />;
+  }
 
   return (
     <AppErrorBoundary>

@@ -54,6 +54,7 @@ if (!uiV2 || !wordForge) {
 }
 
 const gamesMaintenance = process.env.VITE_GAMES_MAINTENANCE === 'true';
+const appMaintenance = process.env.VITE_APP_MAINTENANCE === 'true';
 
 const payload = {
   version: gitSha,
@@ -63,6 +64,7 @@ const payload = {
   wordForge: true,
   mode: 'v2-games',
   gamesMaintenance,
+  appMaintenance,
 };
 
 writeFileSync('public/web-bundle-version.json', `${JSON.stringify(payload, null, 2)}\n`);

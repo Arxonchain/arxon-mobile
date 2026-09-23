@@ -1,7 +1,9 @@
 {
-  "version": "0152810",
-  "builtAt": "2026-08-16T20:37:33.639Z",
+  "version": "7455b95",
+  "builtAt": "2026-09-23T06:57:57.688Z",
   "uiV2": true,
   "wordForge": true,
-  "mode": "v2-games"
+  "mode": "v2-games",
+  "gamesMaintenance": false,
+  "appMaintenance": true
 }

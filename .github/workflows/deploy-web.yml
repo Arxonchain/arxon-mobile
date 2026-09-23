@@ -83,6 +83,7 @@ jobs:
           VITE_WORD_FORGE_ENABLED: 'true'
           VITE_ARXON_UI_V2: 'true'
           VITE_GAMES_MAINTENANCE: 'true'
+          VITE_APP_MAINTENANCE: 'true'
           # Client keys from GitHub Actions secrets (never commit .env).
           # Use sb_publishable_… — never service_role / sb_secret here.
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
