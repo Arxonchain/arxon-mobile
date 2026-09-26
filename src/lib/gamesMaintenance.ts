@@ -1,6 +1,6 @@
 /**
  * Pause Dice + Word Forge (heavy edge/realtime load) while keeping mining/arena core.
- * OTA: set VITE_GAMES_MAINTENANCE=true in deploy; set false when plan is upgraded.
+ * OTA: set VITE_GAMES_MAINTENANCE=true in deploy to pause Dice + Word Forge.
  */
 export const GAMES_MAINTENANCE_MODE =
   import.meta.env.VITE_GAMES_MAINTENANCE === 'true';
