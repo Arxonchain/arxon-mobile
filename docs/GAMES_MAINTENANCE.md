@@ -22,7 +22,7 @@ Users see a full-screen message with **Back to Home** / **Open Arena**.
 
 ## OTA deploy
 
-GitHub Actions **Deploy Web** sets `VITE_GAMES_MAINTENANCE=true` by default until you change the workflow or use a repo variable.
+GitHub Actions **Deploy Web** currently sets `VITE_GAMES_MAINTENANCE=false`. Set it to `true` only when Dice / Word Forge must stay off.
 
 Confirm live: `web-bundle-version.json` → `"gamesMaintenance": true`.
 

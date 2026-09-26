@@ -1,6 +1,6 @@
 /**
  * Full-app maintenance gate (login, mining, everything).
- * OTA / web build: VITE_APP_MAINTENANCE=true until Supabase capacity is restored.
+ * OTA / web build: VITE_APP_MAINTENANCE=true to block the whole app.
  */
 export const APP_MAINTENANCE_MODE = import.meta.env.VITE_APP_MAINTENANCE === 'true';
 

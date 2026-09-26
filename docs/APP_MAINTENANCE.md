@@ -13,7 +13,7 @@ VITE_APP_MAINTENANCE=true
 
 ## Mobile (OTA / Capacitor)
 
-GitHub Actions **Deploy Web** sets `VITE_APP_MAINTENANCE=true` alongside V2 games build flags.
+GitHub Actions **Deploy Web** currently sets `VITE_APP_MAINTENANCE=false`. Set it to `true` only during an outage.
 
 Confirm live: `https://arxon-mobile.pages.dev/web-bundle-version.json` → `"appMaintenance": true`.
 
