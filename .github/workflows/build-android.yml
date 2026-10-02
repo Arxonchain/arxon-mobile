@@ -5,6 +5,9 @@ on:
     branches: [ wallet-on-ota ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -77,3 +80,16 @@ jobs:
         with:
           name: Arxon-Wallet-Private-${{ github.run_number }}
           path: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
+          compression-level: 0
+
+      # Direct .apk download — GitHub Actions zips often fail to extract on phones.
+      - name: Publish APK on Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: private-wallet-latest
+          name: Private wallet APK
+          body: |
+            Sideload only. Uninstall Play Store Arxon and any older private APK first, then install the `.apk` on this release (not the Actions zip).
+          prerelease: true
+          make_latest: false
+          files: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
