@@ -13,6 +13,8 @@ const bundleLocal = process.env.CAPACITOR_BUNDLE_LOCAL === 'true';
 
 /** Domains the WebView may navigate / frame for auth + Turnstile challenges. */
 const ALLOW_NAVIGATION = [
+  'localhost',
+  '*.localhost',
   'challenges.cloudflare.com',
   '*.challenges.cloudflare.com',
   '*.cloudflare.com',
@@ -20,6 +22,8 @@ const ALLOW_NAVIGATION = [
   'arxonchain.xyz',
   'www.arxonchain.xyz',
   '*.supabase.co',
+  'rpc-test.arxon.io',
+  'scan.arxon.io',
 ];
 
 const config: CapacitorConfig = {

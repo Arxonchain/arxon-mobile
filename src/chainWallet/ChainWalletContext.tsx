@@ -182,8 +182,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (ready) void ensureKeys();
-  }, [ready, ensureKeys]);
+    if (ready && mnemonic) void ensureKeys();
+  }, [ready, mnemonic, ensureKeys]);
 
   const refreshBalance = useCallback(async (rpcOverride?: string) => {
     if (!address) {

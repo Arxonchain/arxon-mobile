@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+
 export const PROVE_URL = 'http://127.0.0.1:17871';
 const WASM_JS_REMOTE = 'https://rpc-test.arxon.io/prove/arxon_prove.js';
 const WASM_BIN_REMOTE = 'https://rpc-test.arxon.io/prove/arxon_prove_bg.wasm';
@@ -176,6 +178,9 @@ async function call<T>(
     } catch {
       /* sidecar HTTP below */
     }
+  }
+  if (Capacitor.isNativePlatform()) {
+    throw new Error('In-app prover is not ready yet. Open Send again in a moment.');
   }
   return postHttp(`/v1/${method}`, body);
 }

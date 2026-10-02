@@ -8,7 +8,9 @@ import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/u
 export default function WalletSettings() {
   const navigate = useNavigate();
   const { rpcUrl, setRpcUrl, refreshBalance, logout, mnemonic } = useChainWallet();
-  const { projectId, setProjectId } = useWc();
+  const wc = useWc();
+  const projectId = wc?.projectId ?? '';
+  const setProjectId = wc?.setProjectId;
   const [rpc, setRpc] = useState(rpcUrl);
   const [wcId, setWcId] = useState(projectId);
   const [reveal, setReveal] = useState(false);
@@ -31,6 +33,10 @@ export default function WalletSettings() {
   };
 
   const saveWc = async () => {
+    if (!setProjectId) {
+      setNotice('WalletConnect is still starting. Try again in a moment.');
+      return;
+    }
     setBusy(true);
     try {
       await setProjectId(wcId);

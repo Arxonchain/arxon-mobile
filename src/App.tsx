@@ -55,7 +55,6 @@ import { GAMES_MAINTENANCE_MODE } from "@/lib/gamesMaintenance";
 import { APP_MAINTENANCE_MODE } from "@/lib/appMaintenance";
 import AppMaintenanceScreen from "@/components/system/AppMaintenanceScreen";
 import { ChainWalletProvider, useChainWallet } from "@/chainWallet/ChainWalletContext";
-import { WcGate, WcProvider } from "@/chainWallet/wcProvider";
 import WalletOnboarding from "@/components/wallet/WalletOnboarding";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
@@ -285,8 +284,8 @@ function AppRoutes() {
         </>
       );
     }
-    if (isNative && !chain.ready) return <Spinner />;
     if (isNative && !chain.address) return <WalletOnboarding />;
+    if (isNative && !chain.ready) return <Spinner />;
 
   return (
     <>
@@ -566,6 +565,36 @@ function RouterShell({ children }: { children: React.ReactNode }) {
   return isNative ? <HashRouter>{children}</HashRouter> : <BrowserRouter>{children}</BrowserRouter>;
 }
 
+/** WalletConnect is heavy (WalletKit). Load it only after a chain wallet exists so splash can paint. */
+function DeferredWc({ children }: { children: React.ReactNode }) {
+  const { address } = useChainWallet();
+  const [wc, setWc] = useState<typeof import("@/chainWallet/wcProvider") | null>(null);
+
+  useEffect(() => {
+    if (!isNative || !address) return;
+    let live = true;
+    void import("@/chainWallet/wcProvider")
+      .then((mod) => {
+        if (live) setWc(mod);
+      })
+      .catch((err) => {
+        console.warn("[wallet] WalletConnect deferred load failed", err);
+      });
+    return () => {
+      live = false;
+    };
+  }, [address]);
+
+  if (!wc) return <>{children}</>;
+  const { WcProvider, WcGate } = wc;
+  return (
+    <WcProvider>
+      <WcGate />
+      {children}
+    </WcProvider>
+  );
+}
+
 function App() {
   useEffect(() => {
     markBootOk();
@@ -587,15 +616,13 @@ function App() {
               <AppUpdateOverlay />
               <RouterShell>
                 <ChainWalletProvider>
-                  <WcProvider>
-                    <WcGate>
-                      <AppTourProvider>
-                        <MobileNavProvider>
-                          <AppRoutes />
-                        </MobileNavProvider>
-                      </AppTourProvider>
-                    </WcGate>
-                  </WcProvider>
+                  <DeferredWc>
+                    <AppTourProvider>
+                      <MobileNavProvider>
+                        <AppRoutes />
+                      </MobileNavProvider>
+                    </AppTourProvider>
+                  </DeferredWc>
                 </ChainWalletProvider>
               </RouterShell>
             </TooltipProvider>

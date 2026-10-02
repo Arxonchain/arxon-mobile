@@ -56,6 +56,7 @@ function showFatal(message: string, details?: unknown) {
 }
 
 window.addEventListener("error", (e) => {
+  if (window.__ARXON_BOOT_OK__) return;
   const target = (e as ErrorEvent).target;
   if (target && target instanceof HTMLElement && target.tagName === "SCRIPT") {
     showFatal("script load failed", (e as ErrorEvent).message);
@@ -70,6 +71,10 @@ window.addEventListener("unhandledrejection", (e) => {
   if (/not implemented|nativebiometric|localnotifications|haptics/i.test(msg)) {
     console.warn("[startup] ignored plugin rejection:", reason);
     e.preventDefault();
+    return;
+  }
+  if (window.__ARXON_BOOT_OK__) {
+    console.warn("[startup] unhandled rejection after boot", reason);
     return;
   }
   showFatal("unhandled promise rejection", reason);

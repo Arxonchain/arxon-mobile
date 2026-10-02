@@ -304,22 +304,22 @@ export function WcProvider({ children }: { children: ReactNode }) {
 }
 
 export function useWc() {
-  const ctx = useContext(Ctx);
-  if (!ctx) throw new Error('useWc outside WcProvider');
-  return ctx;
+  return useContext(Ctx);
 }
 
 export function WcGate() {
-  const { proposal, request } = useWc();
+  const ctx = useWc();
   const navigate = useNavigate();
   const location = useLocation();
   const last = useRef('');
   useEffect(() => {
+    if (!ctx) return;
+    const { proposal, request } = ctx;
     const key = proposal ? `p:${proposal.id}` : request ? `r:${request.id}` : '';
     if (!key || key === last.current) return;
     last.current = key;
     if (location.pathname.startsWith('/connect')) return;
     navigate('/connect');
-  }, [proposal, request, navigate, location.pathname]);
+  }, [ctx, navigate, location.pathname]);
   return null;
 }

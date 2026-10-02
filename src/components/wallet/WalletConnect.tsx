@@ -6,28 +6,16 @@ import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/u
 
 export default function WalletConnect() {
   const navigate = useNavigate();
-  const {
-    ready,
-    error,
-    sessions,
-    proposal,
-    request,
-    busy,
-    pair,
-    approveProposal,
-    rejectProposal,
-    approveRequest,
-    rejectRequest,
-    disconnect,
-  } = useWc();
+  const wc = useWc();
   const [uri, setUri] = useState('');
   const [localErr, setLocalErr] = useState<string | null>(null);
   const pairedLink = useRef(false);
 
   async function onPair(value?: string) {
+    if (!wc) return;
     setLocalErr(null);
     try {
-      await pair(value ?? uri);
+      await wc.pair(value ?? uri);
       setUri('');
     } catch (e) {
       setLocalErr(e instanceof Error ? e.message : String(e));
@@ -35,13 +23,36 @@ export default function WalletConnect() {
   }
 
   useEffect(() => {
+    if (!wc) return;
     const q = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search);
     const raw = q.get('uri');
     if (pairedLink.current || !raw?.startsWith('wc:')) return;
     pairedLink.current = true;
     setUri(raw);
     void onPair(raw);
-  }, []);
+  }, [wc]);
+
+  if (!wc) {
+    return (
+      <div style={{ ...walletPage, padding: '56px 22px 32px' }}>
+        <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)' }}>Starting WalletConnect…</p>
+      </div>
+    );
+  }
+
+  const {
+    ready,
+    error,
+    sessions,
+    proposal,
+    request,
+    busy,
+    approveProposal,
+    rejectProposal,
+    approveRequest,
+    rejectRequest,
+    disconnect,
+  } = wc;
 
   const reqInfo = request ? requestLabel(request) : null;
   const propInfo = proposal ? dappLabel(proposal) : null;
