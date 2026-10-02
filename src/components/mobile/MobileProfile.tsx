@@ -35,7 +35,7 @@ function Toggle({ on, onToggle }: { on:boolean; onToggle:()=>void }) {
 
 const MENU = [
   {Icon:Users,   label:'Referrals',    sub:'Earn 100 ARX-P per friend', path:'/referrals', col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'},
-  {Icon:Wallet,  label:'Wallet',       sub:'Connect your Web3 wallet',  path:'/wallet',    col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
+  {Icon:Wallet,  label:'Wallet',       sub:'Arxon chain wallet',        path:'/',          col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
   {Icon:Shield,  label:'Security',     sub:'Password & 2FA settings',   path:'/settings',  col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
   {Icon:BookOpen,label:'Litepaper',    sub:'Guides & documentation',    path:'/litepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
   {Icon:Settings,label:'App Settings', sub:'Preferences & display',     path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},

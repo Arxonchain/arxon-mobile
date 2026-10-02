@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, Users } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 import arxonLogo from '@/assets/arxon-logo.jpg';
 
 type AuthMode = 'signin' | 'signup' | 'forgot';
@@ -67,7 +68,7 @@ export default function AuthPage() {
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password);
         if (error) throw error;
-        navigate('/');
+        navigate(Capacitor.isNativePlatform() ? '/mine' : '/');
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email);
         if (error) throw error;
@@ -101,8 +102,8 @@ export default function AuthPage() {
             {mode === 'forgot' && 'Reset Password'}
           </h1>
           <p className="text-muted-foreground text-center mb-8">
-            {mode === 'signin' && 'Sign in to start mining ARX-P'}
-            {mode === 'signup' && 'Join Arxon and start earning'}
+            {mode === 'signin' && 'Sign in to your mining account'}
+            {mode === 'signup' && 'Create a mining account to earn ARX-P'}
             {mode === 'forgot' && 'Enter your email to reset password'}
           </p>
           
@@ -228,6 +229,15 @@ export default function AuthPage() {
                   {mode === 'signin' ? 'Sign up' : 'Sign in'}
                 </button>
               </p>
+            )}
+            {Capacitor.isNativePlatform() && (
+              <button
+                onClick={() => navigate('/')}
+                className="text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 mx-auto mt-4"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to wallet
+              </button>
             )}
           </div>
         </div>

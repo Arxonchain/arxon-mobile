@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, HashRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
+import { ChainWalletProvider, useChainWallet } from "@/chainWallet/ChainWalletContext";
 import { Capacitor } from "@capacitor/core";
 
 // Web pages
@@ -48,8 +49,13 @@ import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import MobileArena from "@/components/mobile/MobileArena";
 import MobileNexus from "@/components/mobile/MobileNexus";
 import MobileProfile from "@/components/mobile/MobileProfile";
-import MobileWallet from "@/components/mobile/MobileWallet";
 import PublicProfile from "@/pages/PublicProfile";
+import WalletOnboarding from "@/components/wallet/WalletOnboarding";
+import WalletHome from "@/components/wallet/WalletHome";
+import WalletActivity from "@/components/wallet/WalletActivity";
+import WalletSend from "@/components/wallet/WalletSend";
+import WalletReceive from "@/components/wallet/WalletReceive";
+import WalletSettings from "@/components/wallet/WalletSettings";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -128,7 +134,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
   if (loading) return <Spinner />;
-  if (user) return <Navigate to="/" replace />;
+  if (user) return <Navigate to={isNative ? '/mine' : '/'} replace />;
   return <>{children}</>;
 }
 
@@ -142,7 +148,9 @@ function MobilePage({ children }: { children: React.ReactNode }) {
 
 function AppRoutes() {
   const { user, loading } = useAuth();
-  if (loading) return <Spinner />;
+  const chain = useChainWallet();
+  if (loading || !chain.ready) return <Spinner />;
+  if (isNative && !chain.address) return <WalletOnboarding />;
 
   return (
     <>
@@ -169,13 +177,18 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            <Route path="/" element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
+            <Route path="/" element={<WalletHome />} />
+            <Route path="/activity" element={<WalletActivity />} />
+            <Route path="/send" element={<WalletSend />} />
+            <Route path="/receive" element={<WalletReceive />} />
+            <Route path="/wallet-settings" element={<WalletSettings />} />
+            <Route path="/wallet" element={<Navigate to="/" replace />} />
+            <Route path="/mine" element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
             <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena" element={<MobileArena />} />
             <Route path="/leaderboard" element={<MobileLeaderboard />} />
             <Route path="/nexus" element={<ProtectedRoute><MobileNexus /></ProtectedRoute>} />
             <Route path="/profile" element={<ProtectedRoute><MobileProfile /></ProtectedRoute>} />
-            <Route path="/wallet" element={<MobileWallet />} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
 
             <Route path="/tasks" element={<ProtectedRoute><MobilePage><Tasks /></MobilePage></ProtectedRoute>} />
@@ -215,14 +228,16 @@ function App() {
     <AppErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <PointsProvider>
-            <TooltipProvider>
-              <Toaster />
-              <RouterShell>
-                <AppRoutes />
-              </RouterShell>
-            </TooltipProvider>
-          </PointsProvider>
+          <ChainWalletProvider>
+            <PointsProvider>
+              <TooltipProvider>
+                <Toaster />
+                <RouterShell>
+                  <AppRoutes />
+                </RouterShell>
+              </TooltipProvider>
+            </PointsProvider>
+          </ChainWalletProvider>
         </AuthProvider>
       </QueryClientProvider>
     </AppErrorBoundary>

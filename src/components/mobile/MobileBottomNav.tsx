@@ -1,7 +1,20 @@
+import type { ReactElement } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/contexts/AuthContext';
+import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 
+const WalletIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <rect x="2" y="6" width="20" height="14" rx="3" fill={a?'hsl(215 35% 62%/0.25)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <path d="M2 11h20" stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+    <circle cx="17" cy="15.5" r="1.5" fill={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'}/>
+  </svg>
+);
+const ActivityIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path d="M4 14h4l2-6 3 10 2-6h5" stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 const HomeIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <rect x="3" y="3" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.25)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
@@ -10,12 +23,10 @@ const HomeIcon = (a: boolean) => (
     <rect x="14" y="14" width="7" height="7" rx="2" fill={a?'hsl(215 35% 62%/0.35)':'none'} stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
   </svg>
 );
-const ChatIcon = (a: boolean) => (
+const ArenaIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"
-      fill={a?'hsl(155 45% 43%/0.2)':'none'} stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
-    <line x1="8" y1="10" x2="16" y2="10" stroke={a?'hsl(155 45% 55%)':'hsl(215 14% 30%)'} strokeWidth="1.4" strokeLinecap="round"/>
-    <line x1="8" y1="14" x2="13" y2="14" stroke={a?'hsl(155 45% 55%)':'hsl(215 14% 30%)'} strokeWidth="1.4" strokeLinecap="round"/>
+      fill={a?'hsl(255 50% 65%/0.2)':'none'} stroke={a?'hsl(255 50% 65%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinejoin="round"/>
   </svg>
 );
 const LeaderboardIcon = (a: boolean) => (
@@ -30,24 +41,66 @@ const ProfileIcon = (a: boolean) => (
     <path d="M4 21c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke={a?'hsl(215 35% 62%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round"/>
   </svg>
 );
+const MineIcon = (a: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <path d="M3 20l7-7 3 3 8-9" stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="7" cy="8" r="2.2" fill={a?'hsl(155 45% 43%/0.25)':'none'} stroke={a?'hsl(155 45% 50%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
+  </svg>
+);
 
-const TABS = [
-  { to:'/',to2:null,id:'home',label:'Home',icon:HomeIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
-  { to:'/arena',to2:null,id:'arena',label:'Arena',icon:ArenaIcon,col:'hsl(255 50% 65%)',dot:'hsl(255 55% 70%)' },
-  { to:'/leaderboard',to2:null,id:'leaderboard',label:'Leaderboard',icon:LeaderboardIcon,col:'hsl(38 55% 52%)',dot:'hsl(38 60% 58%)' },
-  { to:'/profile',to2:null,id:'profile',label:'Profile',icon:ProfileIcon,col:'hsl(215 35% 62%)',dot:'hsl(215 55% 62%)' },
+type Tab = { to: string; id: string; label: string; icon: (a: boolean) => ReactElement; col: string; dot: string };
+
+const WALLET_TABS: Tab[] = [
+  { to: '/', id: 'wallet', label: 'Wallet', icon: WalletIcon, col: 'hsl(215 35% 62%)', dot: 'hsl(215 55% 62%)' },
+  { to: '/activity', id: 'activity', label: 'Activity', icon: ActivityIcon, col: 'hsl(155 45% 50%)', dot: 'hsl(155 50% 58%)' },
+  { to: '/mine', id: 'mine', label: 'Mine', icon: MineIcon, col: 'hsl(155 45% 43%)', dot: 'hsl(155 50% 52%)' },
 ];
+
+const MINE_TABS: Tab[] = [
+  { to: '/', id: 'wallet', label: 'Wallet', icon: WalletIcon, col: 'hsl(215 35% 62%)', dot: 'hsl(215 55% 62%)' },
+  { to: '/mine', id: 'mine', label: 'Mine', icon: HomeIcon, col: 'hsl(215 35% 62%)', dot: 'hsl(215 55% 62%)' },
+  { to: '/arena', id: 'arena', label: 'Arena', icon: ArenaIcon, col: 'hsl(255 50% 65%)', dot: 'hsl(255 55% 70%)' },
+  { to: '/leaderboard', id: 'leaderboard', label: 'Leaderboard', icon: LeaderboardIcon, col: 'hsl(38 55% 52%)', dot: 'hsl(38 60% 58%)' },
+  { to: '/profile', id: 'profile', label: 'Profile', icon: ProfileIcon, col: 'hsl(215 35% 62%)', dot: 'hsl(215 55% 62%)' },
+];
+
+const MINE_PREFIXES = [
+  '/mine',
+  '/mining',
+  '/arena',
+  '/leaderboard',
+  '/profile',
+  '/nexus',
+  '/tasks',
+  '/referrals',
+  '/settings',
+  '/notifications',
+  '/auth',
+];
+
+function inMine(pathname: string) {
+  return MINE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
 
 export default function MobileBottomNav() {
   const location = useLocation();
-  const { user } = useAuth();
-  if (!user) return null;
-  if (['/auth','/admin','/landing'].some(p => location.pathname.startsWith(p))) return null;
+  const { address } = useChainWallet();
+  if (!address) return null;
+  if (['/admin', '/landing'].some((p) => location.pathname.startsWith(p))) return null;
+
+  const mine = inMine(location.pathname);
+  const tabs = mine ? MINE_TABS : WALLET_TABS;
 
   const activeId = (() => {
-    if (location.pathname === '/') return 'home';
-    for (const t of TABS.slice(1)) if (location.pathname.startsWith(t.to)) return t.id;
-    return 'home';
+    if (location.pathname === '/' || location.pathname.startsWith('/send') || location.pathname.startsWith('/receive') || location.pathname.startsWith('/wallet-settings')) {
+      return 'wallet';
+    }
+    if (location.pathname.startsWith('/activity')) return 'activity';
+    if (location.pathname === '/mine' || location.pathname.startsWith('/mining') || location.pathname.startsWith('/auth')) return 'mine';
+    for (const t of tabs) {
+      if (t.to !== '/' && location.pathname.startsWith(t.to)) return t.id;
+    }
+    return mine ? 'mine' : 'wallet';
   })();
 
   return (
@@ -59,10 +112,10 @@ export default function MobileBottomNav() {
         backdropFilter:'blur(44px) saturate(1.4)',WebkitBackdropFilter:'blur(44px) saturate(1.4)',
         borderRadius:24,border:'1px solid hsl(215 25% 17%/0.55)',padding:'8px 2px',display:'flex',
         boxShadow:'0 -4px 32px hsl(225 35% 3%/0.6),inset 0 1px 0 hsl(215 35% 62%/0.05)'}}>
-        {TABS.map(({ to, id, label, icon, col, dot }) => {
+        {tabs.map(({ to, id, label, icon, col, dot }) => {
           const isActive = id === activeId;
           return (
-            <NavLink key={to} to={to} style={{flex:1,display:'flex',flexDirection:'column',
+            <NavLink key={`${mine ? 'm' : 'w'}-${id}`} to={to} style={{flex:1,display:'flex',flexDirection:'column',
               alignItems:'center',gap:4,padding:'9px 0',textDecoration:'none',
               position:'relative',WebkitTapHighlightColor:'transparent'}}>
               {isActive && (
