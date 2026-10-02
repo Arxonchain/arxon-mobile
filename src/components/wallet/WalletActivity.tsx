@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadActivity, mergeHashes, type ActivityItem } from '@/chainWallet/activity';
-import { SCAN_URL } from '@/chainWallet/chain';
+import { activityLabel, loadActivity, mergeHashes, type ActivityItem } from '@/chainWallet/activity';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { scanRecentFrom } from '@/chainWallet/scan';
 import { shortHash, walletGhost, walletPage } from '@/chainWallet/ui';
@@ -54,25 +53,28 @@ export default function WalletActivity() {
         </p>
       ) : (
         items.map((item) => (
-          <a
+          <button
             key={item.hash}
-            href={`${SCAN_URL}/#/tx/${item.hash}`}
-            target="_blank"
-            rel="noreferrer"
+            type="button"
+            onClick={() => navigate(`/tx/${item.hash}`)}
             style={{
               display: 'block',
-              textDecoration: 'none',
+              width: '100%',
+              textAlign: 'left',
+              background: 'none',
+              border: 'none',
               color: 'inherit',
               padding: '14px 0',
               borderBottom: '1px solid hsl(215 22% 14%)',
+              cursor: 'pointer',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{item.kind === 'transfer' ? 'Sent' : 'On-chain'}</span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{activityLabel(item.kind)}</span>
               <span style={{ fontSize: 13, color: 'hsl(215 14% 52%)' }}>{item.amount ? `${item.amount} ARX` : ''}</span>
             </div>
             <p style={{ fontSize: 12, color: 'hsl(215 14% 42%)', marginTop: 4 }}>{shortHash(item.hash)}</p>
-          </a>
+          </button>
         ))
       )}
     </div>

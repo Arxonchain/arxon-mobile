@@ -92,7 +92,7 @@ export default function MobileBottomNav() {
   const tabs = mine ? MINE_TABS : WALLET_TABS;
 
   const activeId = (() => {
-    if (location.pathname === '/' || location.pathname.startsWith('/send') || location.pathname.startsWith('/receive') || location.pathname.startsWith('/wallet-settings')) {
+    if (location.pathname === '/' || location.pathname.startsWith('/send') || location.pathname.startsWith('/receive') || location.pathname.startsWith('/wallet-settings') || location.pathname.startsWith('/connect') || location.pathname.startsWith('/tx')) {
       return 'wallet';
     }
     if (location.pathname.startsWith('/activity')) return 'activity';

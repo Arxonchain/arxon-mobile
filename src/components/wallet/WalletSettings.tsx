@@ -1,21 +1,42 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_RPC } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { useWc } from '@/chainWallet/wcProvider';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 
 export default function WalletSettings() {
   const navigate = useNavigate();
   const { rpcUrl, setRpcUrl, refreshBalance, logout, mnemonic } = useChainWallet();
+  const { projectId, setProjectId } = useWc();
   const [rpc, setRpc] = useState(rpcUrl);
+  const [wcId, setWcId] = useState(projectId);
   const [reveal, setReveal] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    setWcId(projectId);
+  }, [projectId]);
 
   const save = async () => {
     setBusy(true);
     try {
       const next = await setRpcUrl(rpc);
       await refreshBalance(next);
+      setNotice('RPC saved');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveWc = async () => {
+    setBusy(true);
+    try {
+      await setProjectId(wcId);
+      setNotice(wcId.trim() ? 'WalletConnect Project ID stored on this device.' : 'WalletConnect id cleared');
+    } catch (e) {
+      setNotice(e instanceof Error ? e.message : 'Could not save WalletConnect id');
     } finally {
       setBusy(false);
     }
@@ -42,6 +63,16 @@ export default function WalletSettings() {
           Save
         </button>
       </div>
+
+      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>WalletConnect Project ID</p>
+      <p style={{ fontSize: 12, color: 'hsl(215 14% 42%)', marginBottom: 8, lineHeight: 1.5 }}>
+        Free id from cloud.reown.com. Required to pair a dapp. Not a spending key.
+      </p>
+      <input value={wcId} onChange={(e) => setWcId(e.target.value)} placeholder="Project ID" style={{ ...walletField, marginBottom: 10 }} />
+      <button type="button" style={{ ...walletBtn, width: '100%', marginBottom: 28 }} disabled={busy} onClick={() => void saveWc()}>
+        Save WalletConnect id
+      </button>
+      {notice ? <p style={{ fontSize: 13, color: 'hsl(155 45% 55%)', marginBottom: 16 }}>{notice}</p> : null}
 
       <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>Recovery phrase</p>
       <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => setReveal((v) => !v)}>

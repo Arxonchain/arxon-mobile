@@ -1,8 +1,14 @@
+import { Buffer } from "buffer";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
 import { Capacitor } from "@capacitor/core";
+
+(window as unknown as { Buffer: typeof Buffer }).Buffer = Buffer;
+if (!(globalThis as { global?: unknown }).global) {
+  (globalThis as { global?: unknown }).global = globalThis;
+}
 
 function showFatal(message: string, details?: unknown) {
   const el = document.createElement("div");

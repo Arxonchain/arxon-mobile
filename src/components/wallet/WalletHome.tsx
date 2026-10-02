@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { loadActivity, type ActivityItem } from '@/chainWallet/activity';
-import { SCAN_URL, START_URL } from '@/chainWallet/chain';
+import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/activity';
+import { START_URL } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { shortAddr, shortHash, walletBtn, walletGhost, walletPage } from '@/chainWallet/ui';
 
 export default function WalletHome() {
   const navigate = useNavigate();
-  const { address, balance, rpcError, rpcUrl, refreshBalance } = useChainWallet();
+  const { address, balance, rpcError, rpcUrl, refreshBalance, shieldedBalance, notesError, notesStatus, keysError } = useChainWallet();
   const [recent, setRecent] = useState<ActivityItem[]>([]);
 
   const reload = useCallback(async () => {
@@ -36,12 +36,23 @@ export default function WalletHome() {
       <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-1px', margin: '6px 0 0' }}>
         {balance == null ? '—' : Number(balance).toLocaleString(undefined, { maximumFractionDigits: 4 })}
       </p>
-      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22 }}>ARX · chain 7171</p>
+      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22 }}>
+        ARX · chain 7171{shieldedBalance !== '0' ? ` · shielded ${Number(shieldedBalance).toLocaleString(undefined, { maximumFractionDigits: 4 })}` : ''}
+      </p>
 
       {rpcError ? (
-        <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 16, lineHeight: 1.5 }}>
+        <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12, lineHeight: 1.5 }}>
           Cannot reach {rpcUrl}. {rpcError}
         </p>
+      ) : null}
+      {keysError ? (
+        <p style={{ fontSize: 12, color: 'hsl(38 70% 62%)', marginBottom: 12, lineHeight: 1.5 }}>{keysError}</p>
+      ) : null}
+      {notesStatus ? (
+        <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 12 }}>{notesStatus}</p>
+      ) : null}
+      {notesError ? (
+        <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12, lineHeight: 1.5 }}>{notesError}</p>
       ) : null}
 
       <div style={{ display: 'flex', gap: 10 }}>
@@ -53,6 +64,13 @@ export default function WalletHome() {
         </button>
       </div>
 
+      <button
+        type="button"
+        style={{ ...walletGhost, width: '100%', marginTop: 10 }}
+        onClick={() => navigate('/connect')}
+      >
+        Connect
+      </button>
       <button
         type="button"
         style={{ ...walletGhost, width: '100%', marginTop: 10 }}
@@ -93,16 +111,15 @@ export default function WalletHome() {
           </p>
         ) : (
           recent.map((item) => (
-            <a
+            <button
               key={item.hash}
-              href={`${SCAN_URL}/#/tx/${item.hash}`}
-              target="_blank"
-              rel="noreferrer"
-              style={{ display: 'block', textDecoration: 'none', color: 'inherit', padding: '8px 0', borderTop: '1px solid hsl(215 22% 14%)' }}
+              type="button"
+              onClick={() => navigate(`/tx/${item.hash}`)}
+              style={{ display: 'block', width: '100%', textAlign: 'left', background: 'none', border: 'none', color: 'inherit', padding: '8px 0', borderTop: '1px solid hsl(215 22% 14%)', cursor: 'pointer' }}
             >
-              <span style={{ fontSize: 13 }}>{item.kind === 'transfer' ? 'Sent' : 'On-chain'}</span>
+              <span style={{ fontSize: 13 }}>{activityLabel(item.kind)}</span>
               <span style={{ float: 'right', fontSize: 12, color: 'hsl(215 14% 48%)' }}>{shortHash(item.hash)}</span>
-            </a>
+            </button>
           ))
         )}
       </div>

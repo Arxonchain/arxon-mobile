@@ -56,6 +56,9 @@ import WalletActivity from "@/components/wallet/WalletActivity";
 import WalletSend from "@/components/wallet/WalletSend";
 import WalletReceive from "@/components/wallet/WalletReceive";
 import WalletSettings from "@/components/wallet/WalletSettings";
+import WalletConnectScreen from "@/components/wallet/WalletConnect";
+import WalletTx from "@/components/wallet/WalletTx";
+import { WcGate, WcProvider } from "@/chainWallet/wcProvider";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -182,6 +185,8 @@ function AppRoutes() {
             <Route path="/send" element={<WalletSend />} />
             <Route path="/receive" element={<WalletReceive />} />
             <Route path="/wallet-settings" element={<WalletSettings />} />
+            <Route path="/connect" element={<WalletConnectScreen />} />
+            <Route path="/tx/:hash" element={<WalletTx />} />
             <Route path="/wallet" element={<Navigate to="/" replace />} />
             <Route path="/mine" element={user ? <MobileDashboard /> : <Navigate to="/auth" replace />} />
             <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
@@ -223,6 +228,15 @@ function RouterShell({ children }: { children: React.ReactNode }) {
   return isNative ? <HashRouter>{children}</HashRouter> : <BrowserRouter>{children}</BrowserRouter>;
 }
 
+function NativeWalletLayer({ children }: { children: React.ReactNode }) {
+  return (
+    <WcProvider>
+      <WcGate />
+      {children}
+    </WcProvider>
+  );
+}
+
 function App() {
   return (
     <AppErrorBoundary>
@@ -233,7 +247,13 @@ function App() {
               <TooltipProvider>
                 <Toaster />
                 <RouterShell>
-                  <AppRoutes />
+                  {isNative ? (
+                    <NativeWalletLayer>
+                      <AppRoutes />
+                    </NativeWalletLayer>
+                  ) : (
+                    <AppRoutes />
+                  )}
                 </RouterShell>
               </TooltipProvider>
             </PointsProvider>
