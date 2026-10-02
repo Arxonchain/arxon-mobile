@@ -31,9 +31,10 @@ export default defineConfig(({ mode }) => {
   // Relative "./" resolves assets under /auth/assets/* and blanks the confirm page.
   base: "/",
 
-  // IMPORTANT: support older Android WebView (Android 7/8 devices)
+  // Wallet (viem) needs BigInt. es2017 was for ancient WebViews; this private
+  // APK is for current devices. Store OTA on main stays es2017 until wallet ships.
   esbuild: {
-    target: "es2017",
+    target: "es2020",
   },
 
   server: {
@@ -52,6 +53,7 @@ export default defineConfig(({ mode }) => {
   },
   define: {
     "import.meta.env.VITE_SENTRY_RELEASE": JSON.stringify(release),
+    global: "globalThis",
   },
   plugins: [
     react(),
@@ -68,11 +70,12 @@ export default defineConfig(({ mode }) => {
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      buffer: "buffer",
     },
     dedupe: ["react", "react-dom"],
   },
   build: {
-    target: "es2017",
+    target: "es2020",
     chunkSizeWarningLimit: 2000,
     sourcemap: sentryUpload ? "hidden" : false,
   },

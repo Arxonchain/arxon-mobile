@@ -1,0 +1,1 @@
+export { scanRecentFrom } from './inspect';

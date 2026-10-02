@@ -54,6 +54,9 @@ import GamesMaintenanceScreen from "@/components/system/GamesMaintenanceScreen";
 import { GAMES_MAINTENANCE_MODE } from "@/lib/gamesMaintenance";
 import { APP_MAINTENANCE_MODE } from "@/lib/appMaintenance";
 import AppMaintenanceScreen from "@/components/system/AppMaintenanceScreen";
+import { ChainWalletProvider, useChainWallet } from "@/chainWallet/ChainWalletContext";
+import { WcGate, WcProvider } from "@/chainWallet/wcProvider";
+import WalletOnboarding from "@/components/wallet/WalletOnboarding";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
@@ -104,7 +107,13 @@ const MobileLeaderboard = lazy(() => import("@/components/mobile/MobileLeaderboa
 const MobileArena = lazy(() => import("@/components/mobile/MobileArena"));
 const MobileNexus = lazy(() => import("@/components/mobile/MobileNexus"));
 const MobileProfile = lazy(() => import("@/components/mobile/MobileProfile"));
-const MobileWallet = lazy(() => import("@/components/mobile/MobileWallet"));
+const WalletHome = lazy(() => import("@/components/wallet/WalletHome"));
+const WalletActivity = lazy(() => import("@/components/wallet/WalletActivity"));
+const WalletSend = lazy(() => import("@/components/wallet/WalletSend"));
+const WalletReceive = lazy(() => import("@/components/wallet/WalletReceive"));
+const WalletSettings = lazy(() => import("@/components/wallet/WalletSettings"));
+const WalletConnectScreen = lazy(() => import("@/components/wallet/WalletConnect"));
+const WalletTx = lazy(() => import("@/components/wallet/WalletTx"));
 const MobileSettings = lazy(() => import("@/components/mobile/MobileSettings"));
 
 const ArenaV2 = lazy(() => import("@/features/arxon-v2/pages/ArenaV2"));
@@ -226,7 +235,7 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    return <Navigate to="/" replace />;
+      return <Navigate to={isNative ? '/mine' : '/'} replace />;
   }
   return <>{children}</>;
 }
@@ -253,6 +262,7 @@ function DevPublicRoutes() {
 function AppRoutes() {
   const location = useLocation();
   const { user, loading } = useAuth();
+  const chain = useChainWallet();
   const [splashDone, setSplashDone] = useState(!isNative);
 
   if (isDevPublicPath(location.pathname)) {
@@ -267,14 +277,16 @@ function AppRoutes() {
       </>
     );
   }
-  if (loading) {
-    return (
-      <>
-        <Spinner />
-        <SlowLoadOverlay loading delayMs={2500} message="Still loading…" />
-      </>
-    );
-  }
+    if (loading) {
+      return (
+        <>
+          <Spinner />
+          <SlowLoadOverlay loading delayMs={2500} message="Still loading…" />
+        </>
+      );
+    }
+    if (isNative && !chain.ready) return <Spinner />;
+    if (isNative && !chain.address) return <WalletOnboarding />;
 
   return (
     <>
@@ -297,6 +309,7 @@ function AppRoutes() {
         <Route path="/admin/login"    element={<AdminLogin />} />
         <Route path="/ui-preview" element={<AppPreviewShell />}>
           <Route index element={<DashboardNeon preview />} />
+          <Route path="mine" element={<DashboardNeon preview />} />
           <Route path="mining" element={<Navigate to="/ui-preview" replace />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
           <Route path="arena/dice" element={g(<DiceHubV2 />)} />
@@ -380,7 +393,15 @@ function AppRoutes() {
 
         {isNative ? (
           <>
-            <Route path="/" element={user ? (ARXON_UI_V2_ENABLED ? <DashboardV2 /> : <MobileDashboard />) : <Navigate to="/auth" replace />} />
+            <Route path="/" element={<WalletHome />} />
+            <Route path="/activity" element={<WalletActivity />} />
+            <Route path="/send" element={<WalletSend />} />
+            <Route path="/receive" element={<WalletReceive />} />
+            <Route path="/wallet-settings" element={<WalletSettings />} />
+            <Route path="/connect" element={<WalletConnectScreen />} />
+            <Route path="/tx/:hash" element={<WalletTx />} />
+            <Route path="/wallet" element={<WalletHome />} />
+            <Route path="/mine" element={user ? (ARXON_UI_V2_ENABLED ? <DashboardV2 /> : <MobileDashboard />) : <Navigate to="/auth" replace />} />
             {WORD_FORGE_ENABLED && GamingHubPage && (
               <Route path="/games" element={
                 <ProtectedRoute>
@@ -398,7 +419,7 @@ function AppRoutes() {
               path="/mining"
               element={
                 ARXON_UI_V2_ENABLED
-                  ? <Navigate to="/" replace />
+                  ? <Navigate to="/mine" replace />
                   : <ProtectedRoute><MobileMining /></ProtectedRoute>
               }
             />
@@ -416,7 +437,6 @@ function AppRoutes() {
             <Route path="/leaderboard"  element={ARXON_UI_V2_ENABLED ? <LeaderboardV2 /> : <MobileLeaderboard />} />
             <Route path="/nexus"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NexusV2 /> : <MobileNexus />}</ProtectedRoute>} />
             <Route path="/profile"      element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <ProfileV2 /> : <MobileProfile />}</ProtectedRoute>} />
-            <Route path="/wallet"       element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <WalletV2 /> : <MobileWallet />}</ProtectedRoute>} />
             <Route path="/profile/:userId" element={<PublicProfile />} />
             <Route path="/tasks"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <TasksV2 /> : <MobilePage><Tasks /></MobilePage>}</ProtectedRoute>} />
             <Route path="/referrals"    element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <ReferralsV2 /> : <MobilePage><Referrals /></MobilePage>}</ProtectedRoute>} />
@@ -566,11 +586,17 @@ function App() {
               <NetworkOfflineBanner />
               <AppUpdateOverlay />
               <RouterShell>
-                <AppTourProvider>
-                  <MobileNavProvider>
-                    <AppRoutes />
-                  </MobileNavProvider>
-                </AppTourProvider>
+                <ChainWalletProvider>
+                  <WcProvider>
+                    <WcGate>
+                      <AppTourProvider>
+                        <MobileNavProvider>
+                          <AppRoutes />
+                        </MobileNavProvider>
+                      </AppTourProvider>
+                    </WcGate>
+                  </WcProvider>
+                </ChainWalletProvider>
               </RouterShell>
             </TooltipProvider>
           </PointsProvider>

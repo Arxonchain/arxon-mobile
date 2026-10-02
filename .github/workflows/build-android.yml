@@ -2,7 +2,8 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ wallet-on-ota ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -29,13 +30,16 @@ jobs:
         env:
           VITE_WORD_FORGE_ENABLED: 'true'
           VITE_ARXON_UI_V2: 'true'
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
-      - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/push-notifications
-
-      # Default Capacitor config loads OTA from https://arxon-mobile.pages.dev (not localhost).
-      - name: Sync Capacitor
+      # Bundle dist into the APK so this sideload does NOT load live pages.dev OTA
+      # (OTA still has the Coming Soon wallet). Do not copy this env onto store AAB.
+      - name: Sync Capacitor (local bundle)
         run: npx cap sync android
+        env:
+          CAPACITOR_BUNDLE_LOCAL: 'true'
 
       - name: Install ImageMagick
         run: sudo apt-get install -y imagemagick
@@ -66,10 +70,10 @@ jobs:
           JAVA_HOME: ${{ env.JAVA_HOME }}
 
       - name: Rename APK
-        run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Arxon-Mining-App-${{ github.run_number }}.apk
+        run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Arxon-Mining-App-${{ github.run_number }}
-          path: android/app/build/outputs/apk/debug/Arxon-Mining-App-${{ github.run_number }}.apk
+          name: Arxon-Wallet-Private-${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk

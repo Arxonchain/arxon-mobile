@@ -10,6 +10,7 @@ import arxonLogo from '@/assets/arxon-icon.svg';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
 import { captchaStaleMessage, isCaptchaTokenStale } from '@/lib/auth/captchaToken';
+import { Capacitor } from '@capacitor/core';
 
 // FIX BUG-23 + BUG-25 + BUG-28:
 // - This is the ONLY auth page used in routes (AuthPage.tsx). Auth.tsx is dead.
@@ -163,7 +164,7 @@ export default function AuthPage() {
           authFailed = true;
           throw error;
         }
-        navigate('/');
+        navigate(Capacitor.isNativePlatform() ? '/mine' : '/');
 
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email, token || undefined);

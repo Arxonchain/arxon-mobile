@@ -1,0 +1,86 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
+import type { Hex } from 'viem';
+import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
+import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { walletGhost, walletPage } from '@/chainWallet/ui';
+
+function badgeColor(state: InspectedTx['rows'][number]['state']) {
+  if (state === 'hidden') return 'hsl(155 45% 55%)';
+  if (state === 'public') return 'hsl(0 70% 62%)';
+  return 'hsl(215 14% 48%)';
+}
+
+export default function WalletTx() {
+  const navigate = useNavigate();
+  const { rpcUrl } = useChainWallet();
+  const { hash } = useParams<{ hash: string }>();
+  const [data, setData] = useState<InspectedTx | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!hash || !hash.startsWith('0x')) {
+      setErr('Missing transaction hash');
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const next = await inspectTx(rpcUrl, hash as Hex);
+        if (!cancelled) setData(next);
+      } catch (e) {
+        if (!cancelled) setErr(e instanceof Error ? e.message : 'Could not load tx');
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [hash, rpcUrl]);
+
+  return (
+    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+      <button type="button" onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}>
+        Back
+      </button>
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 12px' }}>Tx</h1>
+      <div style={{ padding: 16, borderRadius: 18, background: 'hsl(225 26% 8%)', border: '1px solid hsl(215 22% 18%)', wordBreak: 'break-all', fontSize: 12, lineHeight: 1.6, marginBottom: 10 }}>
+        {hash}
+      </div>
+      <button
+        type="button"
+        style={{ ...walletGhost, width: '100%', marginBottom: 16 }}
+        onClick={() => {
+          if (!hash) return;
+          void navigator.clipboard.writeText(hash).then(() => setCopied(true));
+        }}
+      >
+        {copied ? 'Copied' : 'Copy hash'}
+      </button>
+      {err ? <p style={{ color: 'hsl(0 70% 62%)', fontSize: 13 }}>{err}</p> : null}
+      {!data && !err ? <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)' }}>Loading from RPC…</p> : null}
+      {data ? (
+        <>
+          <p style={{ fontSize: 18, fontWeight: 700, color: 'hsl(215 35% 72%)' }}>
+            {data.status === 'success' ? 'Included' : data.status === 'reverted' ? 'Reverted — not applied' : 'Pending'}
+          </p>
+          <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', marginBottom: 12 }}>
+            {data.kind === 'shield' ? 'Shield' : data.kind === 'private' ? 'Private' : data.kind === 'unshield' ? 'Unshield' : data.kind === 'transfer' ? 'Transfer' : 'Call'}
+            {data.blockNumber ? ` · #${data.blockNumber}` : ''}
+          </p>
+          {data.rows.map((row) => (
+            <div key={row.label} style={{ padding: 14, borderRadius: 16, background: 'hsl(225 26% 8%)', border: '1px solid hsl(215 22% 18%)', marginBottom: 8 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{row.label}</span>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 0.6, color: badgeColor(row.state) }}>
+                  {row.state === 'hidden' ? 'HIDDEN' : row.state === 'public' ? 'PUBLIC' : ''}
+                </span>
+              </div>
+              <p style={{ fontSize: 12, color: 'hsl(215 14% 52%)', marginTop: 6, wordBreak: 'break-all' }}>{row.value}</p>
+            </div>
+          ))}
+        </>
+      ) : null}
+    </div>
+  );
+}

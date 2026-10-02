@@ -16,6 +16,7 @@ import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
 import LegalLinks from '@/components/legal/LegalLinks';
 import { captchaStaleMessage, isCaptchaTokenStale } from '@/lib/auth/captchaToken';
+import { Capacitor } from '@capacitor/core';
 type AuthMode = 'signin' | 'signup' | 'forgot';
 
 function isAlreadyRegisteredError(message?: string) {
@@ -158,7 +159,7 @@ export default function AuthLandingV2() {
           authFailed = true;
           throw error;
         }
-        navigate('/');
+        navigate(Capacitor.isNativePlatform() ? '/mine' : '/');
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email, token || undefined);
         if (error) {

@@ -75,7 +75,11 @@
     "@radix-ui/react-tooltip": "^1.2.7",
     "@sentry/react": "^10.75.0",
     "@sentry/vite-plugin": "^5.4.0",
+    "@reown/walletkit": "^1.6.0",
     "@supabase/supabase-js": "^2.89.0",
+    "@walletconnect/core": "^2.25.0",
+    "@walletconnect/jsonrpc-utils": "^1.0.8",
+    "@walletconnect/utils": "^2.25.0",
     "@tanstack/react-query": "^5.83.0",
     "canvas-confetti": "^1.9.4",
     "class-variance-authority": "^0.7.1",
@@ -104,6 +108,8 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",
+    "viem": "^2.56.9",
+    "buffer": "^6.0.3",
     "zod": "^3.25.76"
   },
   "devDependencies": {

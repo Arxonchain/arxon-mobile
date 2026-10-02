@@ -1,3 +1,4 @@
+import { Buffer } from "buffer";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { CapacitorUpdater } from "@capgo/capacitor-updater";
@@ -8,6 +9,10 @@ import { isDevPublicPath, resolveAppPath } from "@/lib/devPublicRoutes";
 import AppLoadFailureScreen from "@/components/system/AppLoadFailureScreen";
 import type { LoadFailureKind } from "@/components/system/failureCatalog";
 import { initSentry, captureBootFailure } from "@/lib/sentry";
+
+if (!(globalThis as { Buffer?: typeof Buffer }).Buffer) {
+  (globalThis as { Buffer?: typeof Buffer }).Buffer = Buffer;
+}
 
 initSentry();
 
