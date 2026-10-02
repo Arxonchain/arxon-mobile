@@ -22,7 +22,7 @@ export default function WalletHome() {
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>ARXON WALLET</p>
+        <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>PORTFOLIO</p>
         <button
           type="button"
           onClick={() => navigate('/wallet-settings')}
@@ -77,13 +77,6 @@ export default function WalletHome() {
         onClick={() => window.open(START_URL, '_blank')}
       >
         Testnet faucet
-      </button>
-      <button
-        type="button"
-        style={{ ...walletGhost, width: '100%', marginTop: 10 }}
-        onClick={() => navigate('/mine')}
-      >
-        Open mining
       </button>
 
       <div

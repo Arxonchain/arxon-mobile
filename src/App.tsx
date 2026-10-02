@@ -108,6 +108,7 @@ const MobileNexus = lazy(() => import("@/components/mobile/MobileNexus"));
 const MobileProfile = lazy(() => import("@/components/mobile/MobileProfile"));
 const WalletHome = lazy(() => import("@/components/wallet/WalletHome"));
 const WalletActivity = lazy(() => import("@/components/wallet/WalletActivity"));
+const WalletExplore = lazy(() => import("@/components/wallet/WalletExplore"));
 const WalletSend = lazy(() => import("@/components/wallet/WalletSend"));
 const WalletReceive = lazy(() => import("@/components/wallet/WalletReceive"));
 const WalletSettings = lazy(() => import("@/components/wallet/WalletSettings"));
@@ -309,6 +310,8 @@ function AppRoutes() {
         <Route path="/ui-preview" element={<AppPreviewShell />}>
           <Route index element={<DashboardNeon preview />} />
           <Route path="mine" element={<DashboardNeon preview />} />
+          <Route path="activity" element={<DashboardNeon preview />} />
+          <Route path="explore" element={<DashboardNeon preview />} />
           <Route path="mining" element={<Navigate to="/ui-preview" replace />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
           <Route path="arena/dice" element={g(<DiceHubV2 />)} />
@@ -394,6 +397,7 @@ function AppRoutes() {
           <>
             <Route path="/" element={<WalletHome />} />
             <Route path="/activity" element={<WalletActivity />} />
+            <Route path="/explore" element={<WalletExplore />} />
             <Route path="/send" element={<WalletSend />} />
             <Route path="/receive" element={<WalletReceive />} />
             <Route path="/wallet-settings" element={<WalletSettings />} />

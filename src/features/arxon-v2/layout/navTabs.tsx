@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
-import { ArenaNavIcon } from './ArenaNavIcon';
 
 export type NavTab = {
   to: string;
@@ -15,15 +14,39 @@ const INACTIVE = 'rgba(232,252,255,0.38)';
 const stroke = (active: boolean, accent: string) => (active ? accent : INACTIVE);
 const fill = (active: boolean, accent: string) => (active ? `${accent}30` : 'none');
 
-/** V2 nav: Wallet is home; Mine is the live OTA dashboard. */
+/** Wallet tabs + a single Mine tab for the whole mining/games app. */
 export function buildV2NavTabs(basePath = ''): NavTab[] {
   const p = (path: string) => (basePath ? `${basePath}${path === '/' ? '' : path}` : path || '/');
 
   return [
     {
+      to: p('/activity'),
+      id: 'activity',
+      label: 'Activity',
+      accent: neon.cyan,
+      icon: (a) => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path d="M4 6h16M4 12h10M4 18h13" stroke={stroke(a, neon.cyan)} strokeWidth="1.8" strokeLinecap="round" />
+          <circle cx="18" cy="12" r="1.6" fill={fill(a, neon.cyan)} stroke={stroke(a, neon.cyan)} strokeWidth="1.4" />
+        </svg>
+      ),
+    },
+    {
+      to: p('/explore'),
+      id: 'explore',
+      label: 'Explore',
+      accent: neon.purple,
+      icon: (a) => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="8" fill={fill(a, neon.purple)} stroke={stroke(a, neon.purple)} strokeWidth="1.8" />
+          <path d="M10.2 10.2l6-1.8-1.8 6-4.2-4.2z" fill={a ? `${neon.purple}55` : 'none'} stroke={stroke(a, neon.purple)} strokeWidth="1.6" strokeLinejoin="round" />
+        </svg>
+      ),
+    },
+    {
       to: p('/'),
-      id: 'wallet',
-      label: 'Wallet',
+      id: 'portfolio',
+      label: 'Portfolio',
       accent: neon.teal,
       end: true,
       icon: (a) => (
@@ -35,31 +58,12 @@ export function buildV2NavTabs(basePath = ''): NavTab[] {
     },
     {
       to: p('/mine'),
-      id: 'home',
+      id: 'mine',
       label: 'Mine',
-      accent: neon.cyan,
+      accent: neon.gold,
       icon: (a) => (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z" fill={fill(a, neon.cyan)} stroke={stroke(a, neon.cyan)} strokeWidth="1.8" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    {
-      to: p('/arena'),
-      id: 'arena',
-      label: 'Arena',
-      accent: neon.purple,
-      icon: (a) => <ArenaNavIcon active={a} accent={neon.purple} />,
-    },
-    {
-      to: p('/profile'),
-      id: 'profile',
-      label: 'You',
-      accent: neon.cyan,
-      icon: (a) => (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="8" r="4" fill={fill(a, neon.cyan)} stroke={stroke(a, neon.cyan)} strokeWidth="1.8" />
-          <path d="M4 21c0-3.3 3.6-6 8-6s8 2.7 8 6" stroke={stroke(a, neon.cyan)} strokeWidth="1.8" strokeLinecap="round" />
+          <path d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z" fill={fill(a, neon.gold)} stroke={stroke(a, neon.gold)} strokeWidth="1.8" strokeLinejoin="round" />
         </svg>
       ),
     },

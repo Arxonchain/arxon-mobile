@@ -1,0 +1,92 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Capacitor } from '@capacitor/core';
+import { SCAN_URL, START_URL } from '@/chainWallet/chain';
+import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
+
+async function openUrl(url: string) {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url });
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+function looksLikeTx(value: string) {
+  return /^0x[0-9a-fA-F]{64}$/.test(value.trim());
+}
+
+function looksLikeAddress(value: string) {
+  return /^0x[0-9a-fA-F]{40}$/.test(value.trim());
+}
+
+export default function WalletExplore() {
+  const navigate = useNavigate();
+  const { address } = useChainWallet();
+  const [q, setQ] = useState('');
+  const [notice, setNotice] = useState<string | null>(null);
+
+  const lookup = async () => {
+    const value = q.trim();
+    setNotice(null);
+    if (!value) {
+      setNotice('Paste a tx hash or 0x address.');
+      return;
+    }
+    if (looksLikeTx(value)) {
+      navigate(`/tx/${value}`);
+      return;
+    }
+    if (looksLikeAddress(value)) {
+      await openUrl(`${SCAN_URL}/address/${value}`);
+      return;
+    }
+    setNotice('Use a 0x transaction hash (66 chars) or a public address.');
+  };
+
+  return (
+    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+      <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>EXPLORE</p>
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 8px' }}>Chain 7171</h1>
+      <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', lineHeight: 1.5, marginBottom: 18 }}>
+        Look up a transaction or address on Arxon. Shielded fields stay hidden on-chain.
+      </p>
+
+      <input
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        placeholder="0x hash or address"
+        style={{ ...walletField, marginBottom: 10 }}
+      />
+      <button type="button" style={{ ...walletBtn, width: '100%', marginBottom: 12 }} onClick={() => void lookup()}>
+        Look up
+      </button>
+      {notice ? <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', marginBottom: 16 }}>{notice}</p> : null}
+
+      <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => void openUrl(SCAN_URL)}>
+        Open explorer
+      </button>
+      {address ? (
+        <button
+          type="button"
+          style={{ ...walletGhost, width: '100%', marginBottom: 10 }}
+          onClick={() => void openUrl(`${SCAN_URL}/address/${address}`)}
+        >
+          My address on explorer
+        </button>
+      ) : null}
+      <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => void openUrl(START_URL)}>
+        Testnet faucet
+      </button>
+      <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => navigate('/connect')}>
+        Connect a dapp
+      </button>
+    </div>
+  );
+}
