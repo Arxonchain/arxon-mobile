@@ -8,6 +8,7 @@ const LEAF_SCAN_KEY = 'arxon.leafScanAt';
 const WC_PROJECT_KEY = 'arxon.wcProjectId';
 const TOKENS_KEY = 'arxon.listedTokens';
 const HIDE_BAL_KEY = 'arxon.hideBalance';
+const NETWORK_KEY = 'arxon.network';
 
 function read(key: string): string | null {
   try {
@@ -93,6 +94,11 @@ export const storage = {
   getHideBalance: () => read(HIDE_BAL_KEY) === '1',
   setHideBalance: (on: boolean) => {
     write(HIDE_BAL_KEY, on ? '1' : '0');
+  },
+  getNetwork: () => Promise.resolve(read(NETWORK_KEY)),
+  setNetwork: (id: string) => {
+    write(NETWORK_KEY, id);
+    return Promise.resolve();
   },
   getListedTokens: () => Promise.resolve(read(TOKENS_KEY)),
   setListedTokens: (json: string) => {

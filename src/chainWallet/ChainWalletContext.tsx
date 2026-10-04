@@ -12,6 +12,13 @@ import { formatEther, parseEther, type Address } from 'viem';
 
 import { pushActivity } from './activity';
 import { assertKnownAnchor, DEFAULT_RPC, PRECOMPILE, publicClient, walletClient } from './chain';
+import {
+  fetchEthereumBalances,
+  sendEthereumNative,
+  sendEthereumToken,
+  type EthereumBalances,
+} from './ethereum';
+import { isWalletNetworkId, type EthereumToken, type WalletNetworkId } from './networks';
 import { relayUrl, submitRelayed } from './relay';
 import { accountFromMnemonic, newMnemonic } from './keys';
 import {
@@ -40,7 +47,10 @@ type ChainWalletState = {
   address: Address | null;
   shieldedPk: string | null;
   rpcUrl: string;
+  network: WalletNetworkId;
+  setNetwork: (id: WalletNetworkId) => Promise<void>;
   balance: string | null;
+  ethBalances: EthereumBalances;
   rpcError: string | null;
   notesError: string | null;
   notesStatus: string | null;
@@ -55,6 +65,7 @@ type ChainWalletState = {
   refreshNotes: () => Promise<void>;
   refreshKeys: () => Promise<void>;
   sendArx: (to: Address, amount: string) => Promise<`0x${string}`>;
+  sendEthereum: (token: EthereumToken, to: Address, amount: string) => Promise<`0x${string}`>;
   sendShielded: (amount: string, flags: PrivacyFlags) => Promise<`0x${string}`>;
   sendPrivate: (recipientPk: string, amount: string, flags: PrivacyFlags) => Promise<`0x${string}`>;
   sendUnshield: (to: Address, amount: string, flags: PrivacyFlags) => Promise<`0x${string}`>;
@@ -118,7 +129,9 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [rpcUrl, setRpc] = useState(DEFAULT_RPC);
+  const [network, setNetworkState] = useState<WalletNetworkId>('arxon');
   const [balance, setBalance] = useState<string | null>(null);
+  const [ethBalances, setEthBalances] = useState<EthereumBalances>({ ETH: null, USDC: null, USDT: null });
   const [rpcError, setRpcError] = useState<string | null>(null);
   const [shieldedPk, setShieldedPk] = useState<string | null>(null);
   const [notes, setNotes] = useState<StoredNote[]>([]);
@@ -164,9 +177,14 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [saved, storedRpc] = await Promise.all([storage.getMnemonic(), storage.getRpc()]);
+      const [saved, storedRpc, storedNetwork] = await Promise.all([
+        storage.getMnemonic(),
+        storage.getRpc(),
+        storage.getNetwork(),
+      ]);
       if (cancelled) return;
       if (saved) setMnemonic(saved);
+      if (isWalletNetworkId(storedNetwork)) setNetworkState(storedNetwork);
       let rpc = storedRpc;
       if (rpc && rpc.includes('trycloudflare.com')) {
         rpc = DEFAULT_RPC;
@@ -188,10 +206,26 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const refreshBalance = useCallback(async (rpcOverride?: string) => {
     if (!address) {
       setBalance(null);
+      setEthBalances({ ETH: null, USDC: null, USDT: null });
+      return;
+    }
+    const gen = ++rpcGen.current;
+    if (network === 'ethereum') {
+      try {
+        const { balances, error } = await fetchEthereumBalances(address);
+        if (gen !== rpcGen.current) return;
+        setEthBalances(balances);
+        setBalance(balances.ETH);
+        setRpcError(error);
+      } catch (e) {
+        if (gen !== rpcGen.current) return;
+        setEthBalances({ ETH: null, USDC: null, USDT: null });
+        setBalance(null);
+        setRpcError(e instanceof Error ? e.message : 'Ethereum RPC unreachable');
+      }
       return;
     }
     const url = (rpcOverride ?? rpcUrl).trim() || DEFAULT_RPC;
-    const gen = ++rpcGen.current;
     try {
       const wei = await publicClient(url).getBalance({ address });
       if (gen !== rpcGen.current) return;
@@ -200,9 +234,9 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     } catch (e) {
       if (gen !== rpcGen.current) return;
       setBalance(null);
-      setRpcError(e instanceof Error ? e.message : 'RPC unreachable');
+      setRpcError(e instanceof Error ? e.message : 'Arxon Testnet RPC unreachable');
     }
-  }, [address, rpcUrl]);
+  }, [address, rpcUrl, network]);
 
   useEffect(() => {
     void refreshBalance();
@@ -231,6 +265,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     await storage.clearLeafScanAt();
     setMnemonic(null);
     setBalance(null);
+    setEthBalances({ ETH: null, USDC: null, USDT: null });
     setShieldedPk(null);
     setNotes([]);
     setNotesError(null);
@@ -242,6 +277,11 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     await storage.setRpc(next);
     setRpc(next);
     return next;
+  }, []);
+
+  const setNetwork = useCallback(async (id: WalletNetworkId) => {
+    await storage.setNetwork(id);
+    setNetworkState(id);
   }, []);
 
   const sendShielded = useCallback(
@@ -270,6 +310,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: asBits(flags),
         at: Date.now(),
+        token: 'ARX',
+        network: 'arxon',
       });
       await waitOk(rpcUrl, hash, 'Shield');
       await commitOutputs(
@@ -320,6 +362,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: asBits(flags),
         at: Date.now(),
+        token: 'ARX',
+        network: 'arxon',
       });
       await waitOk(rpcUrl, hash, 'Private transfer');
       await markSpent(note.cm);
@@ -360,6 +404,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: asBits(flags),
         at: Date.now(),
+        token: 'ARX',
+        network: 'arxon',
       });
       await waitOk(rpcUrl, hash, 'Unshield');
       await markSpent(note.cm);
@@ -381,11 +427,35 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: 0,
         at: Date.now(),
+        token: 'ARX',
+        network: 'arxon',
       });
       await waitOk(rpcUrl, hash, 'Send');
       return hash;
     },
     [mnemonic, rpcUrl]
+  );
+
+  const sendEthereum = useCallback(
+    async (token: EthereumToken, to: Address, amount: string) => {
+      if (!mnemonic) throw new Error('No wallet');
+      const hash =
+        token === 'ETH'
+          ? await sendEthereumNative(mnemonic, to, amount)
+          : await sendEthereumToken(mnemonic, token, to, amount);
+      await pushActivity({
+        hash,
+        kind: 'transfer',
+        to,
+        amount,
+        maskBits: 0,
+        at: Date.now(),
+        token,
+        network: 'ethereum',
+      });
+      return hash;
+    },
+    [mnemonic]
   );
 
   const value: ChainWalletState = {
@@ -394,7 +464,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     address,
     shieldedPk,
     rpcUrl,
+    network,
+    setNetwork,
     balance,
+    ethBalances,
     rpcError,
     notesError,
     notesStatus,
@@ -409,6 +482,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     refreshNotes,
     refreshKeys: ensureKeys,
     sendArx,
+    sendEthereum,
     sendShielded,
     sendPrivate,
     sendUnshield,

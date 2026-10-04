@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Capacitor } from '@capacitor/core';
-import { SCAN_URL, START_URL } from '@/chainWallet/chain';
+import { START_URL } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { NETWORKS } from '@/chainWallet/networks';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
+import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
 async function openUrl(url: string) {
   try {
@@ -28,9 +30,11 @@ function looksLikeAddress(value: string) {
 
 export default function WalletExplore() {
   const navigate = useNavigate();
-  const { address } = useChainWallet();
+  const { address, network } = useChainWallet();
   const [q, setQ] = useState('');
   const [notice, setNotice] = useState<string | null>(null);
+  const explorer = NETWORKS[network].explorer;
+  const isEth = network === 'ethereum';
 
   const lookup = async () => {
     const value = q.trim();
@@ -44,7 +48,7 @@ export default function WalletExplore() {
       return;
     }
     if (looksLikeAddress(value)) {
-      await openUrl(`${SCAN_URL}/address/${value}`);
+      await openUrl(`${explorer}/address/${value}`);
       return;
     }
     setNotice('Invalid');
@@ -53,7 +57,8 @@ export default function WalletExplore() {
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>EXPLORE</p>
-      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 16px' }}>Explore</h1>
+      <NetworkSwitcher />
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '4px 0 16px' }}>Explore</h1>
 
       <input
         value={q}
@@ -66,21 +71,23 @@ export default function WalletExplore() {
       </button>
       {notice ? <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', marginBottom: 16 }}>{notice}</p> : null}
 
-      <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => void openUrl(SCAN_URL)}>
+      <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => void openUrl(explorer)}>
         Explorer
       </button>
       {address ? (
         <button
           type="button"
           style={{ ...walletGhost, width: '100%', marginBottom: 10 }}
-          onClick={() => void openUrl(`${SCAN_URL}/address/${address}`)}
+          onClick={() => void openUrl(`${explorer}/address/${address}`)}
         >
           My address
         </button>
       ) : null}
-      <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => void openUrl(START_URL)}>
-        Faucet
-      </button>
+      {isEth ? null : (
+        <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => void openUrl(START_URL)}>
+          Faucet
+        </button>
+      )}
       <button type="button" style={{ ...walletGhost, width: '100%', marginBottom: 10 }} onClick={() => navigate('/connect')}>
         Connect
       </button>

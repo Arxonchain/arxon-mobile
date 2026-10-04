@@ -11,6 +11,8 @@ export type ActivityItem = {
   amount: string;
   maskBits: number;
   at: number;
+  token?: string;
+  network?: 'arxon' | 'ethereum';
 };
 
 const MAX = 50;

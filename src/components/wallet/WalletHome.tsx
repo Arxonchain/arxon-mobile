@@ -5,6 +5,7 @@ import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/ac
 import { START_URL } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
+import { ETHEREUM_TOKENS, NETWORKS } from '@/chainWallet/networks';
 import {
   addListedToken,
   loadListedTokens,
@@ -12,20 +13,46 @@ import {
   type ListedToken,
 } from '@/chainWallet/tokens';
 import { shortAddr, shortHash, walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
+import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+
+function fmt(v: string | null, digits: number) {
+  if (v == null) return '—';
+  const n = Number(v);
+  if (!Number.isFinite(n)) return v;
+  return n.toLocaleString(undefined, { maximumFractionDigits: digits });
+}
 
 export default function WalletHome() {
   const navigate = useNavigate();
-  const { address, balance, rpcError, rpcUrl, refreshBalance, shieldedBalance, notesError, notesStatus, keysError } =
-    useChainWallet();
+  const {
+    address,
+    balance,
+    rpcError,
+    rpcUrl,
+    refreshBalance,
+    shieldedBalance,
+    notesError,
+    notesStatus,
+    keysError,
+    network,
+    ethBalances,
+    refreshNotes,
+  } = useChainWallet();
   const { hidden, toggle, show } = useHideBalance();
   const [recent, setRecent] = useState<ActivityItem[]>([]);
   const [tokens, setTokens] = useState<(ListedToken & { bal: string })[]>([]);
   const [tokenAddr, setTokenAddr] = useState('');
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenErr, setTokenErr] = useState<string | null>(null);
+  const isEth = network === 'ethereum';
+  const net = NETWORKS[network];
 
   const reload = useCallback(async () => {
     setRecent((await loadActivity()).slice(0, 4));
+    if (isEth) {
+      setTokens([]);
+      return;
+    }
     const listed = await loadListedTokens();
     const rows = await Promise.all(
       listed.map(async (t) => {
@@ -41,12 +68,13 @@ export default function WalletHome() {
       })
     );
     setTokens(rows);
-  }, [address, rpcUrl]);
+  }, [address, rpcUrl, isEth]);
 
   useEffect(() => {
     void reload();
     void refreshBalance();
-  }, [reload, refreshBalance]);
+    if (!isEth) void refreshNotes();
+  }, [reload, refreshBalance, refreshNotes, isEth]);
 
   async function onAddToken() {
     setTokenErr(null);
@@ -63,8 +91,7 @@ export default function WalletHome() {
     }
   }
 
-  const publicAmt =
-    balance == null ? '—' : Number(balance).toLocaleString(undefined, { maximumFractionDigits: 4 });
+  const publicAmt = fmt(balance, isEth ? 6 : 4);
   const vaultAmt = Number(shieldedBalance).toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   return (
@@ -80,41 +107,35 @@ export default function WalletHome() {
         </button>
       </div>
 
-      <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', marginTop: 18 }}>{address ? shortAddr(address) : '—'}</p>
+      <NetworkSwitcher />
+
+      <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', marginTop: 4 }}>{address ? shortAddr(address) : '—'}</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0 0' }}>
         <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>{show(publicAmt)}</p>
         <button
           type="button"
           onClick={toggle}
-          aria-label={hidden ? 'Show balance' : 'Hide balance'}
+          aria-label={hidden ? 'Show' : 'Hide'}
           style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', cursor: 'pointer', padding: 4 }}
         >
-          {hidden ? (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M3 3l18 18M10.6 10.6a2 2 0 002.8 2.8M9.9 5.1A10 10 0 0121 12a10.4 10.4 0 01-3.2 4.5M6.1 6.1A10.4 10.4 0 003 12a10 10 0 0012.4 6.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" stroke="currentColor" strokeWidth="1.8" />
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8" />
-            </svg>
-          )}
+          {hidden ? 'Show' : 'Hide'}
         </button>
       </div>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22 }}>
-        ARX{shieldedBalance !== '0' ? ` · Vault ${show(vaultAmt)}` : ''}
+        {net.nativeSymbol}
+        {!isEth && shieldedBalance !== '0' ? ` · Vault ${show(vaultAmt)}` : ''}
       </p>
 
       {rpcError ? (
-        <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12 }}>{rpcError}</p>
+        <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12, wordBreak: 'break-word' }}>{rpcError}</p>
       ) : null}
-      {keysError ? (
+      {!isEth && keysError ? (
         <p style={{ fontSize: 12, color: 'hsl(38 70% 62%)', marginBottom: 12 }}>{keysError}</p>
       ) : null}
-      {notesStatus ? (
+      {!isEth && notesStatus ? (
         <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 12 }}>{notesStatus}</p>
       ) : null}
-      {notesError ? (
+      {!isEth && notesError ? (
         <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12 }}>{notesError}</p>
       ) : null}
 
@@ -125,24 +146,30 @@ export default function WalletHome() {
         <button type="button" style={walletGhost} onClick={() => navigate('/receive')}>
           Receive
         </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield')}>
-          Shield
-        </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield')}>
-          Unshield
-        </button>
+        {isEth ? null : (
+          <>
+            <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield')}>
+              Shield
+            </button>
+            <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield')}>
+              Unshield
+            </button>
+          </>
+        )}
       </div>
 
       <button type="button" style={{ ...walletGhost, width: '100%', marginTop: 10 }} onClick={() => navigate('/connect')}>
         Connect
       </button>
-      <button
-        type="button"
-        style={{ ...walletGhost, width: '100%', marginTop: 10 }}
-        onClick={() => window.open(START_URL, '_blank')}
-      >
-        Faucet
-      </button>
+      {isEth ? null : (
+        <button
+          type="button"
+          style={{ ...walletGhost, width: '100%', marginTop: 10 }}
+          onClick={() => window.open(START_URL, '_blank')}
+        >
+          Faucet
+        </button>
+      )}
       <button type="button" style={{ ...walletGhost, width: '100%', marginTop: 10 }} onClick={() => navigate('/mine')}>
         Mine
       </button>
@@ -156,32 +183,13 @@ export default function WalletHome() {
           border: '1px solid hsl(215 22% 17%/0.55)',
         }}
       >
-        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Tokens</p>
-        <input
-          value={tokenAddr}
-          onChange={(e) => setTokenAddr(e.target.value)}
-          placeholder="Token 0x…"
-          style={{ ...walletField, marginBottom: 10 }}
-        />
-        <button
-          type="button"
-          style={{ ...walletGhost, width: '100%' }}
-          disabled={tokenBusy || !tokenAddr.trim()}
-          onClick={() => void onAddToken()}
-        >
-          {tokenBusy ? 'Processing' : 'Add token'}
-        </button>
-        {tokenErr ? (
-          <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginTop: 10 }}>{tokenErr}</p>
-        ) : null}
-        {tokens.length === 0 ? (
-          <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginTop: 14 }}>No tokens</p>
-        ) : (
-          tokens.map((t) => (
+        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isEth ? 'ETH USDC USDT' : 'Tokens'}</p>
+        {isEth ? (
+          ETHEREUM_TOKENS.map((t) => (
             <button
-              key={t.address}
+              key={t.symbol}
               type="button"
-              onClick={() => navigate(`/token/${t.address}`)}
+              onClick={() => navigate(`/send?token=${t.symbol}`)}
               style={{
                 display: 'block',
                 width: '100%',
@@ -192,13 +200,60 @@ export default function WalletHome() {
                 padding: '10px 0',
                 borderTop: '1px solid hsl(215 22% 14%)',
                 cursor: 'pointer',
-                marginTop: 4,
               }}
             >
               <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
-              <span style={{ float: 'right', fontSize: 13 }}>{show(t.bal)}</span>
+              <span style={{ float: 'right', fontSize: 13 }}>
+                {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
+              </span>
             </button>
           ))
+        ) : (
+          <>
+            <input
+              value={tokenAddr}
+              onChange={(e) => setTokenAddr(e.target.value)}
+              placeholder="Token 0x…"
+              style={{ ...walletField, marginBottom: 10 }}
+            />
+            <button
+              type="button"
+              style={{ ...walletGhost, width: '100%' }}
+              disabled={tokenBusy || !tokenAddr.trim()}
+              onClick={() => void onAddToken()}
+            >
+              {tokenBusy ? 'Processing' : 'Add token'}
+            </button>
+            {tokenErr ? (
+              <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginTop: 10 }}>{tokenErr}</p>
+            ) : null}
+            {tokens.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginTop: 14 }}>No tokens</p>
+            ) : (
+              tokens.map((t) => (
+                <button
+                  key={t.address}
+                  type="button"
+                  onClick={() => navigate(`/token/${t.address}`)}
+                  style={{
+                    display: 'block',
+                    width: '100%',
+                    textAlign: 'left',
+                    background: 'none',
+                    border: 'none',
+                    color: 'inherit',
+                    padding: '10px 0',
+                    borderTop: '1px solid hsl(215 22% 14%)',
+                    cursor: 'pointer',
+                    marginTop: 4,
+                  }}
+                >
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
+                  <span style={{ float: 'right', fontSize: 13 }}>{show(t.bal)}</span>
+                </button>
+              ))
+            )}
+          </>
         )}
       </div>
 

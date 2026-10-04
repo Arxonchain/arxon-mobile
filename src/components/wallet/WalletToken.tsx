@@ -73,7 +73,7 @@ function requireUnits(amount: string, decimals: number): bigint {
 export default function WalletToken() {
   const { address: tokenParam = '' } = useParams<{ address: string }>();
   const navigate = useNavigate();
-  const { address, mnemonic, rpcUrl, shieldedPk } = useChainWallet();
+  const { address, mnemonic, rpcUrl, shieldedPk, network, setNetwork } = useChainWallet();
   const { show } = useHideBalance();
   const [meta, setMeta] = useState<ListedToken | null>(null);
   const [publicBal, setPublicBal] = useState<string>('—');
@@ -83,6 +83,7 @@ export default function WalletToken() {
   const [amount, setAmount] = useState('');
   const [flags, setFlags] = useState<PrivacyFlags>(OPEN);
   const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [poolLive, setPoolLive] = useState<boolean | null>(null);
 
@@ -132,7 +133,16 @@ export default function WalletToken() {
       gas: kind === 'transfer' ? BigInt(120_000) : BigInt(8_000_000),
       type: 'legacy' as const,
     } as unknown as Parameters<typeof client.sendTransaction>[0]);
-    await pushActivity({ hash, kind, to: token, amount, maskBits: 0, at: Date.now() });
+    await pushActivity({
+      hash,
+      kind,
+      to: token,
+      amount,
+      maskBits: 0,
+      at: Date.now(),
+      token: meta?.symbol ?? 'Token',
+      network: 'arxon',
+    });
     await waitOk(rpcUrl, hash, label);
     return hash;
   }
@@ -140,6 +150,14 @@ export default function WalletToken() {
   async function onGo() {
     setNotice(null);
     if (!token || !meta || !mnemonic) return;
+    if (!amount.trim()) {
+      setNotice('Enter an amount');
+      return;
+    }
+    if (!confirm) {
+      setConfirm(true);
+      return;
+    }
     setBusy(true);
     try {
       if (mode === 'send') {
@@ -245,6 +263,18 @@ export default function WalletToken() {
     }
   }
 
+  if (network === 'ethereum') {
+    return (
+      <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+        <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 12px' }}>{meta?.symbol ?? 'Token'}</h1>
+        <p style={{ fontSize: 15, fontWeight: 800, marginBottom: 16 }}>Arxon Testnet only</p>
+        <button type="button" style={walletBtn} onClick={() => void setNetwork('arxon')}>
+          Arxon Testnet · play
+        </button>
+      </div>
+    );
+  }
+
   if (!token) {
     return (
       <div style={walletPage}>
@@ -265,7 +295,7 @@ export default function WalletToken() {
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <button
         type="button"
-        onClick={() => navigate('/')}
+        onClick={() => (confirm ? setConfirm(false) : navigate('/'))}
         style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}
       >
         Back
@@ -290,7 +320,10 @@ export default function WalletToken() {
             <button
               key={m.id}
               type="button"
-              onClick={() => setMode(m.id)}
+              onClick={() => {
+                setMode(m.id);
+                setConfirm(false);
+              }}
               style={mode === m.id ? walletBtn : walletGhost}
             >
               {m.label}
@@ -298,6 +331,8 @@ export default function WalletToken() {
           ))}
       </div>
 
+      {confirm ? null : (
+        <>
       {mode === 'send' || mode === 'private' ? (
         <input
           value={to}
@@ -337,14 +372,25 @@ export default function WalletToken() {
             </label>
           ))
         : null}
+        </>
+      )}
 
       {notice ? (
         <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', lineHeight: 1.5, marginBottom: 12, wordBreak: 'break-all' }}>
           {notice}
         </p>
       ) : null}
+      {confirm ? (
+        <div style={{ textAlign: 'center', padding: '8px 0 16px' }}>
+          <p style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-1.5px', margin: '0 0 8px' }}>
+            {amount || '—'} {meta?.symbol ?? ''}
+          </p>
+          <p style={{ fontSize: 22, fontWeight: 800, color: 'hsl(215 40% 72%)' }}>Arxon Testnet</p>
+          <p style={{ fontSize: 13, fontWeight: 700, color: 'hsl(215 30% 60%)', marginBottom: 12 }}>play</p>
+        </div>
+      ) : null}
       <button type="button" style={{ ...walletBtn, width: '100%' }} disabled={busy || !meta} onClick={() => void onGo()}>
-        {busy ? 'Processing' : mode === 'shield' ? 'Shield' : mode === 'unshield' ? 'Unshield' : mode === 'private' ? 'Send' : 'Send'}
+        {busy ? 'Processing' : confirm ? 'Confirm' : mode === 'shield' ? 'Shield' : mode === 'unshield' ? 'Unshield' : 'Send'}
       </button>
     </div>
   );

@@ -110,6 +110,7 @@ const WalletActivity = lazy(() => import("@/components/wallet/WalletActivity"));
 const WalletExplore = lazy(() => import("@/components/wallet/WalletExplore"));
 const WalletMarket = lazy(() => import("@/components/wallet/WalletMarket"));
 const WalletPortfolio = lazy(() => import("@/components/wallet/WalletPortfolio"));
+const WalletMine = lazy(() => import("@/components/wallet/WalletMine"));
 const WalletSend = lazy(() => import("@/components/wallet/WalletSend"));
 const WalletReceive = lazy(() => import("@/components/wallet/WalletReceive"));
 const WalletSettings = lazy(() => import("@/components/wallet/WalletSettings"));
@@ -315,6 +316,8 @@ function AppRoutes() {
           <Route path="mine" element={<DashboardNeon preview />} />
           <Route path="activity" element={<DashboardNeon preview />} />
           <Route path="explore" element={<DashboardNeon preview />} />
+          <Route path="balances" element={<DashboardNeon preview />} />
+          <Route path="portfolio" element={<Navigate to="/ui-preview/balances" replace />} />
           <Route path="mining" element={<Navigate to="/ui-preview" replace />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
           <Route path="arena/dice" element={g(<DiceHubV2 />)} />
@@ -402,7 +405,8 @@ function AppRoutes() {
             <Route path="/activity" element={<WalletActivity />} />
             <Route path="/explore" element={<WalletExplore />} />
             <Route path="/market" element={<WalletMarket />} />
-            <Route path="/portfolio" element={<WalletPortfolio />} />
+            <Route path="/balances" element={<WalletPortfolio />} />
+            <Route path="/portfolio" element={<Navigate to="/balances" replace />} />
             <Route path="/send" element={<WalletSend />} />
             <Route path="/receive" element={<WalletReceive />} />
             <Route path="/wallet-settings" element={<WalletSettings />} />
@@ -410,7 +414,7 @@ function AppRoutes() {
             <Route path="/tx/:hash" element={<WalletTx />} />
             <Route path="/token/:address" element={<WalletToken />} />
             <Route path="/wallet" element={<WalletHome />} />
-            <Route path="/mine" element={user ? (ARXON_UI_V2_ENABLED ? <DashboardV2 /> : <MobileDashboard />) : <Navigate to="/auth" replace />} />
+            <Route path="/mine" element={<WalletMine />} />
             {WORD_FORGE_ENABLED && GamingHubPage && (
               <Route path="/games" element={
                 <ProtectedRoute>
@@ -420,18 +424,8 @@ function AppRoutes() {
                 </ProtectedRoute>
               } />
             )}
-            {/*
-              V2 / store+OTA (VITE_ARXON_UI_V2=true): /mining redirects to dashboard.
-              Classic (flag unset): keep /mining page.
-            */}
-            <Route
-              path="/mining"
-              element={
-                ARXON_UI_V2_ENABLED
-                  ? <Navigate to="/mine" replace />
-                  : <ProtectedRoute><MobileMining /></ProtectedRoute>
-              }
-            />
+            {/* Mine is the mining-hub session (start, progress, claim, stop) on Arxon Testnet. */}
+            <Route path="/mining" element={<Navigate to="/mine" replace />} />
             <Route path="/arena/prediction-market" element={ARXON_UI_V2_ENABLED ? <PredictionMarketV2 /> : <MobileArena />} />
             <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceHubV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />

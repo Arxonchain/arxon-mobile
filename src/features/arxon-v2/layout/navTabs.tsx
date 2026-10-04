@@ -67,9 +67,9 @@ export function buildV2NavTabs(basePath = ''): NavTab[] {
       ),
     },
     {
-      to: p('/portfolio'),
-      id: 'portfolio',
-      label: 'Portfolio',
+      to: p('/balances'),
+      id: 'balances',
+      label: 'Balances',
       accent: neon.cyan,
       icon: (a) => (
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none">

@@ -17,11 +17,12 @@ export default function PreviewBottomNav() {
     if (p.startsWith(`${APP_PREVIEW_BASE}/explore`)) return 'explore';
     if (p.startsWith(`${APP_PREVIEW_BASE}/market`)) return 'market';
     if (
+      p.startsWith(`${APP_PREVIEW_BASE}/balances`) ||
       p.startsWith(`${APP_PREVIEW_BASE}/portfolio`) ||
       p.startsWith(`${APP_PREVIEW_BASE}/activity`) ||
       p.startsWith(`${APP_PREVIEW_BASE}/tx`)
     ) {
-      return 'portfolio';
+      return 'balances';
     }
     return 'home';
   })();

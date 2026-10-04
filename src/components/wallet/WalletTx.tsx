@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import type { Hex } from 'viem';
+import { formatEther, type Hex } from 'viem';
 import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
+import { ethereumPublicClient } from '@/chainWallet/ethereum';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { NETWORKS } from '@/chainWallet/networks';
 import { walletGhost, walletPage } from '@/chainWallet/ui';
 
 function badgeColor(state: InspectedTx['rows'][number]['state']) {
@@ -13,7 +15,7 @@ function badgeColor(state: InspectedTx['rows'][number]['state']) {
 
 export default function WalletTx() {
   const navigate = useNavigate();
-  const { rpcUrl } = useChainWallet();
+  const { rpcUrl, network } = useChainWallet();
   const { hash } = useParams<{ hash: string }>();
   const [data, setData] = useState<InspectedTx | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -27,6 +29,36 @@ export default function WalletTx() {
     let cancelled = false;
     (async () => {
       try {
+        if (network === 'ethereum') {
+          const client = ethereumPublicClient();
+          const tx = await client.getTransaction({ hash: hash as Hex });
+          let status: InspectedTx['status'] = 'pending';
+          let blockNumber: string | null = tx.blockNumber != null ? tx.blockNumber.toString() : null;
+          try {
+            const receipt = await client.getTransactionReceipt({ hash: hash as Hex });
+            status = receipt.status === 'success' ? 'success' : 'reverted';
+            blockNumber = receipt.blockNumber.toString();
+          } catch {
+            /* mempool */
+          }
+          const next: InspectedTx = {
+            hash: hash as Hex,
+            status,
+            blockNumber,
+            from: tx.from,
+            to: tx.to,
+            valueArx: formatEther(tx.value),
+            kind: 'transfer',
+            rows: [
+              { label: 'Network', value: NETWORKS.ethereum.label, state: 'public' },
+              { label: 'From', value: tx.from, state: 'public' },
+              { label: 'To', value: tx.to ?? '—', state: 'public' },
+              { label: 'ETH', value: formatEther(tx.value), state: 'public' },
+            ],
+          };
+          if (!cancelled) setData(next);
+          return;
+        }
         const next = await inspectTx(rpcUrl, hash as Hex);
         if (!cancelled) setData(next);
       } catch (e) {
@@ -36,7 +68,7 @@ export default function WalletTx() {
     return () => {
       cancelled = true;
     };
-  }, [hash, rpcUrl]);
+  }, [hash, rpcUrl, network]);
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>

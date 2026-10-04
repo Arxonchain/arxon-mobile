@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DEFAULT_RPC } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { ETHEREUM_RPC, NETWORKS } from '@/chainWallet/networks';
 import { useWc } from '@/chainWallet/wcProvider';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
+import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
 export default function WalletSettings() {
   const navigate = useNavigate();
-  const { rpcUrl, setRpcUrl, refreshBalance, logout, mnemonic } = useChainWallet();
+  const { rpcUrl, setRpcUrl, refreshBalance, logout, mnemonic, network } = useChainWallet();
   const wc = useWc();
   const projectId = wc?.projectId ?? '';
   const setProjectId = wc?.setProjectId;
@@ -57,18 +59,40 @@ export default function WalletSettings() {
       >
         Back
       </button>
-      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 20px' }}>Wallet settings</h1>
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 12px' }}>Wallet settings</h1>
+      <NetworkSwitcher />
 
-      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>RPC</p>
-      <input value={rpc} onChange={(e) => setRpc(e.target.value)} style={{ ...walletField, marginBottom: 10 }} />
-      <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
-        <button type="button" style={walletGhost} onClick={() => setRpc(DEFAULT_RPC)}>
-          Testnet
-        </button>
-        <button type="button" style={walletBtn} disabled={busy} onClick={() => void save()}>
-          Save
-        </button>
-      </div>
+      {network === 'ethereum' ? (
+        <>
+          <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>{NETWORKS.ethereum.label}</p>
+          <p
+            style={{
+              padding: 14,
+              borderRadius: 16,
+              background: 'hsl(225 26% 8%)',
+              border: '1px solid hsl(215 22% 18%)',
+              fontSize: 13,
+              wordBreak: 'break-all',
+              marginBottom: 28,
+            }}
+          >
+            {ETHEREUM_RPC}
+          </p>
+        </>
+      ) : (
+        <>
+          <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>RPC</p>
+          <input value={rpc} onChange={(e) => setRpc(e.target.value)} style={{ ...walletField, marginBottom: 10 }} />
+          <div style={{ display: 'flex', gap: 10, marginBottom: 28 }}>
+            <button type="button" style={walletGhost} onClick={() => setRpc(DEFAULT_RPC)}>
+              Testnet
+            </button>
+            <button type="button" style={walletBtn} disabled={busy} onClick={() => void save()}>
+              Save
+            </button>
+          </div>
+        </>
+      )}
 
       <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>WalletConnect Project ID</p>
       <p style={{ fontSize: 12, color: 'hsl(215 14% 42%)', marginBottom: 8, lineHeight: 1.5 }}>

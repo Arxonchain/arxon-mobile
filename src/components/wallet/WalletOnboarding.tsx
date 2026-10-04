@@ -47,6 +47,9 @@ export default function WalletOnboarding() {
     <div style={{ ...walletPage, padding: '56px 22px 32px' }}>
       <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>ARXON</p>
       <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', margin: '10px 0 8px' }}>Wallet</h1>
+      <p style={{ fontSize: 13, color: 'hsl(215 14% 52%)', marginBottom: 8 }}>
+        Same 0x on Ethereum and Arxon Testnet.
+      </p>
 
       {mode === 'pick' && (
         <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', gap: 12 }}>
