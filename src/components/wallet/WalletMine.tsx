@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useMining } from '@/hooks/useMining';
 import { usePoints } from '@/hooks/usePoints';
 import { walletBtn, walletGhost, walletPage } from '@/chainWallet/ui';
+import { TokenMark } from '@/components/wallet/TokenMark';
 
 const MIN_CLAIM = 10;
 const RING = 2 * Math.PI * 54;
@@ -98,7 +99,10 @@ export default function WalletMine() {
         Arxon Testnet · play
       </p>
 
-      <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', marginBottom: 4 }}>ARX-P</p>
+      <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 6 }}>
+        <TokenMark id="ARX" size={16} />
+        ARX-P
+      </p>
       <p style={{ fontSize: 32, fontWeight: 700, letterSpacing: '-0.8px', margin: '0 0 20px' }}>
         {totalPts.toLocaleString()}
       </p>

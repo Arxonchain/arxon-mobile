@@ -8,6 +8,7 @@ import { ETHEREUM_TOKENS, NETWORKS } from '@/chainWallet/networks';
 import { loadListedTokens, tokenPublicBalance, type ListedToken } from '@/chainWallet/tokens';
 import { shortHash, walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -71,13 +72,17 @@ export default function WalletBalances() {
         </button>
       </div>
       <NetworkSwitcher />
-      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '4px 0 8px' }}>
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '4px 0 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <TokenMark id={isEth ? 'ETH' : 'ARX'} size={32} />
         {show(native)} {net.nativeSymbol}
       </h1>
       {isEth ? (
         <p style={{ fontSize: 13, color: 'hsl(155 40% 55%)', marginBottom: 16, fontWeight: 700 }}>Ethereum · real</p>
       ) : (
-        <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 16 }}>Vault {show(vault)}</p>
+        <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <TokenMark id="ARX" size={16} />
+          Vault {show(vault)}
+        </p>
       )}
       {rpcError ? (
         <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12, wordBreak: 'break-word' }}>{rpcError}</p>
@@ -102,8 +107,8 @@ export default function WalletBalances() {
                 cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
-              <span style={{ float: 'right', fontSize: 13 }}>
+              <TokenName id={t.symbol} name={t.symbol} />
+              <span style={{ float: 'right', fontSize: 13, lineHeight: '28px' }}>
                 {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
               </span>
             </button>
@@ -125,8 +130,8 @@ export default function WalletBalances() {
                 cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>ARX</span>
-              <span style={{ float: 'right', fontSize: 13 }}>{show(native)}</span>
+              <TokenName id="ARX" name="ARX" />
+              <span style={{ float: 'right', fontSize: 13, lineHeight: '28px' }}>{show(native)}</span>
             </button>
             {tokens.map((t) => (
               <button

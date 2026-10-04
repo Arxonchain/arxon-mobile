@@ -7,6 +7,7 @@ import { ETHEREUM_TOKENS, NETWORKS } from '@/chainWallet/networks';
 import { loadListedTokens, tokenPublicBalance, type ListedToken } from '@/chainWallet/tokens';
 import { walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -77,8 +78,8 @@ export default function WalletMarket() {
                 marginBottom: 10,
               }}
             >
-              <span style={{ fontSize: 16, fontWeight: 700 }}>{t.symbol}</span>
-              <span style={{ float: 'right', fontSize: 15 }}>
+              <TokenName id={t.symbol} name={t.symbol} size={32} />
+              <span style={{ float: 'right', fontSize: 15, lineHeight: '32px' }}>
                 {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
               </span>
               <span style={{ display: 'block', fontSize: 12, color: 'hsl(155 40% 55%)', marginTop: 4, fontWeight: 700 }}>
@@ -104,9 +105,10 @@ export default function WalletMarket() {
                 marginBottom: 10,
               }}
             >
-              <span style={{ fontSize: 16, fontWeight: 700 }}>ARX</span>
-              <span style={{ float: 'right', fontSize: 15 }}>{show(native)}</span>
-              <span style={{ display: 'block', fontSize: 12, color: 'hsl(215 14% 48%)', marginTop: 4 }}>
+              <TokenName id="ARX" name="ARX" size={32} />
+              <span style={{ float: 'right', fontSize: 15, lineHeight: '32px' }}>{show(native)}</span>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'hsl(215 14% 48%)', marginTop: 8 }}>
+                <TokenMark id="ARX" size={14} />
                 Vault {show(vault)}
               </span>
             </button>

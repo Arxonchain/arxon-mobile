@@ -7,6 +7,7 @@ import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { ETHEREUM_TOKENS, NETWORKS, type EthereumToken } from '@/chainWallet/networks';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { TokenMark } from '@/components/wallet/TokenMark';
 
 const OPEN: PrivacyFlags = {
   hideSender: false,
@@ -179,6 +180,9 @@ export default function WalletSend() {
       {confirm ? (
         <div style={{ textAlign: 'center', padding: '12px 0 24px' }}>
           <p style={{ fontSize: 12, letterSpacing: '0.16em', fontWeight: 800, color: 'hsl(215 14% 52%)' }}>SEND</p>
+          <div style={{ display: 'flex', justifyContent: 'center', margin: '12px 0 8px' }}>
+            <TokenMark id={isEth ? token : 'ARX'} size={56} />
+          </div>
           <p style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-1.5px', margin: '10px 0 8px', lineHeight: 1.1 }}>
             {amount || '—'} {tokenLabel}
           </p>
@@ -205,8 +209,16 @@ export default function WalletSend() {
                   key={t.symbol}
                   type="button"
                   onClick={() => setToken(t.symbol)}
-                  style={token === t.symbol ? walletBtn : walletGhost}
+                  style={{
+                    ...(token === t.symbol ? walletBtn : walletGhost),
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 6,
+                    padding: '10px 8px',
+                  }}
                 >
+                  <TokenMark id={t.symbol} size={20} />
                   {t.symbol}
                 </button>
               ))}

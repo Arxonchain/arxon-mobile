@@ -4,6 +4,7 @@ import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { walletGhost, walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { TokenMark } from '@/components/wallet/TokenMark';
 
 export default function WalletReceive() {
   const navigate = useNavigate();
@@ -43,9 +44,21 @@ export default function WalletReceive() {
       >
         {net.label}
       </p>
-      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 8 }}>
-        {isEth ? 'ETH USDC USDT' : 'Public ARX'}
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        {isEth ? (
+          <>
+            <TokenMark id="ETH" size={24} />
+            <TokenMark id="USDC" size={24} />
+            <TokenMark id="USDT" size={24} />
+            <span style={{ fontSize: 12, color: 'hsl(215 14% 48%)' }}>ETH USDC USDT</span>
+          </>
+        ) : (
+          <>
+            <TokenMark id="ARX" size={24} />
+            <span style={{ fontSize: 12, color: 'hsl(215 14% 48%)' }}>Public ARX</span>
+          </>
+        )}
+      </div>
       <div style={{ padding: 16, borderRadius: 18, background: 'hsl(225 26% 8%)', border: '1px solid hsl(215 22% 18%)', wordBreak: 'break-all', fontSize: 14, lineHeight: 1.5 }}>
         {address}
       </div>

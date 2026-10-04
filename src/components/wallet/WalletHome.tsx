@@ -14,6 +14,7 @@ import {
 } from '@/chainWallet/tokens';
 import { shortAddr, shortHash, walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -111,6 +112,7 @@ export default function WalletHome() {
 
       <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', marginTop: 4 }}>{address ? shortAddr(address) : '—'}</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0 0' }}>
+        <TokenMark id={isEth ? 'ETH' : 'ARX'} size={36} />
         <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>{show(publicAmt)}</p>
         <button
           type="button"
@@ -121,9 +123,15 @@ export default function WalletHome() {
           {hidden ? 'Show' : 'Hide'}
         </button>
       </div>
-      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22 }}>
+      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22, display: 'flex', alignItems: 'center', gap: 8 }}>
         {net.nativeSymbol}
-        {!isEth && shieldedBalance !== '0' ? ` · Vault ${show(vaultAmt)}` : ''}
+        {!isEth && shieldedBalance !== '0' ? (
+          <>
+            <span>· Vault</span>
+            <TokenMark id="ARX" size={16} />
+            <span>{show(vaultAmt)}</span>
+          </>
+        ) : null}
       </p>
 
       {rpcError ? (
@@ -202,8 +210,8 @@ export default function WalletHome() {
                 cursor: 'pointer',
               }}
             >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
-              <span style={{ float: 'right', fontSize: 13 }}>
+              <TokenName id={t.symbol} name={t.symbol} />
+              <span style={{ float: 'right', fontSize: 13, lineHeight: '28px' }}>
                 {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
               </span>
             </button>

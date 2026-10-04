@@ -36,6 +36,7 @@ import {
   type ListedToken,
 } from '@/chainWallet/tokens';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
+import { TokenMark } from '@/components/wallet/TokenMark';
 
 const UNIT = BigInt(1_000_000_000);
 const OPEN: PrivacyFlags = {
@@ -306,8 +307,15 @@ export default function WalletToken() {
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '8px 0 4px' }}>{meta?.symbol ?? 'Token'}</h1>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', marginBottom: 6 }}>{meta?.name ?? token}</p>
       <p style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', margin: '8px 0 0' }}>{show(publicBal)}</p>
-      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 16 }}>
-        {arx20 ? `Vault ${show(vaultLabel)}` : 'Public'}
+      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
+        {arx20 ? (
+          <>
+            <TokenMark id="ARX" size={16} />
+            Vault {show(vaultLabel)}
+          </>
+        ) : (
+          'Public'
+        )}
       </p>
       {poolLive === false ? (
         <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', marginBottom: 16 }}>Offline</p>
