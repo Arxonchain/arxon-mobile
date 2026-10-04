@@ -194,12 +194,14 @@ export function proveShield(input: {
   maskBits: number;
   expiryBlock: number;
   skHex?: string | null;
+  token?: string | null;
 }): Promise<ShieldProof> {
   return call('shield', {
     amount_wei: input.amountWei.toString(),
     mask_bits: input.maskBits,
     expiry_block: input.expiryBlock,
     sk_hex: input.skHex ?? null,
+    token: input.token ?? null,
   });
 }
 
@@ -211,6 +213,7 @@ export function proveTransfer(input: {
   recipientPk: string;
   note: { amountWei: string; rho: string; leafIndex: number };
   leaves: string[];
+  token?: string | null;
 }): Promise<SpendProof> {
   return call('transfer', {
     amount_wei: input.amountWei.toString(),
@@ -224,6 +227,7 @@ export function proveTransfer(input: {
       leaf_index: input.note.leafIndex,
     },
     leaves: input.leaves,
+    token: input.token ?? null,
   });
 }
 
@@ -235,6 +239,7 @@ export function proveUnshield(input: {
   recipient: string;
   note: { amountWei: string; rho: string; leafIndex: number };
   leaves: string[];
+  token?: string | null;
 }): Promise<SpendProof> {
   return call('unshield', {
     amount_wei: input.amountWei.toString(),
@@ -248,5 +253,6 @@ export function proveUnshield(input: {
       leaf_index: input.note.leafIndex,
     },
     leaves: input.leaves,
+    token: input.token ?? null,
   });
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FLAG_COPY, type PrivacyFlags } from '@/chainWallet/privacy';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { SEND_FLAGS, UNSHIELD_FLAGS, VAULT_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
@@ -14,6 +14,10 @@ const OPEN: PrivacyFlags = {
 
 export default function WalletSend() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const mode = params.get('mode');
+  const selfIn = mode === 'shield';
+  const selfOut = mode === 'unshield';
   const {
     sendArx,
     sendShielded,
@@ -21,7 +25,6 @@ export default function WalletSend() {
     sendUnshield,
     refreshBalance,
     notes,
-    shieldedBalance,
     address,
     shieldedPk,
     balance,
@@ -35,21 +38,18 @@ export default function WalletSend() {
   const route = useMemo(
     () =>
       routeSend({
-        to,
+        to: selfIn ? '' : selfOut && address ? address : to,
         amount,
-        flags,
+        flags: selfIn ? VAULT_FLAGS : selfOut ? UNSHIELD_FLAGS : { ...flags, hideBalance: false },
         notes,
         publicArx: balance,
         shieldedPk,
       }),
-    [to, amount, flags, notes, balance, shieldedPk]
+    [to, amount, flags, notes, balance, shieldedPk, selfIn, selfOut, address]
   );
 
-  const spendable = notes.filter((n) => !n.spent).length;
-
-  async function finish(hash: `0x${string}`, title: string) {
+  async function finish(hash: `0x${string}`) {
     await refreshBalance();
-    setNotice(`${title}. ${hash}`);
     navigate(`/tx/${hash}`);
   }
 
@@ -62,31 +62,26 @@ export default function WalletSend() {
     setBusy(true);
     try {
       if (route.kind === 'public') {
-        await finish(await sendArx(route.to, amount), 'Sent');
+        await finish(await sendArx(route.to, amount));
         return;
       }
       if (route.kind === 'shield') {
-        setNotice('Proving Halo2 shield. First run warms keys and can take a few minutes.');
-        await finish(await sendShielded(amount, flags), 'Shielded');
+        await finish(await sendShielded(amount, VAULT_FLAGS));
         return;
       }
       if (route.kind === 'private') {
         if (route.shieldFirst) {
-          setNotice('Shielding into your note first…');
           await sendShielded(amount, flags);
         }
-        setNotice('Proving private pay. Relayer pays gas so your 0x is not the tx from.');
-        await finish(await sendPrivate(route.pk, amount, flags), 'Private transfer');
+        await finish(await sendPrivate(route.pk, amount, { ...flags, hideBalance: false }));
         return;
       }
       if (route.shieldFirst) {
-        setNotice('Shielding into your note first…');
-        await sendShielded(amount, flags);
+        await sendShielded(amount, VAULT_FLAGS);
       }
-      setNotice('Proving unshield. Relayer pays gas. Payout 0x stays public.');
-      await finish(await sendUnshield(route.to, amount, flags), 'Unshielded');
+      await finish(await sendUnshield(route.to, amount, UNSHIELD_FLAGS));
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Unknown error';
+      const msg = e instanceof Error ? e.message : 'Failed';
       setNotice(msg);
       const found = msg.match(/0x[a-fA-F0-9]{64}/);
       if (found) navigate(`/tx/${found[0]}`);
@@ -94,6 +89,9 @@ export default function WalletSend() {
       setBusy(false);
     }
   }
+
+  const title = selfIn ? 'Shield' : selfOut ? 'Unshield' : 'Send';
+  const cta = busy ? 'Processing' : title;
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
@@ -104,36 +102,58 @@ export default function WalletSend() {
       >
         Back
       </button>
-      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 12px' }}>Send ARX</h1>
-      <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', lineHeight: 1.5, marginBottom: 16 }}>
-        Paste a public 0x or a shielded key. Leave To blank to hold ARX in your private balance.
-      </p>
-      <input value={to} onChange={(e) => setTo(e.target.value)} placeholder="To 0x… or shielded key 0x… (64 hex)" style={{ ...walletField, marginBottom: 10 }} />
-      <input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount" style={{ ...walletField, marginBottom: 16 }} />
+      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 16px' }}>{title}</h1>
+      {selfIn || selfOut ? null : (
+        <input
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="To"
+          style={{ ...walletField, marginBottom: 10 }}
+        />
+      )}
+      <input
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        placeholder="Amount"
+        style={{ ...walletField, marginBottom: 16 }}
+      />
 
-      {FLAG_COPY.map((item) => (
-        <label key={item.key} style={{ display: 'flex', gap: 12, alignItems: 'flex-start', marginBottom: 10, padding: 12, borderRadius: 16, background: 'hsl(225 26% 8%)', border: '1px solid hsl(215 22% 18%)' }}>
-          <input type="checkbox" checked={flags[item.key]} onChange={() => setFlags((f) => ({ ...f, [item.key]: !f[item.key] }))} style={{ marginTop: 3 }} />
-          <span>
-            <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{item.label}</span>
-            <span style={{ display: 'block', fontSize: 12, color: 'hsl(215 14% 48%)', marginTop: 2 }}>{item.hint}</span>
-          </span>
-        </label>
-      ))}
+      {selfIn || selfOut
+        ? null
+        : SEND_FLAGS.map((item) => (
+            <label
+              key={item.key}
+              style={{
+                display: 'flex',
+                gap: 12,
+                alignItems: 'center',
+                marginBottom: 10,
+                padding: 12,
+                borderRadius: 16,
+                background: 'hsl(225 26% 8%)',
+                border: '1px solid hsl(215 22% 18%)',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={flags[item.key]}
+                onChange={() => setFlags((f) => ({ ...f, [item.key]: !f[item.key] }))}
+              />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{item.label}</span>
+            </label>
+          ))}
 
-      <p style={{ fontSize: 13, color: 'hsl(215 35% 72%)', fontWeight: 600, lineHeight: 1.5, margin: '8px 0 10px' }}>{route.label}</p>
-      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 14 }}>
-        Public {balance ?? '—'} ARX · shielded {shieldedBalance} ARX in {spendable} note{spendable === 1 ? '' : 's'}
-        {address ? ` · ${address.slice(0, 6)}…${address.slice(-4)}` : ''}
-      </p>
-      {notice ? <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', lineHeight: 1.5, marginBottom: 12, wordBreak: 'break-all' }}>{notice}</p> : null}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" style={walletGhost} onClick={() => navigate('/')}>Cancel</button>
-        <button type="button" style={walletBtn} disabled={busy} onClick={() => void onSend()}>{busy ? 'Sending…' : 'Send'}</button>
-      </div>
-      {flags.hideBalance ? (
-        <p style={{ fontSize: 12, color: 'hsl(215 14% 42%)', marginTop: 12 }}>Hide balance is a UI flag (bit 3). On-chain free balance stays public.</p>
+      {notice ? (
+        <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', marginBottom: 12, wordBreak: 'break-all' }}>{notice}</p>
       ) : null}
+      <div style={{ display: 'flex', gap: 10 }}>
+        <button type="button" style={walletGhost} onClick={() => navigate('/')}>
+          Cancel
+        </button>
+        <button type="button" style={walletBtn} disabled={busy} onClick={() => void onSend()}>
+          {cta}
+        </button>
+      </div>
     </div>
   );
 }

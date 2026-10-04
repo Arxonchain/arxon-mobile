@@ -46,10 +46,7 @@ export default function WalletOnboarding() {
   return (
     <div style={{ ...walletPage, padding: '56px 22px 32px' }}>
       <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>ARXON</p>
-      <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', margin: '10px 0 8px' }}>Your wallet</h1>
-      <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', lineHeight: 1.6, maxWidth: 340 }}>
-        Create or import an Arxon chain wallet first. Mining stays in its own section after this.
-      </p>
+      <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', margin: '10px 0 8px' }}>Wallet</h1>
 
       {mode === 'pick' && (
         <div style={{ marginTop: 36, display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -57,7 +54,7 @@ export default function WalletOnboarding() {
             Create wallet
           </button>
           <button type="button" style={walletGhost} disabled={busy} onClick={() => setMode('import')}>
-            I already have a phrase
+            Import
           </button>
         </div>
       )}

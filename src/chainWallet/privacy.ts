@@ -13,6 +13,22 @@ export const DEFAULT_FLAGS: PrivacyFlags = {
   hideBalance: false,
 };
 
+/** Shield into the vault: notes are fully private. The public door (amount leaving 0x) stays visible. */
+export const VAULT_FLAGS: PrivacyFlags = {
+  hideSender: true,
+  hideReceiver: true,
+  hideAmount: true,
+  hideBalance: false,
+};
+
+/** Unshield to a public 0x: payout address and amount are public; spender can stay hidden. */
+export const UNSHIELD_FLAGS: PrivacyFlags = {
+  hideSender: true,
+  hideReceiver: false,
+  hideAmount: false,
+  hideBalance: false,
+};
+
 export function asBits(flags: PrivacyFlags): number {
   let bits = 0;
   if (flags.hideSender) bits |= 1;
@@ -35,12 +51,13 @@ export function needsShieldedProof(flags: PrivacyFlags): boolean {
   return flags.hideSender || flags.hideReceiver || flags.hideAmount;
 }
 
-export const FLAG_COPY: { key: keyof PrivacyFlags; label: string; hint: string }[] = [
-  { key: 'hideSender', label: 'Hide sender', hint: 'Who spends stays in the proof. Private pay / Unshield gas is the relayer, not your EVM from.' },
-  { key: 'hideReceiver', label: 'Hide receiver', hint: 'Who is paid stays in the proof' },
-  { key: 'hideAmount', label: 'Hide amount', hint: 'Value is committed, not published' },
-  { key: 'hideBalance', label: 'Hide balance', hint: 'Front-end only in v1; chain balance stays public' },
+export const SEND_FLAGS: { key: 'hideSender' | 'hideReceiver' | 'hideAmount'; label: string }[] = [
+  { key: 'hideSender', label: 'Hide sender' },
+  { key: 'hideReceiver', label: 'Hide receiver' },
+  { key: 'hideAmount', label: 'Hide amount' },
 ];
+
+export const FLAG_COPY = SEND_FLAGS;
 
 export function flagSummary(flags: PrivacyFlags): string {
   const on = FLAG_COPY.filter((item) => flags[item.key]).map((item) => item.label);

@@ -6,7 +6,8 @@ import { buildV2NavTabs } from './navTabs';
 
 const tabs = buildV2NavTabs();
 
-const PORTFOLIO_PREFIXES = ['/send', '/receive', '/connect', '/wallet-settings', '/wallet'];
+const HOME_PREFIXES = ['/send', '/receive', '/connect', '/wallet-settings', '/wallet', '/token'];
+const PORTFOLIO_PREFIXES = ['/portfolio', '/activity', '/tx'];
 const MINE_PREFIXES = [
   '/mine',
   '/mining',
@@ -34,11 +35,12 @@ export default function MobileBottomNavV2() {
 
   const activeId = (() => {
     const path = location.pathname;
-    if (path === '/activity' || path.startsWith('/tx')) return 'activity';
     if (path === '/explore' || path.startsWith('/explore/')) return 'explore';
-    if (path === '/' || PORTFOLIO_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'portfolio';
-    if (MINE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'mine';
-    return 'portfolio';
+    if (path === '/market' || path.startsWith('/market/')) return 'market';
+    if (PORTFOLIO_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'portfolio';
+    if (MINE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'home';
+    if (path === '/' || HOME_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'home';
+    return 'home';
   })();
 
   return <NeonBottomNav tabs={tabs} activeId={activeId} layoutId="v2-nav-pill" position="fixed" />;

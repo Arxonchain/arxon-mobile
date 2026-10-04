@@ -17,6 +17,7 @@ export const SCAN_URL = 'https://scan.arxon.io';
 export const PRECOMPILE = {
   view: '0x0000000000000000000000000000000000000800' as const,
   submit: '0x0000000000000000000000000000000000000801' as const,
+  arx20: '0x0000000000000000000000000000000000000802' as const,
 };
 
 export const VIEW_ABI = [
@@ -46,6 +47,43 @@ export const VIEW_ABI = [
     type: 'function',
     stateMutability: 'view',
     inputs: [{ type: 'uint256', name: 'index' }],
+    outputs: [{ type: 'bytes32' }],
+  },
+] as const;
+
+export const ARX20_VIEW_ABI = [
+  {
+    name: 'getNoteTreeRoot',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ type: 'address', name: 'token' }],
+    outputs: [{ type: 'bytes32' }],
+  },
+  {
+    name: 'isKnownNoteRoot',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { type: 'address', name: 'token' },
+      { type: 'bytes32', name: 'root' },
+    ],
+    outputs: [{ type: 'bool' }],
+  },
+  {
+    name: 'getNoteLeafCount',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ type: 'address', name: 'token' }],
+    outputs: [{ type: 'uint256' }],
+  },
+  {
+    name: 'getNoteLeaf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { type: 'address', name: 'token' },
+      { type: 'uint256', name: 'index' },
+    ],
     outputs: [{ type: 'bytes32' }],
   },
 ] as const;
@@ -102,6 +140,47 @@ export async function assertKnownAnchor(rpcUrl: string, anchor: Hex) {
   if (!known) {
     throw new Error(
       'Note tree on this device did not match the chain (leaf order). Reload the wallet so it can read every pool commitment, then send Private pay again.'
+    );
+  }
+}
+
+export async function fetchArx20NoteLeaves(rpcUrl: string, token: Hex): Promise<Hex[] | null> {
+  const client = publicClient(rpcUrl);
+  try {
+    const count = await client.readContract({
+      address: PRECOMPILE.arx20,
+      abi: ARX20_VIEW_ABI,
+      functionName: 'getNoteLeafCount',
+      args: [token],
+    });
+    const n = Number(count);
+    if (!Number.isSafeInteger(n) || n < 0) return null;
+    const leaves: Hex[] = [];
+    for (let i = 0; i < n; i++) {
+      const leaf = await client.readContract({
+        address: PRECOMPILE.arx20,
+        abi: ARX20_VIEW_ABI,
+        functionName: 'getNoteLeaf',
+        args: [token, BigInt(i)],
+      });
+      leaves.push(leaf);
+    }
+    return leaves;
+  } catch {
+    return null;
+  }
+}
+
+export async function assertKnownArx20Anchor(rpcUrl: string, token: Hex, anchor: Hex) {
+  const known = await publicClient(rpcUrl).readContract({
+    address: PRECOMPILE.arx20,
+    abi: ARX20_VIEW_ABI,
+    functionName: 'isKnownNoteRoot',
+    args: [token, anchor],
+  });
+  if (!known) {
+    throw new Error(
+      'This token’s vault on this device did not match the chain. Reload, then try again.'
     );
   }
 }

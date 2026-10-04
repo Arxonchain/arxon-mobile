@@ -6,6 +6,8 @@ const NOTES_KEY = 'arxon.notes';
 const LEAVES_KEY = 'arxon.leaves';
 const LEAF_SCAN_KEY = 'arxon.leafScanAt';
 const WC_PROJECT_KEY = 'arxon.wcProjectId';
+const TOKENS_KEY = 'arxon.listedTokens';
+const HIDE_BAL_KEY = 'arxon.hideBalance';
 
 function read(key: string): string | null {
   try {
@@ -86,6 +88,25 @@ export const storage = {
   getWcProjectId: () => Promise.resolve(read(WC_PROJECT_KEY)),
   setWcProjectId: (id: string) => {
     write(WC_PROJECT_KEY, id);
+    return Promise.resolve();
+  },
+  getHideBalance: () => read(HIDE_BAL_KEY) === '1',
+  setHideBalance: (on: boolean) => {
+    write(HIDE_BAL_KEY, on ? '1' : '0');
+  },
+  getListedTokens: () => Promise.resolve(read(TOKENS_KEY)),
+  setListedTokens: (json: string) => {
+    write(TOKENS_KEY, json);
+    return Promise.resolve();
+  },
+  getTokenNotes: (token: string) => Promise.resolve(read(`arxon.notes.${token.toLowerCase()}`)),
+  setTokenNotes: (token: string, json: string) => {
+    write(`arxon.notes.${token.toLowerCase()}`, json);
+    return Promise.resolve();
+  },
+  getTokenLeaves: (token: string) => Promise.resolve(read(`arxon.leaves.${token.toLowerCase()}`)),
+  setTokenLeaves: (token: string, json: string) => {
+    write(`arxon.leaves.${token.toLowerCase()}`, json);
     return Promise.resolve();
   },
 };

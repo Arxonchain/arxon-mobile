@@ -43,21 +43,18 @@ export function routeSend(input: {
   shieldedPk: string | null;
 }): SendRoute {
   if (!input.amount || Number(input.amount) <= 0) {
-    return { kind: 'need-amount', label: 'Enter how much ARX.' };
+    return { kind: 'need-amount', label: 'Enter amount' };
   }
   let wei: bigint;
   try {
     wei = parseEther(input.amount);
   } catch {
-    return { kind: 'need-amount', label: 'Enter a valid ARX amount.' };
+    return { kind: 'need-amount', label: 'Enter amount' };
   }
 
   const dest = parseDest(input.to);
   if (dest.kind === 'bad') {
-    return {
-      kind: 'bad-to',
-      label: 'Paste a public 0x address (40 hex) or a shielded key (64 hex). Leave To blank to hold ARX in your private balance.',
-    };
+    return { kind: 'bad-to', label: 'Invalid address' };
   }
 
   const noteOk = hasCoveringNote(input.notes, wei);
@@ -71,24 +68,24 @@ export function routeSend(input: {
 
   if (dest.kind === 'empty') {
     if (!publicOk) {
-      return { kind: 'need-funds', label: 'Need public ARX to move into your private balance.' };
+      return { kind: 'need-funds', label: 'Not enough' };
     }
-    return { kind: 'shield', label: 'Move public ARX into a note you own (shield in).' };
+    return { kind: 'shield', label: 'Shield' };
   }
 
   if (dest.kind === 'public') {
     if (!privateFlags) {
       if (!publicOk) {
-        return { kind: 'need-funds', label: 'Not enough public ARX for a transparent send.' };
+        return { kind: 'need-funds', label: 'Not enough' };
       }
-      return { kind: 'public', to: dest.address, label: 'Public send to that 0x. Nothing is hidden on-chain.' };
+      return { kind: 'public', to: dest.address, label: 'Send' };
     }
     if (noteOk) {
       return {
         kind: 'unshield',
         to: dest.address,
         shieldFirst: false,
-        label: 'Pay that 0x from a note (unshield). Payout address stays public. Relayer pays gas.',
+        label: 'Unshield',
       };
     }
     if (publicOk) {
@@ -96,25 +93,23 @@ export function routeSend(input: {
         kind: 'unshield',
         to: dest.address,
         shieldFirst: true,
-        label: 'Shield in, then unshield to that 0x. Two proofs. Payout address stays public.',
+        label: 'Processing',
       };
     }
-    return { kind: 'need-funds', label: 'Need a spendable note or public ARX to pay that 0x privately.' };
+    return { kind: 'need-funds', label: 'Not enough' };
   }
 
   const own =
     !!input.shieldedPk && dest.pk.toLowerCase() === input.shieldedPk.toLowerCase();
   if (own && !noteOk && publicOk) {
-    return { kind: 'shield', label: 'That is your shielded key. This deposits public ARX into a note you own.' };
+    return { kind: 'shield', label: 'Shield' };
   }
   if (noteOk) {
     return {
       kind: 'private',
       pk: dest.pk,
       shieldFirst: false,
-      label: own
-        ? 'Private pay to your own shielded key. Relayer pays gas.'
-        : 'Private pay to that shielded key. Relayer pays gas.',
+      label: 'Send',
     };
   }
   if (publicOk) {
@@ -122,11 +117,11 @@ export function routeSend(input: {
       kind: 'private',
       pk: dest.pk,
       shieldFirst: true,
-      label: 'Shield in, then private pay. Two proofs. Relayer pays the second hop.',
+      label: 'Processing',
     };
   }
   return {
     kind: 'need-funds',
-    label: 'Need a spendable note or public ARX to private-pay that key.',
+    label: 'Not enough',
   };
 }

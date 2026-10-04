@@ -15,7 +15,6 @@ import AuthConfirm from "@/pages/AuthConfirm";
 import ResetPasswordPage from "@/pages/ResetPasswordPage";
 import ChangePassword from "@/pages/ChangePassword";
 import MobileSplash from "@/components/mobile/MobileSplash";
-import MobileBottomNav from "@/components/mobile/MobileBottomNav";
 import MobileBottomNavV2 from "@/features/arxon-v2/layout/MobileBottomNavV2";
 import DashboardV2 from "@/features/arxon-v2/pages/DashboardV2";
 import SessionRecovery from "@/components/system/SessionRecovery";
@@ -109,11 +108,14 @@ const MobileProfile = lazy(() => import("@/components/mobile/MobileProfile"));
 const WalletHome = lazy(() => import("@/components/wallet/WalletHome"));
 const WalletActivity = lazy(() => import("@/components/wallet/WalletActivity"));
 const WalletExplore = lazy(() => import("@/components/wallet/WalletExplore"));
+const WalletMarket = lazy(() => import("@/components/wallet/WalletMarket"));
+const WalletPortfolio = lazy(() => import("@/components/wallet/WalletPortfolio"));
 const WalletSend = lazy(() => import("@/components/wallet/WalletSend"));
 const WalletReceive = lazy(() => import("@/components/wallet/WalletReceive"));
 const WalletSettings = lazy(() => import("@/components/wallet/WalletSettings"));
 const WalletConnectScreen = lazy(() => import("@/components/wallet/WalletConnect"));
 const WalletTx = lazy(() => import("@/components/wallet/WalletTx"));
+const WalletToken = lazy(() => import("@/components/wallet/WalletToken"));
 const MobileSettings = lazy(() => import("@/components/mobile/MobileSettings"));
 
 const ArenaV2 = lazy(() => import("@/features/arxon-v2/pages/ArenaV2"));
@@ -162,6 +164,7 @@ const queryClient = new QueryClient({
 });
 
 const isNative = Capacitor.isNativePlatform();
+const walletShell = isNative || import.meta.env.VITE_WALLET_SHELL === 'true';
 
 const Spinner = () => (
   <div style={{ minHeight: '100vh', background: errorUi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -285,8 +288,8 @@ function AppRoutes() {
         </>
       );
     }
-    if (isNative && !chain.address) return <WalletOnboarding />;
-    if (isNative && !chain.ready) return <Spinner />;
+    if (walletShell && !chain.address) return <WalletOnboarding />;
+    if (walletShell && !chain.ready) return <Spinner />;
 
   return (
     <>
@@ -393,16 +396,19 @@ function AppRoutes() {
           <Route path="global-map"      element={<AdminGlobalMap />} />
         </Route>
 
-        {isNative ? (
+        {walletShell ? (
           <>
             <Route path="/" element={<WalletHome />} />
             <Route path="/activity" element={<WalletActivity />} />
             <Route path="/explore" element={<WalletExplore />} />
+            <Route path="/market" element={<WalletMarket />} />
+            <Route path="/portfolio" element={<WalletPortfolio />} />
             <Route path="/send" element={<WalletSend />} />
             <Route path="/receive" element={<WalletReceive />} />
             <Route path="/wallet-settings" element={<WalletSettings />} />
             <Route path="/connect" element={<WalletConnectScreen />} />
             <Route path="/tx/:hash" element={<WalletTx />} />
+            <Route path="/token/:address" element={<WalletToken />} />
             <Route path="/wallet" element={<WalletHome />} />
             <Route path="/mine" element={user ? (ARXON_UI_V2_ENABLED ? <DashboardV2 /> : <MobileDashboard />) : <Navigate to="/auth" replace />} />
             {WORD_FORGE_ENABLED && GamingHubPage && (
@@ -560,7 +566,7 @@ function AppRoutes() {
       </Routes>
       </Suspense>
 
-      {isNative && (ARXON_UI_V2_ENABLED ? <MobileBottomNavV2 /> : <MobileBottomNav />)}
+      {walletShell && <MobileBottomNavV2 />}
     </>
   );
 }
