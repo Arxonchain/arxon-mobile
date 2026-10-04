@@ -75,14 +75,8 @@ jobs:
       - name: Rename APK
         run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Arxon-Wallet-Private-${{ github.run_number }}
-          path: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
-          compression-level: 0
-
       # Direct .apk download — GitHub Actions zips often fail to extract on phones.
+      # Publish before Actions artifacts so a full storage quota cannot skip this step.
       - name: Publish APK on Releases
         uses: softprops/action-gh-release@v2
         with:
@@ -93,3 +87,11 @@ jobs:
           prerelease: true
           make_latest: false
           files: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
+
+      - name: Upload APK
+        continue-on-error: true
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arxon-Wallet-Private-${{ github.run_number }}
+          path: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
+          compression-level: 0
