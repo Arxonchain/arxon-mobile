@@ -62,7 +62,7 @@ export default function WalletConnect() {
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
-      <button type="button" onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}>
+      <button type="button" onClick={() => navigate('/balances')} style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}>
         Back
       </button>
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 8px' }}>Connect</h1>

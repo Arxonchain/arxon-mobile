@@ -14,8 +14,7 @@ export default function PreviewBottomNav() {
 
   const activeId = (() => {
     const p = location.pathname;
-    if (p.startsWith(`${APP_PREVIEW_BASE}/explore`)) return 'explore';
-    if (p.startsWith(`${APP_PREVIEW_BASE}/market`)) return 'market';
+    if (p.startsWith(`${APP_PREVIEW_BASE}/testnet`)) return 'testnet';
     if (
       p.startsWith(`${APP_PREVIEW_BASE}/balances`) ||
       p.startsWith(`${APP_PREVIEW_BASE}/portfolio`) ||
@@ -24,7 +23,7 @@ export default function PreviewBottomNav() {
     ) {
       return 'balances';
     }
-    return 'home';
+    return 'mine';
   })();
 
   return <NeonBottomNav tabs={tabs} activeId={activeId} layoutId="preview-nav-pill" position="absolute" />;

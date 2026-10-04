@@ -5,7 +5,7 @@ import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/ac
 import { START_URL } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
-import { ETHEREUM_TOKENS, NETWORKS } from '@/chainWallet/networks';
+import { NETWORKS } from '@/chainWallet/networks';
 import {
   addListedToken,
   loadListedTokens,
@@ -13,7 +13,7 @@ import {
   type ListedToken,
 } from '@/chainWallet/tokens';
 import { shortAddr, shortHash, walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
-import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { useLockNetwork } from '@/chainWallet/walletNav';
 import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
 
 function fmt(v: string | null, digits: number) {
@@ -25,6 +25,7 @@ function fmt(v: string | null, digits: number) {
 
 export default function WalletHome() {
   const navigate = useNavigate();
+  useLockNetwork('arxon');
   const {
     address,
     balance,
@@ -35,8 +36,6 @@ export default function WalletHome() {
     notesError,
     notesStatus,
     keysError,
-    network,
-    ethBalances,
     refreshNotes,
   } = useChainWallet();
   const { hidden, toggle, show } = useHideBalance();
@@ -45,17 +44,12 @@ export default function WalletHome() {
   const [tokenAddr, setTokenAddr] = useState('');
   const [tokenBusy, setTokenBusy] = useState(false);
   const [tokenErr, setTokenErr] = useState<string | null>(null);
-  const isEth = network === 'ethereum';
-  const net = NETWORKS[network];
 
   const reload = useCallback(async () => {
-    setRecent((await loadActivity()).slice(0, 4));
-    if (isEth) {
-      setTokens([]);
-      return;
-    }
+    const rows = (await loadActivity()).filter((item) => item.network !== 'ethereum').slice(0, 4);
+    setRecent(rows);
     const listed = await loadListedTokens();
-    const rows = await Promise.all(
+    const next = await Promise.all(
       listed.map(async (t) => {
         let bal = '—';
         if (address) {
@@ -68,14 +62,14 @@ export default function WalletHome() {
         return { ...t, bal };
       })
     );
-    setTokens(rows);
-  }, [address, rpcUrl, isEth]);
+    setTokens(next);
+  }, [address, rpcUrl]);
 
   useEffect(() => {
     void reload();
     void refreshBalance();
-    if (!isEth) void refreshNotes();
-  }, [reload, refreshBalance, refreshNotes, isEth]);
+    void refreshNotes();
+  }, [reload, refreshBalance, refreshNotes]);
 
   async function onAddToken() {
     setTokenErr(null);
@@ -92,13 +86,13 @@ export default function WalletHome() {
     }
   }
 
-  const publicAmt = fmt(balance, isEth ? 6 : 4);
+  const publicAmt = fmt(balance, 4);
   const vaultAmt = Number(shieldedBalance).toLocaleString(undefined, { maximumFractionDigits: 4 });
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>HOME</p>
+        <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>TESTNET</p>
         <button
           type="button"
           onClick={() => navigate('/wallet-settings')}
@@ -108,11 +102,22 @@ export default function WalletHome() {
         </button>
       </div>
 
-      <NetworkSwitcher />
+      <div
+        style={{
+          margin: '12px 0 16px',
+          padding: '14px 16px',
+          borderRadius: 18,
+          background: 'hsl(215 35% 62%/0.16)',
+          border: '1px solid hsl(215 35% 62%/0.55)',
+        }}
+      >
+        <p style={{ fontSize: 11, letterSpacing: '0.16em', fontWeight: 800, margin: 0 }}>ARXON TESTNET</p>
+        <p style={{ fontSize: 13, color: 'hsl(215 20% 78%)', margin: '6px 0 0' }}>{NETWORKS.arxon.label}</p>
+      </div>
 
       <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', marginTop: 4 }}>{address ? shortAddr(address) : '—'}</p>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0 0' }}>
-        <TokenMark id={isEth ? 'ETH' : 'ARX'} size={36} />
+        <TokenMark id="ARX" size={36} />
         <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>{show(publicAmt)}</p>
         <button
           type="button"
@@ -124,62 +129,55 @@ export default function WalletHome() {
         </button>
       </div>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22, display: 'flex', alignItems: 'center', gap: 8 }}>
-        {net.nativeSymbol}
-        {!isEth && shieldedBalance !== '0' ? (
+        ARX
+        {shieldedBalance !== '0' ? (
           <>
             <span>· Vault</span>
             <TokenMark id="ARX" size={16} />
             <span>{show(vaultAmt)}</span>
           </>
-        ) : null}
+        ) : (
+          <>
+            <span>· Vault</span>
+            <span>{show(vaultAmt)}</span>
+          </>
+        )}
       </p>
 
       {rpcError ? (
         <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12, wordBreak: 'break-word' }}>{rpcError}</p>
       ) : null}
-      {!isEth && keysError ? (
+      {keysError ? (
         <p style={{ fontSize: 12, color: 'hsl(38 70% 62%)', marginBottom: 12 }}>{keysError}</p>
       ) : null}
-      {!isEth && notesStatus ? (
+      {notesStatus ? (
         <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 12 }}>{notesStatus}</p>
       ) : null}
-      {!isEth && notesError ? (
+      {notesError ? (
         <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12 }}>{notesError}</p>
       ) : null}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <button type="button" style={walletBtn} onClick={() => navigate('/send')}>
+        <button type="button" style={walletBtn} onClick={() => navigate('/send?net=arxon')}>
           Send
         </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/receive')}>
+        <button type="button" style={walletGhost} onClick={() => navigate('/receive?net=arxon')}>
           Receive
         </button>
-        {isEth ? null : (
-          <>
-            <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield')}>
-              Shield
-            </button>
-            <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield')}>
-              Unshield
-            </button>
-          </>
-        )}
+        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield&net=arxon')}>
+          Shield
+        </button>
+        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield&net=arxon')}>
+          Unshield
+        </button>
       </div>
 
-      <button type="button" style={{ ...walletGhost, width: '100%', marginTop: 10 }} onClick={() => navigate('/connect')}>
-        Connect
-      </button>
-      {isEth ? null : (
-        <button
-          type="button"
-          style={{ ...walletGhost, width: '100%', marginTop: 10 }}
-          onClick={() => window.open(START_URL, '_blank')}
-        >
-          Faucet
-        </button>
-      )}
-      <button type="button" style={{ ...walletGhost, width: '100%', marginTop: 10 }} onClick={() => navigate('/mine')}>
-        Mine
+      <button
+        type="button"
+        style={{ ...walletGhost, width: '100%', marginTop: 10 }}
+        onClick={() => window.open(START_URL, '_blank')}
+      >
+        Faucet
       </button>
 
       <div
@@ -191,13 +189,32 @@ export default function WalletHome() {
           border: '1px solid hsl(215 22% 17%/0.55)',
         }}
       >
-        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{isEth ? 'ETH USDC USDT' : 'Tokens'}</p>
-        {isEth ? (
-          ETHEREUM_TOKENS.map((t) => (
+        <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Tokens</p>
+        <input
+          value={tokenAddr}
+          onChange={(e) => setTokenAddr(e.target.value)}
+          placeholder="Token 0x…"
+          style={{ ...walletField, marginBottom: 10 }}
+        />
+        <button
+          type="button"
+          style={{ ...walletGhost, width: '100%' }}
+          disabled={tokenBusy || !tokenAddr.trim()}
+          onClick={() => void onAddToken()}
+        >
+          {tokenBusy ? 'Processing' : 'Add token'}
+        </button>
+        {tokenErr ? (
+          <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginTop: 10 }}>{tokenErr}</p>
+        ) : null}
+        {tokens.length === 0 ? (
+          <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginTop: 14 }}>No extra tokens</p>
+        ) : (
+          tokens.map((t) => (
             <button
-              key={t.symbol}
+              key={t.address}
               type="button"
-              onClick={() => navigate(`/send?token=${t.symbol}`)}
+              onClick={() => navigate(`/token/${t.address}`)}
               style={{
                 display: 'block',
                 width: '100%',
@@ -208,60 +225,13 @@ export default function WalletHome() {
                 padding: '10px 0',
                 borderTop: '1px solid hsl(215 22% 14%)',
                 cursor: 'pointer',
+                marginTop: 4,
               }}
             >
-              <TokenName id={t.symbol} name={t.symbol} />
-              <span style={{ float: 'right', fontSize: 13, lineHeight: '28px' }}>
-                {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
-              </span>
+              <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
+              <span style={{ float: 'right', fontSize: 13 }}>{show(t.bal)}</span>
             </button>
           ))
-        ) : (
-          <>
-            <input
-              value={tokenAddr}
-              onChange={(e) => setTokenAddr(e.target.value)}
-              placeholder="Token 0x…"
-              style={{ ...walletField, marginBottom: 10 }}
-            />
-            <button
-              type="button"
-              style={{ ...walletGhost, width: '100%' }}
-              disabled={tokenBusy || !tokenAddr.trim()}
-              onClick={() => void onAddToken()}
-            >
-              {tokenBusy ? 'Processing' : 'Add token'}
-            </button>
-            {tokenErr ? (
-              <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginTop: 10 }}>{tokenErr}</p>
-            ) : null}
-            {tokens.length === 0 ? (
-              <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginTop: 14 }}>No tokens</p>
-            ) : (
-              tokens.map((t) => (
-                <button
-                  key={t.address}
-                  type="button"
-                  onClick={() => navigate(`/token/${t.address}`)}
-                  style={{
-                    display: 'block',
-                    width: '100%',
-                    textAlign: 'left',
-                    background: 'none',
-                    border: 'none',
-                    color: 'inherit',
-                    padding: '10px 0',
-                    borderTop: '1px solid hsl(215 22% 14%)',
-                    cursor: 'pointer',
-                    marginTop: 4,
-                  }}
-                >
-                  <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
-                  <span style={{ float: 'right', fontSize: 13 }}>{show(t.bal)}</span>
-                </button>
-              ))
-            )}
-          </>
         )}
       </div>
 
@@ -278,7 +248,7 @@ export default function WalletHome() {
           <p style={{ fontSize: 13, fontWeight: 700 }}>Activity</p>
           <button
             type="button"
-            onClick={() => navigate('/activity')}
+            onClick={() => navigate('/activity?net=arxon')}
             style={{ background: 'none', border: 'none', color: 'hsl(215 35% 72%)', fontSize: 12, cursor: 'pointer' }}
           >
             See all

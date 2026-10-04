@@ -48,13 +48,14 @@ export function fromBits(bits: number): PrivacyFlags {
 }
 
 export function needsShieldedProof(flags: PrivacyFlags): boolean {
-  return flags.hideSender || flags.hideReceiver || flags.hideAmount;
+  return flags.hideSender || flags.hideReceiver || flags.hideAmount || flags.hideBalance;
 }
 
-export const SEND_FLAGS: { key: 'hideSender' | 'hideReceiver' | 'hideAmount'; label: string }[] = [
+export const SEND_FLAGS: { key: keyof PrivacyFlags; label: string }[] = [
   { key: 'hideSender', label: 'Hide sender' },
   { key: 'hideReceiver', label: 'Hide receiver' },
   { key: 'hideAmount', label: 'Hide amount' },
+  { key: 'hideBalance', label: 'Hide balance' },
 ];
 
 export const FLAG_COPY = SEND_FLAGS;

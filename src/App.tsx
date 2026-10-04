@@ -312,13 +312,14 @@ function AppRoutes() {
         <Route path="/privacy"        element={<PrivacyPolicy />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
         <Route path="/ui-preview" element={<AppPreviewShell />}>
-          <Route index element={<DashboardNeon preview />} />
+          <Route index element={<Navigate to="/ui-preview/mine" replace />} />
           <Route path="mine" element={<DashboardNeon preview />} />
           <Route path="activity" element={<DashboardNeon preview />} />
           <Route path="explore" element={<DashboardNeon preview />} />
           <Route path="balances" element={<DashboardNeon preview />} />
+          <Route path="testnet" element={<DashboardNeon preview />} />
           <Route path="portfolio" element={<Navigate to="/ui-preview/balances" replace />} />
-          <Route path="mining" element={<Navigate to="/ui-preview" replace />} />
+          <Route path="mining" element={<Navigate to="/ui-preview/mine" replace />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
           <Route path="arena/dice" element={g(<DiceHubV2 />)} />
           <Route path="arena/dice/house" element={g(<DiceMatchV2 />)} />
@@ -401,11 +402,12 @@ function AppRoutes() {
 
         {walletShell ? (
           <>
-            <Route path="/" element={<WalletHome />} />
+            <Route path="/" element={<Navigate to="/balances" replace />} />
             <Route path="/activity" element={<WalletActivity />} />
             <Route path="/explore" element={<WalletExplore />} />
             <Route path="/market" element={<WalletMarket />} />
             <Route path="/balances" element={<WalletPortfolio />} />
+            <Route path="/testnet" element={<WalletHome />} />
             <Route path="/portfolio" element={<Navigate to="/balances" replace />} />
             <Route path="/send" element={<WalletSend />} />
             <Route path="/receive" element={<WalletReceive />} />
@@ -413,7 +415,7 @@ function AppRoutes() {
             <Route path="/connect" element={<WalletConnectScreen />} />
             <Route path="/tx/:hash" element={<WalletTx />} />
             <Route path="/token/:address" element={<WalletToken />} />
-            <Route path="/wallet" element={<WalletHome />} />
+            <Route path="/wallet" element={<Navigate to="/balances" replace />} />
             <Route path="/mine" element={<WalletMine />} />
             {WORD_FORGE_ENABLED && GamingHubPage && (
               <Route path="/games" element={
@@ -424,8 +426,8 @@ function AppRoutes() {
                 </ProtectedRoute>
               } />
             )}
-            {/* Mine is the mining-hub session (start, progress, claim, stop) on Arxon Testnet. */}
-            <Route path="/mining" element={<Navigate to="/mine" replace />} />
+            {/* Dedicated mining session stays inside the Mine hub. */}
+            <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena/prediction-market" element={ARXON_UI_V2_ENABLED ? <PredictionMarketV2 /> : <MobileArena />} />
             <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceHubV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
             <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />

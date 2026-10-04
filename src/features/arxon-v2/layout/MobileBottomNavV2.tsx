@@ -6,8 +6,9 @@ import { buildV2NavTabs } from './navTabs';
 
 const tabs = buildV2NavTabs();
 
-const HOME_PREFIXES = ['/send', '/receive', '/connect', '/wallet-settings', '/wallet', '/token'];
-const BALANCES_PREFIXES = ['/balances', '/portfolio', '/activity', '/tx'];
+const BALANCES_PREFIXES = ['/balances', '/portfolio', '/wallet', '/connect', '/wallet-settings'];
+const TESTNET_PREFIXES = ['/testnet', '/token'];
+const SHARED_WALLET = ['/send', '/receive', '/activity', '/tx'];
 const MINE_PREFIXES = [
   '/mine',
   '/mining',
@@ -27,7 +28,7 @@ const MINE_PREFIXES = [
 export default function MobileBottomNavV2() {
   const location = useLocation();
   const { hideNav } = useMobileNav();
-  const { address } = useChainWallet();
+  const { address, network } = useChainWallet();
 
   if (!address || hideNav) return null;
   if (['/auth', '/admin'].some((p) => location.pathname.startsWith(p))) return null;
@@ -35,12 +36,13 @@ export default function MobileBottomNavV2() {
 
   const activeId = (() => {
     const path = location.pathname;
-    if (path === '/explore' || path.startsWith('/explore/')) return 'explore';
-    if (path === '/market' || path.startsWith('/market/')) return 'market';
     if (BALANCES_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'balances';
-    if (MINE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'home';
-    if (path === '/' || HOME_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'home';
-    return 'home';
+    if (TESTNET_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'testnet';
+    if (SHARED_WALLET.some((p) => path === p || path.startsWith(`${p}/`))) {
+      return network === 'arxon' ? 'testnet' : 'balances';
+    }
+    if (MINE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'mine';
+    return 'balances';
   })();
 
   return <NeonBottomNav tabs={tabs} activeId={activeId} layoutId="v2-nav-pill" position="fixed" />;

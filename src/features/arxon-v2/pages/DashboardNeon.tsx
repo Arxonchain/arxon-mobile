@@ -318,6 +318,22 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
       onClick: () => go('/tasks'),
     },
     {
+      id: 'arena',
+      eyebrow: 'Battles',
+      title: 'Arena',
+      cta: 'Enter',
+      variant: 'leaderboard',
+      onClick: () => go('/arena'),
+    },
+    {
+      id: 'games',
+      eyebrow: 'Play',
+      title: 'Games',
+      cta: 'Play',
+      variant: 'referrals',
+      onClick: () => go('/games'),
+    },
+    {
       id: 'leaderboard',
       eyebrow: 'Rankings',
       title: 'Leaderboard',
@@ -341,6 +357,22 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
       cta: 'Send ARX-P',
       variant: 'nexus',
       onClick: () => go('/nexus'),
+    },
+    {
+      id: 'settings',
+      eyebrow: 'Account',
+      title: 'Settings',
+      cta: 'Open',
+      variant: 'nexus',
+      onClick: () => go('/settings'),
+    },
+    {
+      id: 'mining',
+      eyebrow: 'Session',
+      title: 'Mining',
+      cta: 'Open',
+      variant: 'tasks',
+      onClick: () => go('/mining'),
     },
   ], [pendingTasks, userRank, go]);
 
@@ -429,7 +461,7 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
 
         {/* Explore — 2×2 quad grid */}
         <motion.div variants={fadeUp} style={{ padding: '20px 16px 0' }}>
-          <NeonSectionTitle title="Explore" />
+          <NeonSectionTitle title="Hub" />
           <ExploreQuadGrid items={exploreItems} />
         </motion.div>
 

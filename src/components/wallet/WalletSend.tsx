@@ -6,7 +6,7 @@ import { routeSend } from '@/chainWallet/routeSend';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { ETHEREUM_TOKENS, NETWORKS, type EthereumToken } from '@/chainWallet/networks';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
-import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { useLockNetwork, walletHomePath } from '@/chainWallet/walletNav';
 import { TokenMark } from '@/components/wallet/TokenMark';
 
 const OPEN: PrivacyFlags = {
@@ -24,6 +24,8 @@ export default function WalletSend() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const mode = params.get('mode');
+  const wantArxon = params.get('net') === 'arxon' || mode === 'shield' || mode === 'unshield';
+  useLockNetwork(wantArxon ? 'arxon' : 'ethereum');
   const {
     sendArx,
     sendEthereum,
@@ -35,12 +37,11 @@ export default function WalletSend() {
     address,
     shieldedPk,
     balance,
-    network,
-    setNetwork,
   } = useChainWallet();
-  const isEth = network === 'ethereum';
+  const isEth = !wantArxon;
   const selfIn = !isEth && mode === 'shield';
   const selfOut = !isEth && mode === 'unshield';
+  const home = walletHomePath(isEth ? 'ethereum' : 'arxon');
   const requested = params.get('token');
   const [token, setToken] = useState<EthereumToken>(isEthToken(requested) ? requested : 'ETH');
   const [to, setTo] = useState('');
@@ -55,7 +56,7 @@ export default function WalletSend() {
     setConfirm(false);
   }, [requested, isEth]);
 
-  const net = NETWORKS[network];
+  const net = NETWORKS[isEth ? 'ethereum' : 'arxon'];
   const tokenLabel = isEth ? token : 'ARX';
 
   const route = useMemo(
@@ -65,7 +66,7 @@ export default function WalletSend() {
         : routeSend({
             to: selfIn ? '' : selfOut && address ? address : to,
             amount,
-            flags: selfIn ? VAULT_FLAGS : selfOut ? UNSHIELD_FLAGS : { ...flags, hideBalance: false },
+            flags: selfIn ? VAULT_FLAGS : selfOut ? UNSHIELD_FLAGS : flags,
             notes,
             publicArx: balance,
             shieldedPk,
@@ -132,7 +133,7 @@ export default function WalletSend() {
         if (route.shieldFirst) {
           await sendShielded(amount, flags);
         }
-        await finish(await sendPrivate(route.pk, amount, { ...flags, hideBalance: false }));
+        await finish(await sendPrivate(route.pk, amount, flags));
         return;
       }
       if (route.shieldFirst) {
@@ -152,30 +153,26 @@ export default function WalletSend() {
   const title = selfIn ? 'Shield' : selfOut ? 'Unshield' : 'Send';
   const cta = busy ? 'Processing' : confirm ? 'Confirm' : title;
 
-  if (isEth && (mode === 'shield' || mode === 'unshield')) {
-    return (
-      <div style={{ ...walletPage, padding: '52px 20px 0' }}>
-        <NetworkSwitcher />
-        <h1 style={{ fontSize: 26, fontWeight: 700, margin: '8px 0 12px' }}>{mode === 'shield' ? 'Shield' : 'Unshield'}</h1>
-        <p style={{ fontSize: 15, fontWeight: 700, marginBottom: 16 }}>Arxon Testnet only</p>
-        <button type="button" style={walletBtn} onClick={() => void setNetwork('arxon')}>
-          Arxon Testnet · play
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <button
         type="button"
-        onClick={() => (confirm ? setConfirm(false) : navigate('/'))}
+        onClick={() => (confirm ? setConfirm(false) : navigate(home))}
         style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}
       >
         Back
       </button>
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 8px' }}>{title}</h1>
-      <NetworkSwitcher />
+      <p
+        style={{
+          fontSize: 13,
+          fontWeight: 800,
+          color: isEth ? 'hsl(155 40% 55%)' : 'hsl(215 40% 72%)',
+          marginBottom: 16,
+        }}
+      >
+        {net.label}
+      </p>
 
       {confirm ? (
         <div style={{ textAlign: 'center', padding: '12px 0 24px' }}>
@@ -270,7 +267,7 @@ export default function WalletSend() {
         <p style={{ fontSize: 13, color: 'hsl(38 70% 62%)', marginBottom: 12, wordBreak: 'break-all' }}>{notice}</p>
       ) : null}
       <div style={{ display: 'flex', gap: 10 }}>
-        <button type="button" style={walletGhost} onClick={() => (confirm ? setConfirm(false) : navigate('/'))}>
+        <button type="button" style={walletGhost} onClick={() => (confirm ? setConfirm(false) : navigate(home))}>
           Cancel
         </button>
         <button type="button" style={walletBtn} disabled={busy} onClick={() => void onSend()}>

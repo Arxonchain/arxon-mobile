@@ -266,7 +266,7 @@ export default function AuthLandingV2() {
             {mode === 'forgot' && 'Reset Password'}
           </h1>
           <p className="text-cyan-100/60 text-center mb-8 text-sm">
-            {mode === 'signin' && 'Sign in to start mining ARX-P'}
+            {mode === 'signin' && 'Log in with your existing mining account'}
             {mode === 'signup' && 'Join Arxon and start earning'}
             {mode === 'forgot' && 'Enter your email to reset password'}
           </p>

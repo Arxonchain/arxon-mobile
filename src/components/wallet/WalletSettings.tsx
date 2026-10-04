@@ -5,6 +5,7 @@ import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { ETHEREUM_RPC, NETWORKS } from '@/chainWallet/networks';
 import { useWc } from '@/chainWallet/wcProvider';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
+import { walletHomePath } from '@/chainWallet/walletNav';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
 export default function WalletSettings() {
@@ -54,7 +55,7 @@ export default function WalletSettings() {
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <button
         type="button"
-        onClick={() => navigate('/')}
+        onClick={() => navigate(walletHomePath(network))}
         style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}
       >
         Back
@@ -130,7 +131,7 @@ export default function WalletSettings() {
         onClick={() => {
           if (window.confirm('Remove this wallet from the phone? The phrase is the only way back.')) {
             void logout();
-            navigate('/');
+            navigate('/balances');
           }
         }}
       >

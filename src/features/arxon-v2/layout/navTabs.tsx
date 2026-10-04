@@ -19,54 +19,6 @@ export function buildV2NavTabs(basePath = ''): NavTab[] {
 
   return [
     {
-      to: p('/'),
-      id: 'home',
-      label: 'Home',
-      accent: neon.teal,
-      end: true,
-      icon: (a) => (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path
-            d="M4 10.5L12 4l8 6.5V20a1 1 0 01-1 1h-5v-6H10v6H5a1 1 0 01-1-1v-9.5z"
-            fill={fill(a, neon.teal)}
-            stroke={stroke(a, neon.teal)}
-            strokeWidth="1.8"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    {
-      to: p('/explore'),
-      id: 'explore',
-      label: 'Explore',
-      accent: neon.purple,
-      icon: (a) => (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="8" fill={fill(a, neon.purple)} stroke={stroke(a, neon.purple)} strokeWidth="1.8" />
-          <path
-            d="M10.2 10.2l6-1.8-1.8 6-4.2-4.2z"
-            fill={a ? `${neon.purple}55` : 'none'}
-            stroke={stroke(a, neon.purple)}
-            strokeWidth="1.6"
-            strokeLinejoin="round"
-          />
-        </svg>
-      ),
-    },
-    {
-      to: p('/market'),
-      id: 'market',
-      label: 'Market',
-      accent: neon.gold,
-      icon: (a) => (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M5 17l4-5 3 2.5L19 7" stroke={stroke(a, neon.gold)} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M14 7h5v5" stroke={stroke(a, neon.gold)} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    {
       to: p('/balances'),
       id: 'balances',
       label: 'Balances',
@@ -81,6 +33,42 @@ export function buildV2NavTabs(basePath = ''): NavTab[] {
             strokeLinejoin="round"
           />
           <path d="M16 12h4M18 10.5v3" stroke={stroke(a, neon.cyan)} strokeWidth="1.8" strokeLinecap="round" />
+        </svg>
+      ),
+    },
+    {
+      to: p('/testnet'),
+      id: 'testnet',
+      label: 'Testnet',
+      accent: neon.purple,
+      icon: (a) => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <path
+            d="M9 3h6l1 6H8L9 3z"
+            fill={fill(a, neon.purple)}
+            stroke={stroke(a, neon.purple)}
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M8 9h8l2 11H6L8 9z"
+            fill={fill(a, neon.purple)}
+            stroke={stroke(a, neon.purple)}
+            strokeWidth="1.8"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+    },
+    {
+      to: p('/mine'),
+      id: 'mine',
+      label: 'Mine',
+      accent: neon.teal,
+      icon: (a) => (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+          <circle cx="12" cy="12" r="4" fill={fill(a, neon.teal)} stroke={stroke(a, neon.teal)} strokeWidth="1.8" />
+          <circle cx="12" cy="12" r="8.5" stroke={stroke(a, neon.teal)} strokeWidth="1.4" strokeDasharray="3 3" />
         </svg>
       ),
     },

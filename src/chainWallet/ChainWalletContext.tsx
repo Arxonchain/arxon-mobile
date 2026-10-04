@@ -129,7 +129,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
   const [rpcUrl, setRpc] = useState(DEFAULT_RPC);
-  const [network, setNetworkState] = useState<WalletNetworkId>('arxon');
+  const [network, setNetworkState] = useState<WalletNetworkId>('ethereum');
   const [balance, setBalance] = useState<string | null>(null);
   const [ethBalances, setEthBalances] = useState<EthereumBalances>({ ETH: null, USDC: null, USDT: null });
   const [rpcError, setRpcError] = useState<string | null>(null);

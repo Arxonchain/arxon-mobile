@@ -1,21 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { activityLabel, loadActivity, mergeHashes, type ActivityItem } from '@/chainWallet/activity';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { scanRecentFrom } from '@/chainWallet/scan';
 import { shortHash, walletGhost, walletPage } from '@/chainWallet/ui';
-import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { useLockNetwork, walletHomePath } from '@/chainWallet/walletNav';
 
 export default function WalletActivity() {
   const navigate = useNavigate();
-  const { address, rpcUrl, refreshBalance, network } = useChainWallet();
+  const [params] = useSearchParams();
+  const wantArxon = params.get('net') === 'arxon';
+  useLockNetwork(wantArxon ? 'arxon' : 'ethereum');
+  const { address, rpcUrl, refreshBalance } = useChainWallet();
+  const home = walletHomePath(wantArxon ? 'arxon' : 'ethereum');
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [status, setStatus] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    setItems(await loadActivity());
-  }, []);
+    const all = await loadActivity();
+    setItems(all.filter((item) => (wantArxon ? item.network !== 'ethereum' : item.network === 'ethereum')));
+  }, [wantArxon]);
 
   useEffect(() => {
     void reload();
@@ -23,7 +28,7 @@ export default function WalletActivity() {
 
   const scan = async () => {
     if (!address) return;
-    if (network === 'ethereum') {
+    if (!wantArxon) {
       window.open(`${NETWORKS.ethereum.explorer}/address/${address}`, '_blank', 'noopener,noreferrer');
       return;
     }
@@ -43,19 +48,21 @@ export default function WalletActivity() {
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <button
         type="button"
-        onClick={() => navigate('/')}
+        onClick={() => navigate(home)}
         style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}
       >
         Back
       </button>
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 8px' }}>Activity</h1>
-      <NetworkSwitcher />
+      <p style={{ fontSize: 13, fontWeight: 800, color: wantArxon ? 'hsl(215 40% 72%)' : 'hsl(155 40% 55%)', marginBottom: 12 }}>
+        {wantArxon ? NETWORKS.arxon.label : NETWORKS.ethereum.label}
+      </p>
       <button
         type="button"
         style={{ ...walletGhost, width: '100%', marginBottom: 16 }}
         onClick={() => void scan()}
       >
-        {network === 'ethereum' ? 'Explorer' : 'Scan incoming'}
+        {wantArxon ? 'Scan incoming' : 'Explorer'}
       </button>
       {status ? <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', marginBottom: 12 }}>{status}</p> : null}
       {items.length === 0 ? (

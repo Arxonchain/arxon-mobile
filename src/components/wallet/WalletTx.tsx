@@ -6,6 +6,7 @@ import { ethereumPublicClient } from '@/chainWallet/ethereum';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { walletGhost, walletPage } from '@/chainWallet/ui';
+import { walletHomePath } from '@/chainWallet/walletNav';
 
 function badgeColor(state: InspectedTx['rows'][number]['state']) {
   if (state === 'hidden') return 'hsl(155 45% 55%)';
@@ -72,7 +73,7 @@ export default function WalletTx() {
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
-      <button type="button" onClick={() => navigate('/')} style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}>
+      <button type="button" onClick={() => navigate(walletHomePath(network))} style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}>
         Back
       </button>
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 12px' }}>Tx</h1>

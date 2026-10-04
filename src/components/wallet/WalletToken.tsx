@@ -10,6 +10,7 @@ import {
   walletClient,
 } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { useLockNetwork } from '@/chainWallet/walletNav';
 import { asBits, SEND_FLAGS, UNSHIELD_FLAGS, VAULT_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import { proveShield, proveTransfer, proveUnshield } from '@/chainWallet/prove';
@@ -74,6 +75,7 @@ function requireUnits(amount: string, decimals: number): bigint {
 export default function WalletToken() {
   const { address: tokenParam = '' } = useParams<{ address: string }>();
   const navigate = useNavigate();
+  useLockNetwork('arxon');
   const { address, mnemonic, rpcUrl, shieldedPk, network, setNetwork } = useChainWallet();
   const { show } = useHideBalance();
   const [meta, setMeta] = useState<ListedToken | null>(null);
@@ -296,7 +298,7 @@ export default function WalletToken() {
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <button
         type="button"
-        onClick={() => (confirm ? setConfirm(false) : navigate('/'))}
+        onClick={() => (confirm ? setConfirm(false) : navigate('/testnet'))}
         style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}
       >
         Back

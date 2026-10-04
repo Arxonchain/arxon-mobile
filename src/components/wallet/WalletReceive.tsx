@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { walletGhost, walletPage } from '@/chainWallet/ui';
-import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { useLockNetwork, walletHomePath } from '@/chainWallet/walletNav';
 import { TokenMark } from '@/components/wallet/TokenMark';
 
 export default function WalletReceive() {
   const navigate = useNavigate();
-  const { address, shieldedPk, keysError, refreshKeys, network } = useChainWallet();
+  const [params] = useSearchParams();
+  const wantArxon = params.get('net') === 'arxon';
+  useLockNetwork(wantArxon ? 'arxon' : 'ethereum');
+  const { address, shieldedPk, keysError, refreshKeys } = useChainWallet();
   const [copied, setCopied] = useState<string | null>(null);
-  const isEth = network === 'ethereum';
-  const net = NETWORKS[network];
+  const isEth = !wantArxon;
+  const net = NETWORKS[isEth ? 'ethereum' : 'arxon'];
+  const home = walletHomePath(isEth ? 'ethereum' : 'arxon');
 
   useEffect(() => {
     if (!isEth) void refreshKeys();
@@ -27,13 +31,12 @@ export default function WalletReceive() {
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
       <button
         type="button"
-        onClick={() => navigate('/')}
+        onClick={() => navigate(home)}
         style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer', padding: 0 }}
       >
         Back
       </button>
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 8px' }}>Receive</h1>
-      <NetworkSwitcher />
       <p
         style={{
           fontSize: 16,
