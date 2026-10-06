@@ -10,8 +10,15 @@ import {
 } from 'react';
 import { formatEther, parseEther, type Address } from 'viem';
 
-import { pushActivity } from './activity';
-import { assertKnownAnchor, DEFAULT_RPC, PRECOMPILE, publicClient, walletClient } from './chain';
+import { pushActivity, saveClocks } from './activity';
+import { assertKnownAnchor, DEFAULT_RPC, PRECOMPILE, publicClient, waitIncluded, walletClient } from './chain';
+import {
+  startClocks,
+  stampInBlock,
+  stampProved,
+  stampSent,
+  type TxPhaseFn,
+} from './clocks';
 import {
   fetchEthereumBalances,
   sendEthereumNative,
@@ -66,9 +73,19 @@ type ChainWalletState = {
   refreshKeys: () => Promise<void>;
   sendArx: (to: Address, amount: string) => Promise<`0x${string}`>;
   sendEthereum: (token: EthereumToken, to: Address, amount: string) => Promise<`0x${string}`>;
-  sendShielded: (amount: string, flags: PrivacyFlags) => Promise<`0x${string}`>;
-  sendPrivate: (recipientPk: string, amount: string, flags: PrivacyFlags) => Promise<`0x${string}`>;
-  sendUnshield: (to: Address, amount: string, flags: PrivacyFlags) => Promise<`0x${string}`>;
+  sendShielded: (amount: string, flags: PrivacyFlags, onPhase?: TxPhaseFn) => Promise<`0x${string}`>;
+  sendPrivate: (
+    recipientPk: string,
+    amount: string,
+    flags: PrivacyFlags,
+    onPhase?: TxPhaseFn
+  ) => Promise<`0x${string}`>;
+  sendUnshield: (
+    to: Address,
+    amount: string,
+    flags: PrivacyFlags,
+    onPhase?: TxPhaseFn
+  ) => Promise<`0x${string}`>;
 };
 
 const Ctx = createContext<ChainWalletState | null>(null);
@@ -91,10 +108,7 @@ async function expiryBlock(rpcUrl: string): Promise<number> {
 }
 
 async function waitOk(rpcUrl: string, hash: `0x${string}`, label: string) {
-  const receipt = await publicClient(rpcUrl).waitForTransactionReceipt({
-    hash,
-    timeout: 180_000,
-  });
+  const receipt = await waitIncluded(rpcUrl, hash);
   if (receipt.status !== 'success') {
     throw new Error(`${label} reverted on chain (${hash}). Open Activity.`);
   }
@@ -285,8 +299,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const sendShielded = useCallback(
-    async (amount: string, flags: PrivacyFlags) => {
+    async (amount: string, flags: PrivacyFlags, onPhase?: TxPhaseFn) => {
       if (!mnemonic) throw new Error('No wallet');
+      const clocks = startClocks();
+      onPhase?.('Processing');
       const wei = requireWei(amount);
       const expiry = await expiryBlock(rpcUrl);
       const proof = await proveShield({
@@ -295,6 +311,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         expiryBlock: expiry,
         skHex: await storage.getShieldedSk(),
       });
+      stampProved(clocks);
+      onPhase?.('Proved');
       await storage.setShieldedSk(proof.sk_hex);
       setShieldedPk(proof.pk_hex);
       const hash = await sendLegacy(rpcUrl, mnemonic, {
@@ -303,17 +321,25 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         value: wei,
           gas: BigInt(8_000_000),
       });
+      stampSent(clocks);
       await pushActivity({
         hash,
         kind: 'shield',
         to: PRECOMPILE.submit,
         amount,
         maskBits: asBits(flags),
-        at: Date.now(),
+        at: clocks.tapAt,
         token: 'ARX',
         network: 'arxon',
+        clocks: { ...clocks },
       });
-      await waitOk(rpcUrl, hash, 'Shield');
+      const receipt = await waitIncluded(rpcUrl, hash);
+      stampInBlock(clocks);
+      await saveClocks(hash, clocks);
+      onPhase?.('In block');
+      if (receipt.status !== 'success') {
+        throw new Error(`Shield reverted on chain (${hash}). Open Activity.`);
+      }
       await commitOutputs(
         [
           {
@@ -333,8 +359,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   );
 
   const sendPrivate = useCallback(
-    async (recipientPk: string, amount: string, flags: PrivacyFlags) => {
+    async (recipientPk: string, amount: string, flags: PrivacyFlags, onPhase?: TxPhaseFn) => {
       if (!mnemonic) throw new Error('No wallet');
+      const clocks = startClocks();
+      onPhase?.('Processing');
       const live = await loadLiveNotes(rpcUrl);
       const wei = requireWei(amount);
       const sk = await storage.getShieldedSk();
@@ -350,22 +378,32 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         note: { amountWei: note.amountWei, rho: note.rho, leafIndex: note.leafIndex },
         leaves: live.leaves,
       });
+      stampProved(clocks);
+      onPhase?.('Proved');
       await assertKnownAnchor(rpcUrl, proof.anchor);
       const data = transferCalldata(proof);
       const hash = relayUrl(rpcUrl)
         ? await submitRelayed(rpcUrl, data)
           : await sendLegacy(rpcUrl, mnemonic, { to: PRECOMPILE.submit, data, gas: BigInt(8_000_000) });
+      stampSent(clocks);
       await pushActivity({
         hash,
         kind: 'private',
         to: recipientPk,
         amount,
         maskBits: asBits(flags),
-        at: Date.now(),
+        at: clocks.tapAt,
         token: 'ARX',
         network: 'arxon',
+        clocks: { ...clocks },
       });
-      await waitOk(rpcUrl, hash, 'Private transfer');
+      const receipt = await waitIncluded(rpcUrl, hash);
+      stampInBlock(clocks);
+      await saveClocks(hash, clocks);
+      onPhase?.('In block');
+      if (receipt.status !== 'success') {
+        throw new Error(`Private transfer reverted on chain (${hash}). Open Activity.`);
+      }
       await markSpent(note.cm);
       await commitOutputs(await secretsToNotes(proof.notes), shieldedPk);
       await refreshNotes();
@@ -375,8 +413,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   );
 
   const sendUnshield = useCallback(
-    async (to: Address, amount: string, flags: PrivacyFlags) => {
+    async (to: Address, amount: string, flags: PrivacyFlags, onPhase?: TxPhaseFn) => {
       if (!mnemonic) throw new Error('No wallet');
+      const clocks = startClocks();
+      onPhase?.('Processing');
       const live = await loadLiveNotes(rpcUrl);
       const wei = requireWei(amount);
       const sk = await storage.getShieldedSk();
@@ -392,22 +432,32 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         note: { amountWei: note.amountWei, rho: note.rho, leafIndex: note.leafIndex },
         leaves: live.leaves,
       });
+      stampProved(clocks);
+      onPhase?.('Proved');
       await assertKnownAnchor(rpcUrl, proof.anchor);
       const data = unshieldCalldata(proof, to);
       const hash = relayUrl(rpcUrl)
         ? await submitRelayed(rpcUrl, data)
           : await sendLegacy(rpcUrl, mnemonic, { to: PRECOMPILE.submit, data, gas: BigInt(8_000_000) });
+      stampSent(clocks);
       await pushActivity({
         hash,
         kind: 'unshield',
         to,
         amount,
         maskBits: asBits(flags),
-        at: Date.now(),
+        at: clocks.tapAt,
         token: 'ARX',
         network: 'arxon',
+        clocks: { ...clocks },
       });
-      await waitOk(rpcUrl, hash, 'Unshield');
+      const receipt = await waitIncluded(rpcUrl, hash);
+      stampInBlock(clocks);
+      await saveClocks(hash, clocks);
+      onPhase?.('In block');
+      if (receipt.status !== 'success') {
+        throw new Error(`Unshield reverted on chain (${hash}). Open Activity.`);
+      }
       await markSpent(note.cm);
       await commitOutputs(await secretsToNotes(proof.notes), shieldedPk);
       await refreshNotes();

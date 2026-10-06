@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatEther, type Hex } from 'viem';
+import { loadActivity } from '@/chainWallet/activity';
+import type { TxClocks } from '@/chainWallet/clocks';
 import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
 import { ethereumPublicClient } from '@/chainWallet/ethereum';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { walletGhost, walletPage } from '@/chainWallet/ui';
 import { walletHomePath } from '@/chainWallet/walletNav';
+import { ClockLabels } from '@/components/wallet/ClockLabels';
 
 function badgeColor(state: InspectedTx['rows'][number]['state']) {
   if (state === 'hidden') return 'hsl(155 45% 55%)';
@@ -19,6 +22,7 @@ export default function WalletTx() {
   const { rpcUrl, network } = useChainWallet();
   const { hash } = useParams<{ hash: string }>();
   const [data, setData] = useState<InspectedTx | null>(null);
+  const [clocks, setClocks] = useState<TxClocks | undefined>(undefined);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -30,6 +34,9 @@ export default function WalletTx() {
     let cancelled = false;
     (async () => {
       try {
+        const rows = await loadActivity();
+        const saved = rows.find((row) => row.hash.toLowerCase() === hash.toLowerCase());
+        if (!cancelled) setClocks(saved?.clocks);
         if (network === 'ethereum') {
           const client = ethereumPublicClient();
           const tx = await client.getTransaction({ hash: hash as Hex });
@@ -101,6 +108,9 @@ export default function WalletTx() {
             {data.kind === 'shield' ? 'Shield' : data.kind === 'private' ? 'Private' : data.kind === 'unshield' ? 'Unshield' : data.kind === 'transfer' ? 'Transfer' : 'Call'}
             {data.blockNumber ? ` · #${data.blockNumber}` : ''}
           </p>
+          <div style={{ marginBottom: clocks ? 12 : 0 }}>
+            <ClockLabels clocks={clocks} />
+          </div>
           {data.rows.map((row) => (
             <div key={row.label} style={{ padding: 14, borderRadius: 16, background: 'hsl(225 26% 8%)', border: '1px solid hsl(215 22% 18%)', marginBottom: 8 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>

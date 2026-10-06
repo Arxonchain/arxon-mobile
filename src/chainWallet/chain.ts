@@ -95,6 +95,15 @@ export function publicClient(rpcUrl: string) {
   });
 }
 
+export async function waitIncluded(rpcUrl: string, hash: Hex) {
+  const client = publicClient(rpcUrl);
+  try {
+    return await client.waitForTransactionReceipt({ hash, timeout: 180_000 });
+  } catch {
+    return client.getTransactionReceipt({ hash });
+  }
+}
+
 export function walletClient(rpcUrl: string, mnemonic: string) {
   const account = mnemonicToAccount(mnemonic.trim());
   return createWalletClient({

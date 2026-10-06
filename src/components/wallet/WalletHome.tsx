@@ -14,6 +14,7 @@ import {
 } from '@/chainWallet/tokens';
 import { shortAddr, shortHash, walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 import { useLockNetwork } from '@/chainWallet/walletNav';
+import { ClockLabels } from '@/components/wallet/ClockLabels';
 import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
 
 function fmt(v: string | null, digits: number) {
@@ -276,6 +277,7 @@ export default function WalletHome() {
             >
               <span style={{ fontSize: 13 }}>{activityLabel(item.kind)}</span>
               <span style={{ float: 'right', fontSize: 12, color: 'hsl(215 14% 48%)' }}>{shortHash(item.hash)}</span>
+              <ClockLabels clocks={item.clocks} />
             </button>
           ))
         )}

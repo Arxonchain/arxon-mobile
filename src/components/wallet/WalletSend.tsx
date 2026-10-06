@@ -4,6 +4,7 @@ import { getAddress, type Address } from 'viem';
 import { SEND_FLAGS, UNSHIELD_FLAGS, VAULT_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import type { TxPhase } from '@/chainWallet/clocks';
 import { ETHEREUM_TOKENS, NETWORKS, type EthereumToken } from '@/chainWallet/networks';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 import { useLockNetwork, walletHomePath } from '@/chainWallet/walletNav';
@@ -48,6 +49,7 @@ export default function WalletSend() {
   const [amount, setAmount] = useState('');
   const [flags, setFlags] = useState<PrivacyFlags>(OPEN);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<TxPhase>('Processing');
   const [confirm, setConfirm] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -119,27 +121,28 @@ export default function WalletSend() {
       setConfirm(true);
       return;
     }
-    setBusy(true);
-    try {
-      if (route.kind === 'public') {
-        await finish(await sendArx(route.to, amount));
-        return;
-      }
-      if (route.kind === 'shield') {
-        await finish(await sendShielded(amount, VAULT_FLAGS));
-        return;
-      }
-      if (route.kind === 'private') {
-        if (route.shieldFirst) {
-          await sendShielded(amount, flags);
+      setBusy(true);
+      setPhase('Processing');
+      try {
+        if (route.kind === 'public') {
+          await finish(await sendArx(route.to, amount));
+          return;
         }
-        await finish(await sendPrivate(route.pk, amount, flags));
-        return;
-      }
-      if (route.shieldFirst) {
-        await sendShielded(amount, VAULT_FLAGS);
-      }
-      await finish(await sendUnshield(route.to, amount, UNSHIELD_FLAGS));
+        if (route.kind === 'shield') {
+          await finish(await sendShielded(amount, VAULT_FLAGS, setPhase));
+          return;
+        }
+        if (route.kind === 'private') {
+          if (route.shieldFirst) {
+            await sendShielded(amount, flags, setPhase);
+          }
+          await finish(await sendPrivate(route.pk, amount, flags, setPhase));
+          return;
+        }
+        if (route.shieldFirst) {
+          await sendShielded(amount, VAULT_FLAGS, setPhase);
+        }
+        await finish(await sendUnshield(route.to, amount, UNSHIELD_FLAGS, setPhase));
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed';
       setNotice(msg);
@@ -151,7 +154,7 @@ export default function WalletSend() {
   }
 
   const title = selfIn ? 'Shield' : selfOut ? 'Unshield' : 'Send';
-  const cta = busy ? 'Processing' : confirm ? 'Confirm' : title;
+  const cta = busy ? phase : confirm ? 'Confirm' : title;
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>

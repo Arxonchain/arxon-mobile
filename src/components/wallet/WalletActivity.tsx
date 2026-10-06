@@ -6,6 +6,7 @@ import { NETWORKS } from '@/chainWallet/networks';
 import { scanRecentFrom } from '@/chainWallet/scan';
 import { shortHash, walletGhost, walletPage } from '@/chainWallet/ui';
 import { useLockNetwork, walletHomePath } from '@/chainWallet/walletNav';
+import { ClockLabels } from '@/components/wallet/ClockLabels';
 
 export default function WalletActivity() {
   const navigate = useNavigate();
@@ -97,6 +98,7 @@ export default function WalletActivity() {
               {shortHash(item.hash)}
               {item.network === 'ethereum' ? ' · Ethereum' : item.network === 'arxon' ? ' · Arxon Testnet' : ''}
             </p>
+            <ClockLabels clocks={item.clocks} />
           </button>
         ))
       )}

@@ -2,14 +2,23 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { formatUnits, getAddress, parseUnits, type Address } from 'viem';
 
-import { pushActivity } from '@/chainWallet/activity';
+import { pushActivity, saveClocks } from '@/chainWallet/activity';
 import {
   assertKnownArx20Anchor,
   fetchArx20NoteLeaves,
   publicClient,
+  waitIncluded,
   walletClient,
 } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import {
+  startClocks,
+  stampInBlock,
+  stampProved,
+  stampSent,
+  type TxClocks,
+  type TxPhase,
+} from '@/chainWallet/clocks';
 import { useLockNetwork } from '@/chainWallet/walletNav';
 import { asBits, SEND_FLAGS, UNSHIELD_FLAGS, VAULT_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { useHideBalance } from '@/chainWallet/hideBalance';
@@ -49,16 +58,6 @@ const OPEN: PrivacyFlags = {
 
 type Mode = 'send' | 'shield' | 'unshield' | 'private';
 
-async function waitOk(rpcUrl: string, hash: `0x${string}`, label: string) {
-  const receipt = await publicClient(rpcUrl).waitForTransactionReceipt({
-    hash,
-    timeout: 180_000,
-  });
-  if (receipt.status !== 'success') {
-    throw new Error(`${label} reverted (${hash}).`);
-  }
-}
-
 async function expiryBlock(rpcUrl: string): Promise<number> {
   const block = await publicClient(rpcUrl).getBlockNumber();
   return Number(block) + 96;
@@ -86,6 +85,7 @@ export default function WalletToken() {
   const [amount, setAmount] = useState('');
   const [flags, setFlags] = useState<PrivacyFlags>(OPEN);
   const [busy, setBusy] = useState(false);
+  const [phase, setPhase] = useState<TxPhase>('Processing');
   const [confirm, setConfirm] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [poolLive, setPoolLive] = useState<boolean | null>(null);
@@ -127,7 +127,12 @@ export default function WalletToken() {
     void reload();
   }, [reload]);
 
-  async function sendTx(data: `0x${string}`, label: string, kind: 'shield' | 'private' | 'unshield' | 'transfer') {
+  async function sendTx(
+    data: `0x${string}`,
+    label: string,
+    kind: 'shield' | 'private' | 'unshield' | 'transfer',
+    clocks?: TxClocks
+  ) {
     if (!mnemonic || !token) throw new Error('No wallet');
     const client = walletClient(rpcUrl, mnemonic);
     const hash = await client.sendTransaction({
@@ -136,17 +141,27 @@ export default function WalletToken() {
       gas: kind === 'transfer' ? BigInt(120_000) : BigInt(8_000_000),
       type: 'legacy' as const,
     } as unknown as Parameters<typeof client.sendTransaction>[0]);
+    if (clocks) stampSent(clocks);
     await pushActivity({
       hash,
       kind,
       to: token,
       amount,
       maskBits: 0,
-      at: Date.now(),
+      at: clocks?.tapAt ?? Date.now(),
       token: meta?.symbol ?? 'Token',
       network: 'arxon',
+      clocks: clocks ? { ...clocks } : undefined,
     });
-    await waitOk(rpcUrl, hash, label);
+    const receipt = await waitIncluded(rpcUrl, hash);
+    if (clocks) {
+      stampInBlock(clocks);
+      await saveClocks(hash, clocks);
+      setPhase('In block');
+    }
+    if (receipt.status !== 'success') {
+      throw new Error(`${label} reverted (${hash}).`);
+    }
     return hash;
   }
 
@@ -162,6 +177,7 @@ export default function WalletToken() {
       return;
     }
     setBusy(true);
+    setPhase('Processing');
     try {
       if (mode === 'send') {
         const wei = parseUnits(amount.trim() || '0', meta.decimals);
@@ -171,11 +187,11 @@ export default function WalletToken() {
         navigate(`/tx/${hash}`);
         return;
       }
+      const clocks = startClocks();
       const wei = requireUnits(amount, meta.decimals);
       const expiry = await expiryBlock(rpcUrl);
       const sk = await storage.getShieldedSk();
       if (mode === 'shield') {
-        setNotice('Processing');
         const proof = await proveShield({
           amountWei: wei,
           maskBits: asBits(VAULT_FLAGS),
@@ -183,8 +199,10 @@ export default function WalletToken() {
           skHex: sk,
           token,
         });
+        stampProved(clocks);
+        setPhase('Proved');
         await storage.setShieldedSk(proof.sk_hex);
-        const hash = await sendTx(arx20ShieldCalldata(proof), 'Shield', 'shield');
+        const hash = await sendTx(arx20ShieldCalldata(proof), 'Shield', 'shield', clocks);
         await commitTokenOutputs(token, [
           {
             cm: proof.note.cm,
@@ -201,7 +219,6 @@ export default function WalletToken() {
       const live = await loadLiveTokenNotes(rpcUrl, token);
       const note = pickTokenNote(live.notes, wei, meta.symbol);
       if (mode === 'private') {
-        setNotice('Processing');
         const proof = await proveTransfer({
           amountWei: wei,
           maskBits: asBits(flags),
@@ -212,8 +229,10 @@ export default function WalletToken() {
           leaves: live.leaves,
           token,
         });
+        stampProved(clocks);
+        setPhase('Proved');
         await assertKnownArx20Anchor(rpcUrl, token, proof.anchor);
-        const hash = await sendTx(arx20TransferCalldata(proof), 'Private', 'private');
+        const hash = await sendTx(arx20TransferCalldata(proof), 'Private', 'private', clocks);
         await markTokenSpent(token, note.cm);
         await commitTokenOutputs(
           token,
@@ -229,7 +248,6 @@ export default function WalletToken() {
         navigate(`/tx/${hash}`);
         return;
       }
-      setNotice('Processing');
       const dest = to.trim() || address;
       if (!dest) throw new Error('No wallet');
       const recipient = getAddress(dest) as Address;
@@ -243,8 +261,10 @@ export default function WalletToken() {
         leaves: live.leaves,
         token,
       });
+      stampProved(clocks);
+      setPhase('Proved');
       await assertKnownArx20Anchor(rpcUrl, token, proof.anchor);
-      const hash = await sendTx(arx20UnshieldCalldata(proof, recipient), 'Unshield', 'unshield');
+      const hash = await sendTx(arx20UnshieldCalldata(proof, recipient), 'Unshield', 'unshield', clocks);
       await markTokenSpent(token, note.cm);
       await commitTokenOutputs(
         token,
@@ -400,7 +420,7 @@ export default function WalletToken() {
         </div>
       ) : null}
       <button type="button" style={{ ...walletBtn, width: '100%' }} disabled={busy || !meta} onClick={() => void onGo()}>
-        {busy ? 'Processing' : confirm ? 'Confirm' : mode === 'shield' ? 'Shield' : mode === 'unshield' ? 'Unshield' : 'Send'}
+        {busy ? (mode === 'send' ? 'Processing' : phase) : confirm ? 'Confirm' : mode === 'shield' ? 'Shield' : mode === 'unshield' ? 'Unshield' : 'Send'}
       </button>
     </div>
   );
