@@ -58,7 +58,7 @@ export default function WalletReceive() {
         ) : (
           <>
             <TokenMark id="ARX" size={24} />
-            <span style={{ fontSize: 12, color: 'hsl(215 14% 48%)' }}>Public ARX</span>
+            <span style={{ fontSize: 12, color: 'hsl(215 14% 48%)' }}>Public tARX</span>
           </>
         )}
       </div>

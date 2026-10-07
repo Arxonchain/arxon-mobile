@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getAddress, type Address } from 'viem';
 import { SEND_FLAGS, UNSHIELD_FLAGS, VAULT_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
-import { routeSend } from '@/chainWallet/routeSend';
+import { isShieldedPk, routeSend } from '@/chainWallet/routeSend';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import type { TxPhase } from '@/chainWallet/clocks';
 import { ETHEREUM_TOKENS, NETWORKS, type EthereumToken } from '@/chainWallet/networks';
@@ -25,7 +25,7 @@ export default function WalletSend() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const mode = params.get('mode');
-  const wantArxon = params.get('net') === 'arxon' || mode === 'shield' || mode === 'unshield';
+  const wantArxon = params.get('net') === 'arxon' || mode === 'shield' || mode === 'unshield' || mode === 'private';
   useLockNetwork(wantArxon ? 'arxon' : 'ethereum');
   const {
     sendArx,
@@ -42,6 +42,7 @@ export default function WalletSend() {
   const isEth = !wantArxon;
   const selfIn = !isEth && mode === 'shield';
   const selfOut = !isEth && mode === 'unshield';
+  const wantPrivate = !isEth && mode === 'private';
   const home = walletHomePath(isEth ? 'ethereum' : 'arxon');
   const requested = params.get('token');
   const [token, setToken] = useState<EthereumToken>(isEthToken(requested) ? requested : 'ETH');
@@ -58,15 +59,19 @@ export default function WalletSend() {
     setConfirm(false);
   }, [requested, isEth]);
 
+  useEffect(() => {
+    if (selfOut && address) setTo((prev) => prev || address);
+  }, [selfOut, address]);
+
   const net = NETWORKS[isEth ? 'ethereum' : 'arxon'];
-  const tokenLabel = isEth ? token : 'ARX';
+  const tokenLabel = isEth ? token : net.nativeSymbol;
 
   const route = useMemo(
     () =>
       isEth
         ? null
         : routeSend({
-            to: selfIn ? '' : selfOut && address ? address : to,
+            to: selfIn ? '' : selfOut ? (to.trim() || address || '') : to,
             amount,
             flags: selfIn ? VAULT_FLAGS : selfOut ? UNSHIELD_FLAGS : flags,
             notes,
@@ -112,6 +117,10 @@ export default function WalletSend() {
       return;
     }
 
+    if (wantPrivate && !isShieldedPk(to)) {
+      setNotice('Enter a shielded pk (0x + 64 hex)');
+      return;
+    }
     if (!route) return;
     if (route.kind === 'need-amount' || route.kind === 'bad-to' || route.kind === 'need-funds') {
       setNotice(route.label);
@@ -153,7 +162,7 @@ export default function WalletSend() {
     }
   }
 
-  const title = selfIn ? 'Shield' : selfOut ? 'Unshield' : 'Send';
+  const title = selfIn ? 'Shield' : selfOut ? 'Unshield' : wantPrivate ? 'Private' : 'Send';
   const cta = busy ? phase : confirm ? 'Confirm' : title;
 
   return (
@@ -224,11 +233,11 @@ export default function WalletSend() {
               ))}
             </div>
           ) : null}
-          {selfIn || selfOut ? null : (
+          {selfIn ? null : (
             <input
               value={to}
               onChange={(e) => setTo(e.target.value)}
-              placeholder="To"
+              placeholder={selfOut ? 'Payout 0x (yours or another)' : wantPrivate ? 'Shielded pk 0x…' : 'To'}
               style={{ ...walletField, marginBottom: 10 }}
             />
           )}

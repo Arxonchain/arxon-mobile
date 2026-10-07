@@ -120,7 +120,7 @@ export function pickNote(notes: StoredNote[], amountWei: bigint): StoredNote {
     const total = shielded.reduce((s, n) => s + BigInt(n.amountWei), BigInt(0));
     throw new Error(
       shielded.length
-        ? `No one note covers ${formatEther(amountWei)} ARX (shielded ${formatEther(total)} ARX).`
+        ? `No one note covers ${formatEther(amountWei)} tARX (shielded ${formatEther(total)} tARX).`
         : 'No spendable notes on this device. Shield in a new amount (the 0.1 already in the pool cannot be spent without saved secrets).'
     );
   }

@@ -116,7 +116,7 @@ export async function inspectTx(rpcUrl: string, hash: Hex): Promise<InspectedTx>
               amountHidden: out ? isZero(out.revealedAmount) : false,
               receiverHidden: out ? isZero(out.revealedReceiver) : false,
               senderHidden: false,
-              amountCalldata: `${formatEther(tx.value)} ARX`,
+              amountCalldata: `${formatEther(tx.value)} tARX`,
               senderNote: 'omit',
             }),
             { label: 'cm', value: out?.cm ?? '—', state: 'info' },
@@ -169,7 +169,7 @@ export async function inspectTx(rpcUrl: string, hash: Hex): Promise<InspectedTx>
           rows: [
             statusRow,
             { label: 'Payout', value: recipient, state: 'public' },
-            { label: 'Exit', value: `${formatEther(amount)} ARX`, state: 'public' },
+            { label: 'Exit', value: `${formatEther(amount)} tARX`, state: 'public' },
             gasFromRow(tx.from),
             { label: 'Anchor', value: anchor, state: 'info' },
             ...flagRows(flags, {
@@ -193,7 +193,7 @@ export async function inspectTx(rpcUrl: string, hash: Hex): Promise<InspectedTx>
       statusRow,
       { label: 'To', value: tx.to ?? 'contract create', state: 'public' },
       { label: 'From', value: tx.from, state: 'public' },
-      { label: 'Amount', value: `${formatEther(tx.value)} ARX`, state: 'public' },
+      { label: 'Amount', value: `${formatEther(tx.value)} tARX`, state: 'public' },
     ],
   };
 }

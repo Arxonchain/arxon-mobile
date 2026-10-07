@@ -34,6 +34,7 @@ import {
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { toast } from '@/hooks/use-toast';
+import FourTxClaimCard from '@/features/arxon-v2/components/FourTxClaimCard';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -444,6 +445,7 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
             loading={preview ? false : mining.loading || mining.isClaiming}
             sessionMaxed={preview ? false : mining.sessionMaxed}
           />
+          <FourTxClaimCard preview={preview} />
           <AnimatePresence>
             {isMiningLive && (
               <MiningLiveSessionCard

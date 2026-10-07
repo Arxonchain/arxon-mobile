@@ -93,7 +93,7 @@ const Ctx = createContext<ChainWalletState | null>(null);
 function requireWei(amount: string): bigint {
   const wei = parseEther(amount);
     if (wei === BigInt(0) || wei % UNIT !== BigInt(0)) {
-    throw new Error('Shielded amounts must be a whole number of 0.000000001 ARX');
+    throw new Error('Shielded amounts must be a whole number of 0.000000001 tARX');
   }
   return wei;
 }
@@ -329,7 +329,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: asBits(flags),
         at: clocks.tapAt,
-        token: 'ARX',
+        token: 'tARX',
         network: 'arxon',
         clocks: { ...clocks },
       });
@@ -393,7 +393,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: asBits(flags),
         at: clocks.tapAt,
-        token: 'ARX',
+        token: 'tARX',
         network: 'arxon',
         clocks: { ...clocks },
       });
@@ -447,7 +447,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: asBits(flags),
         at: clocks.tapAt,
-        token: 'ARX',
+        token: 'tARX',
         network: 'arxon',
         clocks: { ...clocks },
       });
@@ -477,7 +477,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amount,
         maskBits: 0,
         at: Date.now(),
-        token: 'ARX',
+        token: 'tARX',
         network: 'arxon',
       });
       await waitOk(rpcUrl, hash, 'Send');

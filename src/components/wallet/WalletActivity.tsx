@@ -91,7 +91,7 @@ export default function WalletActivity() {
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 14, fontWeight: 600 }}>{activityLabel(item.kind)}</span>
               <span style={{ fontSize: 13, color: 'hsl(215 14% 52%)' }}>
-                {item.amount ? `${item.amount} ${item.token ?? 'ARX'}` : ''}
+                {item.amount ? `${item.amount} ${item.token ?? 'tARX'}` : ''}
               </span>
             </div>
             <p style={{ fontSize: 12, color: 'hsl(215 14% 42%)', marginTop: 4 }}>

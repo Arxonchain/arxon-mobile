@@ -4,9 +4,12 @@ import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/ac
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import { ETHEREUM_TOKENS } from '@/chainWallet/networks';
+import { quoteFor, usdFromAmount } from '@/chainWallet/prices';
 import { shortAddr, shortHash, walletBtn, walletGhost, walletPage } from '@/chainWallet/ui';
 import { useLockNetwork } from '@/chainWallet/walletNav';
-import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
+import { TokenMark } from '@/components/wallet/TokenMark';
+import { TokenBalanceRow, WalletUsdHero } from '@/components/wallet/TokenBalanceRow';
+import { useTokenPrices } from '@/hooks/useTokenPrices';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -20,6 +23,7 @@ export default function WalletBalances() {
   useLockNetwork('ethereum');
   const { address, ethBalances, refreshBalance, rpcError } = useChainWallet();
   const { hidden, toggle, show } = useHideBalance();
+  const { prices } = useTokenPrices();
   const [recent, setRecent] = useState<ActivityItem[]>([]);
 
   const reload = useCallback(async () => {
@@ -32,6 +36,10 @@ export default function WalletBalances() {
   }, [reload, refreshBalance]);
 
   const eth = fmt(ethBalances.ETH, 6);
+  const totalUsd = ETHEREUM_TOKENS.reduce((sum, t) => {
+    const part = usdFromAmount(ethBalances[t.symbol], quoteFor(t.symbol, prices).usd);
+    return part == null ? sum : (sum ?? 0) + part;
+  }, null as number | null);
 
   return (
     <div style={{ ...walletPage, padding: '52px 20px 0' }}>
@@ -58,10 +66,12 @@ export default function WalletBalances() {
 
       <p style={{ fontSize: 13, color: 'hsl(155 40% 55%)', fontWeight: 700, margin: '12px 0 4px' }}>Ethereum · real</p>
       <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', margin: '0 0 8px' }}>{address ? shortAddr(address) : '—'}</p>
-      <h1 style={{ fontSize: 26, fontWeight: 700, margin: '4px 0 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-        <TokenMark id="ETH" size={32} />
-        {show(eth)} ETH
-      </h1>
+      <WalletUsdHero
+        totalUsd={totalUsd}
+        cryptoLabel={`${eth} ETH`}
+        hidden={hidden}
+        mark={<TokenMark id="ETH" size={32} />}
+      />
       {rpcError ? (
         <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12, wordBreak: 'break-word' }}>{rpcError}</p>
       ) : null}
@@ -77,27 +87,17 @@ export default function WalletBalances() {
 
       <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Assets</p>
       {ETHEREUM_TOKENS.map((t) => (
-        <button
+        <TokenBalanceRow
           key={t.symbol}
-          type="button"
+          id={t.symbol}
+          name={t.symbol}
+          amount={ethBalances[t.symbol]}
+          digits={t.symbol === 'ETH' ? 6 : 2}
+          quote={quoteFor(t.symbol, prices)}
+          hidden={hidden}
+          show={show}
           onClick={() => navigate(`/send?token=${t.symbol}`)}
-          style={{
-            display: 'block',
-            width: '100%',
-            textAlign: 'left',
-            background: 'none',
-            border: 'none',
-            color: 'inherit',
-            padding: '10px 0',
-            borderTop: '1px solid hsl(215 22% 14%)',
-            cursor: 'pointer',
-          }}
-        >
-          <TokenName id={t.symbol} name={t.symbol} />
-          <span style={{ float: 'right', fontSize: 13, lineHeight: '28px' }}>
-            {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
-          </span>
-        </button>
+        />
       ))}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', margin: '24px 0 8px' }}>

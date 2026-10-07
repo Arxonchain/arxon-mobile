@@ -14,8 +14,10 @@ import {
 } from '@/chainWallet/tokens';
 import { shortAddr, shortHash, walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 import { useLockNetwork } from '@/chainWallet/walletNav';
+import { noMarketQuote } from '@/chainWallet/prices';
 import { ClockLabels } from '@/components/wallet/ClockLabels';
-import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
+import { TokenBalanceRow } from '@/components/wallet/TokenBalanceRow';
+import { TokenMark } from '@/components/wallet/TokenMark';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -129,8 +131,9 @@ export default function WalletHome() {
           {hidden ? 'Show' : 'Hide'}
         </button>
       </div>
+      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', margin: '2px 0 0' }}>testnet · no USD</p>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22, display: 'flex', alignItems: 'center', gap: 8 }}>
-        ARX
+        tARX
         {shieldedBalance !== '0' ? (
           <>
             <span>· Vault</span>
@@ -168,6 +171,9 @@ export default function WalletHome() {
         <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield&net=arxon')}>
           Shield
         </button>
+        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=private&net=arxon')}>
+          Private
+        </button>
         <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield&net=arxon')}>
           Unshield
         </button>
@@ -178,7 +184,7 @@ export default function WalletHome() {
         style={{ ...walletGhost, width: '100%', marginTop: 10 }}
         onClick={() => window.open(START_URL, '_blank')}
       >
-        Faucet
+        Faucet · tARX
       </button>
 
       <div
@@ -212,26 +218,16 @@ export default function WalletHome() {
           <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginTop: 14 }}>No extra tokens</p>
         ) : (
           tokens.map((t) => (
-            <button
+            <TokenBalanceRow
               key={t.address}
-              type="button"
+              name={t.symbol}
+              amount={t.bal === '—' ? null : t.bal}
+              digits={4}
+              quote={noMarketQuote()}
+              hidden={hidden}
+              show={show}
               onClick={() => navigate(`/token/${t.address}`)}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                background: 'none',
-                border: 'none',
-                color: 'inherit',
-                padding: '10px 0',
-                borderTop: '1px solid hsl(215 22% 14%)',
-                cursor: 'pointer',
-                marginTop: 4,
-              }}
-            >
-              <span style={{ fontSize: 14, fontWeight: 600 }}>{t.symbol}</span>
-              <span style={{ float: 'right', fontSize: 13 }}>{show(t.bal)}</span>
-            </button>
+            />
           ))
         )}
       </div>

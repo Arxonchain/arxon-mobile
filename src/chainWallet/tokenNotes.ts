@@ -101,7 +101,7 @@ export function pickTokenNote(notes: StoredNote[], amountWei: bigint, symbol: st
     return pickNote(notes, amountWei);
   } catch (e) {
     const msg = e instanceof Error ? e.message : 'No note';
-    throw new Error(msg.replaceAll(' ARX', ` ${symbol}`));
+    throw new Error(msg.replaceAll(' tARX', ` ${symbol}`).replaceAll(' ARX', ` ${symbol}`));
   }
 }
 

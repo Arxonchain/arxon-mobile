@@ -3,11 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { formatUnits } from 'viem';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
-import { ETHEREUM_TOKENS, NETWORKS } from '@/chainWallet/networks';
+import { ETHEREUM_TOKENS } from '@/chainWallet/networks';
+import { noMarketQuote, quoteFor } from '@/chainWallet/prices';
 import { loadListedTokens, tokenPublicBalance, type ListedToken } from '@/chainWallet/tokens';
 import { walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
+import { TokenBalanceRow } from '@/components/wallet/TokenBalanceRow';
 import { TokenMark, TokenName } from '@/components/wallet/TokenMark';
+import { useTokenPrices } from '@/hooks/useTokenPrices';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -19,10 +22,10 @@ function fmt(v: string | null, digits: number) {
 export default function WalletMarket() {
   const navigate = useNavigate();
   const { address, balance, rpcUrl, shieldedBalance, network, ethBalances } = useChainWallet();
-  const { show } = useHideBalance();
+  const { hidden, show } = useHideBalance();
+  const { prices } = useTokenPrices();
   const [tokens, setTokens] = useState<(ListedToken & { bal: string })[]>([]);
   const isEth = network === 'ethereum';
-  const net = NETWORKS[network];
 
   const reload = useCallback(async () => {
     if (isEth) {
@@ -61,37 +64,24 @@ export default function WalletMarket() {
 
       {isEth
         ? ETHEREUM_TOKENS.map((t) => (
-            <button
+            <TokenBalanceRow
               key={t.symbol}
-              type="button"
+              id={t.symbol}
+              name={t.symbol}
+              amount={ethBalances[t.symbol]}
+              digits={t.symbol === 'ETH' ? 6 : 2}
+              quote={quoteFor(t.symbol, prices)}
+              hidden={hidden}
+              show={show}
+              padded
               onClick={() => navigate(`/send?token=${t.symbol}`)}
-              style={{
-                display: 'block',
-                width: '100%',
-                textAlign: 'left',
-                background: 'hsl(225 26% 8%)',
-                border: '1px solid hsl(215 22% 17%/0.55)',
-                color: 'inherit',
-                borderRadius: 16,
-                padding: 16,
-                cursor: 'pointer',
-                marginBottom: 10,
-              }}
-            >
-              <TokenName id={t.symbol} name={t.symbol} size={32} />
-              <span style={{ float: 'right', fontSize: 15, lineHeight: '32px' }}>
-                {show(fmt(ethBalances[t.symbol], t.symbol === 'ETH' ? 6 : 2))}
-              </span>
-              <span style={{ display: 'block', fontSize: 12, color: 'hsl(155 40% 55%)', marginTop: 4, fontWeight: 700 }}>
-                {net.label}
-              </span>
-            </button>
+            />
           ))
         : (
           <>
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/testnet')}
               style={{
                 display: 'block',
                 width: '100%',
@@ -105,34 +95,26 @@ export default function WalletMarket() {
                 marginBottom: 10,
               }}
             >
-              <TokenName id="ARX" name="ARX" size={32} />
+              <TokenName id="ARX" name="tARX" size={32} />
               <span style={{ float: 'right', fontSize: 15, lineHeight: '32px' }}>{show(native)}</span>
+              <span style={{ display: 'block', fontSize: 11, color: 'hsl(215 14% 48%)', marginTop: 6 }}>testnet · no USD</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'hsl(215 14% 48%)', marginTop: 8 }}>
                 <TokenMark id="ARX" size={14} />
                 Vault {show(vault)}
               </span>
             </button>
             {tokens.map((t) => (
-              <button
+              <TokenBalanceRow
                 key={t.address}
-                type="button"
+                name={t.symbol}
+                amount={t.bal === '—' ? null : t.bal}
+                digits={4}
+                quote={noMarketQuote()}
+                hidden={hidden}
+                show={show}
+                padded
                 onClick={() => navigate(`/token/${t.address}`)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  background: 'hsl(225 26% 8%)',
-                  border: '1px solid hsl(215 22% 17%/0.55)',
-                  color: 'inherit',
-                  borderRadius: 16,
-                  padding: 16,
-                  cursor: 'pointer',
-                  marginBottom: 10,
-                }}
-              >
-                <span style={{ fontSize: 16, fontWeight: 700 }}>{t.symbol}</span>
-                <span style={{ float: 'right', fontSize: 15 }}>{show(t.bal)}</span>
-              </button>
+              />
             ))}
           </>
         )}

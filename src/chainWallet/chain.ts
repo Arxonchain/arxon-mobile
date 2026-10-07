@@ -3,8 +3,8 @@ import { mnemonicToAccount } from 'viem/accounts';
 
 export const ARXON = defineChain({
   id: 7171,
-  name: 'Arxon',
-  nativeCurrency: { name: 'ARX', symbol: 'ARX', decimals: 18 },
+  name: 'Arxon Testnet',
+  nativeCurrency: { name: 'tARX', symbol: 'tARX', decimals: 18 },
   rpcUrls: { default: { http: ['https://rpc-test.arxon.io'] } },
 });
 

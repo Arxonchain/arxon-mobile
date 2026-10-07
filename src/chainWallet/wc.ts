@@ -194,7 +194,7 @@ function requestDetail(method: string, params: unknown): string {
     let amount = '';
     try {
       if (typeof tx.value === 'string' && tx.value !== '0x' && tx.value !== '0x0') {
-        amount = `${formatEther(BigInt(tx.value))} ARX`;
+        amount = `${formatEther(BigInt(tx.value))} tARX`;
       }
     } catch {
       amount = '';
