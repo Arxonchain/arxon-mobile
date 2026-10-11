@@ -3,6 +3,7 @@ import {
   FileDown, Upload, History, Globe, ListChecks, Link2,
   BarChart3, Megaphone, Coins, RotateCcw, BookOpen,
 } from "lucide-react";
+import { WHITEPAPER_URL } from "@/lib/whitepaper";
 
 export interface AdminNavItem {
   icon: typeof LayoutDashboard;
@@ -56,7 +57,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
   {
     title: "Resources",
     items: [
-      { icon: BookOpen, label: "Litepaper ↗", path: "/litepaper", external: true },
+      { icon: BookOpen, label: "Whitepaper ↗", path: WHITEPAPER_URL, external: true },
     ],
   },
 ];

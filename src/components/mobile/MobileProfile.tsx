@@ -16,6 +16,7 @@ import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { WHITEPAPER_URL } from '@/lib/whitepaper';
 
 const stagger = { hidden:{opacity:0}, show:{opacity:1,transition:{staggerChildren:0.05,delayChildren:0.08}} };
 const fadeUp  = { hidden:{opacity:0,y:20}, show:{opacity:1,y:0,transition:{duration:0.42,ease:[0.25,0.46,0.45,0.94]}} };
@@ -39,7 +40,7 @@ const MENU = [
   {Icon:Users,   label:'Referrals',    sub:'Earn 100 ARX-P per friend', path:'/referrals', col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'},
   {Icon:Wallet,  label:'Wallet',       sub:'Connect your Web3 wallet',  path:'/wallet',    col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
   {Icon:Shield,  label:'Security',     sub:'Password & account security', path:'/settings?tab=security', col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
-  {Icon:BookOpen,label:'Litepaper',    sub:'Guides & documentation',    path:'/litepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
+  {Icon:BookOpen,label:'Whitepaper',   sub:'Protocol & token docs',     path:'/whitepaper', href: WHITEPAPER_URL, col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
   {Icon:Settings,label:'App Settings', sub:'Notifications & display',   path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
 ];
 
@@ -446,7 +447,7 @@ export default function MobileProfile() {
         <p style={{fontSize:10, textTransform:'uppercase', letterSpacing:'0.15em',
           color:'hsl(215 14% 30%)', fontWeight:700, marginBottom:12, marginTop:20}}>Account</p>
         {MENU.map((item, i) => (
-          <motion.div key={i} whileTap={{scale:0.98, x:2}} onClick={() => navigate(item.path)}
+          <motion.div key={i} whileTap={{scale:0.98, x:2}} onClick={() => ('href' in item && item.href ? window.open(item.href, '_blank', 'noopener,noreferrer') : navigate(item.path))}
             className="glass-card press card-lift"
             style={{display:'flex', alignItems:'center', gap:12, padding:'14px 16px',
               borderRadius:18, marginBottom:8, cursor:'pointer'}}>

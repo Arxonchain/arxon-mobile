@@ -16,6 +16,7 @@ import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { V2Page, V2ButtonGhost, fadeUp, stagger } from '../design/Kit';
 import { neon } from '../design/neonTokens';
+import { WHITEPAPER_URL } from '@/lib/whitepaper';
 import {
   NeonScreenHeader,
   NeonGlassCard,
@@ -56,12 +57,12 @@ const QUICK: { Icon: LucideIcon; label: string; path: string; accent: string }[]
   { Icon: Send, label: 'Nexus', path: '/nexus', accent: neon.cyan },
 ];
 
-const MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string }[] = [
+const MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string; href?: string }[] = [
   { Icon: Receipt, label: 'Points History', sub: 'Credits & deductions', path: '/points-history', accent: neon.gold },
   { Icon: Users, label: 'Referrals', sub: '100 ARX-P per friend', path: '/referrals', accent: neon.teal },
   { Icon: Wallet, label: 'Wallet', sub: 'Connect Web3 wallet', path: '/wallet', accent: neon.cyan },
   { Icon: Shield, label: 'Security', sub: 'Password & account', path: '/settings?tab=security', accent: neon.purple },
-  { Icon: BookOpen, label: 'Litepaper', sub: 'Guides & docs', path: '/litepaper', accent: 'rgba(184,239,248,0.6)' },
+  { Icon: BookOpen, label: 'Whitepaper', sub: 'Protocol & token docs', path: '/whitepaper', accent: 'rgba(184,239,248,0.6)', href: WHITEPAPER_URL },
   { Icon: Settings, label: 'App Settings', sub: 'Notifications & display', path: '/settings', accent: 'rgba(184,239,248,0.45)' },
 ];
 
@@ -443,7 +444,14 @@ export default function ProfileV2() {
         <motion.div variants={fadeUp}>
           <NeonMenuGroup title="Account">
             {MENU.map((item) => (
-              <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
+              <NeonMenuRow
+                key={item.path}
+                icon={item.Icon}
+                label={item.label}
+                sub={item.sub}
+                accent={item.accent}
+                onClick={() => (item.href ? window.open(item.href, '_blank', 'noopener,noreferrer') : navigate(item.path))}
+              />
             ))}
           </NeonMenuGroup>
         </motion.div>

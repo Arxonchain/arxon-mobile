@@ -14,7 +14,7 @@ const navItems = [
 const BottomNav = memo(() => {
   const location = useLocation();
 
-  const hidden = ['/auth', '/admin', '/landing', '/litepaper'];
+  const hidden = ['/auth', '/admin', '/landing', '/whitepaper'];
   if (hidden.some(p => location.pathname.startsWith(p))) return null;
 
   return (
