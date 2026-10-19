@@ -58,7 +58,12 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
           diagnostics={diagnostics}
           setDiagnostics={setDiagnostics}
           onBack={() => leave('help')}
-          onSend={() => { setSent(true); setNote(''); go('help', false); }}
+          onSend={() => {
+            live?.report(kind, note);
+            setSent(true);
+            setNote('');
+            go('help', false);
+          }}
         />
       )}
     </div>
@@ -165,7 +170,11 @@ function Help({ sent, go, onBack }: { sent: boolean; go: Go; onBack: () => void 
       <p style={kicker(196)}>SUPPORT</p>
       <div style={{ ...listCard, top: 222 }}>
         {support.map(([title, sub, target], index) => (
-          <button key={title} type="button" onClick={() => target && go(target)} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none', cursor: target ? 'pointer' : 'default' }}>
+          <button key={title} type="button" onClick={() => {
+            if (target) go(target);
+            else if (title === 'Help center') window.open('https://arxon.io', '_blank', 'noopener,noreferrer');
+            else if (title === 'Contact support') window.open('https://arxon.io', '_blank', 'noopener,noreferrer');
+          }} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none', cursor: 'pointer' }}>
             <span>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{title}</span>
               <span style={{ display: 'block', marginTop: 2, fontSize: 13, color: '#8b9097' }}>{sub}</span>

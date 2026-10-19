@@ -61,7 +61,9 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
     return Number.isFinite(n) && n > 0;
   });
   const empty = liveRows ? !liveFunded : view === 'home' || view === 'home-hidden';
-  const hidden = view === 'home-hidden' || (!empty && !sheet && localHide);
+  const hidden = live?.app
+    ? live.hidden || view === 'home-hidden'
+    : view === 'home-hidden' || (!empty && !sheet && localHide);
   const vaulted = view === 'home-vaulted' || view === 'home-unvaulted';
   if (network !== 'testnet') rememberTabs(empty ? 'empty' : vaulted ? 'vaulted' : 'funded');
 
@@ -76,7 +78,9 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   const total = liveRows
     ? (network === 'testnet' ? live!.testnetTotal : live!.total)
     : empty ? '$0.00' : view === 'home-vaulted' ? '$978.60' : view === 'home-unvaulted' ? '$1,188.60' : '$1,398.60';
-  const day = empty
+  const day = liveRows
+    ? { text: live!.day, color: live!.dayTone === 'up' ? '#3ddc84' : live!.dayTone === 'down' ? '#ff5c5c' : '#5c5f64' }
+    : empty
     ? { text: '+$0.00 (0.00%) Today', color: '#5c5f64' }
     : view === 'home-vaulted'
       ? { text: '+$13.89 (1.44%) Today', color: '#3ddc84' }
@@ -86,6 +90,10 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   const tokens = liveRows ?? (empty ? ZERO : vaulted ? AFTER_VAULT : FUNDED);
 
   function eye() {
+    if (live?.app) {
+      live.toggleHide();
+      return;
+    }
     if (view === 'home') go('home-hidden', false);
     else if (view === 'home-hidden') go('home', false);
     else setLocalHide((v) => !v);
@@ -137,7 +145,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
 
       <button type="button" onClick={() => go('defaults')} style={pill}>
         <FigmaImg src={art('shield.svg')} width={16} height={16} />
-        Custom · 2 of 4 hidden
+        {live?.app ? live.privacyPill : 'Custom · 2 of 4 hidden'}
       </button>
 
       <div style={{ position: 'absolute', left: 18, top: 292, width: 354, display: 'flex', gap: 14 }}>

@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/receipt/${name}`;
 const CODE = 'ARX-7K2M-93QD-LX4P';
@@ -13,6 +14,7 @@ export function isReceiptScreen(id: string) {
 }
 
 export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const [who, setWho] = useState('Lawyer');
   const [note, setNote] = useState('');
   const [made, setMade] = useState(false);
@@ -20,9 +22,11 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const leave = () => (back ? back() : go(id === 'receipt' ? 'activity' : 'receipt', false));
   const label = made ? `FOR ${who.toUpperCase()}${note.trim() ? ` · ${note.trim().toUpperCase()}` : ''}` : 'FOR LAWYER · CASE 2291';
 
+  const liveCode = live?.app && live.codes[0]?.code ? live.codes[0].code : CODE;
+
   async function copyCode() {
     try {
-      await navigator.clipboard.writeText(CODE);
+      await navigator.clipboard.writeText(liveCode);
     } catch {
       /* preview can still show the confirmation */
     }
@@ -56,9 +60,13 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
       <HomeBar />
       {id === 'receipt' && <Receipt go={go} onShare={() => share('Private receipt · 25.00 ARX · Oct 7, 2026 · 4:12:36 PM')} />}
       {id === 'code-create' && (
-        <Create who={who} setWho={setWho} note={note} setNote={setNote} onGenerate={() => { setMade(true); go('code-ready'); }} />
+        <Create who={who} setWho={setWho} note={note} setNote={setNote} onGenerate={() => {
+          if (live?.app) live.makeCode(who, note);
+          setMade(true);
+          go('code-ready');
+        }} />
       )}
-      {id === 'code-ready' && <Ready label={label} copied={copied} onCopy={copyCode} onShare={() => share(CODE)} />}
+      {id === 'code-ready' && <Ready label={label} copied={copied} onCopy={copyCode} onShare={() => share(liveCode)} />}
       {id === 'code-log' && <Log go={go} />}
     </div>
   );

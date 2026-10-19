@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/swap/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -217,6 +218,8 @@ function Picker({ query, setQuery, onChoose, onClose }: { query: string; setQuer
 }
 
 function Review({ pay, recv, amount, quote, go, leave }: { pay: Tok; recv: Tok; amount: number; quote: number; go: Go; leave: () => void }) {
+  const live = useLiveFrame();
+  const [err, setErr] = useState<string | null>(null);
   const rate = pairRate(pay.id, recv.id);
   const total = amount + FEE;
   return (
@@ -243,7 +246,14 @@ function Review({ pay, recv, amount, quote, go, leave }: { pay: Tok; recv: Tok; 
         <Row label="Total" value={`${total.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${pay.symbol}`} />
       </div>
       <p style={{ position: 'absolute', left: 30, top: 527, width: 330, margin: 0, fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Swap amounts stay hidden on-chain. The final amount can vary by up to the slippage.</p>
-      <button type="button" onClick={() => go('swap-success')} style={{ ...action, top: 649, background: '#accafe', color: '#0c1018' }}>Confirm swap</button>
+      {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+      <button type="button" onClick={() => {
+        if (live?.app) {
+          setErr('No swap quote is available. This wallet does not run a DEX.');
+          return;
+        }
+        go('swap-success');
+      }} style={{ ...action, top: 649, background: '#accafe', color: '#0c1018' }}>Confirm swap</button>
       <button type="button" onClick={leave} style={{ ...ghost, top: 714 }}>Cancel</button>
       <HomeBar />
     </>

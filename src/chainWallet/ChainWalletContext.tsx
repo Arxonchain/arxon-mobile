@@ -27,7 +27,8 @@ import {
 } from './ethereum';
 import { isWalletNetworkId, type EthereumToken, type WalletNetworkId } from './networks';
 import { relayUrl, submitRelayed } from './relay';
-import { accountFromMnemonic, newMnemonic } from './keys';
+import { newMnemonic, resolveAccount } from './keys';
+import { currentPassword, sealMnemonic, sessionStore, unlockWithPassword } from './session';
 import {
   commitOutputs,
   hydrateLeaves,
@@ -51,6 +52,8 @@ const UNIT = BigInt(1_000_000_000);
 type ChainWalletState = {
   ready: boolean;
   mnemonic: string | null;
+  accountIndex: number;
+  locked: boolean;
   address: Address | null;
   shieldedPk: string | null;
   rpcUrl: string;
@@ -66,6 +69,10 @@ type ChainWalletState = {
   shieldedBalance: string;
   createWallet: () => Promise<string>;
   importWallet: (phrase: string) => Promise<void>;
+  importPrivateKey: (key: string) => Promise<void>;
+  setAccountIndex: (index: number) => Promise<void>;
+  unlockSession: (password: string) => Promise<boolean>;
+  lockSession: () => Promise<void>;
   logout: () => Promise<void>;
   setRpcUrl: (url: string) => Promise<string>;
   refreshBalance: (rpcOverride?: string) => Promise<void>;
@@ -127,9 +134,10 @@ async function secretsToNotes(secrets: NoteSecrets[]) {
 async function sendLegacy(
   rpcUrl: string,
   mnemonic: string,
-  args: { to: Address; data?: `0x${string}`; value?: bigint; gas?: bigint }
+  args: { to: Address; data?: `0x${string}`; value?: bigint; gas?: bigint },
+  addressIndex = 0,
 ) {
-  const client = walletClient(rpcUrl, mnemonic);
+  const client = walletClient(rpcUrl, mnemonic, addressIndex);
   return client.sendTransaction({
     to: args.to,
     data: args.data,
@@ -142,6 +150,8 @@ async function sendLegacy(
 export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [mnemonic, setMnemonic] = useState<string | null>(null);
+  const [accountIndex, setAccountIndexState] = useState(0);
+  const [locked, setLocked] = useState(false);
   const [rpcUrl, setRpc] = useState(DEFAULT_RPC);
   const [network, setNetworkState] = useState<WalletNetworkId>('ethereum');
   const [balance, setBalance] = useState<string | null>(null);
@@ -154,10 +164,14 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const [keysError, setKeysError] = useState<string | null>(null);
   const rpcGen = useRef(0);
 
-  const address = useMemo(
-    () => (mnemonic ? accountFromMnemonic(mnemonic).address : null),
-    [mnemonic]
-  );
+  const address = useMemo(() => {
+    if (!mnemonic) return null;
+    try {
+      return resolveAccount(mnemonic, accountIndex).address;
+    } catch {
+      return null;
+    }
+  }, [mnemonic, accountIndex]);
 
   const shieldedBalance = useMemo(() => formatEther(shieldedTotal(notes)), [notes]);
 
@@ -197,7 +211,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         storage.getNetwork(),
       ]);
       if (cancelled) return;
-      if (saved) setMnemonic(saved);
+      setAccountIndexState(sessionStore.accountIndex());
+      const needsLock = sessionStore.hasPassword() && (!!saved || !!sessionStore.getBox());
+      setLocked(needsLock);
+      if (saved && !needsLock) setMnemonic(saved);
       if (isWalletNetworkId(storedNetwork)) setNetworkState(storedNetwork);
       let rpc = storedRpc;
       if (rpc && rpc.includes('trycloudflare.com')) {
@@ -259,15 +276,51 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const createWallet = useCallback(async () => {
     const phrase = newMnemonic();
     await storage.setMnemonic(phrase);
+    const password = currentPassword();
+    if (password) await sealMnemonic(password, phrase);
     setMnemonic(phrase);
+    setLocked(false);
     return phrase;
   }, []);
 
   const importWallet = useCallback(async (phrase: string) => {
     const trimmed = phrase.trim().split(/\s+/).join(' ');
-    accountFromMnemonic(trimmed);
+    resolveAccount(trimmed, 0);
     await storage.setMnemonic(trimmed);
+    const password = currentPassword();
+    if (password) await sealMnemonic(password, trimmed);
     setMnemonic(trimmed);
+    setLocked(false);
+  }, []);
+
+  const importPrivateKey = useCallback(async (key: string) => {
+    resolveAccount(key, 0);
+    await storage.setMnemonic(key.trim());
+    const password = currentPassword();
+    if (password) await sealMnemonic(password, key.trim());
+    setMnemonic(key.trim());
+    setLocked(false);
+  }, []);
+
+  const setAccountIndex = useCallback(async (index: number) => {
+    sessionStore.setAccountIndex(index);
+    setAccountIndexState(index);
+  }, []);
+
+  const unlockSession = useCallback(async (password: string) => {
+    const secret = await unlockWithPassword(password);
+    if (!secret) return false;
+    await storage.setMnemonic(secret);
+    setMnemonic(secret);
+    setLocked(false);
+    return true;
+  }, []);
+
+  const lockSession = useCallback(async () => {
+    if (sessionStore.hasPassword()) {
+      setMnemonic(null);
+      setLocked(true);
+    }
   }, []);
 
   const logout = useCallback(async () => {
@@ -284,6 +337,9 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     setNotes([]);
     setNotesError(null);
     setNotesStatus(null);
+    sessionStore.clearPass();
+    sessionStore.clearBox();
+    setLocked(false);
   }, []);
 
   const setRpcUrl = useCallback(async (url: string) => {
@@ -320,7 +376,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         data: shieldCalldata(proof),
         value: wei,
           gas: BigInt(8_000_000),
-      });
+      }, accountIndex);
       stampSent(clocks);
       await pushActivity({
         hash,
@@ -355,7 +411,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       await refreshNotes();
       return hash;
     },
-    [mnemonic, rpcUrl, refreshNotes]
+    [mnemonic, rpcUrl, refreshNotes, accountIndex]
   );
 
   const sendPrivate = useCallback(
@@ -384,7 +440,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       const data = transferCalldata(proof);
       const hash = relayUrl(rpcUrl)
         ? await submitRelayed(rpcUrl, data)
-          : await sendLegacy(rpcUrl, mnemonic, { to: PRECOMPILE.submit, data, gas: BigInt(8_000_000) });
+          : await sendLegacy(rpcUrl, mnemonic, { to: PRECOMPILE.submit, data, gas: BigInt(8_000_000) }, accountIndex);
       stampSent(clocks);
       await pushActivity({
         hash,
@@ -409,7 +465,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       await refreshNotes();
       return hash;
     },
-    [mnemonic, rpcUrl, refreshNotes, shieldedPk]
+    [mnemonic, rpcUrl, refreshNotes, shieldedPk, accountIndex]
   );
 
   const sendUnshield = useCallback(
@@ -438,7 +494,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       const data = unshieldCalldata(proof, to);
       const hash = relayUrl(rpcUrl)
         ? await submitRelayed(rpcUrl, data)
-          : await sendLegacy(rpcUrl, mnemonic, { to: PRECOMPILE.submit, data, gas: BigInt(8_000_000) });
+          : await sendLegacy(rpcUrl, mnemonic, { to: PRECOMPILE.submit, data, gas: BigInt(8_000_000) }, accountIndex);
       stampSent(clocks);
       await pushActivity({
         hash,
@@ -463,13 +519,13 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       await refreshNotes();
       return hash;
     },
-    [mnemonic, rpcUrl, refreshNotes, shieldedPk]
+    [mnemonic, rpcUrl, refreshNotes, shieldedPk, accountIndex]
   );
 
   const sendArx = useCallback(
     async (to: Address, amount: string) => {
       if (!mnemonic) throw new Error('No wallet');
-      const hash = await sendLegacy(rpcUrl, mnemonic, { to, value: parseEther(amount) });
+      const hash = await sendLegacy(rpcUrl, mnemonic, { to, value: parseEther(amount) }, accountIndex);
       await pushActivity({
         hash,
         kind: 'transfer',
@@ -483,7 +539,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       await waitOk(rpcUrl, hash, 'Send');
       return hash;
     },
-    [mnemonic, rpcUrl]
+    [mnemonic, rpcUrl, accountIndex]
   );
 
   const sendEthereum = useCallback(
@@ -491,8 +547,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       if (!mnemonic) throw new Error('No wallet');
       const hash =
         token === 'ETH'
-          ? await sendEthereumNative(mnemonic, to, amount)
-          : await sendEthereumToken(mnemonic, token, to, amount);
+          ? await sendEthereumNative(mnemonic, to, amount, undefined, accountIndex)
+          : await sendEthereumToken(mnemonic, token, to, amount, undefined, accountIndex);
       await pushActivity({
         hash,
         kind: 'transfer',
@@ -505,12 +561,14 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       });
       return hash;
     },
-    [mnemonic]
+    [mnemonic, accountIndex]
   );
 
   const value: ChainWalletState = {
     ready,
     mnemonic,
+    accountIndex,
+    locked,
     address,
     shieldedPk,
     rpcUrl,
@@ -526,6 +584,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     shieldedBalance,
     createWallet,
     importWallet,
+    importPrivateKey,
+    setAccountIndex,
+    unlockSession,
+    lockSession,
     logout,
     setRpcUrl,
     refreshBalance,

@@ -75,7 +75,11 @@ export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) 
       </div>
       {err ? <p style={{ position: 'absolute', left: 22, top: 670, width: 346, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
       <button type="button" disabled={!ready} onClick={() => {
-        if (!live?.app || mode !== 'phrase') { go('ready-skip'); return; }
+        if (!live?.app) { go('ready-skip'); return; }
+        if (mode === 'key') {
+          void live.importKey(keyText).then(() => go('home')).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Could not import that key'));
+          return;
+        }
         void live.importPhrase(phrase).then(() => go('home')).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Could not import that phrase'));
       }} style={{ ...importBtn, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64', cursor: ready ? 'pointer' : 'default' }}>
         Import wallet

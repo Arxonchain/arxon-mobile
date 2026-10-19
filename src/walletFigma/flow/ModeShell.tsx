@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { font } from '@/walletFigma/tokens';
 import FlowStudio from './FlowStudio';
@@ -10,6 +10,14 @@ const AppModeContext = createContext<Mode>('mining');
 
 export function useAppMode() {
   return useContext(AppModeContext);
+}
+
+type WalletModeActions = { openMining: () => void; openWallet: () => void };
+
+const WalletModeActionsContext = createContext<WalletModeActions | null>(null);
+
+export function useWalletModeActions() {
+  return useContext(WalletModeActionsContext);
 }
 
 /** One app, two modes. Wallet is the real chain wallet. Mining is the existing V2 miner. */
@@ -33,8 +41,15 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     navigate(next === 'mining' ? '/mine' : '/');
   }
 
+  const actions = useMemo<WalletModeActions>(
+    () => ({ openMining: () => choose('mining'), openWallet: () => choose('wallet') }),
+    // choose is stable enough for this shell
+    [],
+  );
+
   return (
     <AppModeContext.Provider value={mode}>
+      <WalletModeActionsContext.Provider value={actions}>
       <div style={{ height: '100vh', background: '#050505', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div
           style={{
@@ -61,6 +76,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
         )}
       </div>
+      </WalletModeActionsContext.Provider>
     </AppModeContext.Provider>
   );
 }

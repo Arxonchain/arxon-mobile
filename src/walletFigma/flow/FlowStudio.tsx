@@ -49,10 +49,22 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
 
   useEffect(() => {
+    if (!app || !live?.app || !live.ready) return;
+    if (live.startId && live.startId !== 'splash' && (id === 'splash' || (live.locked && id !== 'unlock' && id !== 'unlock-wrong'))) {
+      setId(live.startId);
+    }
+  }, [app, live?.ready, live?.startId, live?.locked, id]);
+
+  useEffect(() => {
+    if (live?.sessionPassword && !password) setPassword(live.sessionPassword);
+  }, [live?.sessionPassword]);
+
+  useEffect(() => {
     if (id !== 'splash') return;
+    if (app && live?.startId && live.startId !== 'splash') return;
     const t = window.setTimeout(() => go('gateway', false), 1600);
     return () => window.clearTimeout(t);
-  }, [id]);
+  }, [id, app, live?.startId]);
 
   useEffect(() => {
     if (app) return;
@@ -104,24 +116,32 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [app, id]);
 
   function go(next: string, remember = true) {
-    if (live?.app) {
-      if (next === 'testnet') void live.setNetwork('arxon');
-      else if (next === 'home' || next.startsWith('home-') || next === 'more') void live.setNetwork('ethereum');
-    }
-    if (next === 'testnet') {
-      setNet('testnet');
+    void (async () => {
+      let dest = next;
+      if (live?.app) {
+        const decision = await live.beforeGo(id, next, password);
+        if (decision.note) setNote(decision.note);
+        if (decision.block && !decision.replace) return;
+        if (decision.replace) dest = decision.replace;
+      }
+      if (live?.app) {
+        if (dest === 'testnet') void live.setNetwork('arxon');
+        else if (dest === 'home' || dest.startsWith('home-') || dest === 'more') void live.setNetwork('ethereum');
+      }
+      if (dest === 'testnet') {
+        setNet('testnet');
+        if (remember) setStack((prev) => [...prev, id]);
+        setId('testnet');
+        return;
+      }
+      if (dest === 'home' || dest === 'home-funded' || dest === 'home-hidden' || dest === 'home-vaulted' || dest === 'home-unvaulted' || dest === 'more') {
+        setNet('mainnet');
+      }
+      if (!SCREEN_MAP[dest]) return;
       if (remember) setStack((prev) => [...prev, id]);
-      setId('testnet');
-      setNote(null);
-      return;
-    }
-    if (next === 'home' || next === 'home-funded' || next === 'home-hidden' || next === 'home-vaulted' || next === 'home-unvaulted' || next === 'more') {
-      setNet('mainnet');
-    }
-    if (!SCREEN_MAP[next]) return;
-    if (remember) setStack((prev) => [...prev, id]);
-    setId(next);
-    setNote(null);
+      setId(dest);
+      if (!live?.app) setNote(null);
+    })();
   }
 
   function back() {

@@ -2,6 +2,9 @@ import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { setVaultLockRequired } from './VaultScreens';
+import { useLiveFrame } from './liveFrame';
+import { sessionStore, type AutoLock } from '@/chainWallet/session';
+import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 
 const art = (name: string) => `/wallet-figma/privacy/${name}`;
 const onToggle = '/wallet-figma/send/toggle-on.svg';
@@ -16,15 +19,16 @@ export function isPrivacyScreen(id: string) {
 }
 
 export function PrivacyScreens({ id, go, back, password, setPassword }: { id: string; go: Go; back?: () => void; password: string; setPassword: (value: string) => void }) {
+  const live = useLiveFrame();
   const [privateMode, setPrivateMode] = useState(true);
   const [hideLaunch, setHideLaunch] = useState(true);
   const [hideActivity, setHideActivity] = useState(true);
   const [shots, setShots] = useState(false);
-  const [hideSender, setHideSender] = useState(false);
-  const [hideReceiver, setHideReceiver] = useState(false);
-  const [hideAmount, setHideAmount] = useState(true);
-  const [hideBalance, setHideBalance] = useState(true);
-  const [lock, setLock] = useState('1 minute');
+  const [hideSender, setHideSender] = useState(() => live?.defaults.hideSender ?? false);
+  const [hideReceiver, setHideReceiver] = useState(() => live?.defaults.hideReceiver ?? false);
+  const [hideAmount, setHideAmount] = useState(() => live?.defaults.hideAmount ?? true);
+  const [hideBalance, setHideBalance] = useState(() => live?.defaults.hideBalance ?? true);
+  const [lock, setLock] = useState(sessionStore.autoLock());
   const [face, setFace] = useState(true);
   const [faceSend, setFaceSend] = useState(true);
   const [facePhrase, setFacePhrase] = useState(true);
@@ -60,7 +64,12 @@ export function PrivacyScreens({ id, go, back, password, setPassword }: { id: st
           hideBalance={hideBalance}
           setHideBalance={setHideBalance}
           onBack={() => leave('privacy')}
-          onSave={() => go('privacy', false)}
+          onSave={() => {
+            const flags = { hideSender, hideReceiver, hideAmount, hideBalance };
+            writeDefaultPrivacy(flags);
+            live?.saveDefaults(flags);
+            go('privacy', false);
+          }}
           onBalance={() => go('balance-privacy')}
         />
       )}
@@ -82,10 +91,10 @@ export function PrivacyScreens({ id, go, back, password, setPassword }: { id: st
         />
       )}
       {id === 'change-pass' && <Change expected={expected} onSave={setPassword} onBack={() => leave('face-settings')} onDone={() => go('face-settings', false)} />}
-      {id === 'view-verify' && <Verify expected={expected} onBack={() => leave('privacy')} onNext={() => go('view-hidden', false)} />}
+      {id === 'view-verify' && <Verify expected={expected} onBack={() => leave('privacy')} onNext={() => { void live?.ensureWords(); go('view-hidden', false); }} />}
       {id === 'view-hidden' && <Hidden onBack={() => leave('view-verify')} onReveal={() => go('view-shown')} />}
       {id === 'view-shown' && <Shown onBack={() => leave('view-hidden')} onHide={() => go('view-hidden', false)} onDone={() => go('privacy', false)} />}
-      {id === 'autolock' && <LockSheet value={lock} onClose={() => go('privacy', false)} onPick={(next) => { setLock(next); go('privacy', false); }} />}
+      {id === 'autolock' && <LockSheet value={lock} onClose={() => go('privacy', false)} onPick={(next) => { setLock(next); sessionStore.setAutoLock(next as AutoLock); go('privacy', false); }} />}
     </div>
   );
 }
@@ -380,6 +389,8 @@ function Hidden({ onBack, onReveal }: { onBack: () => void; onReveal: () => void
 }
 
 function Shown({ onBack, onHide, onDone }: { onBack: () => void; onHide: () => void; onDone: () => void }) {
+  const live = useLiveFrame();
+  const words = live?.words && live.words.length >= 12 ? live.words.slice(0, 12) : WORDS;
   const [copied, setCopied] = useState(false);
   return (
     <>
@@ -391,7 +402,7 @@ function Shown({ onBack, onHide, onDone }: { onBack: () => void; onHide: () => v
           <div style={{ marginTop: 18 }}>
             <WordGrid />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 12 }}>
-              <button type="button" onClick={() => { navigator.clipboard?.writeText(WORDS.join(' ')).catch(() => undefined); setCopied(true); }} style={textBtn}>{copied ? 'Copied' : 'Copy'}</button>
+              <button type="button" onClick={() => { navigator.clipboard?.writeText(words.join(' ')).catch(() => undefined); setCopied(true); }} style={textBtn}>{copied ? 'Copied' : 'Copy'}</button>
               <button type="button" onClick={onHide} style={textBtn}>Hide</button>
             </div>
           </div>
@@ -413,9 +424,11 @@ function PhraseHead() {
 }
 
 function WordGrid({ blur }: { blur?: boolean }) {
+  const live = useLiveFrame();
+  const words = live?.words && live.words.length >= 12 ? live.words.slice(0, 12) : WORDS;
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #accafe', borderRadius: 12, overflow: 'hidden', filter: blur ? 'blur(6px)' : undefined }}>
-      {WORDS.map((word, index) => (
+      {words.map((word, index) => (
         <div key={word} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', boxSizing: 'border-box', borderTop: index > 1 ? '1px solid #2a3447' : undefined, borderLeft: index % 2 ? '1px solid #2a3447' : undefined }}>
           <span style={{ width: 20, color: '#8b9097', fontSize: 12, flexShrink: 0 }}>{index + 1}</span>
           <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.3 }}>{word}</span>

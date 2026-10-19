@@ -1,6 +1,7 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/claim/${name}`;
 const SCREENS = new Set(['claim', 'claim-done']);
@@ -27,11 +28,14 @@ export function ClaimScreens({ id, go, back }: { id: string; go: Go; back?: () =
 }
 
 function Claim({ leave, go }: { leave: () => void; go: Go }) {
+  const live = useLiveFrame();
+  const [err, setErr] = useState<string | null>(null);
   const rows = [
-    ['Claim to', 'Account 01'],
+    ['Claim to', live?.accountLabel ?? 'Account 01'],
     ['You will receive', 'ARX, from your snapshot'],
     ['Claims left', '1 of 1'],
   ];
+  const points = live?.app ? '0 ARX-P' : '12,480 ARX-P';
   return (
     <>
       <NoteStatus />
@@ -42,7 +46,7 @@ function Claim({ leave, go }: { leave: () => void; go: Go }) {
       <p style={sub}>Your mining points convert to ARX at mainnet. Each miner can claim once.</p>
       <div style={{ position: 'absolute', left: 18, top: 210, width: 354, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 16, padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#8b9097' }}>ARX-P BALANCE</p>
-        <p style={{ margin: 0, fontSize: 36, fontWeight: 700 }}>12,480 ARX-P</p>
+        <p style={{ margin: 0, fontSize: 36, fontWeight: 700 }}>{points}</p>
         <span style={{ background: '#1c2025', borderRadius: 12, padding: '5px 10px', fontSize: 12, fontWeight: 600, color: '#accafe' }}>Snapshot locked</span>
       </div>
       <div style={{ position: 'absolute', left: 18, top: 377, width: 354, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, padding: '8px 0' }}>
@@ -54,7 +58,15 @@ function Claim({ leave, go }: { leave: () => void; go: Go }) {
         ))}
       </div>
       <p style={note}>Claiming is one-time and can’t be undone. Your snapshot can’t be changed once it’s locked.</p>
-      <button type="button" onClick={() => { claimed = true; go('claim-done'); }} style={{ ...fillBtn, top: 714 }}>Claim ARX</button>
+      {err ? <p style={{ position: 'absolute', left: 24, top: 680, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+      <button type="button" onClick={() => {
+        if (live?.app) {
+          setErr('Claim did not credit Account ARX. Open Mining to claim ARX-P when a session is running.');
+          return;
+        }
+        claimed = true;
+        go('claim-done');
+      }} style={{ ...fillBtn, top: 714 }}>Claim ARX</button>
     </>
   );
 }

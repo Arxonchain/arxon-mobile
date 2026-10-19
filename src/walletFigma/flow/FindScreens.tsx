@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/find/${name}`;
 
@@ -52,9 +53,20 @@ export function FindScreens({ id, go, back }: { id: string; go: Go; back?: () =>
 }
 
 function Search({ go, leave }: { go: Go; leave: () => void }) {
+  const live = useLiveFrame();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
-  const rows = SUGGESTED.filter((row) => !q || row.name.toLowerCase().includes(q) || row.amount.toLowerCase().includes(q));
+  const rows = live?.app
+    ? live.search(query).map((row) => ({
+        name: row.name,
+        amount: row.amount,
+        value: row.value,
+        change: row.change,
+        tone: row.tone === 'up' ? '#3ddc84' : row.tone === 'down' ? '#ff5c5c' : '#8b9097',
+        icon: row.icon,
+        to: row.to,
+      }))
+    : SUGGESTED.filter((row) => !q || row.name.toLowerCase().includes(q) || row.amount.toLowerCase().includes(q));
   return (
     <>
       <button type="button" aria-label="Back" onClick={leave} style={{ ...backBtn, left: 18, top: 56 }}>
@@ -140,7 +152,9 @@ function ManageRow({ token, on, toggle }: { token: (typeof MANAGED)[number]; on:
 }
 
 function AddToken({ go, leave }: { go: Go; leave: () => void }) {
-  const [address, setAddress] = useState('arx1qxk9m4…4f7d');
+  const live = useLiveFrame();
+  const [address, setAddress] = useState('');
+  const [err, setErr] = useState<string | null>(null);
   const ready = address.trim().length > 0;
   return (
     <>
@@ -163,7 +177,7 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
             </button>
           </div>
         </Field>
-        {ready && (
+        {ready && !live?.app && (
           <div style={{ display: 'flex', gap: 12 }}>
             <div style={{ ...box, width: 171, padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span style={{ fontSize: 12, color: '#8b9097' }}>Symbol</span>
@@ -180,7 +194,11 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
           <span style={{ width: 262, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>Anyone can create a token with any name. Only add tokens from sources you trust.</span>
         </div>
       </div>
-      <button type="button" disabled={!ready} onClick={() => go('manage')} style={{ ...primaryBtn, opacity: ready ? 1 : 0.45 }}>Add token</button>
+      {err ? <p style={{ position: 'absolute', left: 22, top: 670, width: 346, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+      <button type="button" disabled={!ready} onClick={() => {
+        if (!live?.app) { go('manage'); return; }
+        void live.addToken(address).then(() => go('manage')).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Could not add that token'));
+      }} style={{ ...primaryBtn, opacity: ready ? 1 : 0.45 }}>Add token</button>
     </>
   );
 }

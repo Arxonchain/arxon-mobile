@@ -235,7 +235,7 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
     setBusy(true);
     setErr(null);
     try {
-      await live.send(token.symbol, to, amount, net === 'testnet');
+      await live.send(token.symbol, to, amount, net === 'testnet', priv && token.id === 'arx' ? 'private' : 'home');
       go('send-success');
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Send failed');

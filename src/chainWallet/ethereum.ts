@@ -9,7 +9,7 @@ import {
   type Address,
   type Hex,
 } from 'viem';
-import { mnemonicToAccount } from 'viem/accounts';
+import { resolveAccount } from './keys';
 
 import {
   ETHEREUM,
@@ -81,8 +81,8 @@ export function ethereumPublicClient(rpcUrl = ETHEREUM_RPC) {
   });
 }
 
-export function ethereumWalletClient(mnemonic: string, rpcUrl = ETHEREUM_RPC) {
-  const account = mnemonicToAccount(mnemonic.trim());
+export function ethereumWalletClient(mnemonic: string, rpcUrl = ETHEREUM_RPC, addressIndex = 0) {
+  const account = resolveAccount(mnemonic, addressIndex);
   return createWalletClient({
     account,
     chain: ETHEREUM,
@@ -148,9 +148,10 @@ export async function sendEthereumNative(
   mnemonic: string,
   to: Address,
   amount: string,
-  rpcUrl = ETHEREUM_RPC
+  rpcUrl = ETHEREUM_RPC,
+  addressIndex = 0,
 ): Promise<Hex> {
-  const client = ethereumWalletClient(mnemonic, rpcUrl);
+  const client = ethereumWalletClient(mnemonic, rpcUrl, addressIndex);
   try {
     const hash = await client.sendTransaction({
       to,
@@ -168,13 +169,15 @@ export async function sendEthereumToken(
   token: Exclude<EthereumToken, 'ETH'>,
   to: Address,
   amount: string,
-  rpcUrl = ETHEREUM_RPC
+  rpcUrl = ETHEREUM_RPC,
+  addressIndex = 0,
 ): Promise<Hex> {
   const meta = ETHEREUM_TOKENS.find((t) => t.symbol === token);
   if (!meta?.address) throw new Error('Unknown Ethereum token');
-  const client = ethereumWalletClient(mnemonic, rpcUrl);
+  const client = ethereumWalletClient(mnemonic, rpcUrl, addressIndex);
   const value = parseUnits(amount.trim() || '0', meta.decimals);
   if (value === BigInt(0)) throw new Error('Enter an amount.');
+  const account = client.account;
 
   try {
     const hash =

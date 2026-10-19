@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
 
 const IDS = new Set([
   'vault-empty', 'vault', 'vault-amount', 'vault-review', 'vault-done', 'move-home', 'move-home-done',
@@ -76,6 +77,7 @@ export function tabTarget(which: 'home' | 'vault' | 'explore' | 'history' | 'acc
 }
 
 export function VaultScreens({ id, go, back, behind, password }: { id: string; go: Go; back?: () => void; behind?: string; password: string }) {
+  const live = useLiveFrame();
   const [hidden, setHidden] = useState(false);
   const [moveIn, setMoveIn] = useState('1000');
   const [moveOut, setMoveOut] = useState('500');
@@ -175,7 +177,13 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
       ) : id === 'vault-done' || id === 'move-home-done' || id === 'priv-done' || id === 'unshield-done' || id === 'vault-failed' ? (
         <Result id={id} go={go} fundedVault={fundedVault} />
       ) : (
-        <Unlock wrong={id === 'vault-lock-wrong'} locked={id === 'vault-locked' && (lockUntil == null || remain > 0)} clock={clock} typed={typed} setTyped={setTyped} onUnlock={submitPassword} onFace={land} leave={leave} go={go} />
+        <Unlock wrong={id === 'vault-lock-wrong'} locked={id === 'vault-locked' && (lockUntil == null || remain > 0)} clock={clock} typed={typed} setTyped={setTyped} onUnlock={submitPassword} onFace={() => {
+          if (live?.app) {
+            void live.unlockBiometric().then((ok) => { if (ok) land(); });
+            return;
+          }
+          land();
+        }} leave={leave} go={go} />
       )}
       {(id === 'vault-empty' || id === 'vault' || id === 'vault-many' || id === 'vault-nofunds' || sheet) && <Tabs go={go} here={sheet ? 'vault' : id} />}
     </div>
@@ -210,6 +218,7 @@ function price(sym: Sym) {
 }
 
 function Amount({ id, token, amount, leave, onKey, go }: { id: string; token: Sym; amount: string; leave: () => void; onKey: (key: string) => void; go: Go }) {
+  const live = useLiveFrame();
   const movingIn = id === 'vault-amount' || id === 'vault-over';
   const sending = id === 'priv-amount' || id === 'unshield-amount';
   const value = num(amount);
@@ -258,7 +267,13 @@ function Amount({ id, token, amount, leave, onKey, go }: { id: string; token: Sy
             </button>
           ))}
         </div>
-        <button type="button" disabled={!ready} onClick={() => go(id === 'move-home' ? 'move-home-done' : id === 'priv-amount' ? 'priv-review' : id === 'unshield-amount' ? 'unshield-review' : 'vault-review')} style={{ ...btn, marginTop: 8, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>
+        <button type="button" disabled={!ready} onClick={() => {
+          if (id === 'move-home' && live?.app) {
+            void live.vaultMoveOut(amount).then(() => go('move-home-done')).catch(() => go('vault-failed'));
+            return;
+          }
+          go(id === 'move-home' ? 'move-home-done' : id === 'priv-amount' ? 'priv-review' : id === 'unshield-amount' ? 'unshield-review' : 'vault-review');
+        }} style={{ ...btn, marginTop: 8, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>
           {id === 'move-home' ? 'Move to Home' : 'Review'}
         </button>
       </div>
@@ -273,6 +288,9 @@ function fill(onKey: (key: string) => void, current: string, max: number) {
 }
 
 function Review({ id, token, amount, go, leave }: { id: string; token: Sym; amount: string; go: Go; leave: () => void }) {
+  const live = useLiveFrame();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const value = num(amount || '0');
   const fiat = value * price(token);
   const total = token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`;
@@ -300,7 +318,21 @@ function Review({ id, token, amount, go, leave }: { id: string; token: Sym; amou
         {id === 'vault-review' ? 'Funds stay in your wallet. Home no longer counts them until you move them back.' : id === 'priv-review' ? 'Sender, recipient and amount stay hidden.' : 'The recipient and the amount will be visible on-chain.'}
       </p>
       <div style={{ marginTop: 'auto', padding: '0 18px 28px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <button type="button" onClick={() => go(id === 'vault-review' ? 'vault-pending' : id === 'priv-review' ? 'priv-pending' : 'unshield-pending')} style={{ ...btn, background: '#accafe', color: '#0c1018', border: 'none' }}>{id === 'vault-review' ? 'Confirm and move' : id === 'priv-review' ? 'Confirm transfer' : 'Confirm and unshield'}</button>
+        {err ? <p style={{ margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+        <button type="button" disabled={busy} onClick={() => {
+          if (!live?.app) {
+            go(id === 'vault-review' ? 'vault-pending' : id === 'priv-review' ? 'priv-pending' : 'unshield-pending');
+            return;
+          }
+          setBusy(true);
+          setErr(null);
+          const run = id === 'vault-review'
+            ? live.vaultMoveIn(amount)
+            : id === 'priv-review'
+              ? live.send('ARX', '', amount, true, 'private')
+              : live.send('ARX', '', amount, true, 'unshield');
+          void run.then(() => go(id === 'vault-review' ? 'vault-done' : id === 'priv-review' ? 'priv-done' : 'unshield-done', false)).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Vault send failed')).finally(() => setBusy(false));
+        }} style={{ ...btn, background: '#accafe', color: '#0c1018', border: 'none', opacity: busy ? 0.6 : 1 }}>{busy ? 'Working' : id === 'vault-review' ? 'Confirm and move' : id === 'priv-review' ? 'Confirm transfer' : 'Confirm and unshield'}</button>
         <button type="button" onClick={leave} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { vaultEntry } from './VaultScreens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/token/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -89,10 +90,21 @@ const FRAMES: Record<string, {
 const RANGES = ['1H', '1D', '1W', '1M', '1Y', 'All'];
 
 export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const frame = FRAMES[id] ?? FRAMES['token-arx'];
+  const liveTok = live?.app
+    ? live.tokens.find((row) => row.name === frame.title) ?? (frame.title === 'Arxon' ? live.testnetTokens[0] : undefined)
+    : undefined;
+  const amount = liveTok?.amount ?? frame.amount;
+  const fiat = liveTok?.value ?? frame.fiat;
+  const change = liveTok ? `${liveTok.change}${liveTok.change.includes('Today') ? '' : ''}` : frame.change;
+  const vaultLabel = live?.app
+    ? (frame.title === 'Arxon' && Number(live.shielded) > 0 ? `${live.shielded} ARX in Vault` : undefined)
+    : frame.vault;
   const [range, setRange] = useState('1D');
   const [star, setStar] = useState(false);
-  const empty = !!frame.empty;
+  const liveN = liveTok ? Number(liveTok.amount.replace(/[^0-9.]/g, '')) : 0;
+  const empty = live?.app ? !(Number.isFinite(liveN) && liveN > 0) : !!frame.empty;
   const activityTop = frame.card ? 636 : 544;
   const rowsTop = frame.card ? 672 : 580;
   const leave = () => (back ? back() : go(empty ? 'home' : 'home-funded', false));
@@ -111,20 +123,20 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
         <FigmaImg src={art('star.svg')} width={20} height={20} />
       </button>
 
-      <p style={{ position: 'absolute', left: 22, top: 118, margin: 0, fontSize: 34, fontWeight: 700 }}>{frame.amount}</p>
+      <p style={{ position: 'absolute', left: 22, top: 118, margin: 0, fontSize: 34, fontWeight: 700 }}>{amount}</p>
       <p style={{ position: 'absolute', left: 22, top: 166, margin: 0, display: 'flex', gap: 12, fontSize: 15, fontWeight: 500 }}>
-        <span style={{ color: '#8b9097' }}>{frame.fiat}</span>
-        <span style={{ color: frame.flat ? '#8b9097' : frame.up ? '#3ddc84' : '#ff5c5c' }}>{frame.change}</span>
+        <span style={{ color: '#8b9097' }}>{fiat}</span>
+        <span style={{ color: liveTok ? (liveTok.tone === 'up' ? '#3ddc84' : liveTok.tone === 'down' ? '#ff5c5c' : '#8b9097') : frame.flat ? '#8b9097' : frame.up ? '#3ddc84' : '#ff5c5c' }}>{change}</span>
       </p>
 
-      {frame.vault && (
+      {vaultLabel && (
         <button type="button" onClick={() => go(vaultEntry('vault'))} style={pill}>
-          <span style={{ color: '#accafe', fontWeight: 500 }}>{frame.vault}</span>
+          <span style={{ color: '#accafe', fontWeight: 500 }}>{vaultLabel}</span>
           <span style={{ color: '#8b9097' }}>· not counted here</span>
         </button>
       )}
 
-      <div style={{ position: 'absolute', left: 18, top: frame.vault ? 232 : 206, width: 354, height: frame.vault ? 124 : 150, overflow: 'hidden' }}>
+      <div style={{ position: 'absolute', left: 18, top: vaultLabel ? 232 : 206, width: 354, height: vaultLabel ? 124 : 150, overflow: 'hidden' }}>
         <img src={art(frame.up ? 'chart-up.svg' : 'chart-down.svg')} alt="" width={354} height={150} />
       </div>
 

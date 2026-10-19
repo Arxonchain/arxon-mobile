@@ -1,5 +1,5 @@
 import { createPublicClient, createWalletClient, defineChain, http, type Hex } from 'viem';
-import { mnemonicToAccount } from 'viem/accounts';
+import { resolveAccount } from './keys';
 
 export const ARXON = defineChain({
   id: 7171,
@@ -104,8 +104,8 @@ export async function waitIncluded(rpcUrl: string, hash: Hex) {
   }
 }
 
-export function walletClient(rpcUrl: string, mnemonic: string) {
-  const account = mnemonicToAccount(mnemonic.trim());
+export function walletClient(rpcUrl: string, mnemonic: string, addressIndex = 0) {
+  const account = resolveAccount(mnemonic, addressIndex);
   return createWalletClient({
     account,
     chain: defineChain({ ...ARXON, rpcUrls: { default: { http: [rpcUrl] } } }),

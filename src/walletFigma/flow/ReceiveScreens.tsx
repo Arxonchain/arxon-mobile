@@ -22,6 +22,7 @@ export function isReceiveScreen(id: string) {
 }
 
 export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const [nets, setNets] = useState<Net[]>(BUILT);
   const [selected, setSelected] = useState('mainnet');
   const [pub, setPub] = useState(true);
@@ -33,6 +34,10 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
 
   function pick(netId: string) {
     setSelected(netId);
+    if (live?.app) {
+      if (netId === 'testnet') void live.setNetwork('arxon');
+      else if (netId === 'mainnet') void live.setNetwork('ethereum');
+    }
     if (back) back();
     else go('receive', false);
   }
@@ -44,13 +49,13 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
       const id = `custom-${nets.length}`;
       setNets((prev) => [...prev, { id, name: name || 'Custom network', sub: rpc || 'Custom RPC', icon: 'plus.svg', pill: name || 'Custom network' }]);
       setSelected(id);
+      if (live?.app && rpc) void live.setRpcUrl(rpc);
     }
     setForm({ name: '', rpc: '', chain: '', symbol: '', explorer: '' });
     if (back) back();
     else go('network', false);
   }
 
-  const live = useLiveFrame();
   const address = live?.address ?? ADDRESS;
 
   async function copy() {

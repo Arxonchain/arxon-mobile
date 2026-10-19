@@ -3,7 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { rememberFromActivity, tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
-import { useLiveFrame } from './liveFrame';
+import { useLiveFrame, type LiveActivity } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -103,9 +103,9 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   const vaultList = id === 'activity-filtered' || id === 'activity-vault';
   const none = id === 'activity-none';
   const groups = vaultList
-    ? [{ day: 'Today', age: 0, items: VAULT_ROWS }]
+    ? [{ day: 'Today', age: 0, items: (live?.app ? live.activity.flatMap((g) => g.items).filter((row) => row.kind === 'vault') : VAULT_ROWS) }]
     : live?.app
-      ? live.activity
+      ? filterLive(live.activity, type, token, date)
       : filterRows(type, token, date);
   const filteredBlank = !empty && !none && !vaultList && groups.length === 0;
 
@@ -138,6 +138,22 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
       )}
     </div>
   );
+}
+
+function filterLive(groups: LiveActivity[], type: string, token: string, date = 'Any time') {
+  const kind = type === 'Sent' ? 'sent' : type === 'Received' ? 'received' : type === 'Swaps' ? 'swap' : type === 'Private' ? 'private' : type === 'Vault moves' ? 'vault' : '';
+  const maxAge = date === 'Last 7 days' ? 7 : date === 'Last 30 days' ? 30 : 10000;
+  return groups
+    .filter((group) => group.age < maxAge)
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((row) => {
+        const typeOk = !kind || row.kind === kind || (kind === 'sent' && row.kind === 'private');
+        const tokenOk = token === 'All tokens' || row.token === token || row.token === `t${token}`;
+        return typeOk && tokenOk;
+      }),
+    }))
+    .filter((group) => group.items.length);
 }
 
 function filterRows(type: string, token: string, date = 'Any time') {

@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/unlock/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -25,11 +26,16 @@ export function UnlockScreens({
 }
 
 function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go: Go }) {
+  const live = useLiveFrame();
   const [value, setValue] = useState(wrong ? 'incorrect' : '');
   const [show, setShow] = useState(false);
   const expected = password || 'Arxon123!';
 
   function unlock() {
+    if (live?.app) {
+      void live.unlock(value).then((ok) => go(ok ? 'home' : 'unlock-wrong', false));
+      return;
+    }
     const typed = value;
     if (typed === expected) go('home-funded');
     else go('unlock-wrong', false);
@@ -57,7 +63,13 @@ function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go:
         Forgot password?
       </button>
       <button type="button" onClick={unlock} style={{ ...unlockBtn, background: '#90b9ff', color: '#0c1018', top: 649 }}>Unlock</button>
-      <button type="button" onClick={() => go('home-funded')} style={{ ...unlockBtn, top: 714, background: 'transparent', color: '#accafe', border: '1.5px solid #2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+      <button type="button" onClick={() => {
+        if (live?.app) {
+          void live.unlockBiometric().then((ok) => go(ok ? 'home' : 'unlock-wrong', false));
+          return;
+        }
+        go('home-funded');
+      }} style={{ ...unlockBtn, top: 714, background: 'transparent', color: '#accafe', border: '1.5px solid #2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
         <img src={art('face.svg')} alt="" width={20} height={20} />
         Use Face ID
       </button>
