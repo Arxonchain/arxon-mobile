@@ -39,6 +39,7 @@ type LiveNavInput = {
     approveRequest: () => Promise<void>;
     rejectRequest: () => Promise<void>;
     pair: (uri: string) => Promise<void>;
+    disconnect: (topic: string) => Promise<void>;
   } | null;
 };
 
@@ -120,19 +121,34 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return { note: `${row.label} created from your recovery phrase.` };
   }
 
-  if (to === 'dapp' && wc?.proposal) {
-    return {};
+  if (to === 'dapp' && !wc?.proposal && !wc?.request) {
+    return {
+      note: 'No WalletConnect request is waiting. Paste a wc: URI from the dApp to pair. This overlay does not invent a connection.',
+    };
   }
-  if (from === 'dapp' && to === 'home') {
-    try {
-      await wc?.approveProposal();
-    } catch (e) {
-      return { block: true, note: e instanceof Error ? e.message : 'Could not connect.' };
+
+  if (from === 'dapp' && (to === 'home' || to === 'home-funded')) {
+    return { replace: 'home' };
+  }
+
+  if (from === 'dapp-tx' && to === 'send-success') {
+    if (!wc?.request) {
+      return { block: true, note: 'No WalletConnect transaction is waiting. Nothing was signed.' };
     }
-    return {};
+    try {
+      await wc.approveRequest();
+      return { replace: 'home' };
+    } catch (e) {
+      return { block: true, note: e instanceof Error ? e.message : 'Could not approve that request.' };
+    }
   }
-  if (from === 'dapp' && (to === 'home-funded' || to === 'home')) {
-    return {};
+  if (from === 'dapp-tx' && (to === 'home' || to === 'home-funded')) {
+    try {
+      await wc?.rejectRequest();
+    } catch {
+      /* reject is best-effort */
+    }
+    return { replace: 'home' };
   }
 
   if (to === 'code-ready') {
@@ -166,6 +182,9 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return {
       note: 'Arxswap is a WalletConnect dApp, not an in-app DEX. Paste a wc: URI from the dApp to pair.',
     };
+  }
+  if (from === 'dapp' && to !== 'home' && to !== 'home-funded' && !wc?.proposal) {
+    return {};
   }
 
   setVaultLockRequired(sessionStore.vaultLock());

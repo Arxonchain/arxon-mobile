@@ -7,7 +7,8 @@ import type { EthereumToken, WalletNetworkId } from '@/chainWallet/networks';
 import { quoteFor, usdFromAmount } from '@/chainWallet/prices';
 import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
-import { addListedToken, loadListedTokens } from '@/chainWallet/tokens';
+import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
+import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { hiddenCount, privacyPill as pillText, readDefaultPrivacy, writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 import { enableBiometrics, verifyBiometrics } from '@/chainWallet/biometrics';
@@ -23,6 +24,7 @@ import {
 } from '@/chainWallet/session';
 import { createDisclosureCode, listDisclosureCodes } from '@/chainWallet/disclosure';
 import { saveSupportReport } from '@/chainWallet/reports';
+import { dappLabel, requestLabel } from '@/chainWallet/wc';
 import { useWc } from '@/chainWallet/wcProvider';
 import { beforeGo, type NavDecision } from './liveNav';
 import { useWalletModeActions } from './ModeShell';
@@ -59,12 +61,25 @@ export type LiveActivity = {
 
 export type LiveSendMode = 'home' | 'vault' | 'private' | 'unshield';
 
+export type LiveInspect = {
+  hash: string;
+  title: string;
+  amount: string;
+  fiat: string;
+  status: string;
+  vault: boolean;
+  rows: [string, string][];
+};
+
 type LiveFrame = {
   app: true;
   ready: boolean;
   locked: boolean;
   address: string | null;
   accountLabel: string;
+  accounts: { index: number; label: string }[];
+  accountIndex: number;
+  setAccountIndex: (index: number) => Promise<void>;
   total: string;
   day: string;
   dayTone: LiveTone;
@@ -75,8 +90,11 @@ type LiveFrame = {
   testnetTotal: string;
   testnetTokens: LiveTok[];
   activity: LiveActivity[];
+  inspect: LiveInspect | null;
+  openTx: (hash: string) => Promise<void>;
   words: string[] | null;
   shielded: string;
+  publicArx: string;
   sessionPassword: string | null;
   startId: string;
   ensureWords: () => Promise<string[]>;
@@ -100,6 +118,11 @@ type LiveFrame = {
   vaultMoveIn: (amount: string) => Promise<void>;
   vaultMoveOut: (amount: string) => Promise<void>;
   wcSessions: { name: string; url: string; topic: string }[];
+  wcPeer: { name: string; url: string; detail: string } | null;
+  wcKind: 'proposal' | 'request' | null;
+  approveWc: () => Promise<void>;
+  rejectWc: () => Promise<void>;
+  disconnectWc: (topic: string) => Promise<void>;
 };
 
 const LiveFrameContext = createContext<LiveFrame | null>(null);
@@ -154,6 +177,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [defaults, setDefaults] = useState(readDefaultPrivacy);
   const [codes, setCodes] = useState(() => listDisclosureCodes());
   const [tick, setTick] = useState(0);
+  const [inspect, setInspect] = useState<LiveInspect | null>(null);
+  const [listed, setListed] = useState<ListedToken[]>([]);
 
   useEffect(() => {
     if (wallet.network === 'arxon') setArx(wallet.balance);
@@ -164,10 +189,13 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     void loadActivity().then((items) => {
       if (!cancel) setActivity(groupActivity(items));
     });
+    void loadListedTokens().then((rows) => {
+      if (!cancel) setListed(rows);
+    });
     return () => {
       cancel = true;
     };
-  }, [wallet.address, wallet.balance, wallet.network]);
+  }, [wallet.address, wallet.balance, wallet.network, wallet.rpcUrl]);
 
   useEffect(() => {
     const onVis = () => {
@@ -374,6 +402,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     locked: wallet.locked || (!!currentPassword() === false && sessionStore.hasPassword() && tick >= 0 && autoLockDue()),
     address: wallet.address,
     accountLabel: current?.label || (wallet.address ? short(wallet.address) : 'Account 01'),
+    accounts,
+    accountIndex: wallet.accountIndex,
+    setAccountIndex: wallet.setAccountIndex,
     total: usd(totalN),
     day: weighted == null ? 'Ethereum' : `${weighted > 0 ? '+' : ''}${weighted.toFixed(2)}% Today`,
     dayTone: toneOf(weighted),
@@ -384,8 +415,29 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     testnetTotal: qty(wallet.network === 'arxon' ? wallet.balance : arx, 4),
     testnetTokens,
     activity,
+    inspect,
+    openTx: async (hash: string) => {
+      try {
+        const row = await inspectTx(wallet.rpcUrl, hash as `0x${string}`);
+        setInspect(toLiveInspect(row));
+      } catch (e) {
+        setInspect({
+          hash,
+          title: 'Transaction',
+          amount: hash.slice(0, 10),
+          fiat: e instanceof Error ? e.message : 'Could not load this transaction',
+          status: 'Unknown',
+          vault: false,
+          rows: [
+            ['Hash', `${hash.slice(0, 10)}…${hash.slice(-6)}`],
+            ['Network', wallet.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet'],
+          ],
+        });
+      }
+    },
     words,
     shielded: wallet.shieldedBalance,
+    publicArx: qty(wallet.network === 'arxon' ? wallet.balance : arx, 4),
     sessionPassword: currentPassword(),
     startId,
     ensureWords,
@@ -411,12 +463,23 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     addToken: async (raw: string) => {
       const token = await addListedToken(wallet.rpcUrl, raw);
+      setListed(await loadListedTokens());
       return `${token.symbol} · ${token.decimals} decimals`;
     },
     search: (query: string) => {
       const q = query.trim().toLowerCase();
-      const rows = tokens.filter(
-        (row) => !q || row.name.toLowerCase().includes(q) || (row.symbol && row.symbol.toLowerCase().includes(q)),
+      const extra: LiveTok[] = listed.map((row) => ({
+        name: row.name,
+        amount: row.symbol,
+        value: short(row.address),
+        change: row.standard === 'arx20' ? 'ARX-20' : 'ERC-20',
+        tone: 'flat' as const,
+        icon: 'eth' as const,
+        to: 'manage',
+        symbol: row.symbol,
+      }));
+      const rows = [...tokens, ...extra].filter(
+        (row) => !q || row.name.toLowerCase().includes(q) || (row.symbol && row.symbol.toLowerCase().includes(q)) || row.value.toLowerCase().includes(q),
       );
       if (/^0x[0-9a-fA-F]{40}$/.test(query.trim())) {
         rows.unshift({
@@ -479,6 +542,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
               approveRequest: wc.approveRequest,
               rejectRequest: wc.rejectRequest,
               pair: wc.pair,
+              disconnect: wc.disconnect,
             }
           : null,
       }),
@@ -492,6 +556,35 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
     },
     wcSessions: (wc?.sessions ?? []).map((row) => ({ name: row.name, url: row.url, topic: row.topic })),
+    wcPeer: wc?.request
+      ? { ...requestLabel(wc.request), detail: requestLabel(wc.request).detail }
+      : wc?.proposal
+        ? { ...dappLabel(wc.proposal), detail: 'See your public address' }
+        : null,
+    wcKind: wc?.request ? 'request' : wc?.proposal ? 'proposal' : null,
+    approveWc: async () => {
+      if (wc?.request) {
+        await wc.approveRequest();
+        return;
+      }
+      if (wc?.proposal) {
+        await wc.approveProposal();
+        return;
+      }
+      throw new Error('No WalletConnect request is waiting. Paste a wc: URI from the dApp to pair.');
+    },
+    rejectWc: async () => {
+      if (wc?.request) {
+        await wc.rejectRequest();
+        return;
+      }
+      if (wc?.proposal) {
+        await wc.rejectProposal();
+      }
+    },
+    disconnectWc: async (topic: string) => {
+      await wc?.disconnect(topic);
+    },
   }), [
     wallet,
     hide,
@@ -499,6 +592,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     mode,
     words,
     activity,
+    inspect,
+    listed,
     arx,
     defaults,
     codes,
@@ -546,8 +641,31 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
   return [...groups.values()];
 }
 
+function toLiveInspect(row: InspectedTx): LiveInspect {
+  const vault = row.kind === 'shield' || row.kind === 'unshield';
+  const title =
+    row.kind === 'shield' ? 'Moved to Vault' : row.kind === 'unshield' ? 'Moved to Home' : row.kind === 'private' ? 'Sent privately' : 'Sent';
+  const amount = row.valueArx && Number(row.valueArx) > 0 ? `${row.valueArx} ARX` : row.kind === 'private' ? 'Amount hidden' : row.hash.slice(0, 10);
+  const hidden = row.rows.filter((item) => item.state === 'hidden').map((item) => item.label);
+  return {
+    hash: row.hash,
+    title,
+    amount,
+    fiat: row.kind === 'private' ? 'Private' : 'Arxon Testnet',
+    status: row.status === 'success' ? 'Confirmed' : row.status === 'reverted' ? 'Reverted' : 'Pending',
+    vault,
+    rows: [
+      ['Date', row.blockNumber ? `Block ${row.blockNumber}` : 'Pending'],
+      ['From', short(row.from)],
+      ['To', row.to ? short(row.to) : '—'],
+      ['Amount', amount],
+      ['Privacy', hidden.length ? hidden.join(', ') : row.kind === 'private' ? 'Private' : 'Public'],
+      ...row.rows.slice(0, 4).map((item): [string, string] => [item.label, item.value.length > 24 ? `${item.value.slice(0, 10)}…${item.value.slice(-4)}` : item.value]),
+    ],
+  };
+}
+
 void hiddenCount;
-void loadListedTokens;
 void checkUnlockPassword;
 void addHdAccount;
 void enableBiometrics;

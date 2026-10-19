@@ -78,8 +78,32 @@ function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go:
 }
 
 function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const pay = id === 'dapp-tx';
-  const close = () => (back ? back() : go(pay ? 'home-funded' : 'home', false));
+  const peer = live?.app ? live.wcPeer : null;
+  const host = peer?.url ? peer.url.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'app.arxswap.io';
+  const title = pay ? 'Approve transaction' : 'Connection request';
+  const body = peer
+    ? pay
+      ? `${peer.name} wants to send from ${live?.accountLabel ?? 'Account 01'}.`
+      : `${peer.name} wants to connect to your wallet.`
+    : pay
+      ? 'Arxswap wants to send from Account 01.'
+      : 'Arxswap wants to connect to your wallet.';
+  const close = () => {
+    if (live?.app) {
+      void live.rejectWc().finally(() => go('home', false));
+      return;
+    }
+    back ? back() : go(pay ? 'home-funded' : 'home', false);
+  };
+  const confirm = () => {
+    if (live?.app) {
+      void live.approveWc().then(() => go('home', false)).catch(() => go('home', false));
+      return;
+    }
+    go(pay ? 'send-success' : 'home');
+  };
   return (
     <Screen clock="ready">
       <div style={{ position: 'absolute', inset: 0, background: '#0b0f16' }}>
@@ -92,16 +116,16 @@ function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
       <div style={{ position: 'absolute', left: 0, top: 284, width: 390, height: 560, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: '24px 24px 0 0' }}>
         <div style={{ position: 'absolute', left: 174, top: 9, width: 40, height: 4, borderRadius: 2, background: '#2a3447' }} />
         <div style={{ position: 'absolute', left: 166, top: 31, width: 56, height: 56, borderRadius: 28, background: '#1c2025', border: '1px solid #2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#accafe', fontWeight: 700, fontSize: 24 }}>S</div>
-        <h1 style={{ ...center, top: 101, left: 24, width: 342, fontSize: 22, fontWeight: 700, color: '#fff' }}>{pay ? 'Approve transaction' : 'Connection request'}</h1>
+        <h1 style={{ ...center, top: 101, left: 24, width: 342, fontSize: 22, fontWeight: 700, color: '#fff' }}>{title}</h1>
         <div style={{ position: 'absolute', left: 109, top: 139, width: 170, height: 30, borderRadius: 15, background: '#1c2025', border: '1px solid #2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           <img src={art('lock.svg')} alt="" width={14} height={14} />
-          <span style={{ fontWeight: 500, fontSize: 13 }}>app.arxswap.io</span>
+          <span style={{ fontWeight: 500, fontSize: 13 }}>{host.length > 18 ? `${host.slice(0, 16)}…` : host}</span>
         </div>
         <p style={{ ...center, top: 183, left: 24, width: 342, fontSize: 14, color: '#8b9097' }}>
-          {pay ? 'Arxswap wants to send from Account 01.' : 'Arxswap wants to connect to your wallet.'}
+          {body}
         </p>
         <div style={{ position: 'absolute', left: 17, top: 217, width: 354, height: 150, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14 }}>
-          <Perm icon="check.svg" tone="ok">{pay ? 'Send 25.00 ARX' : 'See your public address'}</Perm>
+          <Perm icon="check.svg" tone="ok">{pay ? (peer?.detail || 'Send from this wallet') : 'See your public address'}</Perm>
           <div style={{ position: 'absolute', left: 15, top: 49, width: 322, height: 1, background: '#2a3447' }} />
           <Perm icon="check.svg" tone="ok" top={50}>{pay ? 'Network fee 0.0004 ARX' : 'Ask you to approve transactions'}</Perm>
           <div style={{ position: 'absolute', left: 15, top: 99, width: 322, height: 1, background: '#2a3447' }} />
@@ -110,21 +134,23 @@ function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
         <div style={{ position: 'absolute', left: 17, top: 383, width: 354, height: 56, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px' }}>
           <img src={art('avatar.svg')} alt="" width={32} height={32} />
           <span>
-            <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>Account 01</span>
-            <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>arx1q8x4…t7c2n4p</span>
+            <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>{live?.accountLabel ?? 'Account 01'}</span>
+            <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>{live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8x4…t7c2n4p'}</span>
           </span>
           <span style={{ flex: 1 }} />
           <img src={art('chev-down.svg')} alt="" width={18} height={18} />
         </div>
         <button type="button" onClick={close} style={{ ...pair, left: 17, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>{pay ? 'Reject' : 'Cancel'}</button>
-        <button type="button" onClick={() => go(pay ? 'send-success' : 'home')} style={{ ...pair, left: 200, background: '#accafe', color: '#0c1018', border: 'none' }}>{pay ? 'Approve' : 'Connect'}</button>
+        <button type="button" onClick={confirm} style={{ ...pair, left: 200, background: '#accafe', color: '#0c1018', border: 'none' }}>{pay ? 'Approve' : 'Connect'}</button>
       </div>
     </Screen>
   );
 }
 
 function Connected({ back }: { back: () => void }) {
+  const live = useLiveFrame();
   const [arxswap, setArxswap] = useState(true);
+  const sessions = live?.app ? live.wcSessions : arxswap ? [{ name: 'Arxswap', url: 'app.arxswap.io', topic: 'demo' }] : [];
   return (
     <Screen clock="ready">
       <button type="button" onClick={back} aria-label="Back" style={{ position: 'absolute', left: 18, top: 56, width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
@@ -135,13 +161,26 @@ function Connected({ back }: { back: () => void }) {
         Apps that can see your address and ask you to approve transactions.
       </p>
       <div style={{ position: 'absolute', left: 18, top: 222, width: 354, background: '#1c2126', border: '1px solid #293347', borderRadius: 16, overflow: 'hidden' }}>
-        {arxswap && (
-          <AppRow mark="S" title="Arxswap" detail="app.arxswap.io · Connected today" action="Disconnect" danger onAction={() => setArxswap(false)} />
-        )}
-        {arxswap && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
+        {sessions.map((row, index) => (
+          <div key={row.topic}>
+            {index > 0 && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
+            <AppRow
+              mark={(row.name[0] || 'A').toUpperCase()}
+              title={row.name}
+              detail={`${row.url.replace(/^https?:\/\//, '') || 'WalletConnect'} · Connected`}
+              action="Disconnect"
+              danger
+              onAction={() => {
+                if (live?.app) void live.disconnectWc(row.topic);
+                else setArxswap(false);
+              }}
+            />
+          </div>
+        ))}
+        {sessions.length > 0 && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
         <AppRow mark="M" title="Arxon Mining" detail="Extension · Wallet access" action="Manage" />
       </div>
-      <div style={{ position: 'absolute', left: 18, top: arxswap ? 388 : 316, width: 354, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '14px 16px', color: '#8b9097', fontSize: 13 }}>
+      <div style={{ position: 'absolute', left: 18, top: sessions.length ? 388 : 316, width: 354, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '14px 16px', color: '#8b9097', fontSize: 13 }}>
         Disconnecting stops an app from seeing your address. You can connect it again later.
       </div>
     </Screen>

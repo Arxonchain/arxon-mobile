@@ -186,10 +186,10 @@ function Help({ sent, go, onBack }: { sent: boolean; go: Go; onBack: () => void 
       <p style={kicker(436)}>ABOUT</p>
       <div style={{ ...listCard, top: 462 }}>
         {['Terms of Service', 'Privacy Policy'].map((title, index) => (
-          <div key={title} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none' }}>
+          <button key={title} type="button" onClick={() => window.open('https://arxon.io', '_blank', 'noopener,noreferrer')} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none', cursor: 'pointer', width: '100%', background: 'none', color: '#fff', fontFamily: font.sans }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{title}</span>
             <FigmaImg src={art('chev-sm.svg')} width={16} height={16} />
-          </div>
+          </button>
         ))}
         <div style={{ ...listRow, borderTop: '1px solid #2a3447' }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>Version</span>

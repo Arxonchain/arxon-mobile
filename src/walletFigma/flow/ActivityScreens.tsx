@@ -129,7 +129,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
           {empty && <Empty title="No activity yet" body="Your sent, received and swapped transactions will show up here." action="Fund your wallet" onAction={() => go('receive')} />}
           {none && <Empty title="No Vault moves" body="Moves between Home and your Vault will show up here." action="Clear filter" onAction={clear} />}
           {filteredBlank && <Empty title="No activity yet" body="Nothing in this range. Try another date or token." action="Clear filter" onAction={clear} />}
-          {!empty && !none && !filteredBlank && <List groups={groups} go={go} />}
+          {!empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash); }} />}
           <Tabs go={go} here={empty ? 'activity-empty' : vaultList ? 'activity-filtered' : none ? 'activity-none' : 'activity'} />
           {showSheet && (
             <Filter draft={draft} setDraft={setDraft} onClose={leave} onReset={() => { setDraft({ type: 'All', token: 'All tokens', date: 'Any time' }); clear(); }} onApply={apply} />
@@ -178,14 +178,17 @@ function Header({ onFilter }: { onFilter: () => void }) {
   );
 }
 
-function List({ groups, go }: { groups: { day: string; items: Row[] }[]; go: Go }) {
+function List({ groups, go, onOpen }: { groups: { day: string; items: (Row & { hash?: string })[] }[]; go: Go; onOpen?: (hash?: string) => void }) {
   return (
     <div style={{ position: 'absolute', left: 18, top: 176, width: 354, bottom: 110, overflow: 'auto' }}>
       {groups.map((group) => (
         <div key={group.day}>
           <p style={{ margin: '6px 0 4px', fontSize: 13, fontWeight: 500, color: '#8b9097' }}>{group.day}</p>
           {group.items.map((row) => (
-            <button key={row.title + row.sub} type="button" onClick={() => go(row.to || 'tx')} style={rowBtn}>
+            <button key={row.title + row.sub} type="button" onClick={() => {
+              onOpen?.(row.hash);
+              go(row.to || 'tx');
+            }} style={rowBtn}>
               <span style={iconWrap}><Icon kind={row.kind} /></span>
               <span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
                 <span style={{ display: 'block', fontSize: 16, fontWeight: 500 }}>{row.title}</span>
@@ -225,10 +228,20 @@ function Empty({ title, body, action, onAction }: { title: string; body: string;
 }
 
 function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
-  const vault = id === 'tx-vault';
-  const rows = vault
+  const live = useLiveFrame();
+  const inspect = live?.app ? live.inspect : null;
+  const vault = inspect ? inspect.vault : id === 'tx-vault';
+  const rows = inspect
+    ? inspect.rows
+    : vault
     ? [['Date', 'Oct 7, 2026 · 11:02 AM'], ['From', 'Home'], ['To', 'Vault'], ['Amount', '1,000.00 ARX'], ['Network fee', '0.0004 ARX'], ['Privacy', 'Private']]
     : [['Date', 'Oct 7, 2026 · 4:12 PM'], ['To', 'arx1q8x4…t7c2'], ['From', 'Account 01'], ['Network', 'Arxon Mainnet'], ['Network fee', '0.0004 ARX'], ['Privacy', 'Private']];
+  const title = inspect?.title ?? (vault ? 'Moved to Vault' : 'Sent privately');
+  const amount = inspect?.amount ?? (vault ? '1,000.00 ARX' : '25.00 ARX');
+  const fiat = inspect?.fiat ?? (vault ? '$420.00' : '≈ $10.50');
+  const status = inspect?.status ?? 'Confirmed';
+  const hash = inspect?.hash ?? '0x7f3a…c91e';
+  const hashLabel = inspect ? `${inspect.hash.slice(0, 10)}…${inspect.hash.slice(-4)}` : '0x7f3a…c91e';
   return (
     <>
       <NoteStatus />
@@ -241,10 +254,10 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
           <FigmaImg src={art('out.svg')} width={20} height={20} />
         </span>
       </div>
-      <p style={{ position: 'absolute', left: 16, top: 228, width: 358, margin: 0, textAlign: 'center', fontSize: 20, fontWeight: 700 }}>{vault ? 'Moved to Vault' : 'Sent privately'}</p>
-      <p style={{ position: 'absolute', left: 16, top: 258, width: 358, margin: 0, textAlign: 'center', fontSize: 32, fontWeight: 700 }}>{vault ? '1,000.00 ARX' : '25.00 ARX'}</p>
-      <p style={{ position: 'absolute', left: 16, top: 300, width: 358, margin: 0, textAlign: 'center', fontSize: 14, color: '#8b9097' }}>{vault ? '$420.00' : '≈ $10.50'}</p>
-      <span style={{ position: 'absolute', left: 150, top: 332, width: 90, height: 28, borderRadius: 14, background: '#12301f', color: '#3ddc97', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Confirmed</span>
+      <p style={{ position: 'absolute', left: 16, top: 228, width: 358, margin: 0, textAlign: 'center', fontSize: 20, fontWeight: 700 }}>{title}</p>
+      <p style={{ position: 'absolute', left: 16, top: 258, width: 358, margin: 0, textAlign: 'center', fontSize: 32, fontWeight: 700 }}>{amount}</p>
+      <p style={{ position: 'absolute', left: 16, top: 300, width: 358, margin: 0, textAlign: 'center', fontSize: 14, color: '#8b9097' }}>{fiat}</p>
+      <span style={{ position: 'absolute', left: 150, top: 332, width: 90, height: 28, borderRadius: 14, background: '#12301f', color: '#3ddc97', fontSize: 12, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{status}</span>
       <div style={{ position: 'absolute', left: 16, top: 380, width: 358, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, padding: '8px 15px' }}>
         {rows.map(([label, value], index) => (
           <div key={label}>
@@ -256,9 +269,9 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
           </div>
         ))}
       </div>
-      <button type="button" onClick={() => navigator.clipboard?.writeText('0x7f3a…c91e').catch(() => undefined)} style={{ position: 'absolute', left: 16, top: 636, width: 358, height: 56, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '9px 15px', cursor: 'pointer' }}>
+      <button type="button" onClick={() => navigator.clipboard?.writeText(hash).catch(() => undefined)} style={{ position: 'absolute', left: 16, top: 636, width: 358, height: 56, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '9px 15px', cursor: 'pointer' }}>
         <span style={{ display: 'block', fontSize: 12, color: '#8b9097' }}>Transaction hash</span>
-        <span style={{ display: 'block', marginTop: 2, fontSize: 14, fontWeight: 500 }}>0x7f3a…c91e</span>
+        <span style={{ display: 'block', marginTop: 2, fontSize: 14, fontWeight: 500 }}>{hashLabel}</span>
         <span style={{ position: 'absolute', right: 15, top: 17 }}><FigmaImg src={art('copy.svg')} width={20} height={20} /></span>
       </button>
       <button type="button" onClick={() => go(vault ? 'activity-vault' : 'receipt')} style={{ ...barBtn, top: 708, background: '#accafe', color: '#0c1018', border: 'none' }}>{vault ? 'Back to Activity' : 'View private receipt'}</button>

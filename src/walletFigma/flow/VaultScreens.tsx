@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
+import { clearVaultFails, registerVaultFail, sessionStore } from '@/chainWallet/session';
 
 const IDS = new Set([
   'vault-empty', 'vault', 'vault-amount', 'vault-review', 'vault-done', 'move-home', 'move-home-done',
@@ -40,6 +41,7 @@ export function setVaultLockRequired(on: boolean) {
 /** Vault tab opens Unlock while the vault session is closed, then the body Home already chose. */
 export function vaultEntry(body: string) {
   entryBody = body;
+  if (sessionStore.vaultLockedUntil() > Date.now()) return 'vault-locked';
   if (!lockRequired || sessionOpen) return body;
   return 'vault-lock';
 }
@@ -124,6 +126,25 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
   }
 
   function submitPassword() {
+    if (live?.app) {
+      void live.unlock(typed).then((ok) => {
+        if (ok) {
+          clearVaultFails();
+          land();
+          return;
+        }
+        setTyped('');
+        const result = registerVaultFail();
+        if (result.locked) {
+          sessionOpen = false;
+          setLockUntil(result.until);
+          go('vault-locked', false);
+          return;
+        }
+        go('vault-lock-wrong', false);
+      });
+      return;
+    }
     if (typed === expected) {
       land();
       return;
@@ -171,11 +192,11 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
           set((prev) => press(prev, key));
         }} go={go} />
       ) : id === 'vault-review' || id === 'priv-review' || id === 'unshield-review' ? (
-        <Review id={id} token={token} amount={id === 'vault-review' ? moveIn : sendAmt} go={go} leave={leave} />
+        <Review id={id} token={token} amount={id === 'vault-review' ? moveIn : id === 'move-home' ? moveOut : sendAmt} go={go} leave={leave} />
       ) : id === 'vault-pending' || id === 'priv-pending' || id === 'unshield-pending' ? (
-        <Pending id={id} go={go} />
+        <Pending id={id} go={go} amount={id === 'vault-pending' ? moveIn : sendAmt} />
       ) : id === 'vault-done' || id === 'move-home-done' || id === 'priv-done' || id === 'unshield-done' || id === 'vault-failed' ? (
-        <Result id={id} go={go} fundedVault={fundedVault} />
+        <Result id={id} go={go} fundedVault={fundedVault} amount={id === 'move-home-done' ? moveOut : id === 'vault-done' ? moveIn : sendAmt} />
       ) : (
         <Unlock wrong={id === 'vault-lock-wrong'} locked={id === 'vault-locked' && (lockUntil == null || remain > 0)} clock={clock} typed={typed} setTyped={setTyped} onUnlock={submitPassword} onFace={() => {
           if (live?.app) {
@@ -222,7 +243,9 @@ function Amount({ id, token, amount, leave, onKey, go }: { id: string; token: Sy
   const movingIn = id === 'vault-amount' || id === 'vault-over';
   const sending = id === 'priv-amount' || id === 'unshield-amount';
   const value = num(amount);
-  const available = movingIn ? (token === 'ARX' ? 2400 : token === 'USDT' ? 120 : 30) : token === 'ARX' ? 1000 : token === 'USDT' ? 40 : 30;
+  const available = live?.app
+    ? (token !== 'ARX' ? 0 : movingIn || id === 'vault-over' ? Number(live.publicArx.replace(/,/g, '')) || 0 : Number(live.shielded) || 0)
+    : movingIn ? (token === 'ARX' ? 2400 : token === 'USDT' ? 120 : 30) : token === 'ARX' ? 1000 : token === 'USDT' ? 40 : 30;
   const over = value > available;
   const ready = value > 0 && !over;
   const fiat = value * price(token);
@@ -244,7 +267,7 @@ function Amount({ id, token, amount, leave, onKey, go }: { id: string; token: Sy
           <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1, color: over ? '#f25252' : '#fff' }}>{amount ? qty(value, amount.includes('.') ? 2 : 0) : '0'}</span>
           <span style={{ fontSize: 18, fontWeight: 600, color: '#accafe', marginBottom: 6 }}>{token}</span>
         </div>
-        <p style={{ margin: '8px 0 0', color: '#8b9097', fontSize: 15 }}>≈ {money(fiat)}</p>
+        <p style={{ margin: '8px 0 0', color: '#8b9097', fontSize: 15 }}>{live?.app && token === 'ARX' ? 'No USD price' : `≈ ${money(fiat)}`}</p>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 14 }}>
         <span style={{ ...pill, color: over ? '#f25252' : '#8b9097' }}>Available {qty(available)} {token}</span>
@@ -295,8 +318,8 @@ function Review({ id, token, amount, go, leave }: { id: string; token: Sym; amou
   const fiat = value * price(token);
   const total = token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`;
   const rows: [string, string, string?][] = id === 'vault-review'
-    ? [['From', 'Home · Account 01'], ['To', 'Vault'], ['Home balance after', money(HOME_FUNDED - fiat)], ['Privacy', 'Hidden from Home', '#accafe'], ['Network fee', '0.0004 ARX'], ['Total', total]]
-    : [['To', id === 'priv-review' ? 'arx1q8…m2d9' : 'arx1q8x4…t7c2n4p'], ['From', 'Your Vault'], ['Network', 'Arxon'], ['Privacy', id === 'priv-review' ? 'Private' : 'Public', id === 'priv-review' ? '#accafe' : '#fff'], ['Network fee', '0.0004 ARX'], ['Total', total]];
+    ? [['From', live?.accountLabel ? `Home · ${live.accountLabel}` : 'Home · Account 01'], ['To', 'Vault'], ['Home balance after', live?.app ? 'Excluded from Home' : money(HOME_FUNDED - fiat)], ['Privacy', 'Hidden from Home', '#accafe'], ['Network fee', '0.0004 ARX'], ['Total', total]]
+    : [['To', id === 'priv-review' ? (live?.app ? 'Shielded note' : 'arx1q8…m2d9') : (live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8x4…t7c2n4p')], ['From', 'Your Vault'], ['Network', 'Arxon'], ['Privacy', id === 'priv-review' ? 'Private' : 'Public', id === 'priv-review' ? '#accafe' : '#fff'], ['Network fee', '0.0004 ARX'], ['Total', total]];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PhoneStatus />
@@ -304,7 +327,7 @@ function Review({ id, token, amount, go, leave }: { id: string; token: Sym; amou
       <div style={{ textAlign: 'center', marginTop: 12 }}>
         <p style={{ margin: 0, color: '#8b9097', fontSize: 14 }}>{id === 'vault-review' ? 'You are moving' : 'You are sending'}</p>
         <p style={{ margin: '8px 0 0', fontSize: 32, fontWeight: 700 }}>{qty(value)} {token}</p>
-        <p style={{ margin: '6px 0 0', color: '#8b9097' }}>≈ {money(fiat)}</p>
+        <p style={{ margin: '6px 0 0', color: '#8b9097' }}>{live?.app && token === 'ARX' ? 'No USD price' : `≈ ${money(fiat)}`}</p>
       </div>
       <div style={{ margin: '18px 18px 0', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 16, padding: '6px 16px' }}>
         {rows.map(([label, valueText, color]) => (
@@ -330,7 +353,7 @@ function Review({ id, token, amount, go, leave }: { id: string; token: Sym; amou
             ? live.vaultMoveIn(amount)
             : id === 'priv-review'
               ? live.send('ARX', '', amount, true, 'private')
-              : live.send('ARX', '', amount, true, 'unshield');
+              : live.send('ARX', live.address || '', amount, true, 'unshield');
           void run.then(() => go(id === 'vault-review' ? 'vault-done' : id === 'priv-review' ? 'priv-done' : 'unshield-done', false)).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Vault send failed')).finally(() => setBusy(false));
         }} style={{ ...btn, background: '#accafe', color: '#0c1018', border: 'none', opacity: busy ? 0.6 : 1 }}>{busy ? 'Working' : id === 'vault-review' ? 'Confirm and move' : id === 'priv-review' ? 'Confirm transfer' : 'Confirm and unshield'}</button>
         <button type="button" onClick={leave} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
@@ -424,8 +447,8 @@ function VaultHome({ many, hidden, onEye, go, sheet, onPrivate, onPublic }: { ma
           <span style={{ display: 'block', fontSize: 13, color: '#8b9097' }}>Today · 11:02 AM</span>
         </span>
         <span style={{ textAlign: 'right' }}>
-          <span style={{ display: 'block', fontSize: 16, fontWeight: 500 }}>{hidden ? '••••' : '+1,000.00 ARX'}</span>
-          <span style={{ display: 'block', fontSize: 13, color: '#8b9097' }}>{hidden ? '••••' : '$420.00'}</span>
+          <span style={{ display: 'block', fontSize: 16, fontWeight: 500 }}>{hidden ? '••••' : live?.app ? liveArx : '+1,000.00 ARX'}</span>
+          <span style={{ display: 'block', fontSize: 13, color: '#8b9097' }}>{hidden ? '••••' : live?.app ? 'On this phone' : '$420.00'}</span>
         </span>
       </div>
       {sheet && (
@@ -445,9 +468,13 @@ function VaultHome({ many, hidden, onEye, go, sheet, onPrivate, onPublic }: { ma
 }
 
 function Picker({ id, query, setQuery, leave, onPick }: { id: string; query: string; setQuery: (v: string) => void; leave: () => void; onPick: (sym: Sym) => void }) {
+  const live = useLiveFrame();
   const incoming = id === 'vault-pick-in';
   const sending = id === 'vault-send-token';
-  const rows = (incoming
+  const liveArx = incoming ? `${live?.publicArx ?? '0'} ARX` : `${Number(live?.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ARX`;
+  const rows = (live?.app
+    ? [['Arxon', 'ARX', liveArx, 'No USD price']]
+    : incoming
     ? [['Arxon', 'ARX', '1,400.00 ARX', '$588.00'], ['Tether', 'USDT', '120.00 USDT', '$120.00'], ['USD Coin', 'USDC', '30.00 USDC', '$30.00']]
     : [['Arxon', 'ARX', '1,000.00 ARX', '$420.00'], ['USD Coin', 'USDC', '30.00 USDC', '$30.00'], ['Tether', 'USDT', '40.00 USDT', '$40.00']]
   ).filter(([name, sym]) => `${name} ${sym}`.toLowerCase().includes(query.trim().toLowerCase()));
@@ -501,15 +528,16 @@ function Unlock({ wrong, locked, clock, typed, setTyped, onUnlock, onFace, leave
   );
 }
 
-function Pending({ id, go }: { id: string; go: Go }) {
+function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
   const title = id === 'vault-pending' ? 'Moving to Vault' : id === 'priv-pending' ? 'Sending privately' : 'Unshielding';
   const to = id === 'vault-pending' ? 'Vault' : id === 'priv-pending' ? 'arx1q8…m2d9' : 'arx1q8x4…t7c2n4p';
+  const shown = `${qty(num(amount || '0'))} ARX`;
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <PhoneStatus />
       <div style={{ marginTop: 120, width: 96, height: 96, borderRadius: 48, border: '6px solid #1c2a44', borderTopColor: '#accafe', animation: 'vaultspin 1s linear infinite' }} />
       <p style={{ margin: '28px 0 0', fontSize: 22, fontWeight: 700 }}>{title}</p>
-      <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{id === 'vault-pending' ? '1,000.00 ARX' : '250.00 ARX'}</p>
+      <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{shown}</p>
       <div style={{ marginTop: 24, width: 354, background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
         <Line label="To" value={to} />
         <Line label="Network fee" value="0.0004 ARX" />
@@ -521,20 +549,22 @@ function Pending({ id, go }: { id: string; go: Go }) {
   );
 }
 
-function Result({ id, go, fundedVault }: { id: string; go: Go; fundedVault: () => void }) {
+function Result({ id, go, fundedVault, amount }: { id: string; go: Go; fundedVault: () => void; amount: string }) {
+  const live = useLiveFrame();
   const failed = id === 'vault-failed';
   const home = id === 'vault-done' || id === 'move-home-done';
   const title = id === 'vault-done' ? 'Moved to Vault' : id === 'move-home-done' ? 'Moved to Home' : id === 'priv-done' ? 'Sent privately' : id === 'unshield-done' ? 'Unshielded' : 'Move failed';
-  const amount = id === 'move-home-done' ? '500.00 ARX' : id === 'priv-done' || id === 'unshield-done' ? '250.00 ARX' : '1,000.00 ARX';
+  const shown = `${qty(num(amount || '0'))} ARX`;
+  const vaultNow = live?.app ? `${Number(live.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ARX` : undefined;
   const rows: [string, string, string?][] = failed
     ? [['Network fee', 'No fee charged'], ['Vault', 'Not moved', '#f25252'], ['Status', 'Not moved', '#f25252']]
     : id === 'vault-done'
-      ? [['Home balance now', '$978.60'], ['Vault balance', '$420.00'], ['Status', 'Confirmed', '#3ddb85']]
+      ? [['Home balance now', live?.app ? 'Vault excluded' : '$978.60'], ['Vault balance', vaultNow ?? '$420.00'], ['Status', 'Confirmed', '#3ddb85']]
       : id === 'move-home-done'
-        ? [['Home balance now', '$1,188.60'], ['Vault balance', '$210.00'], ['Status', 'Confirmed', '#3ddb85']]
+        ? [['Home balance now', live?.app ? live.publicArx : '$1,188.60'], ['Vault balance', vaultNow ?? '$210.00'], ['Status', 'Confirmed', '#3ddb85']]
         : id === 'priv-done'
-          ? [['To', 'arx1q8…m2d9'], ['Network fee', '0.0004 ARX'], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', '$315.00']]
-          : [['To', 'arx1q8x4…t7c2n4p'], ['Network fee', '0.0004 ARX'], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', '$210.00']];
+          ? [['To', 'Shielded note'], ['Network fee', '0.0004 ARX'], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$315.00']]
+          : [['To', live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8x4…t7c2n4p'], ['Network fee', '0.0004 ARX'], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$210.00']];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <PhoneStatus />
@@ -550,7 +580,7 @@ function Result({ id, go, fundedVault }: { id: string; go: Go; fundedVault: () =
         </div>
       )}
       <p style={{ margin: '22px 0 0', fontSize: 22, fontWeight: 700 }}>{title}</p>
-      <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{amount}</p>
+      <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{shown}</p>
       <div style={{ marginTop: 22, width: 354, background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
         {rows.map(([label, value, color]) => <Line key={label} label={label} value={value} color={color} />)}
       </div>
@@ -565,14 +595,18 @@ function Result({ id, go, fundedVault }: { id: string; go: Go; fundedVault: () =
 }
 
 function Accounts({ id, go, made, name, setName, onCreate }: { id: string; go: Go; made: boolean; name: string; setName: (v: string) => void; onCreate: () => void }) {
+  const live = useLiveFrame();
+  const label = live?.app ? live.accountLabel : made ? name || 'Account 02' : 'Account 01';
+  const addr = live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8…m2d9';
+  const total = live?.app ? live.total : '$0.00';
   return (
     <>
       <PhoneStatus />
       <div style={{ position: 'absolute', left: 18, top: 58, display: 'flex', alignItems: 'center', gap: 10 }}>
         <img src="/wallet-figma/home/avatar.png" alt="" width={36} height={36} style={{ borderRadius: 18 }} />
-        <span style={{ fontSize: 16, fontWeight: 600 }}>{made ? 'Account 02' : 'Account 01'}</span>
+        <span style={{ fontSize: 16, fontWeight: 600 }}>{label}</span>
       </div>
-      <p style={{ position: 'absolute', left: 22, top: 126, margin: 0, fontSize: 48, fontWeight: 700 }}>$0.00</p>
+      <p style={{ position: 'absolute', left: 22, top: 126, margin: 0, fontSize: 48, fontWeight: 700 }}>{total}</p>
       <p style={{ position: 'absolute', left: 22, top: 184, margin: 0, color: '#5c5f64', fontSize: 14 }}>+$0.00 Today</p>
       <button type="button" onClick={() => go('defaults')} style={{ position: 'absolute', left: 22, top: 220, border: '1px solid #2a3447', background: '#11161f', color: '#accafe', borderRadius: 20, padding: '7px 12px', fontFamily: font.sans, fontSize: 13 }}>Custom · 2 of 4 hidden</button>
       <div style={{ position: 'absolute', left: 18, top: 280, width: 354, display: 'flex', justifyContent: 'space-between' }}>
@@ -603,8 +637,8 @@ function Accounts({ id, go, made, name, setName, onCreate }: { id: string; go: G
           <button type="button" onClick={() => go('accounts', false)} style={{ ...rowBtn, background: '#1c2025', borderRadius: 14, padding: '0 12px' }}>
             <img src="/wallet-figma/home/arx-mask.png" alt="" width={28} height={28} />
             <span style={{ flex: 1, textAlign: 'left' }}>
-              <span style={{ display: 'block', fontWeight: 600 }}>{made ? name || 'Account 02' : 'Account 01'}</span>
-              <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>arx1q8…m2d9 · $0.00</span>
+              <span style={{ display: 'block', fontWeight: 600 }}>{label}</span>
+              <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>{addr} · {total}</span>
             </span>
             <FigmaImg src="/wallet-figma/buy/check.svg" width={20} height={20} />
           </button>

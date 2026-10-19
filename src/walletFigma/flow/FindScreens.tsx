@@ -204,9 +204,19 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
 }
 
 function Notes({ leave }: { leave: () => void }) {
+  const live = useLiveFrame();
   const [tab, setTab] = useState<'all' | 'activity' | 'security'>('all');
-  const today = TODAY.filter((item) => tab === 'all' || item.tab === tab);
-  const earlier = EARLIER.filter((item) => tab === 'all' || item.tab === tab);
+  const liveToday = live?.app
+    ? live.activity.flatMap((group) => group.items).slice(0, 3).map((row) => ({
+        title: row.title,
+        body: row.sub,
+        time: 'Today',
+        icon: (row.kind === 'received' ? 'down' : row.kind === 'private' ? 'shield' : 'up') as NoteIcon,
+        tab: 'activity' as NoteTab,
+      }))
+    : TODAY;
+  const today = liveToday.filter((item) => tab === 'all' || item.tab === tab);
+  const earlier = live?.app ? [] : EARLIER.filter((item) => tab === 'all' || item.tab === tab);
   return (
     <>
       <button type="button" aria-label="Back" onClick={leave} style={{ ...backBtn, left: 16, top: 52 }}>

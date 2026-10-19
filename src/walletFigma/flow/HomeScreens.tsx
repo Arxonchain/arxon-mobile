@@ -100,6 +100,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   }
 
   function sendTo() {
+    if (live?.app) return 'send-token';
     return vaulted ? 'send-amount-vault' : 'send-token';
   }
 

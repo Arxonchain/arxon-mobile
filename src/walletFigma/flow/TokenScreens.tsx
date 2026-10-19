@@ -105,11 +105,17 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
   const [star, setStar] = useState(false);
   const liveN = liveTok ? Number(liveTok.amount.replace(/[^0-9.]/g, '')) : 0;
   const empty = live?.app ? !(Number.isFinite(liveN) && liveN > 0) : !!frame.empty;
+  const liveRows = live?.app
+    ? live.activity.flatMap((group) => group.items).filter((row) => {
+        const sym = liveTok?.symbol ?? '';
+        return !sym || row.token === sym || row.token === `t${sym}` || (sym === 'ARX' && !row.token);
+      }).slice(0, 2)
+    : undefined;
   const activityTop = frame.card ? 636 : 544;
   const rowsTop = frame.card ? 672 : 580;
   const leave = () => (back ? back() : go(empty ? 'home' : 'home-funded', false));
-  const sendTo = frame.vaultFunds ? 'send-amount-vault' : 'send-token';
-  const swapTo = frame.vaultFunds ? 'swap-vault' : 'swap';
+  const sendTo = live?.app ? 'send-token' : frame.vaultFunds ? 'send-amount-vault' : 'send-token';
+  const swapTo = live?.app ? 'swap' : frame.vaultFunds ? 'swap-vault' : 'swap';
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
@@ -171,21 +177,27 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
       )}
 
       <p style={{ position: 'absolute', left: 18, top: activityTop, margin: 0, fontSize: 18, fontWeight: 700 }}>Recent activity</p>
-      {frame.rows && (
+      {(liveRows ? liveRows.length > 0 : frame.rows) && (
         <button type="button" onClick={() => go('activity')} style={{ position: 'absolute', left: 316, top: activityTop + 5, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: 0 }}>
           See all
         </button>
       )}
-      {frame.empty && (
+      {(live?.app ? !liveRows?.length : frame.empty) && (
         <div style={{ position: 'absolute', left: 18, top: 672, width: 354, paddingTop: 28, textAlign: 'center' }}>
           <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>No transactions yet</p>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#8b9097' }}>{frame.empty}</p>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#8b9097' }}>{frame.empty ?? 'Your activity will show up here.'}</p>
         </div>
       )}
-      {frame.rows?.map((row, index) => (
-        <button key={row.title} type="button" onClick={() => go(row.to)} style={{ ...activity, top: rowsTop + index * 64 }}>
+      {(liveRows ?? frame.rows)?.map((row, index) => {
+        const inbound = 'tone' in row ? row.tone === 'in' : row.kind === 'received';
+        const hash = 'hash' in row ? row.hash : undefined;
+        return (
+        <button key={row.title + row.sub} type="button" onClick={() => {
+          if (hash) void live?.openTx(hash);
+          go(row.to || 'tx');
+        }} style={{ ...activity, top: rowsTop + index * 64 }}>
           <span style={iconWrap}>
-            <FigmaImg src={art(row.tone === 'in' ? 'in.svg' : 'out-private.svg')} width={18} height={18} />
+            <FigmaImg src={art(inbound ? 'in.svg' : 'out-private.svg')} width={18} height={18} />
           </span>
           <span style={{ width: 150, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{row.title}</span>
@@ -193,11 +205,12 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
           </span>
           <span style={{ flex: 1 }} />
           <span style={{ width: 110, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'right' }}>
-            <span style={{ fontSize: 15, fontWeight: 600, color: row.tone === 'in' ? '#3ddc84' : '#fff' }}>{row.amount}</span>
+            <span style={{ fontSize: 15, fontWeight: 600, color: inbound ? '#3ddc84' : '#fff' }}>{row.amount}</span>
             <span style={{ fontSize: 13, color: '#8b9097' }}>{row.fiat}</span>
           </span>
         </button>
-      ))}
+        );
+      })}
 
       <div style={{ position: 'absolute', left: 8, top: 810, width: 375, height: 34, opacity: 0.25, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', width: 134, height: 5, borderRadius: 100, background: '#fff' }} />

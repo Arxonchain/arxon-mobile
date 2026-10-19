@@ -60,6 +60,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [live?.sessionPassword]);
 
   useEffect(() => {
+    if (!app || !live?.app || !live.wcKind) return;
+    if (live.wcKind === 'proposal' && id !== 'dapp') setId('dapp');
+    if (live.wcKind === 'request' && id !== 'dapp-tx') setId('dapp-tx');
+  }, [app, live?.app, live?.wcKind]);
+
+  useEffect(() => {
     if (id !== 'splash') return;
     if (app && live?.startId && live.startId !== 'splash') return;
     const t = window.setTimeout(() => go('gateway', false), 1600);

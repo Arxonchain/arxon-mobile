@@ -85,13 +85,13 @@ export function PrivacyScreens({ id, go, back, password, setPassword }: { id: st
           phrase={facePhrase}
           setPhrase={setFacePhrase}
           vault={faceVault}
-          setVault={(on) => { setFaceVault(on); setVaultLockRequired(on); }}
+          setVault={(on) => { setFaceVault(on); setVaultLockRequired(on); sessionStore.setVaultLock(on); }}
           onBack={() => leave('account')}
           go={go}
         />
       )}
-      {id === 'change-pass' && <Change expected={expected} onSave={setPassword} onBack={() => leave('face-settings')} onDone={() => go('face-settings', false)} />}
-      {id === 'view-verify' && <Verify expected={expected} onBack={() => leave('privacy')} onNext={() => { void live?.ensureWords(); go('view-hidden', false); }} />}
+      {id === 'change-pass' && <Change expected={expected} onSave={setPassword} persist={live?.persistPassword} unlock={live?.unlock} onBack={() => leave('face-settings')} onDone={() => go('face-settings', false)} />}
+      {id === 'view-verify' && <Verify expected={expected} unlock={live?.unlock} unlockBiometric={live?.unlockBiometric} onBack={() => leave('privacy')} onNext={() => { void live?.ensureWords(); go('view-hidden', false); }} />}
       {id === 'view-hidden' && <Hidden onBack={() => leave('view-verify')} onReveal={() => go('view-shown')} />}
       {id === 'view-shown' && <Shown onBack={() => leave('view-hidden')} onHide={() => go('view-hidden', false)} onDone={() => go('privacy', false)} />}
       {id === 'autolock' && <LockSheet value={lock} onClose={() => go('privacy', false)} onPick={(next) => { setLock(next); sessionStore.setAutoLock(next as AutoLock); go('privacy', false); }} />}
@@ -272,7 +272,11 @@ function Face(props: {
             <span style={rowTitle}>Face ID</span>
             <span style={rowSub}>Unlock Arxon with Face ID</span>
           </span>
-          <Toggle on={props.face} onClick={() => props.setFace(!props.face)} />
+          <Toggle on={props.face} onClick={() => {
+            const next = !props.face;
+            props.setFace(next);
+            sessionStore.setBiometrics(next);
+          }} />
         </div>
         <p style={kicker}>REQUIRE FACE ID FOR</p>
         <div style={group}>
@@ -295,7 +299,7 @@ function Face(props: {
   );
 }
 
-function Change({ expected, onSave, onBack, onDone }: { expected: string; onSave: (value: string) => void; onBack: () => void; onDone: () => void }) {
+function Change({ expected, onSave, persist, unlock, onBack, onDone }: { expected: string; onSave: (value: string) => void; persist?: (password: string) => Promise<void>; unlock?: (password: string) => Promise<boolean>; onBack: () => void; onDone: () => void }) {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -325,6 +329,13 @@ function Change({ expected, onSave, onBack, onDone }: { expected: string; onSave
         type="button"
         disabled={!ready}
         onClick={() => {
+          if (unlock) {
+            void unlock(current).then((ok) => {
+              if (!ok) { setError(true); return; }
+              void (persist ? persist(next) : Promise.resolve()).then(() => { onSave(next); onDone(); });
+            });
+            return;
+          }
           if (current !== expected) { setError(true); return; }
           onSave(next);
           onDone();
@@ -337,7 +348,7 @@ function Change({ expected, onSave, onBack, onDone }: { expected: string; onSave
   );
 }
 
-function Verify({ expected, onBack, onNext }: { expected: string; onBack: () => void; onNext: () => void }) {
+function Verify({ expected, unlock, unlockBiometric, onBack, onNext }: { expected: string; unlock?: (password: string) => Promise<boolean>; unlockBiometric?: () => Promise<boolean>; onBack: () => void; onNext: () => void }) {
   const [value, setValue] = useState('');
   const [show, setShow] = useState(false);
   const [error, setError] = useState(false);
@@ -356,8 +367,21 @@ function Verify({ expected, onBack, onNext }: { expected: string; onBack: () => 
           </button>
         </div>
         {error && <p style={{ margin: '8px 6px 0', color: '#f25252', fontSize: 13 }}>Incorrect password.</p>}
-        <button type="button" onClick={() => (value === expected ? onNext() : setError(true))} style={{ ...primary, position: 'relative', left: 0, bottom: 'auto', width: '100%', marginTop: 16, height: 55, borderRadius: 8, background: value ? '#accafe' : '#1c2025', color: value ? '#0c1018' : '#5c5f64' }}>Continue</button>
-        <button type="button" onClick={onNext} style={{ marginTop: 12, width: '100%', height: 52, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+        <button type="button" onClick={() => {
+          if (unlock) {
+            void unlock(value).then((ok) => (ok ? onNext() : setError(true)));
+            return;
+          }
+          if (value === expected) onNext();
+          else setError(true);
+        }} style={{ ...primary, position: 'relative', left: 0, bottom: 'auto', width: '100%', marginTop: 16, height: 55, borderRadius: 8, background: value ? '#accafe' : '#1c2025', color: value ? '#0c1018' : '#5c5f64' }}>Continue</button>
+        <button type="button" onClick={() => {
+          if (unlockBiometric) {
+            void unlockBiometric().then((ok) => (ok ? onNext() : setError(true)));
+            return;
+          }
+          onNext();
+        }} style={{ marginTop: 12, width: '100%', height: 52, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <FigmaImg src="/wallet-figma/unlock/face.svg" width={20} height={20} />
           Unlock with Face ID
         </button>

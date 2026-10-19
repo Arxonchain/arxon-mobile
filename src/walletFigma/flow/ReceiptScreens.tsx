@@ -23,6 +23,10 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const label = made ? `FOR ${who.toUpperCase()}${note.trim() ? ` · ${note.trim().toUpperCase()}` : ''}` : 'FOR LAWYER · CASE 2291';
 
   const liveCode = live?.app && live.codes[0]?.code ? live.codes[0].code : CODE;
+  const liveInspect = live?.app ? live.inspect : null;
+  const shareText = liveInspect
+    ? `Private receipt · ${liveInspect.amount} · ${liveInspect.hash}`
+    : 'Private receipt · 25.00 ARX · Oct 7, 2026 · 4:12:36 PM';
 
   async function copyCode() {
     try {
@@ -58,7 +62,7 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
         <FigmaImg src={art('back.svg')} width={20} height={20} />
       </button>
       <HomeBar />
-      {id === 'receipt' && <Receipt go={go} onShare={() => share('Private receipt · 25.00 ARX · Oct 7, 2026 · 4:12:36 PM')} />}
+      {id === 'receipt' && <Receipt go={go} onShare={() => share(shareText)} inspect={liveInspect} />}
       {id === 'code-create' && (
         <Create who={who} setWho={setWho} note={note} setNote={setNote} onGenerate={() => {
           if (live?.app) live.makeCode(who, note);
@@ -66,14 +70,16 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
           go('code-ready');
         }} />
       )}
-      {id === 'code-ready' && <Ready label={label} copied={copied} onCopy={copyCode} onShare={() => share(liveCode)} />}
-      {id === 'code-log' && <Log go={go} />}
+      {id === 'code-ready' && <Ready label={label} copied={copied} onCopy={copyCode} onShare={() => share(liveCode)} code={liveCode} created={live?.codes[0]?.at} />}
+      {id === 'code-log' && <Log go={go} codes={live?.app ? live.codes : null} />}
     </div>
   );
 }
 
-function Receipt({ go, onShare }: { go: Go; onShare: () => void }) {
-  const payment = [
+function Receipt({ go, onShare, inspect }: { go: Go; onShare: () => void; inspect: { hash: string; amount: string; rows: [string, string][]; status: string } | null }) {
+  const payment = inspect
+    ? inspect.rows.slice(0, 6).map(([label, value], index) => [label, value, index === inspect.rows.length - 1 ? '#accafe' : '#fff'])
+    : [
     ['Sender', 'arx1q8x4…t7c2n4p', '#fff'],
     ['Receiver', 'arx1q7p2…m2d9', '#fff'],
     ['Amount', '25.00 ARX', '#fff'],
@@ -82,13 +88,16 @@ function Receipt({ go, onShare }: { go: Go; onShare: () => void }) {
     ['Transaction hash', '0x7f3a…c91e', '#fff'],
     ['Hidden from public', 'Amount, balance', '#accafe'],
   ];
+  const beforeAfter = inspect
+    ? [['Hash', `${inspect.hash.slice(0, 10)}…${inspect.hash.slice(-4)}`, '#fff'], ['Status', inspect.status, '#fff']]
+    : [['Before', '2,425.0000 ARX', '#fff'], ['After', '2,399.9996 ARX', '#fff']];
   return (
     <>
       <h1 style={title}>Private receipt</h1>
       <p style={sub}>Proof of this payment, stored permanently on the Arxon chain.</p>
       <Card top={210} rows={payment} />
-      <p style={{ ...eyebrow, top: 470 }}>YOUR BALANCE AT THAT MOMENT</p>
-      <Card top={492} rows={[['Before', '2,425.0000 ARX', '#fff'], ['After', '2,399.9996 ARX', '#fff']]} />
+      <p style={{ ...eyebrow, top: 470 }}>{inspect ? 'ON THIS DEVICE' : 'YOUR BALANCE AT THAT MOMENT'}</p>
+      <Card top={492} rows={beforeAfter} />
       <p style={{ position: 'absolute', left: 30, top: 586, width: 330, margin: 0, fontSize: 12, color: '#8b9097', lineHeight: 1.25 }}>Only you can see your balance. The other person sees theirs on their own receipt.</p>
       <button type="button" onClick={() => go('code-create')} style={{ ...fillBtn, top: 649 }}>Generate disclosure code</button>
       <button type="button" onClick={onShare} style={{ ...lineBtn, top: 714 }}>Share receipt</button>
@@ -124,17 +133,17 @@ function Create({ who, setWho, note, setNote, onGenerate }: { who: string; setWh
   );
 }
 
-function Ready({ label, copied, onCopy, onShare }: { label: string; copied: boolean; onCopy: () => void; onShare: () => void }) {
+function Ready({ label, copied, onCopy, onShare, code, created }: { label: string; copied: boolean; onCopy: () => void; onShare: () => void; code: string; created?: number }) {
   return (
     <>
       <h1 style={title}>Code ready</h1>
       <p style={sub}>Share it only with the person you chose. It works one time.</p>
       <div style={{ position: 'absolute', left: 18, top: 210, width: 354, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 16, padding: '24px 16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#8b9097' }}>{label}</p>
-        <p style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: 1.2 }}>{CODE}</p>
+        <p style={{ margin: 0, fontSize: 22, fontWeight: 700, letterSpacing: 1.2 }}>{code}</p>
         <span style={{ background: '#1c2025', borderRadius: 12, padding: '5px 10px', fontSize: 12, fontWeight: 600, color: '#accafe' }}>Single use · Not used yet</span>
       </div>
-      <Card top={368} rows={[['Created', 'Oct 9, 2026 · 2:05 PM', '#fff'], ['Works for', 'One use', '#fff'], ['Logged on-chain', 'Yes', '#fff']]} />
+      <Card top={368} rows={[['Created', created ? new Date(created).toLocaleString() : 'Oct 9, 2026 · 2:05 PM', '#fff'], ['Works for', 'One use', '#fff'], ['Logged on-chain', created ? 'Saved on this device' : 'Yes', '#fff']]} />
       <div style={noteBox(498)}>Need to share with someone else? Generate a separate code for each person.</div>
       <button type="button" onClick={onCopy} style={{ ...fillBtn, top: 649 }}>{copied ? 'Copied' : 'Copy code'}</button>
       <button type="button" onClick={onShare} style={{ ...lineBtn, top: 714 }}>Share</button>
@@ -142,8 +151,17 @@ function Ready({ label, copied, onCopy, onShare }: { label: string; copied: bool
   );
 }
 
-function Log({ go }: { go: Go }) {
-  const rows: [string, string, string, string][] = [
+function Log({ go, codes }: { go: Go; codes: { code: string; who: string; note: string; at: number; used: boolean }[] | null }) {
+  const rows: [string, string, string, string][] = codes
+    ? (codes.length
+      ? codes.slice(0, 3).map((row) => [
+          `${row.who}${row.note ? ` · ${row.note}` : ''}`,
+          row.used ? 'Used and burned' : 'Not used',
+          row.used ? '#8b9097' : '#accafe',
+          `${row.code.slice(0, 8)}…${row.code.slice(-4)} · ${new Date(row.at).toLocaleDateString()}`,
+        ])
+      : [['No codes yet', 'Generate one', '#8b9097', 'Codes for this payment are saved on this device']])
+    : [
     ['Lawyer · Case 2291', 'Not used', '#accafe', 'ARX-7K2M…LX4P · Created Oct 9, 2026'],
     ['Judge · Court order', 'Used and burned', '#8b9097', 'ARX-4D8N…Q2WZ · Used Oct 8, 10:41 AM'],
     ['Regulator', 'Used and burned', '#8b9097', 'ARX-9H3F…T6BC · Used Oct 3, 9:15 AM'],
