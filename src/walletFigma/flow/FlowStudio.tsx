@@ -28,7 +28,7 @@ const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit'
 const CHECKS = [3, 7, 12];
 
 export default function FlowStudio({ app = false }: { app?: boolean }) {
-  const [id, setId] = useState(app ? 'gateway' : 'splash');
+  const [id, setId] = useState('splash');
   const [stack, setStack] = useState<string[]>([]);
   const [hidden, setHidden] = useState(false);
   const [backup, setBackup] = useState<'drive' | 'manual'>('drive');
