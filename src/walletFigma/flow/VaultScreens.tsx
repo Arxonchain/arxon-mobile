@@ -377,9 +377,16 @@ function Empty({ id, go }: { id: string; go: Go }) {
 }
 
 function VaultHome({ many, hidden, onEye, go, sheet, onPrivate, onPublic }: { many: boolean; hidden: boolean; onEye: () => void; go: Go; sheet: boolean; onPrivate: () => void; onPublic: () => void }) {
-  const rows = many
+  const live = useLiveFrame();
+  const liveArx = live?.app ? `${Number(live.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ARX` : '1,000.00 ARX';
+  const liveFiat = live?.app ? 'No USD price' : '$420.00';
+  const rows = live?.app
+    ? [['Arxon', liveArx, liveFiat, 'ARX']]
+    : many
     ? [['Arxon', '1,000.00 ARX', '$420.00', 'ARX'], ['USD Coin', '30.00 USDC', '$30.00', 'USDC'], ['Tether', '40.00 USDT', '$40.00', 'USDT']]
     : [['Arxon', '1,000.00 ARX', '$420.00', 'ARX']];
+  const total = live?.app ? liveArx : many ? '$490.00' : '$420.00';
+  const sub = live?.app ? 'Arxon Testnet' : many ? '3 tokens' : '1,000.00 ARX';
   return (
     <>
       <PhoneStatus />
@@ -388,8 +395,8 @@ function VaultHome({ many, hidden, onEye, go, sheet, onPrivate, onPublic }: { ma
         <button type="button" aria-label={hidden ? 'Show balance' : 'Hide balance'} onClick={onEye} style={iconBtn}><FigmaImg src={hidden ? '/wallet-figma/home/eye-off.svg' : '/wallet-figma/home/eye.svg'} width={22} height={22} /></button>
       </div>
       <div style={{ position: 'absolute', left: 18, top: 112 }}>
-        <p style={{ margin: 0, fontSize: 40, fontWeight: 700 }}>{hidden ? '••••••' : many ? '$490.00' : '$420.00'}</p>
-        <p style={{ margin: '6px 0 0', color: '#8b9097', fontSize: 14 }}>{hidden ? '••••' : many ? '3 tokens' : '1,000.00 ARX'}</p>
+        <p style={{ margin: 0, fontSize: 40, fontWeight: 700 }}>{hidden ? '••••••' : total}</p>
+        <p style={{ margin: '6px 0 0', color: '#8b9097', fontSize: 14 }}>{hidden ? '••••' : sub}</p>
       </div>
       <div style={{ position: 'absolute', left: 18, top: 196, width: 354, display: 'flex', gap: 10 }}>
         <Mini label="To Vault" onClick={() => go('vault-pick-in')} />
