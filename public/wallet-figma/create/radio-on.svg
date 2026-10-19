@@ -1,0 +1,11 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="radio" clip-path="url(#clip0_0_12)">
+<path id="Radio/on" d="M21 11C21 16.5228 16.5228 21 11 21C5.47715 21 1 16.5228 1 11C1 5.47715 5.47715 1 11 1C16.5228 1 21 5.47715 21 11Z" stroke-width="2" stroke="#ACCAFE"/>
+<circle id="Ellipse" cx="11" cy="11" r="5" fill="#ACCAFE"/>
+</g>
+<defs>
+<clipPath id="clip0_0_12">
+<rect width="22" height="22" fill="white"/>
+</clipPath>
+</defs>
+</svg>

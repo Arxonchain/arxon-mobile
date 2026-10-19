@@ -54,7 +54,8 @@ import { GAMES_MAINTENANCE_MODE } from "@/lib/gamesMaintenance";
 import { APP_MAINTENANCE_MODE } from "@/lib/appMaintenance";
 import AppMaintenanceScreen from "@/components/system/AppMaintenanceScreen";
 import { ChainWalletProvider, useChainWallet } from "@/chainWallet/ChainWalletContext";
-import WalletOnboarding from "@/components/wallet/WalletOnboarding";
+import { OfficialSplash } from "@/walletFigma/flow/WelcomeScreens";
+import ModeShell from "@/walletFigma/flow/ModeShell";
 
 function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
   const { code = '' } = useParams<{ code: string }>();
@@ -106,6 +107,10 @@ const MobileArena = lazy(() => import("@/components/mobile/MobileArena"));
 const MobileNexus = lazy(() => import("@/components/mobile/MobileNexus"));
 const MobileProfile = lazy(() => import("@/components/mobile/MobileProfile"));
 const WalletHome = lazy(() => import("@/components/wallet/WalletHome"));
+const FigmaHome = lazy(() => import("@/walletFigma/HomeScreen"));
+const FigmaVault = lazy(() => import("@/walletFigma/VaultScreen"));
+const FigmaAccount = lazy(() => import("@/walletFigma/AccountScreen"));
+const FigmaPrivacy = lazy(() => import("@/walletFigma/DefaultPrivacy"));
 const WalletActivity = lazy(() => import("@/components/wallet/WalletActivity"));
 const WalletExplore = lazy(() => import("@/components/wallet/WalletExplore"));
 const WalletMarket = lazy(() => import("@/components/wallet/WalletMarket"));
@@ -166,6 +171,14 @@ const queryClient = new QueryClient({
 
 const isNative = Capacitor.isNativePlatform();
 const walletShell = isNative || import.meta.env.VITE_WALLET_SHELL === 'true';
+/**
+ * Test APK (bundled on localhost) and the local preview.
+ * Play Store OTA is served from arxon-mobile.pages.dev and keeps MobileSplash.
+ */
+const walletTestSplash =
+  walletShell &&
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
 const Spinner = () => (
   <div style={{ minHeight: '100vh', background: errorUi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -266,11 +279,14 @@ function DevPublicRoutes() {
 function AppRoutes() {
   const location = useLocation();
   const { user, loading } = useAuth();
-  const chain = useChainWallet();
-  const [splashDone, setSplashDone] = useState(!isNative);
+  const [splashDone, setSplashDone] = useState(!isNative && !walletTestSplash);
 
   if (isDevPublicPath(location.pathname)) {
     return <DevPublicRoutes />;
+  }
+
+  if (!splashDone && walletTestSplash) {
+    return <OfficialSplash ready={!loading} onFinish={() => setSplashDone(true)} />;
   }
 
   if (isNative && !splashDone) {
@@ -281,7 +297,7 @@ function AppRoutes() {
       </>
     );
   }
-    if (loading) {
+    if (loading && !walletShell) {
       return (
         <>
           <Spinner />
@@ -289,10 +305,8 @@ function AppRoutes() {
         </>
       );
     }
-    if (walletShell && !chain.address) return <WalletOnboarding />;
-    if (walletShell && !chain.ready) return <Spinner />;
 
-  return (
+  const shell = (
     <>
       <PushNavListener />
       <AppDeepLinkListener />
@@ -402,7 +416,10 @@ function AppRoutes() {
 
         {walletShell ? (
           <>
-            <Route path="/" element={<Navigate to="/balances" replace />} />
+            <Route path="/" element={<FigmaHome />} />
+            <Route path="/vault" element={<FigmaVault />} />
+            <Route path="/account" element={<FigmaAccount />} />
+            <Route path="/privacy-defaults" element={<FigmaPrivacy />} />
             <Route path="/activity" element={<WalletActivity />} />
             <Route path="/explore" element={<WalletExplore />} />
             <Route path="/market" element={<WalletMarket />} />
@@ -565,6 +582,8 @@ function AppRoutes() {
       {walletShell && <MobileBottomNavV2 />}
     </>
   );
+  if (walletShell) return <ModeShell mining={shell} />;
+  return shell;
 }
 
 function RouterShell({ children }: { children: React.ReactNode }) {
@@ -625,7 +644,7 @@ function App() {
                   <DeferredWc>
                     <AppTourProvider>
                       <MobileNavProvider>
-                        <AppRoutes />
+                <AppRoutes />
                       </MobileNavProvider>
                     </AppTourProvider>
                   </DeferredWc>

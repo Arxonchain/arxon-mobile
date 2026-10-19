@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="58" height="58" viewBox="0 0 58 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="circle">
+<rect width="58" height="58" rx="29" fill="#1C2025"/>
+<circle id="dot" cx="18" cy="29" r="2.5" fill="white"/>
+<circle id="dot_2" cx="23" cy="29" r="2.5" fill="white"/>
+<circle id="dot_3" cx="28" cy="29" r="2.5" fill="white"/>
+<path id="New badge" d="M41.5 29C41.5 31.7614 39.2614 34 36.5 34C33.7386 34 31.5 31.7614 31.5 29C31.5 26.2386 33.7386 24 36.5 24C39.2614 24 41.5 26.2386 41.5 29Z" fill="#ABC9FF" stroke-width="2" stroke="#050505"/>
+</g>
+</svg>

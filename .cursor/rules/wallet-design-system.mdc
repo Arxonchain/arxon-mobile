@@ -1,0 +1,29 @@
+---
+description: Arxon wallet style guide — tokens, type, components, and product rules from the Figma design system (v1.0, 17 Oct 2026).
+globs: src/walletFigma/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Arxon wallet design system
+
+Dark only. Mobile frame 390×844. Plus Jakarta Sans. Screens use Color variables, never raw hex or Primitives. No shadows: depth is a lighter surface plus a 1px border.
+
+## Colour
+
+Page `#050505`, card `#1C2126`, raised `#293342`, border `#29333D`, secondary text `#8C8F99`, text `#FFFFFF`, accent `#ACCAFE`, on-accent `#0C1018`. Success `#3DDB85`, warning `#FABF33`, danger `#F25252`. Subtle fills are those hues at 15% (accent subtle 16%).
+
+## Type (do not invent sizes)
+
+Display Bold 38 amounts. Heading Large Bold 26 screen titles. Heading Medium SemiBold 20 sheets. Title SemiBold 16 cards. Button SemiBold 16. Body Regular 15. Body Small Regular 13 helper. Body Small Strong SemiBold 13 row labels. Caption Regular 12 amounts and timestamps.
+
+## Layout
+
+Space 4, 8, 12, 16, 24. Radius 8 buttons, 12 inputs, 16 cards, full chips. Side margin 18. Content width 354. Top bar 44. Home indicator 34. Tab item 75×78. Button 55. Input 56. List row 64. Details row 50. Card padding 16.
+
+## Components
+
+Primary button is accent fill with on-accent text. Outline is quiet. Destructive is danger. Disabled lowers emphasis. Chip 34 full radius; selected gets an accent border and tint. Status pill 28 with matching dot and text (Mining, Paused, Stopped). Toggle row 64, copy left, switch right, on uses accent. Note card explains; warning uses an amber border and title. Token row shows icon, name, amount, dollars, and 24h change (green up, red down, secondary when flat). Details row: label left in secondary, value right, state colours the value. Input border turns danger on error. Home actions (Send, Receive, Swap, More) and the privacy pill are not components yet.
+
+## Product rules
+
+Privacy is a toggle. Never write “private by default”, a shielded Home balance, or “130+ networks”. Names are Home, Vault, Move to Vault, Move to Home. Home, token detail, Send, and Swap show only the Home balance. One Vault per wallet, shared by every account. v1 Vault tokens are ARX, USDT, and USDC on Arxon. BTC and ETH cannot enter. Vault sends leave the Vault. Swap requires a move to Home first. Wallet-ready copy must not claim a backup when backup was skipped. Opening the Vault asks for Face ID or the passcode; that setting lives in Privacy. Five wrong passwords lock the Vault, first for five minutes, then ten, twenty, and thirty minutes at most. Home stays usable. The Move to Home fee comes out of the amount. A failed move charges no fee. Mining dashboard figures are placeholders. Green is confirmed, amber is pending, red is an error, and colour never stands alone.

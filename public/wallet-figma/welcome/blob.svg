@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1147" height="1094" viewBox="0 0 1147 1094" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="blob-shine-1" filter="url(#filter0_f_0_17)">
+<path d="M567.164 388.379C624.789 386.781 683.751 294.919 726.684 333.419C771.846 373.918 683.673 451.453 702.007 509.301C720.091 566.358 817.532 576.587 822.654 636.225C827.502 692.668 780.742 764.507 724.372 769.693C659.109 775.696 624.125 692.166 567.164 659.726C547.165 648.337 524.737 646.04 501.926 643.009C445.003 635.446 372.186 672.148 334.475 628.811C302.084 591.588 353.943 535.665 367.126 488.102C381.12 437.612 367.079 365.456 413.942 342.094C462.893 317.691 512.497 389.895 567.164 388.379Z" fill-rule="evenodd" clip-rule="evenodd" fill="#3F7CE7"/>
+</g>
+<defs>
+<filter id="filter0_f_0_17" x="3.11435e-07" y="1.07024e-07" width="1147" height="1094" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="162" result="effect1_foregroundBlur_0_17"/>
+</filter>
+</defs>
+</svg>

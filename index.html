@@ -11,7 +11,7 @@
     <link rel="apple-touch-icon" href="/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Readex+Pro:wght@400;500&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -224,6 +224,30 @@
           errBox.style.display = "block";
         }
 
+        var host = location.hostname;
+        var path = (location.pathname || "/").replace(/\/$/, "") || "/";
+        var localTest = host === "localhost" || host === "127.0.0.1" || path === "/flow" || path.indexOf("/flow/") === 0;
+        if (boot && localTest) {
+          var bits = ["arxon-boot-logo", "arxon-boot-spinner", "arxon-boot-title", "arxon-boot-slow"];
+          bits.forEach(function (id) {
+            var el = document.getElementById(id);
+            if (el) el.style.display = "none";
+          });
+          boot.style.background = "#050505";
+          boot.style.justifyContent = "center";
+          var mark = document.createElement("img");
+          mark.alt = "Arxon";
+          mark.src = "/wallet-figma/wordmark.png";
+          mark.width = 1280;
+          mark.height = 500;
+          mark.style.width = "236px";
+          mark.style.height = "auto";
+          mark.style.maxWidth = "none";
+          mark.style.objectFit = "contain";
+          mark.style.position = "relative";
+          boot.appendChild(mark);
+        }
+
         window.__ARXON_DISMISS_BOOT__ = function () {
           if (!boot) return;
           boot.classList.add("hidden");
@@ -254,6 +278,13 @@
         );
       })();
     </script>
-    <script type="module" src="/src/main.tsx"></script>
+    <script type="module">
+      const path = (location.pathname || '/').replace(/\/$/, '') || '/';
+      if (path === '/flow' || path.indexOf('/flow/') === 0) {
+        import('/src/flow-entry.tsx');
+      } else {
+        import('/src/main.tsx');
+      }
+    </script>
   </body>
 </html>

@@ -1,0 +1,49 @@
+---
+description: Section 22 button maps for the Arxon wallet. One row is one prototype link. Back and dimmed sheet areas go back.
+globs: src/walletFigma/**/*.{ts,tsx}
+alwaysApply: false
+---
+
+# Wallet button maps
+
+Frames are numbered `flow.NN`. Back is prototype BACK. Sheets close on the dimmed area or a choice.
+
+## Home first-timer (start 08.01)
+
+Account switcher opens accounts, then Add account. Search queries tokens, addresses, and Arxon names. Bell opens notifications. The eye hides the balance, the 24h change, and every token amount; tap again to return. The privacy pill opens Default privacy. The four flags are hideSender, hideReceiver, hideAmount, hideBalance. The pill reads `Custom · n of 4 hidden`.
+
+Send selects ARX, BTC, or ETH and enters Send. Receive uses the active account address, with copy and share. Swap uses the default pair. More opens sheet 08.04: Buy and Mine. Buy continues Amount, Review, Status. Mine opens Mining entry 21.01. Tap outside to close.
+
+Get started: Fund your wallet only while the total is 0 and opens Receive. Privacy controls hide after defaults are first changed. Face ID hides once biometrics are on. Claim shows while unclaimed ARX-P is above 0 and hides once claimed.
+
+Manage opens token visibility, then Add custom token. An empty Arxon row offers Fund your wallet, then Buy. Empty BTC and ETH rows offer Receive for that asset.
+
+Tabs: Home stays. Vault opens 18.02, or 18.01 when nothing is in the Vault, or 18.08 when Home is $0. The Vault tab replaces the old Wallet tab. Explore is 23.01. Its label replaces Convert. History opens Activity. Account opens Account.
+
+## Wallet flows
+
+Payment privacy starts from the saved defaults and applies to this payment only. Change my defaults opens Default privacy. Save defaults writes them on the device and goes back.
+
+A private receipt shows sender, receiver, amount, time, block, and hash. Balances before and after stay on the device. A disclosure code is single-use and logged. Copy has no in-app share target. Who is this for is Lawyer, Judge, Regulator, or Other, plus an optional note.
+
+Claim is one-time and cannot be undone. Success returns to Home funded, claims left at 0, and the ARX balance updates.
+
+Swap outputs the selected token, amounts, rate, slippage, privacy, network fee, and total. Cancel returns to Swap. Done returns to Home funded.
+
+Activity filter types are All, Sent, Received, Swaps, Private. Tokens are All, ARX, BTC, ETH, USDT, USDC. Dates are Any time, Last 7 days, Last 30 days. A funded token row opens that token’s transaction details. USD Coin shows Home funds only. In Vault opens the Vault. See all opens Activity.
+
+Auto-lock choices are immediately, 1 minute, 5 minutes, 15 minutes, and 1 hour. Change password needs the current password, a new password, and a match, then returns to Face ID and password. A report sends category, description, app version, and device, never keys or balances. Add network saves a custom RPC and returns to Select network.
+
+## Vault
+
+Only ARX, USDT, and USDC can enter. Funds in the Vault are excluded from Home and are sent from the Vault. Move to Home has no review step. The selected Vault tab is a white icon and label.
+
+Move in uses Home funds and goes to the amount, skipping the picker when Home holds one token. Max is the Home amount minus the network fee. Review stays disabled until the amount is above 0. Confirm shows pending, then success. Home falls by the amount and the Vault rises by it. Cancel, Done, and Back to Vault return to 18.02. Back to Home opens Home after the move, or Home funded when the Vault is empty.
+
+Move to Home skips review. The fee comes out of the amount. Done returns to the Vault. Back to Home shows the new Home total.
+
+If Home has no funds, Add funds opens Buy. An amount over the available balance turns red and disables Review. A failed move leaves both balances unchanged and charges no fee. History from the Vault lists moves under All, and those amounts are not coloured. The In Vault pill opens the Vault. Swap from a token that is only in the Vault opens Move to Home, and the available amount is the Home balance.
+
+Send with one token opens the two choices. Several tokens open a picker first. Private transfer hides sender, recipient, and amount. Unshield to a public address leaves recipient and amount visible. Both charge a fee. Done updates only the Vault.
+
+Opening the Vault uses Face ID or the password when that setting is on. A wrong password is shown, and the fifth wrong password locks the Vault. The lock is 5 minutes, then 10, 20, and 30 minutes at most. Use Face ID returns to the unlock screen. Home stays usable. Several tokens list the Vault balances in dollars, highest first. Clearing a filter with no results returns to Activity.

@@ -1,0 +1,12 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="1317.24" height="1312.4" viewBox="0 0 1317.24 1312.4" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="blob-shine-1" filter="url(#filter0_f_0_22)">
+<path d="M650.123 419.904C727.407 417.523 806.485 280.679 864.065 338.031C924.635 398.363 806.381 513.865 830.97 600.039C855.223 685.035 985.907 700.274 992.777 789.116C999.279 873.197 936.566 980.215 860.965 987.939C773.436 996.882 726.517 872.449 650.123 824.125C623.301 807.158 593.221 803.736 562.628 799.221C486.285 787.955 388.626 842.628 338.049 778.071C294.607 722.621 364.159 639.313 381.839 568.459C400.607 493.245 381.776 385.756 444.627 350.954C510.279 314.601 576.805 422.163 650.123 419.904Z" fill-rule="evenodd" clip-rule="evenodd" fill="#3F7CE7"/>
+</g>
+<defs>
+<filter id="filter0_f_0_22" x="2.94862e-07" y="7.83518e-07" width="1317.24" height="1312.4" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+<feFlood flood-opacity="0" result="BackgroundImageFix"/>
+<feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape"/>
+<feGaussianBlur stdDeviation="162" result="effect1_foregroundBlur_0_22"/>
+</filter>
+</defs>
+</svg>
