@@ -27,7 +27,7 @@ function Phone({ children, onClick }: { children: ReactNode; onClick?: () => voi
       style={{
         position: 'relative',
         width: 390,
-        height: 844,
+        height: live?.app ? '100%' : 844,
         background: '#050505',
         overflow: 'hidden',
         color: '#e7e7e8',
@@ -65,7 +65,7 @@ function Splash({ onNext }: { onNext: () => void }) {
   );
 }
 
-/** App splash. Wordmark only — the phone status bar stays in the /flow frames. */
+/** App splash. Same blue-gradient 01.01 screen, without the fake phone status bar. */
 export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; onFinish: () => void }) {
   const finishRef = useRef(onFinish);
   finishRef.current = onFinish;
@@ -84,18 +84,26 @@ export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; on
     <button
       type="button"
       onClick={() => ready && onFinish()}
-      style={{
-        minHeight: '100vh',
-        width: '100%',
-        background: '#050505',
-        border: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 0,
-      }}
+      style={{ minHeight: '100vh', width: '100%', background: '#050505', border: 'none', padding: 0, display: 'flex', justifyContent: 'center' }}
     >
-      <img src="/wallet-figma/wordmark.png" alt="Arxon" width={1280} height={500} style={{ width: 236, height: 'auto' }} />
+      <div style={{ position: 'relative', width: 390, height: 844, overflow: 'hidden' }}>
+        <Glow />
+        <img
+          src="/wallet-figma/wordmark.png"
+          alt="Arxon"
+          width={1280}
+          height={500}
+          style={{
+            position: 'absolute',
+            left: (390 - WORDMARK_W) / 2,
+            top: 383 + (78 - WORDMARK_H) / 2,
+            width: WORDMARK_W,
+            height: WORDMARK_H,
+            maxWidth: 'none',
+            objectFit: 'contain',
+          }}
+        />
+      </div>
     </button>
   );
 }

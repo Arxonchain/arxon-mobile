@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { font } from '@/walletFigma/tokens';
 import FlowStudio from './FlowStudio';
@@ -30,8 +30,14 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
-    navigate(next === 'mining' ? '/mine' : '/');
+    if (next === 'mining') navigate('/mine');
   }
+
+  useEffect(() => {
+    const open = () => choose('mining');
+    window.addEventListener('arxon-open-mining', open);
+    return () => window.removeEventListener('arxon-open-mining', open);
+  }, []);
 
   return (
     <AppModeContext.Provider value={mode}>
@@ -51,15 +57,12 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           <Toggle on={mode === 'wallet'} onClick={() => choose('wallet')}>Wallet</Toggle>
           <Toggle on={mode === 'mining'} onClick={() => choose('mining')}>Mining</Toggle>
         </div>
-        {mode === 'wallet' ? (
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
-            <LiveFrameProvider>
-              <FlowStudio app />
-            </LiveFrameProvider>
-          </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
-        )}
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: mode === 'wallet' ? 'flex' : 'none', flexDirection: 'column' }}>
+          <LiveFrameProvider>
+            <FlowStudio app />
+          </LiveFrameProvider>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none' }}>{children}</div>
       </div>
     </AppModeContext.Provider>
   );

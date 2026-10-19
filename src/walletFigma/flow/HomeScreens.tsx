@@ -102,12 +102,14 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   }
 
   return (
-    <div style={{ position: 'relative', width: 390, height: liveRows && empty ? 1040 : 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+    <div style={{ position: 'relative', width: 390, height: live?.app ? '100%' : liveRows && empty ? 1040 : 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.home-cards::-webkit-scrollbar{display:none}.home-cards{scrollbar-width:none}`}</style>
+      {live?.app ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
         <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
       </div>
+      )}
 
       <header style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button type="button" onClick={() => go('accounts')} style={plain}>
@@ -167,7 +169,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
         <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354 }}>
+      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, bottom: live?.app ? 80 : undefined, overflowY: live?.app ? 'auto' : undefined }}>
         {tokens.map((token) => (
           <button key={token.name} type="button" onClick={() => go(token.to)} style={tokenRow}>
             <TokenIcon kind={token.icon} />

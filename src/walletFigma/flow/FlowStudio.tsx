@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { markBootOk } from '@/lib/bootState';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font, ink } from '@/walletFigma/tokens';
 import { SCREENS, SCREEN_MAP, type Scr, type TabId } from './catalog';
@@ -45,8 +46,13 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const [net, setNet] = useState<WalletNet>('mainnet');
   const stageRef = useRef<HTMLDivElement>(null);
   const [fit, setFit] = useState(1);
+  const [appH, setAppH] = useState(844);
 
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
+
+  useEffect(() => {
+    if (app) markBootOk();
+  }, [app]);
 
   useEffect(() => {
     if (id !== 'splash') return;
@@ -74,7 +80,13 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!app) return;
     const stage = stageRef.current;
     if (!stage) return;
-    const measure = () => setAppScale(Math.max(stage.clientWidth, 1) / 390);
+    const measure = () => {
+      const w = Math.max(stage.clientWidth, 1);
+      const h = Math.max(stage.clientHeight, 1);
+      const scale = w / 390;
+      setAppScale(scale);
+      setAppH(Math.max(844, h / scale));
+    };
     measure();
     const watcher = new ResizeObserver(measure);
     watcher.observe(stage);
@@ -104,6 +116,10 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [app, id]);
 
   function go(next: string, remember = true) {
+    if (next === 'mine-entry' && (app || live?.app)) {
+      window.dispatchEvent(new Event('arxon-open-mining'));
+      return;
+    }
     if (live?.app) {
       if (next === 'testnet') void live.setNetwork('arxon');
       else if (next === 'home' || next.startsWith('home-') || next === 'more') void live.setNetwork('ethereum');
@@ -146,6 +162,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const exploreDesigned = isExploreScreen(id);
   const unlockDesigned = id === 'unlock' || id === 'unlock-wrong' || id === 'dapp' || id === 'dapp-tx' || id === 'connected';
   const designed = homeDesigned || tokenDesigned || sendDesigned || receiveDesigned || swapDesigned || buyDesigned || activityDesigned || receiptDesigned || claimDesigned || vaultDesigned || accountDesigned || privacyDesigned || exploreDesigned || unlockDesigned;
+  const fillPhone = app && (homeDesigned || vaultDesigned || activityDesigned || accountDesigned || exploreDesigned);
   const parent = !designed && screen.parent ? SCREEN_MAP[screen.parent] : null;
   const shown = parent && (screen.kind === 'overlay' || screen.overlay) ? parent : screen;
   const overlay = parent && (screen.kind === 'overlay' || screen.overlay) ? screen : null;
@@ -161,7 +178,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, []);
 
   return (
-    <div style={{ height: app ? 'auto' : '100vh', minHeight: app ? '100%' : undefined, overflow: app ? 'visible' : 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
+    <div style={{ height: app ? '100%' : '100vh', overflow: 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
       {!app && <aside style={{ width: menu ? 320 : 0, height: '100vh', flexShrink: 0, overflow: 'auto', borderRight: menu ? '1px solid #1c2025' : 'none', background: '#0c0e14' }}>
         <div style={{ padding: 16, position: 'sticky', top: 0, background: '#0c0e14' }}>
           <strong>Every screen</strong>
@@ -201,17 +218,23 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           </div>
         ))}
       </aside>}
-      <main style={{ flex: app ? 'none' : 1, width: app ? '100%' : undefined, minWidth: 0, height: app ? 'auto' : '100vh', overflow: app ? 'visible' : 'hidden', display: 'flex', flexDirection: 'column', padding: app ? 0 : '12px 16px 16px' }}>
+      <main style={{ flex: 1, width: app ? '100%' : undefined, minWidth: 0, height: app ? '100%' : '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: app ? 0 : '12px 16px 16px' }}>
         {!app && (
         <div style={{ width: '100%', maxWidth: 390, alignSelf: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
           <button type="button" onClick={() => setMenu((v) => !v)} style={linkBtn}>{menu ? 'Hide list' : 'All screens'}</button>
           <span style={{ color: ink.secondary, fontSize: 12 }}>{screen.name}</span>
         </div>
         )}
-        <div ref={stageRef} style={{ flex: app ? 'none' : 1, width: '100%', minHeight: app ? undefined : 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: fillPhone ? 'stretch' : 'center', overflow: 'hidden' }}>
+        {app && (
+          <style>{`
+            .wallet-app-stage img[src*="status.svg"]{display:none!important}
+            .wallet-app-fill > div{height:100%!important;min-height:100%;overflow:hidden!important}
+          `}</style>
+        )}
         <WalletNetworkContext.Provider value={net}>
-        <div style={app
-          ? { width: 390, zoom: appScale, background: ink.page, position: 'relative' }
+        <div className={app ? `wallet-app-stage${fillPhone ? ' wallet-app-fill' : ''}` : undefined} style={app
+          ? { width: 390, height: fillPhone ? appH : 844, zoom: appScale, background: ink.page, position: 'relative', flexShrink: 0, overflow: 'hidden' }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {homeDesigned ? (
             <HomeScreens id={id === 'testnet' ? 'home-funded' : id} network={id === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={stack.length ? back : undefined} behind={stack[stack.length - 1]} />

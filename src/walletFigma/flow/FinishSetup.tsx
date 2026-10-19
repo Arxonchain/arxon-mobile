@@ -1,10 +1,12 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/finish/${name}`;
 type Go = (id: string, remember?: boolean) => void;
 
 export function FinishScreens({ id, go }: { id: string; go: Go }) {
+  const live = useLiveFrame();
   if (id === 'face') {
     return (
       <Screen>
@@ -39,7 +41,7 @@ export function FinishScreens({ id, go }: { id: string; go: Go }) {
         <ReadyRow>Password set</ReadyRow>
         <ReadyRow>Back up anytime from Account</ReadyRow>
       </div>
-      <button type="button" onClick={() => go('home')} style={{ ...primary, top: 712, width: 353 }}>Go to wallet</button>
+      <button type="button" onClick={() => { if (live?.app) void live.ensureWords(); go('home'); }} style={{ ...primary, top: 712, width: 353 }}>Go to wallet</button>
     </Screen>
   );
 }
