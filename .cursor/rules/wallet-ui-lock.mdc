@@ -1,0 +1,15 @@
+---
+description: Lock the approved 131 wallet screens. Do not change their JSX, classNames, styles, or copy.
+globs: src/walletFigma/flow/**/*.{ts,tsx}, src/walletFigma/tokens.ts, src/walletFigma/icons.tsx, public/wallet-figma/**
+alwaysApply: true
+---
+
+# Locked wallet UI (branch `wallet-ui-131`)
+
+These files are the approved design. Do not modify their JSX structure, classNames, styles, or copy.
+
+Locked screens live in `src/walletFigma/flow` and are indexed by `catalog.ts` (welcome 01.01 through Explore 23.03). Assets are in `public/wallet-figma`. Tokens: `src/walletFigma/tokens.ts`. Icons: `src/walletFigma/icons.tsx`.
+
+Leave Figma chrome in place. Status bar (9:41), signal / Wi‑Fi / battery, home indicator, tab icons, action icons, and other decorative marks show where those controls will sit and how they will function later. They are not real OS chrome to implement, and they must not be stripped or restyled.
+
+Do not restyle the old dashboard in place of these screens. Wiring and live data belong outside the locked JSX (handlers, providers, `liveFrame.tsx`, `ModeShell.tsx`, `FlowStudio.tsx`) without changing structure, classNames, styles, or copy.
