@@ -228,23 +228,13 @@
         var path = (location.pathname || "/").replace(/\/$/, "") || "/";
         var localTest = host === "localhost" || host === "127.0.0.1" || path === "/flow" || path.indexOf("/flow/") === 0;
         if (boot && localTest) {
-          loadingBits.forEach(function (id) {
+          var bits = ["arxon-boot-logo", "arxon-boot-spinner", "arxon-boot-title", "arxon-boot-slow"];
+          bits.forEach(function (id) {
             var el = document.getElementById(id);
             if (el) el.style.display = "none";
           });
           boot.style.background = "#050505";
           boot.style.justifyContent = "center";
-          boot.style.overflow = "hidden";
-          var glow = document.createElement("img");
-          glow.src = "/wallet-figma/welcome/blob.svg";
-          glow.alt = "";
-          glow.width = 1147;
-          glow.height = 1094;
-          glow.style.position = "absolute";
-          glow.style.left = "-378px";
-          glow.style.top = "-500px";
-          glow.style.pointerEvents = "none";
-          boot.appendChild(glow);
           var mark = document.createElement("img");
           mark.alt = "Arxon";
           mark.src = "/wallet-figma/wordmark.png";
@@ -255,7 +245,6 @@
           mark.style.maxWidth = "none";
           mark.style.objectFit = "contain";
           mark.style.position = "relative";
-          mark.style.zIndex = "1";
           boot.appendChild(mark);
         }
 

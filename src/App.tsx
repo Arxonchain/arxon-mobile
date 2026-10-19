@@ -288,7 +288,7 @@ function AppRoutes() {
     return <OfficialSplash ready={!loading} onFinish={() => setSplashDone(true)} />;
   }
 
-  if (isNative && !walletShell && !splashDone) {
+  if (isNative && !splashDone) {
     return (
       <>
         <MobileSplash isAppReady={!loading} onFinish={() => setSplashDone(true)} />

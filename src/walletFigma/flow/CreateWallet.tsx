@@ -1,6 +1,5 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
-import { useLiveFrame } from './liveFrame';
 
 const icon = (name: string) => `/wallet-figma/create/${name}`;
 
@@ -205,7 +204,6 @@ function Backup({
 }
 
 function DriveBackup({ id, go, back, password }: { id: string; go: Go; back?: () => void; password: string }) {
-  const live = useLiveFrame();
   if (id === 'drive-connect') {
     return (
       <Screen>
@@ -248,7 +246,7 @@ function DriveBackup({ id, go, back, password }: { id: string; go: Go; back?: ()
         <ReadyRow title="Password set" detail="Unlocks Arxon on this device" />
         <ReadyRow title="Privacy defaults set" detail="You choose what each payment hides" />
       </div>
-      <button type="button" onClick={() => { if (live?.app) void live.ensureWords(); go('home'); }} style={{ ...wideBtn, position: 'absolute', left: 19, top: 712, width: 353 }}>Enter Arxon</button>
+      <button type="button" onClick={() => go('home')} style={{ ...wideBtn, position: 'absolute', left: 19, top: 712, width: 353 }}>Enter Arxon</button>
     </Screen>
   );
 }
