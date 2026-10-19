@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { rememberFromActivity, tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -66,7 +67,10 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   const [token, setToken] = useState('All tokens');
   const [date, setDate] = useState('Any time');
   const [draft, setDraft] = useState({ type: 'All', token: 'All tokens', date: 'Any time' });
-  const empty = id === 'activity-empty';
+  const live = useLiveFrame();
+  const empty = live?.app
+    ? live.activity.length === 0 && id !== 'activity-vault' && id !== 'activity-filtered' && id !== 'tx' && id !== 'tx-vault'
+    : id === 'activity-empty';
   const net = useWalletNetwork();
   if (net === 'mainnet') rememberFromActivity(empty);
   const leave = () => (back ? back() : go(empty ? 'home' : 'activity', false));
@@ -98,7 +102,11 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   const showSheet = id === 'activity-filter';
   const vaultList = id === 'activity-filtered' || id === 'activity-vault';
   const none = id === 'activity-none';
-  const groups = vaultList ? [{ day: 'Today', age: 0, items: VAULT_ROWS }] : filterRows(type, token, date);
+  const groups = vaultList
+    ? [{ day: 'Today', age: 0, items: VAULT_ROWS }]
+    : live?.app
+      ? live.activity
+      : filterRows(type, token, date);
   const filteredBlank = !empty && !none && !vaultList && groups.length === 0;
 
   return (

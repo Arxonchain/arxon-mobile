@@ -23,12 +23,15 @@ import { isAccountScreen, AccountScreens } from './AccountScreens';
 import { isPrivacyScreen, PrivacyScreens } from './PrivacyScreens';
 import { isExploreScreen, ExploreScreens } from './ExploreScreens';
 import { WalletNetworkContext, type WalletNet } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
 const CHECKS = [3, 7, 12];
 
 export default function FlowStudio({ app = false }: { app?: boolean }) {
+  const live = useLiveFrame();
   const [id, setId] = useState('splash');
+  const [appScale, setAppScale] = useState(1);
   const [stack, setStack] = useState<string[]>([]);
   const [hidden, setHidden] = useState(false);
   const [backup, setBackup] = useState<'drive' | 'manual'>('drive');
@@ -52,6 +55,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [id]);
 
   useEffect(() => {
+    if (app) return;
     const stage = stageRef.current;
     if (!stage) return;
     const measure = () => {
@@ -64,9 +68,46 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     const watcher = new ResizeObserver(measure);
     watcher.observe(stage);
     return () => watcher.disconnect();
-  }, [menu]);
+  }, [menu, app]);
+
+  useEffect(() => {
+    if (!app) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const measure = () => setAppScale(Math.max(stage.clientWidth, 1) / 390);
+    measure();
+    const watcher = new ResizeObserver(measure);
+    watcher.observe(stage);
+    return () => watcher.disconnect();
+  }, [app]);
+
+  useEffect(() => {
+    if (!app) return;
+    const stage = stageRef.current;
+    if (!stage) return;
+    const hide = () => {
+      stage.querySelectorAll('span').forEach((el) => {
+        if (el.textContent?.trim() === '9:41') el.style.setProperty('display', 'none');
+      });
+      stage.querySelectorAll('img').forEach((img) => {
+        const src = img.getAttribute('src') || '';
+        if (src.includes('status.svg')) img.style.setProperty('display', 'none');
+      });
+      stage.querySelectorAll('div').forEach((el) => {
+        if (el.style.width === '134px' && el.style.height === '5px') el.style.setProperty('display', 'none');
+      });
+    };
+    hide();
+    const obs = new MutationObserver(hide);
+    obs.observe(stage, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, [app, id]);
 
   function go(next: string, remember = true) {
+    if (live?.app) {
+      if (next === 'testnet') void live.setNetwork('arxon');
+      else if (next === 'home' || next.startsWith('home-') || next === 'more') void live.setNetwork('ethereum');
+    }
     if (next === 'testnet') {
       setNet('testnet');
       if (remember) setStack((prev) => [...prev, id]);
@@ -120,7 +161,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, []);
 
   return (
-    <div style={{ height: app ? '100%' : '100vh', overflow: 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
+    <div style={{ height: app ? 'auto' : '100vh', minHeight: app ? '100%' : undefined, overflow: app ? 'visible' : 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
       {!app && <aside style={{ width: menu ? 320 : 0, height: '100vh', flexShrink: 0, overflow: 'auto', borderRight: menu ? '1px solid #1c2025' : 'none', background: '#0c0e14' }}>
         <div style={{ padding: 16, position: 'sticky', top: 0, background: '#0c0e14' }}>
           <strong>Every screen</strong>
@@ -160,16 +201,18 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           </div>
         ))}
       </aside>}
-      <main style={{ flex: 1, minWidth: 0, height: app ? '100%' : '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: app ? 0 : '12px 16px 16px' }}>
+      <main style={{ flex: app ? 'none' : 1, width: app ? '100%' : undefined, minWidth: 0, height: app ? 'auto' : '100vh', overflow: app ? 'visible' : 'hidden', display: 'flex', flexDirection: 'column', padding: app ? 0 : '12px 16px 16px' }}>
         {!app && (
         <div style={{ width: '100%', maxWidth: 390, alignSelf: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
           <button type="button" onClick={() => setMenu((v) => !v)} style={linkBtn}>{menu ? 'Hide list' : 'All screens'}</button>
           <span style={{ color: ink.secondary, fontSize: 12 }}>{screen.name}</span>
         </div>
         )}
-        <div ref={stageRef} style={{ flex: 1, minHeight: 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div ref={stageRef} style={{ flex: app ? 'none' : 1, width: '100%', minHeight: app ? undefined : 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
         <WalletNetworkContext.Provider value={net}>
-        <div style={{ width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: app ? 0 : 28, overflow: 'hidden', position: 'relative', boxShadow: app ? 'none' : '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={app
+          ? { width: 390, zoom: appScale, background: ink.page, position: 'relative' }
+          : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {homeDesigned ? (
             <HomeScreens id={id === 'testnet' ? 'home-funded' : id} network={id === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={stack.length ? back : undefined} behind={stack[stack.length - 1]} />
           ) : tokenDesigned ? (

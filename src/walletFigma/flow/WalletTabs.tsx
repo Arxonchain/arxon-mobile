@@ -1,4 +1,5 @@
 import { createContext, useContext, type CSSProperties } from 'react';
+import { useLiveFrame } from './liveFrame';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 
@@ -54,8 +55,11 @@ export function pickWalletTab(
 
 export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSelect: (tab: WalletTabName) => void }) {
   const net = useWalletNetwork();
+  const live = useLiveFrame();
   return (
-    <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 2 }}>
+    <nav style={live?.app
+      ? { position: 'absolute', left: 0, right: 0, bottom: 0, background: '#050505', zIndex: 2 }
+      : { position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 2 }}>
       {net === 'testnet' && (
         <p style={{ margin: 0, height: 16, textAlign: 'center', fontFamily: font.sans, fontSize: 11, fontWeight: 600, color: '#accafe', lineHeight: '16px' }}>Arxon Testnet</p>
       )}
@@ -72,9 +76,11 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSele
           );
         })}
       </div>
+      {live?.app ? null : (
       <div style={{ height: 16, position: 'relative' }}>
         <div style={{ position: 'absolute', left: 128, bottom: 6, width: 134, height: 5, borderRadius: 10, background: '#212121' }} />
       </div>
+      )}
     </nav>
   );
 }

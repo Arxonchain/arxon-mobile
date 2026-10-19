@@ -278,7 +278,7 @@ function DevPublicRoutes() {
 function AppRoutes() {
   const location = useLocation();
   const { user, loading } = useAuth();
-  const [splashDone, setSplashDone] = useState(!isNative && !walletTestSplash);
+  const [splashDone, setSplashDone] = useState(walletShell || (!isNative && !walletTestSplash));
 
   if (isDevPublicPath(location.pathname)) {
     return <DevPublicRoutes />;

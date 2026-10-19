@@ -1,11 +1,14 @@
 import { useState, type CSSProperties } from 'react';
+import { useLiveFrame } from './liveFrame';
 import { font } from '@/walletFigma/tokens';
 
 type Go = (id: string, remember?: boolean) => void;
 type Mode = 'phrase' | 'key';
 
 export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const [mode, setMode] = useState<Mode>('phrase');
+  const [err, setErr] = useState<string | null>(null);
   const [phrase, setPhrase] = useState('');
   const [keyText, setKeyText] = useState('');
   const words = phrase.trim().split(/\s+/).filter(Boolean);
@@ -70,7 +73,11 @@ export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) 
             : 'Your key is encrypted and never leaves this device. Arxon can’t recover it for you.'}
         </p>
       </div>
-      <button type="button" disabled={!ready} onClick={() => go('ready-skip')} style={{ ...importBtn, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64', cursor: ready ? 'pointer' : 'default' }}>
+      {err ? <p style={{ position: 'absolute', left: 22, top: 670, width: 346, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+      <button type="button" disabled={!ready} onClick={() => {
+        if (!live?.app || mode !== 'phrase') { go('ready-skip'); return; }
+        void live.importPhrase(phrase).then(() => go('home')).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Could not import that phrase'));
+      }} style={{ ...importBtn, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64', cursor: ready ? 'pointer' : 'default' }}>
         Import wallet
       </button>
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, display: 'flex', justifyContent: 'center', opacity: 0.25 }}>

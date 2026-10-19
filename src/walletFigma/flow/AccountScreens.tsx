@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/account/${name}`;
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
@@ -30,13 +31,16 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const [note, setNote] = useState('');
   const [diagnostics, setDiagnostics] = useState(true);
   const [sent, setSent] = useState(false);
+  const live = useLiveFrame();
+  const full = live?.address ?? ADDRESS;
+  const shortAddr = live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : SHORT;
   const leave = (fallback: string) => (back ? back() : go(fallback, false));
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       {id === 'account' && (
-        <Account code={code} copied={copied} onCopy={() => {
-          navigator.clipboard?.writeText(ADDRESS).catch(() => undefined);
+        <Account code={code} copied={copied} label={live?.accountLabel ?? 'Account 01'} shortAddr={shortAddr} onCopy={() => {
+          navigator.clipboard?.writeText(full).catch(() => undefined);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1200);
         }} go={go} />
@@ -61,7 +65,7 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Account({ code, copied, onCopy, go }: { code: string; copied: boolean; onCopy: () => void; go: Go }) {
+function Account({ code, copied, onCopy, go, label, shortAddr }: { code: string; copied: boolean; onCopy: () => void; go: Go; label: string; shortAddr: string }) {
   return (
     <>
       <PhoneStatus />
@@ -71,8 +75,8 @@ function Account({ code, copied, onCopy, go }: { code: string; copied: boolean; 
           <div style={{ marginTop: 18, minHeight: 84, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
             <FigmaImg src={art('avatar.svg')} width={52} height={52} />
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>Account 01</span>
-              <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{copied ? 'Copied' : SHORT}</span>
+              <span style={{ display: 'block', fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{label}</span>
+              <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{copied ? 'Copied' : shortAddr}</span>
             </span>
             <button type="button" aria-label="Copy address" onClick={onCopy} style={iconBtn}>
               <FigmaImg src={art('copy.svg')} width={20} height={20} />

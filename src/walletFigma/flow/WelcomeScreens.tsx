@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { markBootOk } from '@/lib/bootState';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 /** Source file is 1280×500. Do not force the design box 236×78 — that stretches the mark. */
 const WORDMARK_W = 236;
@@ -19,6 +20,7 @@ export function WelcomeScreens({ id, go }: { id: string; go: Go }) {
 }
 
 function Phone({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
+  const live = useLiveFrame();
   return (
     <div
       onClick={onClick}
@@ -35,8 +37,8 @@ function Phone({ children, onClick }: { children: ReactNode; onClick?: () => voi
     >
       <Glow />
       {children}
-      <StatusBar />
-      <HomeIndicator />
+      {live?.app ? null : <StatusBar />}
+      {live?.app ? null : <HomeIndicator />}
     </div>
   );
 }

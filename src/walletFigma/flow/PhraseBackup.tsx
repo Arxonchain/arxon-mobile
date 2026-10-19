@@ -1,5 +1,6 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/phrase/${name}`;
 
@@ -44,6 +45,11 @@ const CAUTIONS = [
 ];
 
 export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
+  const words = live?.words && live.words.length >= 12 ? live.words.slice(0, 12) : WORDS;
+  useEffect(() => {
+    if (live?.app && (id === 'phrase-hidden' || id === 'phrase-shown' || id === 'phrase-done')) void live.ensureWords();
+  }, [id, live]);
   const caution = CAUTIONS.find((item) => item.id === id);
   if (caution) {
     return (
@@ -62,6 +68,7 @@ export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back
   if (id === 'phrase-hidden' || id === 'phrase-shown') {
     return (
       <Phrase
+        words={words}
         revealed={id === 'phrase-shown'}
         onBack={() => (back ? back() : go(id === 'phrase-shown' ? 'phrase-hidden' : 'caution3', false))}
         onReveal={() => go('phrase-shown')}
@@ -71,9 +78,9 @@ export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back
     );
   }
   if (id === 'phrase-confirm') {
-    return <Confirm onBack={() => (back ? back() : go('phrase-shown', false))} onVerify={() => go('phrase-done')} />;
+    return <Confirm words={words} onBack={() => (back ? back() : go('phrase-shown', false))} onVerify={() => go('phrase-done')} />;
   }
-  return <Ready onEnter={() => go('home')} />;
+  return <Ready onEnter={() => { if (live?.app) void live.ensureWords(); go('home'); }} />;
 }
 
 function Caution({
@@ -119,12 +126,14 @@ function Caution({
 }
 
 function Phrase({
+  words,
   revealed,
   onBack,
   onReveal,
   onHide,
   onWritten,
 }: {
+  words: string[];
   revealed: boolean;
   onBack: () => void;
   onReveal: () => void;
@@ -146,7 +155,7 @@ function Phrase({
               return (
                 <span key={index} style={wordChip}>
                   <span style={{ width: 26, color: '#5c5f64', fontSize: 13 }}>{String(index + 1).padStart(2, '0')}</span>
-                  <span style={{ color: revealed ? '#fff' : '#8b9097', fontWeight: 500, fontSize: 16 }}>{revealed ? WORDS[index] : '••••••'}</span>
+                  <span style={{ color: revealed ? '#fff' : '#8b9097', fontWeight: 500, fontSize: 16 }}>{revealed ? words[index] : '••••••'}</span>
                 </span>
               );
             })}
@@ -174,10 +183,15 @@ function Phrase({
   );
 }
 
-function Confirm({ onBack, onVerify }: { onBack: () => void; onVerify: () => void }) {
+function Confirm({ words, onBack, onVerify }: { words: string[]; onBack: () => void; onVerify: () => void }) {
+  const checks = words === WORDS ? CHECKS : [
+    { label: '#1', options: [words[0], 'rebel', 'cactus'], answer: words[0] },
+    { label: '#10', options: ['spoil', words[9], 'diet'], answer: words[9] },
+    { label: '#12', options: [words[11], 'tiger', 'ocean'], answer: words[11] },
+  ];
   const [picks, setPicks] = useState<Array<string | null>>([null, null, null]);
   const selected = picks.filter(Boolean).length;
-  const ready = CHECKS.every((check, i) => picks[i] === check.answer);
+  const ready = checks.every((check, i) => picks[i] === check.answer);
   return (
     <Screen>
       <Back top={56} onClick={onBack} />
@@ -185,7 +199,7 @@ function Confirm({ onBack, onVerify }: { onBack: () => void; onVerify: () => voi
       <p style={{ ...copy, top: 158, width: 336, fontSize: 15 }}>
         Tap the correct word for each position to make sure you saved it.
       </p>
-      {CHECKS.map((check, group) => (
+      {checks.map((check, group) => (
         <div key={check.label}>
           <p style={{ position: 'absolute', left: 24, top: 232 + group * 104, margin: 0, fontSize: 14 }}>
             <span style={{ color: '#8b9097', fontWeight: 400 }}>Word </span>

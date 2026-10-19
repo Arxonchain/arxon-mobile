@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/receive/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -49,15 +50,18 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     else go('network', false);
   }
 
+  const live = useLiveFrame();
+  const address = live?.address ?? ADDRESS;
+
   async function copy() {
-    try { await navigator.clipboard?.writeText(ADDRESS); } catch { /* preview still confirms */ }
+    try { await navigator.clipboard?.writeText(address); } catch { /* preview still confirms */ }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   }
 
   function share() {
     if (navigator.share) {
-      navigator.share({ title: 'Arxon address', text: ADDRESS }).catch(() => undefined);
+      navigator.share({ title: 'Arxon address', text: address }).catch(() => undefined);
       return;
     }
     void copy();
@@ -67,7 +71,7 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.recv-field::placeholder{color:#8b9097}`}</style>
       {id === 'receive' && (
-        <Receive current={current} pub={pub} setPub={setPub} copied={copied} onCopy={copy} onShare={share} go={go} leave={leave} />
+        <Receive current={current} pub={pub} setPub={setPub} copied={copied} onCopy={copy} onShare={share} go={go} leave={leave} address={address} />
       )}
       {id === 'network' && (
         <Networks nets={nets} selected={selected} onPick={pick} onAdd={() => go('add-network')} onClose={leave} />
@@ -79,8 +83,8 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave }: {
-  current: Net; pub: boolean; setPub: (v: boolean) => void; copied: boolean; onCopy: () => void; onShare: () => void; go: Go; leave: () => void;
+function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, address }: {
+  current: Net; pub: boolean; setPub: (v: boolean) => void; copied: boolean; onCopy: () => void; onShare: () => void; go: Go; leave: () => void; address: string;
 }) {
   return (
     <>
@@ -97,7 +101,7 @@ function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave }: {
         <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>A</div>
       </div>
       <p style={{ position: 'absolute', left: 18, top: 466, width: 354, margin: 0, textAlign: 'center', fontSize: 13, color: '#8b9097' }}>Your Arxon address</p>
-      <p style={{ position: 'absolute', left: 45, top: 488, width: 300, margin: 0, textAlign: 'center', fontSize: 15, fontWeight: 500 }}>{ADDRESS}</p>
+      <p style={{ position: 'absolute', left: 45, top: 488, width: 300, margin: 0, textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{address}</p>
       <div style={{ position: 'absolute', left: 18, top: 534, width: 354, height: 72, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
         <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <FigmaImg src="/wallet-figma/send/shield.svg" width={18} height={18} />

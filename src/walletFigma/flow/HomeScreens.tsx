@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 
 import { FigmaImg } from '@/walletFigma/icons';
 import { rememberTabs, vaultEntry } from './VaultScreens';
 import { pickWalletTab, WalletTabs, type WalletTabName } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
 import { font } from '@/walletFigma/tokens';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
@@ -49,11 +50,17 @@ const CARDS: { title: string; body: string; icon: 'mine' | 'fund' | 'privacy' | 
 ];
 
 export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id: string; go: Go; back?: () => void; behind?: string; network?: 'mainnet' | 'testnet' }) {
+  const live = useLiveFrame();
   const [localHide, setLocalHide] = useState(false);
   const cards = useRef<HTMLDivElement>(null);
   const sheet = id === 'more';
   const view = sheet && behind && behind !== 'more' ? behind : id === 'more' ? 'home-funded' : id;
-  const empty = view === 'home' || view === 'home-hidden';
+  const liveRows = live?.app ? (network === 'testnet' ? live.testnetTokens : live.tokens) : null;
+  const liveFunded = !!liveRows?.some((token) => {
+    const n = Number(token.amount.replace(/[^0-9.]/g, ''));
+    return Number.isFinite(n) && n > 0;
+  });
+  const empty = liveRows ? !liveFunded : view === 'home' || view === 'home-hidden';
   const hidden = view === 'home-hidden' || (!empty && !sheet && localHide);
   const vaulted = view === 'home-vaulted' || view === 'home-unvaulted';
   if (network !== 'testnet') rememberTabs(empty ? 'empty' : vaulted ? 'vaulted' : 'funded');
@@ -66,7 +73,9 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
     if (view === 'home-hidden' && cards.current) cards.current.scrollLeft = 184;
   }, [view]);
 
-  const total = empty ? '$0.00' : view === 'home-vaulted' ? '$978.60' : view === 'home-unvaulted' ? '$1,188.60' : '$1,398.60';
+  const total = liveRows
+    ? (network === 'testnet' ? live!.testnetTotal : live!.total)
+    : empty ? '$0.00' : view === 'home-vaulted' ? '$978.60' : view === 'home-unvaulted' ? '$1,188.60' : '$1,398.60';
   const day = empty
     ? { text: '+$0.00 (0.00%) Today', color: '#5c5f64' }
     : view === 'home-vaulted'
@@ -74,7 +83,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
       : view === 'home-unvaulted'
         ? { text: '+$16.99 (1.45%) Today', color: '#3ddc84' }
         : { text: '+$20.67 (1.50%) Today', color: '#3ddc84' };
-  const tokens = empty ? ZERO : vaulted ? AFTER_VAULT : FUNDED;
+  const tokens = liveRows ?? (empty ? ZERO : vaulted ? AFTER_VAULT : FUNDED);
 
   function eye() {
     if (view === 'home') go('home-hidden', false);
@@ -93,7 +102,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   }
 
   return (
-    <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+    <div style={{ position: 'relative', width: 390, height: liveRows && empty ? 1040 : 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.home-cards::-webkit-scrollbar{display:none}.home-cards{scrollbar-width:none}`}</style>
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
@@ -103,7 +112,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
       <header style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button type="button" onClick={() => go('accounts')} style={plain}>
           <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />
-          <span style={{ fontSize: 16, fontWeight: 500 }}>Account 01</span>
+          <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
           <FigmaImg src={art('chev.svg')} width={16} height={16} />
         </button>
         <div style={{ display: 'flex', gap: 10 }}>

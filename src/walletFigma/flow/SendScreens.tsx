@@ -1,6 +1,8 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
+import { useWalletNetwork } from './WalletTabs';
 
 const art = (name: string) => `/wallet-figma/send/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -219,8 +221,28 @@ function Amount({ token, who, amount, available, vaulted, priv, setPriv, onKey, 
 }
 
 function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof TOKENS)[number]; to: string; amount: string; fiat: number; priv: boolean; go: Go; leave: () => void }) {
+  const live = useLiveFrame();
+  const net = useWalletNetwork();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   const fee = token.id === 'arx' ? 0.0004 : 0;
   const total = `${(Number(amount) + fee).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
+  async function confirm() {
+    if (!live?.app) {
+      go('send-success');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await live.send(token.symbol, to, amount, net === 'testnet');
+      go('send-success');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Send failed');
+    } finally {
+      setBusy(false);
+    }
+  }
   return (
     <>
       <Back top={56} left={18} icon="chev" onClick={leave} />
@@ -246,7 +268,8 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
         <Line label="Total" value={total} />
       </div>
       {priv && token.id === 'arx' && <p style={{ position: 'absolute', left: 30, top: 527, width: 330, margin: 0, fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Private transactions hide the amount and sender on-chain. This can’t be undone once confirmed.</p>}
-      <button type="button" onClick={() => go('send-success')} style={{ ...primary, top: 649, borderRadius: 8, height: 55 }}>Confirm and send</button>
+      {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, fontSize: 12, color: '#f25252', lineHeight: 1.35 }}>{err}</p> : null}
+      <button type="button" disabled={busy} onClick={() => void confirm()} style={{ ...primary, top: 649, borderRadius: 8, height: 55, opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending' : 'Confirm and send'}</button>
       <button type="button" onClick={leave} style={{ ...ghost, top: 714 }}>Cancel</button>
     </>
   );

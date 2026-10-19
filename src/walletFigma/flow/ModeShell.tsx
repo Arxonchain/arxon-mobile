@@ -1,7 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import AppTabs from '@/walletFigma/AppTabs';
+import { useNavigate } from 'react-router-dom';
 import { font } from '@/walletFigma/tokens';
+import FlowStudio from './FlowStudio';
+import { LiveFrameProvider } from './liveFrame';
 
 type Mode = 'wallet' | 'mining';
 
@@ -14,7 +15,6 @@ export function useAppMode() {
 /** One app, two modes. Wallet is the real chain wallet. Mining is the existing V2 miner. */
 export default function ModeShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
   const [mode, setMode] = useState<Mode>(() => {
     try {
       return sessionStorage.getItem('arxon-app-mode') === 'mining' ? 'mining' : 'wallet';
@@ -33,18 +33,12 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     navigate(next === 'mining' ? '/mine' : '/');
   }
 
-  const tabbed = pathname === '/' || ['/vault', '/explore', '/activity', '/account', '/testnet', '/balances', '/market', '/privacy-defaults', '/wallet-settings'].some(
-    (p) => pathname === p || pathname.startsWith(`${p}/`),
-  );
-  const showWalletTabs = mode === 'wallet' && tabbed;
-
   return (
     <AppModeContext.Provider value={mode}>
-      <div style={{ minHeight: '100%', background: '#050505' }}>
+      <div style={{ height: '100vh', background: '#050505', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div
           style={{
-            position: 'sticky',
-            top: 0,
+            flexShrink: 0,
             zIndex: 60,
             height: 48,
             display: 'flex',
@@ -57,8 +51,15 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           <Toggle on={mode === 'wallet'} onClick={() => choose('wallet')}>Wallet</Toggle>
           <Toggle on={mode === 'mining'} onClick={() => choose('mining')}>Mining</Toggle>
         </div>
-        {children}
-        {showWalletTabs ? <AppTabs /> : null}
+        {mode === 'wallet' ? (
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+            <LiveFrameProvider>
+              <FlowStudio app />
+            </LiveFrameProvider>
+          </div>
+        ) : (
+          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
+        )}
       </div>
     </AppModeContext.Provider>
   );
