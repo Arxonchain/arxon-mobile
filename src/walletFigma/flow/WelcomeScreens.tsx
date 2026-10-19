@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { markBootOk } from '@/lib/bootState';
 import { font } from '@/walletFigma/tokens';
 
@@ -63,10 +63,8 @@ function Splash({ onNext }: { onNext: () => void }) {
   );
 }
 
-/** Full-screen 01.01. Scales evenly so the mark is never stretched on a taller phone. */
+/** App splash. Wordmark only — the phone status bar stays in the /flow frames. */
 export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; onFinish: () => void }) {
-  const scale = useFrameScale();
-
   const finishRef = useRef(onFinish);
   finishRef.current = onFinish;
 
@@ -81,23 +79,23 @@ export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; on
   }, [ready]);
 
   return (
-    <div style={{ minHeight: '100vh', width: '100%', background: '#050505', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-      <div style={{ width: 390, height: 844, flex: '0 0 auto', transform: `scale(${scale})`, transformOrigin: 'center center' }}>
-        <Splash onNext={() => ready && onFinish()} />
-      </div>
-    </div>
+    <button
+      type="button"
+      onClick={() => ready && onFinish()}
+      style={{
+        minHeight: '100vh',
+        width: '100%',
+        background: '#050505',
+        border: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 0,
+      }}
+    >
+      <img src="/wallet-figma/wordmark.png" alt="Arxon" width={1280} height={500} style={{ width: 236, height: 'auto' }} />
+    </button>
   );
-}
-
-function useFrameScale() {
-  const [scale, setScale] = useState(1);
-  useEffect(() => {
-    const fit = () => setScale(Math.min(window.innerWidth / 390, window.innerHeight / 844));
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, []);
-  return scale;
 }
 
 function Gateway({ onNext }: { onNext: () => void }) {

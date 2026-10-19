@@ -166,7 +166,7 @@ export default function WalletSend() {
   const cta = busy ? phase : confirm ? 'Confirm' : title;
 
   return (
-    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+    <div style={walletPage}>
       <button
         type="button"
         onClick={() => (confirm ? setConfirm(false) : navigate(home))}

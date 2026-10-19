@@ -28,7 +28,7 @@ export default function WalletReceive() {
   };
 
   return (
-    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+    <div style={walletPage}>
       <button
         type="button"
         onClick={() => navigate(home)}

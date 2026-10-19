@@ -72,20 +72,6 @@ export default function TabBar({ activeId }: { activeId: TabId | null }) {
           );
         })}
       </div>
-      <div style={{ height: 25, width: '100%', position: 'relative' }}>
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 8,
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 134,
-            height: 5,
-            borderRadius: 10,
-            background: ink.bar,
-          }}
-        />
-      </div>
     </nav>
   );
 }

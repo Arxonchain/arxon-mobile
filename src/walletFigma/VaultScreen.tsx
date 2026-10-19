@@ -21,9 +21,9 @@ export default function VaultScreen() {
           These funds are off your Home balance. Send them from the Vault, or move them back to Home before a swap.
         </p>
         <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
-          <button type="button" style={primary} onClick={() => navigate('/testnet')}>Move in</button>
-          <button type="button" style={ghost} onClick={() => navigate('/send')}>Send</button>
-          <button type="button" style={ghost} onClick={() => navigate('/testnet')}>Move out</button>
+          <button type="button" style={primary} onClick={() => navigate('/send?mode=shield&net=arxon')}>To Vault</button>
+          <button type="button" style={ghost} onClick={() => navigate('/send?net=arxon')}>Send</button>
+          <button type="button" style={ghost} onClick={() => navigate('/send?mode=unshield&net=arxon')}>To Home</button>
         </div>
       </div>
     );
@@ -60,7 +60,7 @@ export default function VaultScreen() {
         />
       </div>
       <div style={{ flex: 1 }} />
-      <button type="button" style={cta} onClick={() => navigate('/testnet')}>
+      <button type="button" style={cta} onClick={() => navigate('/send?mode=shield&net=arxon')}>
         Move funds to Vault
       </button>
     </div>

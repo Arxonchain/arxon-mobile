@@ -3,7 +3,7 @@ import { useChainWallet } from './ChainWalletContext';
 import type { WalletNetworkId } from './networks';
 
 export function walletHomePath(network: WalletNetworkId) {
-  return network === 'ethereum' ? '/balances' : '/testnet';
+  return network === 'ethereum' ? '/' : '/testnet';
 }
 
 export function useLockNetwork(id: WalletNetworkId) {

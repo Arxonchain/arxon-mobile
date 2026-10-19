@@ -5,7 +5,6 @@ import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/ac
 import { START_URL } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
-import { NETWORKS } from '@/chainWallet/networks';
 import {
   addListedToken,
   loadListedTokens,
@@ -18,6 +17,9 @@ import { noMarketQuote } from '@/chainWallet/prices';
 import { ClockLabels } from '@/components/wallet/ClockLabels';
 import { TokenBalanceRow } from '@/components/wallet/TokenBalanceRow';
 import { TokenMark } from '@/components/wallet/TokenMark';
+import WalletOnboarding from '@/components/wallet/WalletOnboarding';
+import { FigmaImg } from '@/walletFigma/icons';
+import { ink } from '@/walletFigma/tokens';
 
 function fmt(v: string | null, digits: number) {
   if (v == null) return '—';
@@ -31,6 +33,7 @@ export default function WalletHome() {
   useLockNetwork('arxon');
   const {
     address,
+    ready,
     balance,
     rpcError,
     rpcUrl,
@@ -92,60 +95,21 @@ export default function WalletHome() {
   const publicAmt = fmt(balance, 4);
   const vaultAmt = Number(shieldedBalance).toLocaleString(undefined, { maximumFractionDigits: 4 });
 
+  if (ready && !address) return <WalletOnboarding />;
+
   return (
-    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>TESTNET</p>
-        <button
-          type="button"
-          onClick={() => navigate('/wallet-settings')}
-          style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', fontSize: 13, cursor: 'pointer' }}
-        >
-          Settings
-        </button>
-      </div>
-
-      <div
-        style={{
-          margin: '12px 0 16px',
-          padding: '14px 16px',
-          borderRadius: 18,
-          background: 'hsl(215 35% 62%/0.16)',
-          border: '1px solid hsl(215 35% 62%/0.55)',
-        }}
-      >
-        <p style={{ fontSize: 11, letterSpacing: '0.16em', fontWeight: 800, margin: 0 }}>ARXON TESTNET</p>
-        <p style={{ fontSize: 13, color: 'hsl(215 20% 78%)', margin: '6px 0 0' }}>{NETWORKS.arxon.label}</p>
-      </div>
-
-      <p style={{ fontSize: 14, color: 'hsl(215 14% 48%)', marginTop: 4 }}>{address ? shortAddr(address) : '—'}</p>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '6px 0 0' }}>
+    <div style={walletPage}>
+      <p style={{ margin: '8px 0 0', color: ink.accent, fontSize: 13, fontWeight: 600 }}>Arxon Testnet</p>
+      <p style={{ margin: '4px 0 0', color: ink.secondary, fontSize: 13 }}>{address ? shortAddr(address) : '—'}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
         <TokenMark id="ARX" size={36} />
         <p style={{ fontSize: 40, fontWeight: 700, letterSpacing: '-1px', margin: 0 }}>{show(publicAmt)}</p>
-        <button
-          type="button"
-          onClick={toggle}
-          aria-label={hidden ? 'Show' : 'Hide'}
-          style={{ background: 'none', border: 'none', color: 'hsl(215 18% 62%)', cursor: 'pointer', padding: 4 }}
-        >
-          {hidden ? 'Show' : 'Hide'}
+        <button type="button" onClick={toggle} aria-label={hidden ? 'Show balance' : 'Hide balance'} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+          <FigmaImg src={hidden ? '/wallet-figma/eye-off.svg' : '/wallet-figma/eye.svg'} width={22} height={22} alt="" />
         </button>
       </div>
-      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', margin: '2px 0 0' }}>testnet · no USD</p>
-      <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 22, display: 'flex', alignItems: 'center', gap: 8 }}>
-        tARX
-        {shieldedBalance !== '0' ? (
-          <>
-            <span>· Vault</span>
-            <TokenMark id="ARX" size={16} />
-            <span>{show(vaultAmt)}</span>
-          </>
-        ) : (
-          <>
-            <span>· Vault</span>
-            <span>{show(vaultAmt)}</span>
-          </>
-        )}
+      <p style={{ margin: '6px 0 0', color: ink.secondary, fontSize: 14 }}>
+        {show(`${publicAmt} tARX`)} · Vault {show(vaultAmt)} tARX · no USD price
       </p>
 
       {rpcError ? (
@@ -161,22 +125,12 @@ export default function WalletHome() {
         <p style={{ fontSize: 12, color: 'hsl(0 70% 62%)', marginBottom: 12 }}>{notesError}</p>
       ) : null}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-        <button type="button" style={walletBtn} onClick={() => navigate('/send?net=arxon')}>
-          Send
-        </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/receive?net=arxon')}>
-          Receive
-        </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield&net=arxon')}>
-          Shield
-        </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=private&net=arxon')}>
-          Private
-        </button>
-        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield&net=arxon')}>
-          Unshield
-        </button>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 22 }}>
+        <button type="button" style={walletBtn} onClick={() => navigate('/send?net=arxon')}>Send</button>
+        <button type="button" style={walletGhost} onClick={() => navigate('/receive?net=arxon')}>Receive</button>
+        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=shield&net=arxon')}>To Vault</button>
+        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=unshield&net=arxon')}>To Home</button>
+        <button type="button" style={walletGhost} onClick={() => navigate('/send?mode=private&net=arxon')}>Private</button>
       </div>
 
       <button
@@ -192,8 +146,8 @@ export default function WalletHome() {
           marginTop: 28,
           padding: 16,
           borderRadius: 20,
-          background: 'hsl(225 26% 8%)',
-          border: '1px solid hsl(215 22% 17%/0.55)',
+          background: ink.card,
+          border: `1px solid ${ink.border}`,
         }}
       >
         <p style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Tokens</p>
@@ -237,8 +191,8 @@ export default function WalletHome() {
           marginTop: 28,
           padding: 16,
           borderRadius: 20,
-          background: 'hsl(225 26% 8%)',
-          border: '1px solid hsl(215 22% 17%/0.55)',
+          background: ink.card,
+          border: `1px solid ${ink.border}`,
         }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>

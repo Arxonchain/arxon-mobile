@@ -8,44 +8,47 @@ export function shortHash(hash: string) {
   return `${hash.slice(0, 10)}…${hash.slice(-6)}`;
 }
 
-export const walletFont = "'Creato Display',-apple-system,system-ui,sans-serif";
+export const walletFont = "'Plus Jakarta Sans', -apple-system, system-ui, sans-serif";
 
 export const walletPage: CSSProperties = {
-  minHeight: '100vh',
-  background: 'hsl(225 30% 3%)',
-  paddingBottom: 110,
+  minHeight: '100%',
+  background: '#050505',
+  color: '#ffffff',
   fontFamily: walletFont,
-  color: 'hsl(215 20% 93%)',
+  boxSizing: 'border-box',
+  padding: '8px 18px 128px',
 };
 
 export const walletBtn: CSSProperties = {
   flex: 1,
-  padding: '14px 16px',
-  borderRadius: 16,
-  border: '1px solid hsl(215 35% 62%/0.35)',
-  background: 'hsl(215 35% 62%/0.15)',
-  color: 'hsl(215 35% 82%)',
-  fontSize: 14,
-  fontWeight: 700,
+  height: 52,
+  padding: '0 16px',
+  borderRadius: 8,
+  border: 'none',
+  background: '#accafe',
+  color: '#0c1018',
+  fontSize: 15,
+  fontWeight: 600,
   cursor: 'pointer',
   fontFamily: walletFont,
 };
 
 export const walletGhost: CSSProperties = {
   ...walletBtn,
-  background: 'transparent',
-  border: '1px solid hsl(215 22% 18%)',
-  color: 'hsl(215 18% 78%)',
+  background: '#1c2025',
+  color: '#ffffff',
+  border: '1px solid #2a3447',
 };
 
 export const walletField: CSSProperties = {
   width: '100%',
   boxSizing: 'border-box',
-  padding: '14px 16px',
-  borderRadius: 16,
-  border: '1px solid hsl(215 22% 18%)',
-  background: 'hsl(225 26% 8%)',
-  color: 'hsl(215 20% 93%)',
+  height: 56,
+  padding: '0 16px',
+  borderRadius: 14,
+  border: '1px solid #2a3447',
+  background: '#1c2025',
+  color: '#ffffff',
   fontSize: 15,
   fontFamily: walletFont,
   outline: 'none',

@@ -55,7 +55,7 @@ export default function WalletExplore() {
   };
 
   return (
-    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+    <div style={walletPage}>
       <p style={{ fontSize: 11, letterSpacing: '0.18em', color: 'hsl(215 35% 62%)', fontWeight: 700 }}>EXPLORE</p>
       <NetworkSwitcher />
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '4px 0 16px' }}>Explore</h1>

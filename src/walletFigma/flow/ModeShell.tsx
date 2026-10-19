@@ -1,11 +1,20 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import AppTabs from '@/walletFigma/AppTabs';
 import { font } from '@/walletFigma/tokens';
-import FlowStudio from './FlowStudio';
 
 type Mode = 'wallet' | 'mining';
 
-/** One app, two modes. Wallet is the designed flow. Mining is the existing V2 miner. */
-export default function ModeShell({ mining }: { mining: ReactNode }) {
+const AppModeContext = createContext<Mode>('mining');
+
+export function useAppMode() {
+  return useContext(AppModeContext);
+}
+
+/** One app, two modes. Wallet is the real chain wallet. Mining is the existing V2 miner. */
+export default function ModeShell({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [mode, setMode] = useState<Mode>(() => {
     try {
       return sessionStorage.getItem('arxon-app-mode') === 'mining' ? 'mining' : 'wallet';
@@ -21,18 +30,37 @@ export default function ModeShell({ mining }: { mining: ReactNode }) {
     } catch {
       /* ignore */
     }
+    navigate(next === 'mining' ? '/mine' : '/');
   }
 
+  const tabbed = pathname === '/' || ['/vault', '/explore', '/activity', '/account', '/testnet', '/balances', '/market', '/privacy-defaults', '/wallet-settings'].some(
+    (p) => pathname === p || pathname.startsWith(`${p}/`),
+  );
+  const showWalletTabs = mode === 'wallet' && tabbed;
+
   return (
-    <div style={{ height: '100vh', background: '#050505', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ height: 48, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: '#050505' }}>
-        <Toggle on={mode === 'wallet'} onClick={() => choose('wallet')}>Wallet</Toggle>
-        <Toggle on={mode === 'mining'} onClick={() => choose('mining')}>Mining</Toggle>
+    <AppModeContext.Provider value={mode}>
+      <div style={{ minHeight: '100%', background: '#050505' }}>
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 60,
+            height: 48,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            background: '#050505',
+          }}
+        >
+          <Toggle on={mode === 'wallet'} onClick={() => choose('wallet')}>Wallet</Toggle>
+          <Toggle on={mode === 'mining'} onClick={() => choose('mining')}>Mining</Toggle>
+        </div>
+        {children}
+        {showWalletTabs ? <AppTabs /> : null}
       </div>
-      <div style={{ flex: 1, minHeight: 0, overflow: mode === 'mining' ? 'auto' : 'hidden' }}>
-        {mode === 'wallet' ? <FlowStudio app /> : mining}
-      </div>
-    </div>
+    </AppModeContext.Provider>
   );
 }
 

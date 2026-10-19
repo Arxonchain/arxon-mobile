@@ -107,7 +107,6 @@ const MobileArena = lazy(() => import("@/components/mobile/MobileArena"));
 const MobileNexus = lazy(() => import("@/components/mobile/MobileNexus"));
 const MobileProfile = lazy(() => import("@/components/mobile/MobileProfile"));
 const WalletHome = lazy(() => import("@/components/wallet/WalletHome"));
-const FigmaHome = lazy(() => import("@/walletFigma/HomeScreen"));
 const FigmaVault = lazy(() => import("@/walletFigma/VaultScreen"));
 const FigmaAccount = lazy(() => import("@/walletFigma/AccountScreen"));
 const FigmaPrivacy = lazy(() => import("@/walletFigma/DefaultPrivacy"));
@@ -416,7 +415,7 @@ function AppRoutes() {
 
         {walletShell ? (
           <>
-            <Route path="/" element={<FigmaHome />} />
+            <Route path="/" element={<WalletPortfolio />} />
             <Route path="/vault" element={<FigmaVault />} />
             <Route path="/account" element={<FigmaAccount />} />
             <Route path="/privacy-defaults" element={<FigmaPrivacy />} />
@@ -582,7 +581,7 @@ function AppRoutes() {
       {walletShell && <MobileBottomNavV2 />}
     </>
   );
-  if (walletShell) return <ModeShell mining={shell} />;
+  if (walletShell) return <ModeShell>{shell}</ModeShell>;
   return shell;
 }
 

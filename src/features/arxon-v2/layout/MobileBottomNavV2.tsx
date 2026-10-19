@@ -1,6 +1,7 @@
 import { useLocation } from 'react-router-dom';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { useAppMode } from '@/walletFigma/flow/ModeShell';
 import NeonBottomNav from './NeonBottomNav';
 import { buildV2NavTabs } from './navTabs';
 
@@ -29,8 +30,9 @@ export default function MobileBottomNavV2() {
   const location = useLocation();
   const { hideNav } = useMobileNav();
   const { address, network } = useChainWallet();
+  const mode = useAppMode();
 
-  if (!address || hideNav) return null;
+  if (mode === 'wallet' || !address || hideNav) return null;
   if (['/auth', '/admin'].some((p) => location.pathname.startsWith(p))) return null;
   if (location.pathname === '/word-forge' || location.pathname.startsWith('/word-forge/')) return null;
 

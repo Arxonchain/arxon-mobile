@@ -46,7 +46,7 @@ export default function WalletActivity() {
   };
 
   return (
-    <div style={{ ...walletPage, padding: '52px 20px 0' }}>
+    <div style={walletPage}>
       <button
         type="button"
         onClick={() => navigate(home)}
@@ -80,12 +80,14 @@ export default function WalletActivity() {
               display: 'block',
               width: '100%',
               textAlign: 'left',
-              background: 'none',
-              border: 'none',
+              background: '#1c2025',
+              border: '1px solid #2a3447',
+              borderRadius: 14,
               color: 'inherit',
-              padding: '14px 0',
-              borderBottom: '1px solid hsl(215 22% 14%)',
+              padding: '14px 16px',
+              marginBottom: 8,
               cursor: 'pointer',
+              fontFamily: 'inherit',
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>

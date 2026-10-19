@@ -1,4 +1,6 @@
 import { useNavigate } from 'react-router-dom';
+import { useChainWallet } from '@/chainWallet/ChainWalletContext';
+import { shortAddr } from '@/chainWallet/ui';
 import { font, ink, page } from './tokens';
 
 const ROWS = [
@@ -11,10 +13,13 @@ const ROWS = [
 
 export default function AccountScreen() {
   const navigate = useNavigate();
+  const { address } = useChainWallet();
   return (
     <div style={page}>
       <h1 style={{ margin: '8px 0 0', fontSize: 26, fontWeight: 700 }}>Account</h1>
-      <p style={{ margin: '8px 0 18px', color: '#8b9097', fontSize: 14 }}>Account 01 · keys stay on this phone</p>
+      <p style={{ margin: '8px 0 18px', color: '#8b9097', fontSize: 14 }}>
+        {address ? shortAddr(address) : 'No wallet on this phone yet'} · keys stay on this phone
+      </p>
       <div style={{ background: ink.card, borderRadius: 16, overflow: 'hidden' }}>
         {ROWS.map((row) => (
           <button
