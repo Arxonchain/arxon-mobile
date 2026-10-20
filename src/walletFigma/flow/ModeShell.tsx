@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { font } from '@/walletFigma/tokens';
 import FlowStudio from './FlowStudio';
 import { LiveFrameProvider } from './liveFrame';
+import { ModeChromeContext } from './modeChrome';
 
 type Mode = 'wallet' | 'mining';
 
@@ -23,6 +24,7 @@ export function useWalletModeActions() {
 /** One app, two modes. Wallet is the real chain wallet. Mining is the existing V2 miner. */
 export default function ModeShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const [showToggle, setShowToggle] = useState(false);
   const [mode, setMode] = useState<Mode>(() => {
     try {
       return sessionStorage.getItem('arxon-app-mode') === 'mining' ? 'mining' : 'wallet';
@@ -30,6 +32,8 @@ export default function ModeShell({ children }: { children: ReactNode }) {
       return 'wallet';
     }
   });
+  const chrome = useMemo(() => ({ showToggle, setShowToggle }), [showToggle]);
+  const showBar = mode === 'mining' || showToggle;
 
   function choose(next: Mode) {
     setMode(next);
@@ -50,7 +54,9 @@ export default function ModeShell({ children }: { children: ReactNode }) {
   return (
     <AppModeContext.Provider value={mode}>
       <WalletModeActionsContext.Provider value={actions}>
+      <ModeChromeContext.Provider value={chrome}>
       <div style={{ height: '100vh', background: '#050505', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {showBar ? (
         <div
           style={{
             flexShrink: 0,
@@ -66,6 +72,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           <Toggle on={mode === 'wallet'} onClick={() => choose('wallet')}>Wallet</Toggle>
           <Toggle on={mode === 'mining'} onClick={() => choose('mining')}>Mining</Toggle>
         </div>
+        ) : null}
         {mode === 'wallet' ? (
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
             <LiveFrameProvider>
@@ -76,6 +83,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
         )}
       </div>
+      </ModeChromeContext.Provider>
       </WalletModeActionsContext.Provider>
     </AppModeContext.Provider>
   );

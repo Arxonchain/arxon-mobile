@@ -24,12 +24,14 @@ import { isPrivacyScreen, PrivacyScreens } from './PrivacyScreens';
 import { isExploreScreen, ExploreScreens } from './ExploreScreens';
 import { WalletNetworkContext, type WalletNet } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
+import { isOnboardingScreen, useModeChrome } from './modeChrome';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
 const CHECKS = [3, 7, 12];
 
 export default function FlowStudio({ app = false }: { app?: boolean }) {
   const live = useLiveFrame();
+  const { setShowToggle } = useModeChrome();
   const [id, setId] = useState('splash');
   const [appScale, setAppScale] = useState(1);
   const [stack, setStack] = useState<string[]>([]);
@@ -71,6 +73,11 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     const t = window.setTimeout(() => go('gateway', false), 1600);
     return () => window.clearTimeout(t);
   }, [id, app, live?.startId]);
+
+  useEffect(() => {
+    if (!app) return;
+    setShowToggle(!isOnboardingScreen(id) && !live?.locked);
+  }, [app, id, live?.locked, setShowToggle]);
 
   useEffect(() => {
     if (app) return;
