@@ -25,6 +25,7 @@ import { isExploreScreen, ExploreScreens } from './ExploreScreens';
 import { WalletNetworkContext, type WalletNet } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { isOnboardingScreen, useModeChrome } from './modeChrome';
+import { markBootOk } from '@/lib/bootState';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
 const CHECKS = [3, 7, 12];
@@ -49,6 +50,10 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const [fit, setFit] = useState(1);
 
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
+
+  useEffect(() => {
+    markBootOk();
+  }, []);
 
   useEffect(() => {
     if (!app || !live?.app || !live.ready) return;
@@ -261,7 +266,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         <div ref={stageRef} style={{ flex: app ? 'none' : 1, width: '100%', minHeight: app ? undefined : 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
         <WalletNetworkContext.Provider value={net}>
         <div style={app
-          ? { width: 390, zoom: appScale, background: ink.page, position: 'relative' }
+          ? { width: 390, height: 844, zoom: appScale, background: ink.page, position: 'relative', overflow: 'hidden' }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {homeDesigned ? (
             <HomeScreens id={id === 'testnet' ? 'home-funded' : id} network={id === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={stack.length ? back : undefined} behind={stack[stack.length - 1]} />

@@ -226,26 +226,61 @@
 
         var host = location.hostname;
         var path = (location.pathname || "/").replace(/\/$/, "") || "/";
-        var localTest = host === "localhost" || host === "127.0.0.1" || path === "/flow" || path.indexOf("/flow/") === 0;
-        if (boot && localTest) {
+        var isNative =
+          !!(window.Capacitor &&
+            typeof window.Capacitor.isNativePlatform === "function" &&
+            window.Capacitor.isNativePlatform());
+        var walletBoot =
+          host === "localhost" ||
+          host === "127.0.0.1" ||
+          isNative ||
+          path === "/flow" ||
+          path.indexOf("/flow/") === 0;
+        if (boot && walletBoot) {
           var bits = ["arxon-boot-logo", "arxon-boot-spinner", "arxon-boot-title", "arxon-boot-slow"];
           bits.forEach(function (id) {
             var el = document.getElementById(id);
             if (el) el.style.display = "none";
           });
+          document.documentElement.style.background = "#050505";
+          document.body.style.background = "#050505";
           boot.style.background = "#050505";
           boot.style.justifyContent = "center";
-          var mark = document.createElement("img");
+          boot.style.alignItems = "center";
+          boot.style.gap = "0";
+          var phone = document.createElement("div");
+          phone.id = "arxon-boot-phone";
+          phone.style.cssText =
+            "position:relative;width:390px;height:844px;overflow:hidden;background:#050505;flex-shrink:0;transform-origin:center center;";
+          var scale = Math.min(1, (window.innerWidth || 390) / 390, (window.innerHeight || 844) / 844);
+          phone.style.transform = "scale(" + scale + ")";
+          var glow = document.createElement("div");
+          glow.style.cssText =
+            "position:absolute;left:0;top:0;width:390px;height:572px;overflow:hidden;pointer-events:none;";
+          function absImg(src, w, h, left, top, extra) {
+            var img = document.createElement("img");
+            img.src = src;
+            img.alt = "";
+            img.width = w;
+            img.height = h;
+            img.style.cssText =
+              "position:absolute;left:" + left + "px;top:" + top + "px;max-width:none;" + (extra || "");
+            return img;
+          }
+          glow.appendChild(absImg("/wallet-figma/welcome/blob.svg", 1147, 1094, -378, -500));
+          glow.appendChild(absImg("/wallet-figma/welcome/arc-white.svg", 1028, 598, -281, -330, "mix-blend-mode:overlay;"));
+          glow.appendChild(absImg("/wallet-figma/welcome/arc-white.svg", 1028, 598, 189, -408, "mix-blend-mode:overlay;"));
+          glow.appendChild(absImg("/wallet-figma/welcome/arc-white.svg", 1028, 598, -691, -408, "mix-blend-mode:overlay;"));
+          glow.appendChild(absImg("/wallet-figma/welcome/arc-pink.svg", 1028, 598, -251, -494, "mix-blend-mode:overlay;"));
+          glow.appendChild(absImg("/wallet-figma/welcome/arc-pink-2.svg", 1028, 598, -338, 68, "mix-blend-mode:overlay;"));
+          phone.appendChild(glow);
+          var mark = absImg("/wallet-figma/wordmark.png", 1280, 500, 77, 375.90625);
           mark.alt = "Arxon";
-          mark.src = "/wallet-figma/wordmark.png";
-          mark.width = 1280;
-          mark.height = 500;
           mark.style.width = "236px";
-          mark.style.height = "auto";
-          mark.style.maxWidth = "none";
+          mark.style.height = "92.1875px";
           mark.style.objectFit = "contain";
-          mark.style.position = "relative";
-          boot.appendChild(mark);
+          phone.appendChild(mark);
+          boot.appendChild(phone);
         }
 
         window.__ARXON_DISMISS_BOOT__ = function () {

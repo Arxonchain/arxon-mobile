@@ -44,6 +44,10 @@ function Phone({ children, onClick }: { children: ReactNode; onClick?: () => voi
 }
 
 function Splash({ onNext }: { onNext: () => void }) {
+  useEffect(() => {
+    markBootOk();
+  }, []);
+
   return (
     <Phone onClick={onNext}>
       <img
@@ -104,8 +108,8 @@ function Gateway({ onNext }: { onNext: () => void }) {
   return (
     <Phone>
       <style>{driftCss}</style>
-      <img src={asset('poly-8.png')} alt="" width={250} height={230} style={{ position: 'absolute', left: -80, top: 40, opacity: 0.4, transform: 'rotate(-71deg)', pointerEvents: 'none' }} />
-      <img src={asset('poly-7.png')} alt="" width={250} height={230} style={{ position: 'absolute', left: 210, top: 150, opacity: 0.4, transform: 'rotate(104deg) scaleY(-1)', pointerEvents: 'none' }} />
+      <img src={asset('poly-8.png')} alt="" width={250} height={230} style={{ position: 'absolute', left: -80, top: 40, width: 250, height: 230, maxWidth: 'none', opacity: 0.4, transform: 'rotate(-71deg)', pointerEvents: 'none' }} />
+      <img src={asset('poly-7.png')} alt="" width={250} height={230} style={{ position: 'absolute', left: 210, top: 150, width: 250, height: 230, maxWidth: 'none', opacity: 0.4, transform: 'rotate(104deg) scaleY(-1)', pointerEvents: 'none' }} />
       <Drift left={82} top={198} duration={9} delay={-1} dx={7} dy={-8}>
         <Img name="orb-b.svg" w={96} h={96} left={0} top={6} />
         <div style={{ position: 'absolute', left: 4, top: 0, width: 96, height: 96, borderRadius: 48, background: '#627eeb' }}>
@@ -149,8 +153,8 @@ function Gateway({ onNext }: { onNext: () => void }) {
 function Slide15({ onNext }: { onNext: () => void }) {
   return (
     <Phone>
-      <img src={asset('glow-b.png')} alt="" width={326} height={326} style={{ position: 'absolute', left: -285, top: 45, pointerEvents: 'none' }} />
-      <img src={asset('glow-a.png')} alt="" width={326} height={326} style={{ position: 'absolute', left: 349, top: 200, pointerEvents: 'none' }} />
+      <img src={asset('glow-b.png')} alt="" width={326} height={326} style={{ position: 'absolute', left: -285, top: 45, width: 326, height: 326, maxWidth: 'none', pointerEvents: 'none' }} />
+      <img src={asset('glow-a.png')} alt="" width={326} height={326} style={{ position: 'absolute', left: 349, top: 200, width: 326, height: 326, maxWidth: 'none', pointerEvents: 'none' }} />
       <div style={{ position: 'absolute', inset: 0, zIndex: 1 }}>
         <Coin left={77} top={147} size={89.114} color="#f7931a">
           <Img name="btc-15.svg" w={42.532} h={42.532} left={23} top={23} />
@@ -191,16 +195,16 @@ function Slide15({ onNext }: { onNext: () => void }) {
 function Slide16({ onCreate, onRestore }: { onCreate: () => void; onRestore: () => void }) {
   return (
     <Phone>
-      <img src={asset('ring-outer.png')} alt="" width={326} height={326} style={{ position: 'absolute', left: 32, top: 95, pointerEvents: 'none' }} />
-      <img src={asset('ring-inner.png')} alt="" width={256} height={256} style={{ position: 'absolute', left: 67, top: 130, opacity: 0.9, pointerEvents: 'none' }} />
-      <img src={asset('ring-center.png')} alt="" width={120} height={120} style={{ position: 'absolute', left: 135, top: 198, opacity: 0.3, pointerEvents: 'none' }} />
+      <img src={asset('ring-outer.png')} alt="" width={326} height={326} style={{ position: 'absolute', left: 32, top: 95, width: 326, height: 326, maxWidth: 'none', pointerEvents: 'none' }} />
+      <img src={asset('ring-inner.png')} alt="" width={256} height={256} style={{ position: 'absolute', left: 67, top: 130, width: 256, height: 256, maxWidth: 'none', opacity: 0.9, pointerEvents: 'none' }} />
+      <img src={asset('ring-center.png')} alt="" width={120} height={120} style={{ position: 'absolute', left: 135, top: 198, width: 120, height: 120, maxWidth: 'none', opacity: 0.3, pointerEvents: 'none' }} />
       <Img name="coin-eth.svg" w={79.038} h={79.038} left={70} top={94} />
       <Img name="coin-btc.svg" w={84} h={84} left={251} top={98} />
       <Coin left={64.84} top={335.94} size={79.156} color="#90b9ff" pad={1.82}>
-        <img src={asset('sol.png')} alt="" width={75.55} height={75.55} style={{ borderRadius: 38, objectFit: 'cover' }} />
+        <img src={asset('sol.png')} alt="" width={75.55} height={75.55} style={{ width: 75.55, height: 75.55, maxWidth: 'none', borderRadius: 38, objectFit: 'cover' }} />
       </Coin>
       <Coin left={250.73} top={335.04} size={86.962} color="#92f7dc" pad={1}>
-        <img src={asset('usdt.png')} alt="" width={86} height={86} style={{ borderRadius: 43, objectFit: 'cover' }} />
+        <img src={asset('usdt.png')} alt="" width={86} height={86} style={{ width: 86, height: 86, maxWidth: 'none', borderRadius: 43, objectFit: 'cover' }} />
       </Coin>
       <div style={{ position: 'absolute', left: 151, top: 213, width: 89, height: 89, borderRadius: 44.5, background: '#5c94f4' }}>
         <Img name="orb-center.svg" w={85} h={85} left={2} top={2} />
@@ -245,12 +249,12 @@ function Slide16({ onCreate, onRestore }: { onCreate: () => void; onRestore: () 
 function Glow() {
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 572, overflow: 'hidden', pointerEvents: 'none' }}>
-      <img src={asset('blob.svg')} alt="" width={1147} height={1094} style={{ position: 'absolute', left: -378, top: -500 }} />
-      <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -281, top: -330, mixBlendMode: 'overlay' }} />
-      <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: 189, top: -408, mixBlendMode: 'overlay' }} />
-      <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -691, top: -408, mixBlendMode: 'overlay' }} />
-      <img src={asset('arc-pink.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -251, top: -494, mixBlendMode: 'overlay' }} />
-      <img src={asset('arc-pink-2.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -338, top: 68, mixBlendMode: 'overlay' }} />
+      <img src={asset('blob.svg')} alt="" width={1147} height={1094} style={{ position: 'absolute', left: -378, top: -500, width: 1147, height: 1094, maxWidth: 'none' }} />
+      <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -281, top: -330, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
+      <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: 189, top: -408, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
+      <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -691, top: -408, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
+      <img src={asset('arc-pink.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -251, top: -494, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
+      <img src={asset('arc-pink-2.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -338, top: 68, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
     </div>
   );
 }
@@ -259,7 +263,7 @@ function StatusBar() {
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44, zIndex: 3, pointerEvents: 'none' }}>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
-      <img src={asset('status.svg')} alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
+      <img src={asset('status.svg')} alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33, width: 66.6, height: 11.33, maxWidth: 'none' }} />
     </div>
   );
 }
@@ -279,7 +283,7 @@ function Img({ name, w, h, left, top, flip, z }: { name: string; w: number; h: n
       alt=""
       width={w}
       height={h}
-      style={{ position: 'absolute', left, top, zIndex: z, transform: flip ? 'scaleY(-1)' : undefined, pointerEvents: 'none' }}
+      style={{ position: 'absolute', left, top, width: w, height: h, maxWidth: 'none', zIndex: z, transform: flip ? 'scaleY(-1)' : undefined, pointerEvents: 'none' }}
     />
   );
 }
@@ -377,7 +381,7 @@ function Copy({
   return (
     <div style={{ position: 'absolute', left: 19, top, width: 353, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 55, zIndex: 2 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 17 }}>
-        <img src={asset(dots)} alt="" width={164.61} height={3.26856} />
+        <img src={asset(dots)} alt="" width={164.61} height={3.26856} style={{ width: 164.61, height: 3.26856, maxWidth: 'none' }} />
         <h1 style={headline}>{title}</h1>
       </div>
       <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>

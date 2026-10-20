@@ -284,11 +284,11 @@ function AppRoutes() {
     return <DevPublicRoutes />;
   }
 
-  if (!splashDone && walletTestSplash) {
+  if (!walletShell && !splashDone && walletTestSplash) {
     return <OfficialSplash ready={!loading} onFinish={() => setSplashDone(true)} />;
   }
 
-  if (isNative && !splashDone) {
+  if (isNative && !walletShell && !splashDone) {
     return (
       <>
         <MobileSplash isAppReady={!loading} onFinish={() => setSplashDone(true)} />
