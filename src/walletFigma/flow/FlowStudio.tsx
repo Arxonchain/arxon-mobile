@@ -29,13 +29,42 @@ import { markBootOk } from '@/lib/bootState';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
 
+const HIDE_SCROLLBARS_CSS = `
+.arxon-app-scroll,
+.arxon-app-scroll *,
+.arxon-app-frame,
+.arxon-flow-frame,
+.home-cards,
+.dapp-row,
+.arxon-token-scroll {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.arxon-app-scroll::-webkit-scrollbar,
+.arxon-app-scroll::-webkit-scrollbar-thumb,
+.arxon-app-scroll::-webkit-scrollbar-track,
+.arxon-app-scroll::-webkit-scrollbar-corner,
+.arxon-app-scroll *::-webkit-scrollbar,
+.arxon-app-scroll *::-webkit-scrollbar-thumb,
+.arxon-app-scroll *::-webkit-scrollbar-track,
+.arxon-app-frame::-webkit-scrollbar,
+.arxon-flow-frame::-webkit-scrollbar,
+.home-cards::-webkit-scrollbar,
+.dapp-row::-webkit-scrollbar,
+.arxon-token-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  background: transparent !important;
+}
+`;
+
 const APP_SCROLL_CSS = `
 .arxon-app-frame { transform: translateZ(0); }
 .arxon-app-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
-  scrollbar-width: thin;
 }
 .arxon-app-scroll .home-cards,
 .arxon-app-scroll .dapp-row {
@@ -336,7 +365,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
         <WalletNetworkContext.Provider value={net}>
         <div
-          className={app ? 'arxon-app-frame' : undefined}
+          className={app ? 'arxon-app-frame' : 'arxon-flow-frame'}
           style={app
           ? {
             width: 390,
@@ -348,7 +377,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
             overflow: 'hidden',
           }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'auto', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
-          {app ? <style>{APP_SCROLL_CSS}</style> : null}
+          <style>{HIDE_SCROLLBARS_CSS}{app ? APP_SCROLL_CSS : ''}</style>
           <div
             className={app ? 'arxon-app-scroll' : undefined}
             style={app ? {

@@ -124,7 +124,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
 
   return (
     <div style={{ position: 'relative', width: 390, height: live?.app || !(liveRows && empty) ? 844 : 1040, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      <style>{`.home-cards::-webkit-scrollbar{display:none}.home-cards{scrollbar-width:none}`}</style>
+      <style>{`.home-cards,.arxon-token-scroll{scrollbar-width:none;-ms-overflow-style:none}.home-cards::-webkit-scrollbar,.arxon-token-scroll::-webkit-scrollbar{display:none;width:0;height:0}`}</style>
       {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
@@ -190,7 +190,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : {}) }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : {}) }}>
         {tokens.map((token) => (
           <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
             <TokenIcon kind={token.icon} />
@@ -285,7 +285,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         </div>
       )}
 
-      <div style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, marginBottom: 16 }}>
           <button type="button" onClick={() => go('accounts')} style={plain}>
             <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />

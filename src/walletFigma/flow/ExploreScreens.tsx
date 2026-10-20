@@ -29,7 +29,7 @@ export function ExploreScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const open = (app: App) => go(app.detail ? 'arxswap' : 'dapp');
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      <style>{`.dapp-row{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}.dapp-row::-webkit-scrollbar{display:none}`}</style>
+      <style>{`.dapp-row{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}.dapp-row::-webkit-scrollbar{display:none;width:0;height:0}`}</style>
       {id === 'explore' && <Explore go={go} />}
       {id === 'dapps' && <Dapps chip={chip} setChip={setChip} onBack={() => leave('explore')} open={open} />}
       {id === 'arxswap' && <Detail onBack={() => leave('dapps')} onConnect={() => go('dapp')} />}
