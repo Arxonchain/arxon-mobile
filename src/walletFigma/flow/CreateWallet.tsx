@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const icon = (name: string) => `/wallet-figma/create/${name}`;
 
@@ -314,8 +315,10 @@ function ReadyRow({ title: label, detail }: { title: string; detail: string }) {
 }
 
 function Screen({ children, status = 'flow' }: { children: ReactNode; status?: 'flow' | 'ready' }) {
+  const live = useLiveFrame();
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+      {live?.app ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         {status === 'ready' ? (
           <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600 }}>9:41</span>
@@ -324,10 +327,13 @@ function Screen({ children, status = 'flow' }: { children: ReactNode; status?: '
         )}
         <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: status === 'ready' ? 296 : 288.67, top: status === 'ready' ? 17 : 17.33 }} />
       </div>
+      )}
       {children}
+      {live?.app ? null : (
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, display: 'flex', justifyContent: 'center', opacity: 0.25 }}>
         <div style={{ width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
       </div>
+      )}
     </div>
   );
 }
