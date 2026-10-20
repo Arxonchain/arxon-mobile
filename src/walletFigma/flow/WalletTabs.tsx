@@ -3,7 +3,7 @@ import { useLiveFrame } from './liveFrame';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 
-export type WalletTabName = 'Home' | 'Vault' | 'Explore' | 'History' | 'Account' | 'Testnet';
+export type WalletTabName = 'Home' | 'Explore' | 'History' | 'Account' | 'Testnet';
 export type WalletNet = 'mainnet' | 'testnet';
 
 export const WalletNetworkContext = createContext<WalletNet>('mainnet');
@@ -14,7 +14,6 @@ export function useWalletNetwork() {
 
 const TABS: { name: WalletTabName; src: string; w: number; h: number }[] = [
   { name: 'Home', src: '/wallet-figma/activity/tab-home.svg', w: 22, h: 22 },
-  { name: 'Vault', src: '/wallet-figma/activity/tab-vault.svg', w: 22, h: 23 },
   { name: 'Explore', src: '/wallet-figma/activity/tab-explore.svg', w: 24, h: 24 },
   { name: 'History', src: '/wallet-figma/activity/tab-history.svg', w: 20, h: 20 },
   { name: 'Account', src: '/wallet-figma/activity/tab-account.svg', w: 22, h: 22 },
@@ -38,10 +37,6 @@ export function pickWalletTab(
     go(net === 'testnet' ? 'home-funded' : main.home, false);
     return;
   }
-  if (tab === 'Vault') {
-    go(main.vault, false);
-    return;
-  }
   if (tab === 'Explore') {
     go('explore', false);
     return;
@@ -54,13 +49,9 @@ export function pickWalletTab(
 }
 
 export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSelect: (tab: WalletTabName) => void }) {
-  const net = useWalletNetwork();
   const live = useLiveFrame();
   return (
     <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 8 }}>
-      {net === 'testnet' && (
-        <p style={{ margin: 0, height: 16, textAlign: 'center', fontFamily: font.sans, fontSize: 11, fontWeight: 600, color: '#accafe', lineHeight: '16px' }}>Arxon Testnet</p>
-      )}
       <div style={{ display: 'flex', padding: '0 2px' }}>
         {TABS.map((tab) => {
           const on = tab.name === active;

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
+import { START_URL } from '@/chainWallet/chain';
+import { sessionStore } from '@/chainWallet/session';
 import { rememberTabs, vaultEntry } from './VaultScreens';
 import { pickWalletTab, WalletTabs, type WalletTabName } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
@@ -52,13 +54,20 @@ const CARDS: { title: string; body: string; icon: 'mine' | 'fund' | 'privacy' | 
 ];
 
 export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id: string; go: Go; back?: () => void; behind?: string; network?: 'mainnet' | 'testnet' }) {
+  if (network === 'testnet') {
+    return <TestnetHome id={id} go={go} back={back} behind={behind} />;
+  }
+  return <MainnetHome id={id} go={go} back={back} behind={behind} />;
+}
+
+function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () => void; behind?: string }) {
   const live = useLiveFrame();
   const hideChrome = useAppHidesFigmaChrome();
   const [localHide, setLocalHide] = useState(false);
   const cards = useRef<HTMLDivElement>(null);
   const sheet = id === 'more';
   const view = sheet && behind && behind !== 'more' ? behind : id === 'more' ? 'home-funded' : id;
-  const liveRows = live?.app ? (network === 'testnet' ? live.testnetTokens : live.tokens) : null;
+  const liveRows = live?.app ? live.tokens : null;
   const liveFunded = !!liveRows?.some((token) => {
     const n = Number(token.amount.replace(/[^0-9.]/g, ''));
     return Number.isFinite(n) && n > 0;
@@ -68,7 +77,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
     ? live.hidden || view === 'home-hidden'
     : view === 'home-hidden' || (!empty && !sheet && localHide);
   const vaulted = view === 'home-vaulted' || view === 'home-unvaulted';
-  if (network !== 'testnet') rememberTabs(empty ? 'empty' : vaulted ? 'vaulted' : 'funded');
+  rememberTabs(empty ? 'empty' : vaulted ? 'vaulted' : 'funded');
 
   useEffect(() => {
     setLocalHide(false);
@@ -79,7 +88,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   }, [view]);
 
   const total = liveRows
-    ? (network === 'testnet' ? live!.testnetTotal : live!.total)
+    ? live!.total
     : empty ? '$0.00' : view === 'home-vaulted' ? '$978.60' : view === 'home-unvaulted' ? '$1,188.60' : '$1,398.60';
   const day = liveRows
     ? { text: live!.day, color: live!.dayTone === 'up' ? '#3ddc84' : live!.dayTone === 'down' ? '#ff5c5c' : '#5c5f64' }
@@ -146,7 +155,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
             <FigmaImg src={art(hidden ? 'eye-off.svg' : 'eye.svg')} width={22} height={22} />
           </button>
         </div>
-        <span style={{ fontSize: 14, fontWeight: 400, color: network === 'testnet' ? '#accafe' : hidden ? '#5c5f64' : day.color }}>{network === 'testnet' ? 'Arxon Testnet' : hidden ? '•••• Today' : day.text}</span>
+        <span style={{ fontSize: 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
       </div>
 
       <button type="button" onClick={() => go('defaults')} style={pill}>
@@ -156,7 +165,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
 
       <div style={{ position: 'absolute', left: 18, top: 292, width: 354, display: 'flex', gap: 14 }}>
         <Action label="Send" onClick={() => go(sendTo())}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-        <Action label="Receive" onClick={() => { live?.setReceiveAsset(network === 'testnet' ? 'ARXt' : 'ETH'); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+        <Action label="Receive" onClick={() => { live?.setReceiveAsset('ETH'); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
         <Action label="Swap" onClick={() => go(vaulted ? 'swap-vault' : 'swap')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
         <button type="button" onClick={() => go('more')} style={actionBtn}>
           <FigmaImg src={art('more.svg')} width={58} height={58} />
@@ -198,17 +207,17 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
       </div>
 
       <WalletTabs
-        active={network === 'testnet' ? 'Testnet' : 'Home'}
+        active="Home"
         onSelect={(tab: WalletTabName) => {
           if (tab === 'Home' && sheet) {
             if (back) back();
             else go('home-funded', false);
             return;
           }
-          pickWalletTab(network, tab, go, {
+          pickWalletTab('mainnet', tab, go, {
             home: empty ? 'home' : 'home-funded',
-            vault: network === 'testnet' ? vaultEntry('vault-empty') : vaultTo(),
-            history: network === 'testnet' ? 'activity' : empty ? 'activity-empty' : 'activity',
+            vault: vaultTo(),
+            history: empty ? 'activity-empty' : 'activity',
           });
         }}
       />
@@ -233,6 +242,169 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
     </div>
   );
 }
+
+function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () => void; behind?: string }) {
+  const live = useLiveFrame();
+  const hideChrome = useAppHidesFigmaChrome();
+  const [added, setAdded] = useState(() => sessionStore.testnetAdded());
+  const sheet = id === 'more';
+  const on = live?.app ? live.testnetAdded : added;
+  const hidden = live?.app ? live.hidden : false;
+  const tokens = on ? (live?.app ? live.testnetTokens : DEMO_TESTNET) : [];
+  const total = on ? (live?.app ? live.testnetTotal : '0.00') : '0.00';
+
+  function vaultTo() {
+    if (!on) return 'add-network';
+    if (!tokens.some((row) => Number(row.amount.replace(/[^0-9.]/g, '')) > 0)) return vaultEntry('vault-nofunds');
+    return vaultEntry('vault-empty');
+  }
+
+  async function addNetwork() {
+    if (live?.app) {
+      await live.enableTestnet();
+      return;
+    }
+    sessionStore.setTestnetAdded(true);
+    setAdded(true);
+  }
+
+  function openFaucet() {
+    if (live?.app) {
+      live.openFaucet();
+      return;
+    }
+    window.open(START_URL, '_blank', 'noopener,noreferrer');
+  }
+
+  return (
+    <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+      {hideChrome ? null : (
+        <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
+          <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
+          <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
+        </div>
+      )}
+
+      <div style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
+        <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, marginBottom: 16 }}>
+          <button type="button" onClick={() => go('accounts')} style={plain}>
+            <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />
+            <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
+            <FigmaImg src={art('chev.svg')} width={16} height={16} />
+          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <CircleBtn label="Search" onClick={() => go('search')}><FigmaImg src={art('search.svg')} width={20} height={20} /></CircleBtn>
+            <CircleBtn label="Notifications" onClick={() => go('notifications')}><FigmaImg src={art('bell.svg')} width={20} height={20} /></CircleBtn>
+          </div>
+        </header>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 40, fontWeight: 700, lineHeight: 1 }}>{hidden ? '••••••' : total}</span>
+            {live?.app && (
+              <button type="button" aria-label={hidden ? 'Show balance' : 'Hide balance'} onClick={() => live.toggleHide()} style={iconBtn}>
+                <FigmaImg src={art(hidden ? 'eye-off.svg' : 'eye.svg')} width={22} height={22} />
+              </button>
+            )}
+          </div>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#accafe' }}>Arxon Testnet</span>
+        </div>
+
+        {on && (
+          <div role="tablist" aria-label="Testnet" style={{ display: 'flex', background: '#1c2025', borderRadius: 16, padding: 4, width: 'fit-content', marginBottom: 16 }}>
+            <button type="button" role="tab" aria-selected="true" style={subTab(true)}>Home</button>
+            <button type="button" role="tab" aria-selected="false" onClick={() => go(vaultTo())} style={subTab(false)}>Vault</button>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: on ? 16 : 24 }}>
+          <Action label="Send" onClick={() => go('send-token')}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
+          <Action label="Receive" onClick={() => { live?.setReceiveAsset('ARXt'); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+          <Action label="Swap" onClick={() => go('swap')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
+          <button type="button" onClick={() => go('more')} style={actionBtn}>
+            <FigmaImg src={art('more.svg')} width={58} height={58} />
+            <span style={actionLabel}>More</span>
+          </button>
+        </div>
+
+        {!on ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <button type="button" onClick={() => void addNetwork()} style={ctaCard}>
+              <FigmaImg src={art('plus.svg')} width={18} height={18} />
+              <span style={{ fontSize: 16, fontWeight: 700, textAlign: 'left' }}>Add Arxon Testnet</span>
+              <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.4 }}>Chain 7171 · rpc-test.arxon.io. Tokens stay hidden until you add this network.</span>
+            </button>
+            <button type="button" onClick={openFaucet} style={ghostBtn}>Faucet · tARX</button>
+            <button type="button" onClick={() => go('add-network')} style={ghostBtn}>Custom RPC</button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <button type="button" onClick={openFaucet} style={ghostBtn}>Faucet · tARX</button>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 18, fontWeight: 700 }}>Tokens</span>
+              <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {tokens.map((token) => (
+                <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
+                  <TokenIcon kind={token.icon} />
+                  <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left' }}>
+                    <span style={{ fontSize: 16, fontWeight: 600 }}>{token.name}</span>
+                    <span style={{ fontSize: 12, color: '#8c8f99' }}>{hidden ? '••••' : token.amount}</span>
+                  </span>
+                  <span style={{ display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'right' }}>
+                    <span style={{ fontSize: 16, fontWeight: 600 }}>{hidden ? '••••' : token.value}</span>
+                    <span style={{ fontSize: 12, color: toneColor(token.tone) }}>{hidden ? '••••' : token.change}</span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <WalletTabs
+        active="Testnet"
+        onSelect={(tab: WalletTabName) => {
+          if (tab === 'Testnet' && sheet) {
+            if (back) back();
+            else go('testnet', false);
+            return;
+          }
+          pickWalletTab('testnet', tab, go, {
+            home: 'home-funded',
+            vault: vaultTo(),
+            history: 'activity',
+          });
+        }}
+      />
+
+      {sheet && (
+        <div style={{ position: 'absolute', inset: 0, zIndex: 6 }}>
+          <button type="button" aria-label="Close" onClick={() => (back ? back() : go('testnet', false))} style={scrim} />
+          <div style={sheetBox}>
+            <div style={{ position: 'absolute', left: 174, top: 9, width: 40, height: 4, borderRadius: 4, background: '#293347' }} />
+            <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 18, fontWeight: 700 }}>More</p>
+            <button type="button" onClick={() => go('buy')} style={{ ...actionBtn, position: 'absolute', left: 17, top: 79 }}>
+              <span style={circle}><FigmaImg src={art('buy.svg')} width={24} height={24} /></span>
+              <span style={actionLabel}>Buy</span>
+            </button>
+            <button type="button" onClick={() => go('mine-entry')} style={{ ...actionBtn, position: 'absolute', left: 109, top: 79 }}>
+              <span style={circle}><span style={{ color: '#abc9ff', fontSize: 20, fontWeight: 700 }}>M</span></span>
+              <span style={actionLabel}>Mine</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+const DEMO_TESTNET: Tok[] = [
+  { name: 'Arxon', amount: '0.00 ARXt', value: 'No USD price', change: 'Arxon Testnet', tone: 'flat', icon: 'arx', to: 'token-arx', symbol: 'ARXt' },
+  { name: 'Tether', amount: '0.00 USDTarx', value: 'No USD price', change: 'Arxon Testnet', tone: 'flat', icon: 'usdt', to: 'token-usdt', symbol: 'USDTarx' },
+  { name: 'USD Coin', amount: '0.00 USDCarx', value: 'No USD price', change: 'Arxon Testnet', tone: 'flat', icon: 'usdc', to: 'token-usdc', symbol: 'USDCarx' },
+];
 
 function toneColor(tone: Tok['tone']) {
   if (tone === 'up') return '#3ddb85';
@@ -308,6 +480,46 @@ function TokenIcon({ kind }: { kind: Tok['icon'] }) {
 const plain: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
 const iconBtn: CSSProperties = { width: 22, height: 22, padding: 0, border: 'none', background: 'none', cursor: 'pointer' };
 const pill: CSSProperties = { position: 'absolute', left: 22, top: 232, display: 'flex', alignItems: 'center', gap: 6, background: '#11161f', border: '1px solid #2a3447', borderRadius: 20, padding: '7px 14px 7px 12px', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 500, cursor: 'pointer' };
+function subTab(on: boolean): CSSProperties {
+  return {
+    height: 26,
+    minWidth: 64,
+    padding: '0 12px',
+    border: 'none',
+    borderRadius: 15,
+    background: on ? '#accafe' : 'transparent',
+    color: on ? '#0c1018' : '#8c8f99',
+    fontFamily: font.sans,
+    fontSize: 12,
+    fontWeight: 600,
+    cursor: on ? 'default' : 'pointer',
+  };
+}
+const ctaCard: CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 8,
+  padding: 16,
+  border: 'none',
+  borderRadius: 16,
+  background: '#1c2025',
+  color: '#fff',
+  fontFamily: font.sans,
+  cursor: 'pointer',
+  textAlign: 'left',
+};
+const ghostBtn: CSSProperties = {
+  height: 48,
+  border: '1px solid #2a3447',
+  borderRadius: 12,
+  background: 'transparent',
+  color: '#accafe',
+  fontFamily: font.sans,
+  fontSize: 15,
+  fontWeight: 600,
+  cursor: 'pointer',
+};
 const actionBtn: CSSProperties = { width: 78, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
 const actionLabel: CSSProperties = { fontSize: 14, fontWeight: 400, lineHeight: 1 };
 const circle: CSSProperties = { width: 58, height: 58, borderRadius: 29, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center' };

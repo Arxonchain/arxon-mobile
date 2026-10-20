@@ -104,7 +104,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
   const fiat = liveTok?.value ?? frame.fiat;
   const change = liveTok ? `${liveTok.change}${liveTok.change.includes('Today') ? '' : ''}` : frame.change;
   const vaultLabel = live?.app
-    ? (frame.title === 'Arxon' && Number(live.shielded) > 0 ? `${live.shielded} ARX in Vault` : undefined)
+    ? (net === 'testnet' && frame.title === 'Arxon' && Number(live.shielded) > 0 ? `${live.shielded} ARX in Vault` : undefined)
     : frame.vault;
   const [range, setRange] = useState('1D');
   const [star, setStar] = useState(false);

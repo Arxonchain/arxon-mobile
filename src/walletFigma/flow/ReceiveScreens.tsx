@@ -1,6 +1,8 @@
 import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { ARXON, DEFAULT_RPC, SCAN_URL } from '@/chainWallet/chain';
+import { sessionStore } from '@/chainWallet/session';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
@@ -31,7 +33,11 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const [pub, setPub] = useState(true);
   const [copied, setCopied] = useState(false);
   const [focus, setFocus] = useState('name');
-  const [form, setForm] = useState({ name: '', rpc: '', chain: '', symbol: '', explorer: '' });
+  const [form, setForm] = useState(() =>
+    net === 'testnet'
+      ? { name: 'Arxon Testnet', rpc: DEFAULT_RPC, chain: String(ARXON.id), symbol: 'tARX', explorer: SCAN_URL }
+      : { name: '', rpc: '', chain: '', symbol: '', explorer: '' },
+  );
   const current = nets.find((net) => net.id === selected) ?? nets[0];
   const leave = () => (back ? back() : go(id === 'receive' ? 'home-funded' : 'receive', false));
 
@@ -39,7 +45,7 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     setSelected(netId);
     if (live?.app) {
       if (netId === 'testnet') {
-        void live.setNetwork('arxon');
+        void live.enableTestnet();
         live.setReceiveAsset('ARXt');
       } else if (netId === 'mainnet') {
         void live.setNetwork('ethereum');
@@ -53,12 +59,23 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   function save() {
     const name = form.name.trim();
     const rpc = form.rpc.trim();
+    const chain = form.chain.trim();
+    const arxon = chain === String(ARXON.id) || rpc.includes('rpc-test.arxon.io') || /arxon/i.test(name);
     if (name || rpc) {
       const id = `custom-${nets.length}`;
       setNets((prev) => [...prev, { id, name: name || 'Custom network', sub: rpc || 'Custom RPC', icon: 'plus.svg', pill: name || 'Custom network' }]);
       setSelected(id);
-      if (live?.app && rpc) void live.setRpcUrl(rpc);
     }
+    if (live?.app && arxon) {
+      void live.enableTestnet(rpc || DEFAULT_RPC).then(() => go('testnet', false));
+      return;
+    }
+    if (arxon) {
+      sessionStore.setTestnetAdded(true);
+      go('testnet', false);
+      return;
+    }
+    if (live?.app && rpc) void live.setRpcUrl(rpc);
     setForm({ name: '', rpc: '', chain: '', symbol: '', explorer: '' });
     if (back) back();
     else go('network', false);

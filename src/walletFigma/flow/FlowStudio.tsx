@@ -64,6 +64,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         sessionStorage.removeItem('arxon-flow-screen');
         jumpRef.current = jump;
         setStack([]);
+        if (jump === 'testnet') setNet('testnet');
         setId(jump);
       }
     } catch {
@@ -166,14 +167,14 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       }
       if (live?.app) {
         if (
-          dest === 'testnet' ||
+          (dest === 'testnet' && live.testnetAdded) ||
           dest.startsWith('vault') ||
           dest.startsWith('priv-') ||
           dest.startsWith('unshield-') ||
           dest === 'send-amount-vault'
         ) {
-          void live.setNetwork('arxon');
-        } else if (dest === 'home' || dest.startsWith('home-') || dest === 'more') {
+          if (dest === 'testnet' || live.testnetAdded) void live.setNetwork('arxon');
+        } else if (dest === 'home' || dest.startsWith('home-')) {
           void live.setNetwork('ethereum');
         }
       }
@@ -191,7 +192,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       ) {
         setNet('testnet');
       }
-      if (dest === 'home' || dest === 'home-funded' || dest === 'home-hidden' || dest === 'home-vaulted' || dest === 'home-unvaulted' || dest === 'more') {
+      if (dest === 'home' || dest === 'home-funded' || dest === 'home-hidden' || dest === 'home-vaulted' || dest === 'home-unvaulted') {
         setNet('mainnet');
       }
       if (!SCREEN_MAP[dest]) return;
@@ -313,7 +314,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           ? { width: 390, height: 844, zoom: appScale, background: ink.page, position: 'relative', overflow: 'hidden' }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {homeDesigned ? (
-            <HomeScreens id={id === 'testnet' ? 'home-funded' : id} network={id === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
+            <HomeScreens id={id} network={id === 'testnet' || net === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
           ) : tokenDesigned ? (
             <TokenScreens id={id} go={go} back={back} />
           ) : sendDesigned ? (
@@ -545,7 +546,6 @@ function HomeMock({ id, hidden, go, onToggleHide }: { id: string; hidden: boolea
 function PhoneTabs({ active, go }: { active: TabId; go: (id: string) => void }) {
   const tabs: [TabId, string, string][] = [
     ['home', 'Home', tabTarget('home')],
-    ['vault', 'Vault', tabTarget('vault')],
     ['explore', 'Explore', tabTarget('explore')],
     ['history', 'History', tabTarget('history')],
     ['account', 'Account', tabTarget('account')],

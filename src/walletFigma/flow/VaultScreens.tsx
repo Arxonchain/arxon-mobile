@@ -654,12 +654,11 @@ function Tabs({ go, here }: { go: Go; here: string }) {
   const net = useWalletNetwork();
   return (
     <WalletTabs
-      active="Vault"
+      active="Testnet"
       onSelect={(tab) => {
-        if (tab === 'Vault') return;
         pickWalletTab(net, tab, go, {
           home: tabTarget('home'),
-          vault: net === 'testnet' ? vaultEntry('vault-empty') : here,
+          vault: here,
           history: tabTarget('history'),
         });
       }}

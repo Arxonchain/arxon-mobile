@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { getAddress, type Address } from 'viem';
 import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/activity';
+import { START_URL, DEFAULT_RPC } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import type { EthereumToken, WalletNetworkId } from '@/chainWallet/networks';
@@ -104,6 +106,9 @@ type LiveFrame = {
   importKey: (key: string) => Promise<void>;
   setNetwork: (id: WalletNetworkId) => Promise<void>;
   setRpcUrl: (url: string) => Promise<string>;
+  testnetAdded: boolean;
+  enableTestnet: (rpc?: string) => Promise<void>;
+  openFaucet: () => void;
   send: (symbol: string, to: string, amount: string, testnet: boolean, mode?: LiveSendMode) => Promise<void>;
   unlock: (password: string) => Promise<boolean>;
   unlockBiometric: () => Promise<boolean>;
@@ -200,6 +205,27 @@ function isArxonSymbol(value: string) {
   return s === 'ARX' || s === 'ARXT' || s === 'TARX' || s === 'USDTARX' || s === 'USDCARX';
 }
 
+function listedStable(listed: ListedToken[], kind: 'USDT' | 'USDC') {
+  const row = listed.find((token) => {
+    const s = token.symbol.toUpperCase().replace(/[^A-Z]/g, '');
+    return s === kind || s === `${kind}ARX` || s === `ARX${kind}`;
+  });
+  return row ? `0.00 ${kind === 'USDT' ? 'USDTarx' : 'USDCarx'}` : `0.00 ${kind === 'USDT' ? 'USDTarx' : 'USDCarx'}`;
+}
+
+async function openArxonFaucet() {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      const { Browser } = await import('@capacitor/browser');
+      await Browser.open({ url: START_URL });
+      return;
+    }
+  } catch {
+    /* fall through */
+  }
+  window.open(START_URL, '_blank', 'noopener,noreferrer');
+}
+
 function isArxonStable(value: string) {
   const s = value.toUpperCase();
   return s === 'USDTARX' || s === 'USDCARX';
@@ -222,6 +248,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [receiveAsset, setReceiveAsset] = useState('ETH');
   const [receiveQr, setReceiveQr] = useState<string | null>(null);
   const [alt, setAlt] = useState<AltAddresses | null>(null);
+  const [testnetAdded, setTestnetAdded] = useState(() => sessionStore.testnetAdded());
 
   useEffect(() => {
     if (wallet.network === 'arxon') setArx(wallet.balance);
@@ -376,38 +403,40 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
   ];
 
-  const testnetTokens: LiveTok[] = [
-    {
-      name: 'Arxon',
-      amount: `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} ARXt`,
-      value: 'No USD price',
-      change: 'Arxon Testnet',
-      tone: 'flat',
-      icon: 'arx',
-      to: 'token-arx',
-      symbol: 'ARXt',
-    },
-    {
-      name: 'Tether',
-      amount: '0.00 USDTarx',
-      value: 'No USD price',
-      change: 'Arxon Testnet',
-      tone: 'flat',
-      icon: 'usdt',
-      to: 'token-usdt',
-      symbol: 'USDTarx',
-    },
-    {
-      name: 'USD Coin',
-      amount: '0.00 USDCarx',
-      value: 'No USD price',
-      change: 'Arxon Testnet',
-      tone: 'flat',
-      icon: 'usdc',
-      to: 'token-usdc',
-      symbol: 'USDCarx',
-    },
-  ];
+  const testnetTokens: LiveTok[] = testnetAdded
+    ? [
+        {
+          name: 'Arxon',
+          amount: `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} ARXt`,
+          value: 'No USD price',
+          change: 'Arxon Testnet',
+          tone: 'flat',
+          icon: 'arx',
+          to: 'token-arx',
+          symbol: 'ARXt',
+        },
+        {
+          name: 'Tether',
+          amount: listedStable(listed, 'USDT'),
+          value: 'No USD price',
+          change: 'Arxon Testnet',
+          tone: 'flat',
+          icon: 'usdt',
+          to: 'token-usdt',
+          symbol: 'USDTarx',
+        },
+        {
+          name: 'USD Coin',
+          amount: listedStable(listed, 'USDC'),
+          value: 'No USD price',
+          change: 'Arxon Testnet',
+          tone: 'flat',
+          icon: 'usdc',
+          to: 'token-usdc',
+          symbol: 'USDCarx',
+        },
+      ]
+    : [];
 
   const accounts = sessionStore.accounts();
   const current = accounts.find((row) => row.index === wallet.accountIndex) ?? accounts[0];
@@ -519,7 +548,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     hidden: hide.hidden,
     toggleHide: hide.toggle,
     tokens,
-    testnetTotal: qty(wallet.network === 'arxon' ? wallet.balance : arx, 4),
+    testnetTotal: testnetAdded ? qty(wallet.network === 'arxon' ? wallet.balance : arx, 4) : '0.00',
     testnetTokens,
     activity,
     inspect,
@@ -552,6 +581,16 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     importKey: wallet.importPrivateKey,
     setNetwork: wallet.setNetwork,
     setRpcUrl: wallet.setRpcUrl,
+    testnetAdded,
+    enableTestnet: async (rpc?: string) => {
+      sessionStore.setTestnetAdded(true);
+      setTestnetAdded(true);
+      await wallet.setRpcUrl(rpc?.trim() || DEFAULT_RPC);
+      await wallet.setNetwork('arxon');
+    },
+    openFaucet: () => {
+      void openArxonFaucet();
+    },
     send,
     unlock: async (password: string) => {
       const ok = await wallet.unlockSession(password);
@@ -714,6 +753,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     codes,
     tokens,
     testnetTokens,
+    testnetAdded,
     totalN,
     weighted,
     current,

@@ -64,6 +64,9 @@ export const sessionStore = {
   setVaultLockedUntil: (ms: number) => localStorage.setItem('arxon.vaultLockedUntil', String(ms)),
 
   hasPassword: () => !!localStorage.getItem('arxon.passHash'),
+
+  testnetAdded: () => localStorage.getItem('arxon.testnetAdded') === '1',
+  setTestnetAdded: (on: boolean) => localStorage.setItem('arxon.testnetAdded', on ? '1' : '0'),
 };
 
 let sessionPassword: string | null = null;

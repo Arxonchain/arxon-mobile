@@ -183,7 +183,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (to === 'testnet') {
-    await wallet.setNetwork('arxon');
+    if (sessionStore.testnetAdded()) await wallet.setNetwork('arxon');
     return {};
   }
   if (
@@ -192,6 +192,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     to.startsWith('unshield-') ||
     to === 'send-amount-vault'
   ) {
+    if (!sessionStore.testnetAdded()) return { replace: 'testnet' };
     await wallet.setNetwork('arxon');
     return {};
   }
