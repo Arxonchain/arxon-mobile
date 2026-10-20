@@ -159,6 +159,14 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [app, id, live?.locked, setShowToggle]);
 
   useEffect(() => {
+    if (!app || !live?.app || !live.ready) return;
+    if (live.address || live.locked) return;
+    if (isOnboardingScreen(id) || isWelcomeScreen(id)) return;
+    setStack([]);
+    setId('slide16');
+  }, [app, live?.app, live?.ready, live?.address, live?.locked, id]);
+
+  useEffect(() => {
     if (app) return;
     const stage = stageRef.current;
     if (!stage) return;
@@ -250,6 +258,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         setNet('mainnet');
       }
       if (!SCREEN_MAP[dest]) return;
+      if (isWelcomeScreen(dest) && !isSetupScreen(id)) {
+        setStack([]);
+        setId(dest);
+        if (!live?.app) setNote(null);
+        return;
+      }
       if ((isHomeRoot(dest) || dest === 'unlock') && isSetupScreen(id)) {
         setStack([]);
         setId(dest);

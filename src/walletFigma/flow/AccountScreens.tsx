@@ -44,7 +44,10 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
           navigator.clipboard?.writeText(full).catch(() => undefined);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1200);
-        }} go={go} />
+        }} go={go} onLogout={async () => {
+          if (live?.logout) await live.logout();
+          go('slide16', false);
+        }} />
       )}
       {id === 'currency' && (
         <Currency code={code} onPick={(next) => { setCode(next); go('account', false); }} onBack={() => leave('account')} />
@@ -71,7 +74,7 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Account({ code, copied, onCopy, go, label, shortAddr }: { code: string; copied: boolean; onCopy: () => void; go: Go; label: string; shortAddr: string }) {
+function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { code: string; copied: boolean; onCopy: () => void; go: Go; label: string; shortAddr: string; onLogout: () => void | Promise<void> }) {
   return (
     <>
       <PhoneStatus />
@@ -103,6 +106,11 @@ function Account({ code, copied, onCopy, go, label, shortAddr }: { code: string;
             <Row icon={art('dollar.svg')} label="Currency" value={code} onClick={() => go('currency')} />
             <Row icon={art('globe.svg')} label="Network" value="Arxon" onClick={() => go('network')} />
             <Row icon={art('help.svg')} label="Help & support" onClick={() => go('help')} />
+          </div>
+          <div style={{ ...accountCard, marginTop: 22 }}>
+            <button type="button" onClick={() => void onLogout()} style={rowBtn}>
+              <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontSize: 15, fontWeight: 500, lineHeight: 1.3, color: '#f25252' }}>Log out</span>
+            </button>
           </div>
         </div>
       </div>
