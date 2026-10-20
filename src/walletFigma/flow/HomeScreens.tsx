@@ -45,12 +45,9 @@ const AFTER_VAULT: Tok[] = [
   { name: 'USD Coin', amount: '30.00 USDC', value: '$30.00', change: '0.00%', tone: 'flat', icon: 'usdc', to: 'token-usdc' },
 ];
 
-const CARDS: { title: string; body: string; icon: 'mine' | 'fund' | 'privacy' | 'face' | 'claim'; to: string }[] = [
-  { title: 'Mine ARX', body: 'Earn ARX from your wallet', icon: 'mine', to: 'mine-entry' },
-  { title: 'Fund your wallet', body: 'Add ARX to get started', icon: 'fund', to: 'receive' },
-  { title: 'Privacy controls', body: 'Choose what each payment hides', icon: 'privacy', to: 'defaults' },
-  { title: 'Turn on Face ID', body: 'Unlock faster, stay secure', icon: 'face', to: 'face' },
-  { title: 'Claim your ARX', body: 'Convert your mining points', icon: 'claim', to: 'claim' },
+const CARDS: { title: string; body: string; kind: 'fund' | 'mine'; to: string }[] = [
+  { title: 'Fund your wallet', body: 'Add ARX to get started', kind: 'fund', to: 'receive' },
+  { title: 'Mine ARX-P', body: 'Earn ARX-P in the mining app', kind: 'mine', to: 'mine-entry' },
 ];
 
 export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id: string; go: Go; back?: () => void; behind?: string; network?: 'mainnet' | 'testnet' }) {
@@ -83,9 +80,6 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
     setLocalHide(false);
   }, [id]);
 
-  useEffect(() => {
-    if (view === 'home-hidden' && cards.current) cards.current.scrollLeft = 184;
-  }, [view]);
 
   const total = liveRows
     ? live!.total
@@ -176,11 +170,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       {empty && (
         <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 396, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
           {CARDS.map((card) => (
-            <button key={card.title} type="button" onClick={() => go(card.to)} style={cardBtn}>
-              <CardIcon kind={card.icon} />
-              <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'left' }}>{card.title}</span>
-              <span style={{ fontSize: 12, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.35 }}>{card.body}</span>
-            </button>
+            <StartCard key={card.title} kind={card.kind} title={card.title} body={card.body} onClick={() => go(card.to)} />
           ))}
         </div>
       )}
@@ -438,12 +428,30 @@ function Tab({ label, active, onClick, children }: { label: string; active?: boo
   );
 }
 
-function CardIcon({ kind }: { kind: 'mine' | 'fund' | 'privacy' | 'face' | 'claim' }) {
-  if (kind === 'mine') return <span style={{ color: '#abc9ff', fontSize: 20, fontWeight: 700, lineHeight: 1 }}>M</span>;
-  if (kind === 'fund') return <FigmaImg src={art('plus.svg')} width={18} height={18} />;
-  if (kind === 'privacy') return <FigmaImg src={art('shield-card.svg')} width={18} height={18} />;
-  if (kind === 'face') return <FigmaImg src={art('face.svg')} width={18} height={18} />;
-  return <FigmaImg src={art('claim.svg')} width={18.9} height={18.9} />;
+function StartCard({ kind, title, body, onClick }: { kind: 'fund' | 'mine'; title: string; body: string; onClick: () => void }) {
+  if (kind === 'mine') {
+    return (
+      <button type="button" onClick={onClick} style={mineCardBtn}>
+        <img
+          src={art('mine-dashboard.png')}
+          alt=""
+          style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 22%' }}
+        />
+        <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,5,5,0.05) 18%, rgba(5,5,5,0.88) 72%)' }} />
+        <span style={{ position: 'relative', zIndex: 1, padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, width: '100%', boxSizing: 'border-box' }}>
+          <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'left' }}>{title}</span>
+          <span style={{ fontSize: 12, fontWeight: 400, color: '#d0d3d8', textAlign: 'left', lineHeight: 1.35 }}>{body}</span>
+        </span>
+      </button>
+    );
+  }
+  return (
+    <button type="button" onClick={onClick} style={cardBtn}>
+      <FigmaImg src={art('plus.svg')} width={18} height={18} />
+      <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'left' }}>{title}</span>
+      <span style={{ fontSize: 12, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.35 }}>{body}</span>
+    </button>
+  );
 }
 
 function TokenIcon({ kind }: { kind: Tok['icon'] }) {
@@ -524,6 +532,7 @@ const actionBtn: CSSProperties = { width: 78, display: 'flex', flexDirection: 'c
 const actionLabel: CSSProperties = { fontSize: 14, fontWeight: 400, lineHeight: 1 };
 const circle: CSSProperties = { width: 58, height: 58, borderRadius: 29, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const cardBtn: CSSProperties = { width: 172, height: 132, flexShrink: 0, borderRadius: 16, background: '#1c2025', border: 'none', color: '#fff', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontFamily: font.sans, boxSizing: 'border-box' };
+const mineCardBtn: CSSProperties = { width: 220, height: 132, flexShrink: 0, borderRadius: 16, background: '#0b1118', border: 'none', color: '#fff', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', cursor: 'pointer', fontFamily: font.sans, boxSizing: 'border-box', position: 'relative', overflow: 'hidden' };
 const tokenRow: CSSProperties = { width: '100%', height: 64, display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
 const scrim: CSSProperties = { position: 'absolute', inset: 0, border: 'none', padding: 0, background: 'rgba(0,0,0,0.6)', cursor: 'pointer' };
 const sheetBox: CSSProperties = { position: 'absolute', left: 0, top: 608, width: 390, height: 236, background: '#12171f', border: '1px solid #293347', borderBottom: 'none', borderRadius: '24px 24px 0 0', boxSizing: 'border-box', textAlign: 'left', zIndex: 1 };

@@ -1,5 +1,5 @@
-import { createContext, useContext, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { font } from '@/walletFigma/tokens';
 import FlowStudio from './FlowStudio';
 import { LiveFrameProvider } from './liveFrame';
@@ -21,9 +21,30 @@ export function useWalletModeActions() {
   return useContext(WalletModeActionsContext);
 }
 
+const MINE_PREFIXES = [
+  '/mine',
+  '/mining',
+  '/arena',
+  '/games',
+  '/profile',
+  '/tasks',
+  '/referrals',
+  '/nexus',
+  '/leaderboard',
+  '/settings',
+  '/notifications',
+  '/points-history',
+  '/word-forge',
+];
+
+function isMiningPath(path: string) {
+  return MINE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
 /** One app, two modes. Wallet is the real chain wallet. Mining is the existing V2 miner. */
 export default function ModeShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showToggle, setShowToggle] = useState(false);
   const [mode, setMode] = useState<Mode>(() => {
     try {
@@ -32,23 +53,35 @@ export default function ModeShell({ children }: { children: ReactNode }) {
       return 'wallet';
     }
   });
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+  const locRef = useRef(location);
+  locRef.current = location;
+  const lastMiningPath = useRef(isMiningPath(location.pathname) ? `${location.pathname}${location.search}` : '/mine');
   const chrome = useMemo(() => ({ showToggle, setShowToggle }), [showToggle]);
   const showBar = mode === 'mining' || showToggle;
 
-  function choose(next: Mode) {
+  const choose = useCallback((next: Mode) => {
+    const prev = modeRef.current;
+    const loc = locRef.current;
+    if (prev === 'mining') {
+      lastMiningPath.current = `${loc.pathname}${loc.search}` || '/mine';
+    }
     setMode(next);
     try {
       sessionStorage.setItem('arxon-app-mode', next);
     } catch {
       /* ignore */
     }
-    navigate(next === 'mining' ? '/mine' : '/');
-  }
+    if (next === 'mining') {
+      const dest = lastMiningPath.current || '/mine';
+      if (`${loc.pathname}${loc.search}` !== dest) navigate(dest);
+    }
+  }, [navigate]);
 
   const actions = useMemo<WalletModeActions>(
     () => ({ openMining: () => choose('mining'), openWallet: () => choose('wallet') }),
-    // choose is stable enough for this shell
-    [],
+    [choose],
   );
 
   return (
@@ -71,15 +104,20 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           <ModeToggle mode={mode} onChoose={choose} />
         </div>
         ) : null}
-        {mode === 'wallet' ? (
-          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
-            <LiveFrameProvider>
-              <FlowStudio app />
-            </LiveFrameProvider>
-          </div>
-        ) : (
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>{children}</div>
-        )}
+        <div
+          aria-hidden={mode !== 'wallet'}
+          style={{ flex: 1, minHeight: 0, overflow: 'hidden', display: mode === 'wallet' ? 'flex' : 'none', flexDirection: 'column' }}
+        >
+          <LiveFrameProvider>
+            <FlowStudio app />
+          </LiveFrameProvider>
+        </div>
+        <div
+          aria-hidden={mode !== 'mining'}
+          style={{ flex: 1, minHeight: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none' }}
+        >
+          {children}
+        </div>
       </div>
       </ModeChromeContext.Provider>
       </WalletModeActionsContext.Provider>
