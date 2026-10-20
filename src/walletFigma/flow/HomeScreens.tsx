@@ -174,7 +174,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       </div>
 
       {empty && (
-        <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 396, width: 390, display: 'flex', gap: 12, overflowX: 'auto', padding: '0 18px', boxSizing: 'border-box' }}>
+        <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 396, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
           {CARDS.map((card) => (
             <button key={card.title} type="button" onClick={() => go(card.to)} style={cardBtn}>
               <CardIcon kind={card.icon} />
@@ -190,7 +190,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const } : {}) }}>
+      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : {}) }}>
         {tokens.map((token) => (
           <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
             <TokenIcon kind={token.icon} />
@@ -285,7 +285,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         </div>
       )}
 
-      <div style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
+      <div style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, marginBottom: 16 }}>
           <button type="button" onClick={() => go('accounts')} style={plain}>
             <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />

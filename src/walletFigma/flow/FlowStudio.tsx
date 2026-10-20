@@ -28,6 +28,32 @@ import { isHomeRoot, isOnboardingScreen, isSetupScreen, isWelcomeScreen, useMode
 import { markBootOk } from '@/lib/bootState';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
+
+const APP_SCROLL_CSS = `
+.arxon-app-frame { transform: translateZ(0); }
+.arxon-app-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-x pan-y;
+  scrollbar-width: thin;
+}
+.arxon-app-scroll .home-cards,
+.arxon-app-scroll .dapp-row {
+  overflow-x: auto !important;
+  overflow-y: hidden;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+.arxon-app-frame nav {
+  position: fixed !important;
+  top: auto !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 390px !important;
+  z-index: 8;
+}
+`;
 const CHECKS = [3, 7, 12];
 
 export default function FlowStudio({ app = false }: { app?: boolean }) {
@@ -125,8 +151,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!stage) return;
     const measure = () => {
       const w = Math.max(stage.clientWidth, 1);
-      const h = Math.max(stage.clientHeight, 1);
-      setAppScale(Math.min(w / 390, h / 844));
+      setAppScale(Math.min(1, w / 390));
     };
     measure();
     const watcher = new ResizeObserver(measure);
@@ -308,11 +333,35 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           <span style={{ color: ink.secondary, fontSize: 12 }}>{screen.name}</span>
         </div>
         )}
-        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
         <WalletNetworkContext.Provider value={net}>
-        <div style={app
-          ? { width: 390, height: 844, zoom: appScale, background: ink.page, position: 'relative', overflow: 'hidden' }
-          : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div
+          className={app ? 'arxon-app-frame' : undefined}
+          style={app
+          ? {
+            width: 390,
+            height: appScale > 0 && appScale < 1 ? `${100 / appScale}%` : '100%',
+            transform: appScale > 0 && appScale < 1 ? `scale(${appScale})` : 'translateZ(0)',
+            transformOrigin: 'top center',
+            background: ink.page,
+            position: 'relative',
+            overflow: 'hidden',
+          }
+          : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'auto', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
+          {app ? <style>{APP_SCROLL_CSS}</style> : null}
+          <div
+            className={app ? 'arxon-app-scroll' : undefined}
+            style={app ? {
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 0,
+              bottom: isOnboardingScreen(id) ? 0 : 80,
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              WebkitOverflowScrolling: 'touch',
+            } : { height: '100%' }}
+          >
           {homeDesigned ? (
             <HomeScreens id={id} network={id === 'testnet' || net === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
           ) : tokenDesigned ? (
@@ -356,6 +405,8 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           ) : (
             <Body screen={shown} hidden={hidden} onToggleHide={() => { setHidden((v) => !v); go(hidden ? 'home' : 'home-hidden', false); }} go={go} back={back} backup={backup} setBackup={setBackup} password={password} setPassword={setPassword} confirm={confirm} setConfirm={setConfirm} agree={agree} setAgree={setAgree} phrasePick={phrasePick} setPhrasePick={setPhrasePick} flags={flags} setFlags={setFlags} toast={setNote} />
           )}
+          {shown.tab && !homeDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
+          </div>
           {overlay && (
             <button type="button" onClick={() => go(overlay.parent || 'home', false)} style={{ position: 'absolute', inset: 0, zIndex: 6, background: 'rgba(0,0,0,0.55)', border: 'none', padding: 0 }}>
               <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: ink.card, borderRadius: '16px 16px 0 0', padding: 18, textAlign: 'left' }}>
@@ -363,7 +414,6 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
               </div>
             </button>
           )}
-          {shown.tab && !homeDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
         </div>
         </WalletNetworkContext.Provider>
         </div>

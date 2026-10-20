@@ -98,7 +98,7 @@ function Dapps({ chip, setChip, onBack, open }: { chip: string; setChip: (v: str
       <Back onClick={onBack} />
       <p style={headline}>dApps</p>
       <p style={lead}>Apps you can connect to your wallet.</p>
-      <div style={{ position: 'absolute', left: 18, top: 190, display: 'flex', gap: 10 }}>
+      <div className="dapp-row" style={{ position: 'absolute', left: 18, top: 190, display: 'flex', gap: 10, maxWidth: 354, overflowX: 'auto' }}>
         {CHIPS.map((label) => (
           <button key={label} type="button" onClick={() => setChip(label)} style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: chip === label ? '#accafe' : '#1c2025', color: chip === label ? '#0c1018' : '#8b9097', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{label}</button>
         ))}
