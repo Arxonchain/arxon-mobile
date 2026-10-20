@@ -1,5 +1,5 @@
-import { english, generateMnemonic, hexToBytes, mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
-import type { Hex } from 'viem';
+import { english, generateMnemonic, mnemonicToAccount, privateKeyToAccount } from 'viem/accounts';
+import { hexToBytes, type Hex } from 'viem';
 
 export function newMnemonic(): string {
   return generateMnemonic(english);
