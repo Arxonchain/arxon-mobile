@@ -1,3 +1,4 @@
+import { useAppHidesFigmaChrome } from './appChrome';
 import type { CSSProperties, ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
 
@@ -56,16 +57,21 @@ function ReadyRow({ children }: { children: ReactNode }) {
 }
 
 function Screen({ children }: { children: ReactNode }) {
+  const hide = useAppHidesFigmaChrome();
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+      {hide ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
         <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
       </div>
+      )}
       {children}
+      {hide ? null : (
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, display: 'flex', justifyContent: 'center', opacity: 0.25 }}>
         <div style={{ width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
       </div>
+      )}
     </div>
   );
 }

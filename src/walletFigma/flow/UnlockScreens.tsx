@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 
 const art = (name: string) => `/wallet-figma/unlock/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -223,17 +224,22 @@ function Mark() {
 }
 
 function Screen({ children, clock = 'flow' }: { children: ReactNode; clock?: 'flow' | 'ready' }) {
+  const hide = useAppHidesFigmaChrome();
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`input::placeholder { color: #5c5f64; }`}</style>
+      {hide ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44, zIndex: 3 }}>
         <span style={{ position: 'absolute', left: clock === 'ready' ? 28 : 21, top: clock === 'ready' ? 13 : 14, width: clock === 'ready' ? undefined : 54, textAlign: 'center', fontSize: clock === 'ready' ? 15 : 14, fontWeight: 600, letterSpacing: clock === 'ready' ? 0 : -0.28 }}>9:41</span>
         <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: clock === 'ready' ? 296 : 288.67, top: clock === 'ready' ? 17 : 17.33 }} />
       </div>
+      )}
       {children}
+      {hide ? null : (
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, display: 'flex', justifyContent: 'center', opacity: 0.25, zIndex: 4, pointerEvents: 'none' }}>
         <div style={{ width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
       </div>
+      )}
     </div>
   );
 }

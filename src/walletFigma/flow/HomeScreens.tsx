@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { rememberTabs, vaultEntry } from './VaultScreens';
 import { pickWalletTab, WalletTabs, type WalletTabName } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 import { font } from '@/walletFigma/tokens';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
@@ -52,6 +53,7 @@ const CARDS: { title: string; body: string; icon: 'mine' | 'fund' | 'privacy' | 
 
 export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id: string; go: Go; back?: () => void; behind?: string; network?: 'mainnet' | 'testnet' }) {
   const live = useLiveFrame();
+  const hideChrome = useAppHidesFigmaChrome();
   const [localHide, setLocalHide] = useState(false);
   const cards = useRef<HTMLDivElement>(null);
   const sheet = id === 'more';
@@ -114,10 +116,12 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   return (
     <div style={{ position: 'relative', width: 390, height: liveRows && empty ? 1040 : 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.home-cards::-webkit-scrollbar{display:none}.home-cards{scrollbar-width:none}`}</style>
+      {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
         <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
       </div>
+      )}
 
       <header style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <button type="button" onClick={() => go('accounts')} style={plain}>

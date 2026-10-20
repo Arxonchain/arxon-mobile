@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 
 const art = (name: string) => `/wallet-figma/buy/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -178,6 +179,8 @@ function Back({ onClick }: { onClick: () => void }) {
 }
 
 function PhoneStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
@@ -187,6 +190,8 @@ function PhoneStatus() {
 }
 
 function HomeBar() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <div style={{ position: 'absolute', left: 8, top: 810, width: 375, height: 34, opacity: 0.25, pointerEvents: 'none' }}>
       <div style={{ position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', width: 134, height: 5, borderRadius: 100, background: '#fff' }} />

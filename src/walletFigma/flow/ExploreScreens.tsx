@@ -1,3 +1,4 @@
+import { useAppHidesFigmaChrome } from './appChrome';
 import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
@@ -175,6 +176,8 @@ function Back({ onClick }: { onClick: () => void }) {
 }
 
 function NoteStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600 }}>9:41</span>
@@ -184,6 +187,8 @@ function NoteStatus() {
 }
 
 function PhoneStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>

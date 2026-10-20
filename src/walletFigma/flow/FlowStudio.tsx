@@ -24,7 +24,7 @@ import { isPrivacyScreen, PrivacyScreens } from './PrivacyScreens';
 import { isExploreScreen, ExploreScreens } from './ExploreScreens';
 import { WalletNetworkContext, type WalletNet } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
-import { isOnboardingScreen, useModeChrome } from './modeChrome';
+import { isHomeRoot, isOnboardingScreen, isSetupScreen, isWelcomeScreen, useModeChrome } from './modeChrome';
 import { markBootOk } from '@/lib/bootState';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
@@ -47,6 +47,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const [menu, setMenu] = useState(!app);
   const [net, setNet] = useState<WalletNet>('mainnet');
   const stageRef = useRef<HTMLDivElement>(null);
+  const jumpRef = useRef<string | null>(null);
   const [fit, setFit] = useState(1);
 
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
@@ -56,7 +57,23 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, []);
 
   useEffect(() => {
+    if (!app) return;
+    try {
+      const jump = sessionStorage.getItem('arxon-flow-screen');
+      if (jump && SCREEN_MAP[jump]) {
+        sessionStorage.removeItem('arxon-flow-screen');
+        jumpRef.current = jump;
+        setStack([]);
+        setId(jump);
+      }
+    } catch {
+      /* preview jump is optional */
+    }
+  }, [app]);
+
+  useEffect(() => {
     if (!app || !live?.app || !live.ready) return;
+    if (jumpRef.current) return;
     if (live.startId && live.startId !== 'splash' && (id === 'splash' || (live.locked && id !== 'unlock' && id !== 'unlock-wrong'))) {
       setId(live.startId);
     }
@@ -74,6 +91,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
 
   useEffect(() => {
     if (id !== 'splash') return;
+    if (jumpRef.current) return;
     if (app && live?.startId && live.startId !== 'splash') return;
     const t = window.setTimeout(() => go('gateway', false), 1600);
     return () => window.clearTimeout(t);
@@ -173,6 +191,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         setNet('mainnet');
       }
       if (!SCREEN_MAP[dest]) return;
+      if ((isHomeRoot(dest) || dest === 'unlock') && isSetupScreen(id)) {
+        setStack([]);
+        setId(dest);
+        if (!live?.app) setNote(null);
+        return;
+      }
       if (remember) setStack((prev) => [...prev, id]);
       setId(dest);
       if (!live?.app) setNote(null);
@@ -180,10 +204,26 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }
 
   function back() {
-    const prev = stack[stack.length - 1];
-    if (!prev) return;
-    setStack((s) => s.slice(0, -1));
-    setId(prev);
+    const walleted = Boolean(live?.app && (live.address || live.startId === 'home' || live.startId === 'unlock'));
+    let rest = stack.slice();
+    while (rest.length) {
+      const prev = rest[rest.length - 1];
+      rest = rest.slice(0, -1);
+      if (walleted && (isWelcomeScreen(prev) || (isOnboardingScreen(prev) && !isOnboardingScreen(id)))) {
+        continue;
+      }
+      setStack(rest);
+      setId(prev);
+      return;
+    }
+    setStack([]);
+    if (walleted && !isOnboardingScreen(id) && !isWelcomeScreen(id)) {
+      setId('home');
+      return;
+    }
+    if (id === 'create' || id === 'import' || id === 'backup' || id === 'backup-manual' || id === 'drive-connect') {
+      setId('slide16');
+    }
   }
 
   const homeDesigned = id === 'home' || id === 'home-hidden' || id === 'home-funded' || id === 'more' || id === 'home-vaulted' || id === 'home-unvaulted' || id === 'testnet';
@@ -269,47 +309,47 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           ? { width: 390, height: 844, zoom: appScale, background: ink.page, position: 'relative', overflow: 'hidden' }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'hidden', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
           {homeDesigned ? (
-            <HomeScreens id={id === 'testnet' ? 'home-funded' : id} network={id === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={stack.length ? back : undefined} behind={stack[stack.length - 1]} />
+            <HomeScreens id={id === 'testnet' ? 'home-funded' : id} network={id === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
           ) : tokenDesigned ? (
-            <TokenScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <TokenScreens id={id} go={go} back={back} />
           ) : sendDesigned ? (
-            <SendScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <SendScreens id={id} go={go} back={back} />
           ) : receiveDesigned ? (
-            <ReceiveScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <ReceiveScreens id={id} go={go} back={back} />
           ) : swapDesigned ? (
-            <SwapScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <SwapScreens id={id} go={go} back={back} />
           ) : buyDesigned ? (
-            <BuyScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <BuyScreens id={id} go={go} back={back} />
           ) : activityDesigned ? (
-            <ActivityScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <ActivityScreens id={id} go={go} back={back} />
           ) : receiptDesigned ? (
-            <ReceiptScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <ReceiptScreens id={id} go={go} back={back} />
           ) : claimDesigned ? (
-            <ClaimScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <ClaimScreens id={id} go={go} back={back} />
           ) : vaultDesigned ? (
-            <VaultScreens id={id} go={go} back={stack.length ? back : undefined} behind={stack[stack.length - 1]} password={password} />
+            <VaultScreens id={id} go={go} back={back} behind={stack[stack.length - 1]} password={password} />
           ) : accountDesigned ? (
-            <AccountScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <AccountScreens id={id} go={go} back={back} />
           ) : privacyDesigned ? (
-            <PrivacyScreens id={id} go={go} back={stack.length ? back : undefined} password={password} setPassword={setPassword} />
+            <PrivacyScreens id={id} go={go} back={back} password={password} setPassword={setPassword} />
           ) : exploreDesigned ? (
-            <ExploreScreens id={id} go={go} back={stack.length ? back : undefined} />
+            <ExploreScreens id={id} go={go} back={back} />
           ) : unlockDesigned ? (
-            <UnlockScreens id={id} go={go} back={stack.length ? back : undefined} password={password} />
+            <UnlockScreens id={id} go={go} back={back} password={password} />
           ) : shown.id === 'splash' || shown.id === 'gateway' || shown.id === 'slide15' || shown.id === 'slide16' ? (
             <WelcomeScreens id={shown.id} go={go} />
           ) : shown.id === 'create' || shown.id === 'backup' || shown.id === 'backup-manual' || shown.id === 'drive-connect' || shown.id === 'drive-confirm' || shown.id === 'drive-done' ? (
-            <CreateWalletScreens id={shown.id} go={go} back={stack.length ? back : undefined} password={password} setPassword={setPassword} confirm={confirm} setConfirm={setConfirm} agree={agree} setAgree={setAgree} backup={backup} setBackup={setBackup} />
+            <CreateWalletScreens id={shown.id} go={go} back={back} password={password} setPassword={setPassword} confirm={confirm} setConfirm={setConfirm} agree={agree} setAgree={setAgree} backup={backup} setBackup={setBackup} />
           ) : shown.id === 'caution1' || shown.id === 'caution2' || shown.id === 'caution3' || shown.id === 'phrase-hidden' || shown.id === 'phrase-shown' || shown.id === 'phrase-confirm' || shown.id === 'phrase-done' ? (
-            <PhraseBackupScreens id={shown.id} go={go} back={stack.length ? back : undefined} />
+            <PhraseBackupScreens id={shown.id} go={go} back={back} />
           ) : shown.id === 'import' ? (
-            <ImportWalletScreen go={go} back={stack.length ? back : undefined} />
+            <ImportWalletScreen go={go} back={back} />
           ) : shown.id === 'face' || shown.id === 'ready-skip' ? (
             <FinishScreens id={shown.id} go={go} />
           ) : shown.id === 'search' || shown.id === 'manage' || shown.id === 'add-token' || shown.id === 'notifications' ? (
-            <FindScreens id={shown.id} go={go} back={stack.length ? back : undefined} />
+            <FindScreens id={shown.id} go={go} back={back} />
           ) : (
-            <Body screen={shown} hidden={hidden} onToggleHide={() => { setHidden((v) => !v); go(hidden ? 'home' : 'home-hidden', false); }} go={go} back={stack.length ? back : undefined} backup={backup} setBackup={setBackup} password={password} setPassword={setPassword} confirm={confirm} setConfirm={setConfirm} agree={agree} setAgree={setAgree} phrasePick={phrasePick} setPhrasePick={setPhrasePick} flags={flags} setFlags={setFlags} toast={setNote} />
+            <Body screen={shown} hidden={hidden} onToggleHide={() => { setHidden((v) => !v); go(hidden ? 'home' : 'home-hidden', false); }} go={go} back={back} backup={backup} setBackup={setBackup} password={password} setPassword={setPassword} confirm={confirm} setConfirm={setConfirm} agree={agree} setAgree={setAgree} phrasePick={phrasePick} setPhrasePick={setPhrasePick} flags={flags} setFlags={setFlags} toast={setNote} />
           )}
           {overlay && (
             <button type="button" onClick={() => go(overlay.parent || 'home', false)} style={{ position: 'absolute', inset: 0, zIndex: 6, background: 'rgba(0,0,0,0.55)', border: 'none', padding: 0 }}>

@@ -2,6 +2,7 @@ import { useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 
 const art = (name: string) => `/wallet-figma/find/${name}`;
 
@@ -36,6 +37,7 @@ const EARLIER: { title: string; body: string; time: string; icon: NoteIcon; tab:
 ];
 
 export function FindScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const hideChrome = useAppHidesFigmaChrome();
   const leave = () => (back ? back() : go(id === 'add-token' ? 'manage' : 'home', false));
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
@@ -45,9 +47,11 @@ export function FindScreens({ id, go, back }: { id: string; go: Go; back?: () =>
       {id === 'manage' && <Manage go={go} leave={leave} />}
       {id === 'add-token' && <AddToken go={go} leave={leave} />}
       {id === 'notifications' && <Notes leave={leave} />}
+      {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 8, top: 810, width: 375, height: 34, opacity: 0.25, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
       </div>
+      )}
     </div>
   );
 }
@@ -302,6 +306,8 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Status({ clock }: { clock: 'flow' | 'note' }) {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
       <span style={{ position: 'absolute', left: clock === 'note' ? 28 : 21, top: clock === 'note' ? 13 : 14, width: clock === 'note' ? undefined : 54, textAlign: 'center', fontSize: clock === 'note' ? 15 : 14, fontWeight: 600, letterSpacing: clock === 'note' ? 0 : -0.28 }}>9:41</span>

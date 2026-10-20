@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 import { clearVaultFails, registerVaultFail, sessionStore } from '@/chainWallet/session';
 
 const IDS = new Set([
@@ -734,6 +735,8 @@ function Max({ onClick }: { onClick: () => void }) {
 }
 
 function PhoneStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>

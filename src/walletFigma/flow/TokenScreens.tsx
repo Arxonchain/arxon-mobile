@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { vaultEntry } from './VaultScreens';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 
 const art = (name: string) => `/wallet-figma/token/${name}`;
@@ -92,6 +93,7 @@ const RANGES = ['1H', '1D', '1W', '1M', '1Y', 'All'];
 
 export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
+  const hideChrome = useAppHidesFigmaChrome();
   const net = useWalletNetwork();
   const frame = FRAMES[id] ?? FRAMES['token-arx'];
   const liveTok = live?.app
@@ -122,8 +124,12 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+      {hideChrome ? null : (
+      <>
       <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600 }}>9:41</span>
       <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 296, top: 17 }} />
+      </>
+      )}
       <button type="button" aria-label="Back" onClick={leave} style={{ ...round, left: 18, top: 56 }}>
         <FigmaImg src={art('chev.svg')} width={20} height={20} />
       </button>
@@ -215,9 +221,11 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
         );
       })}
 
+      {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 8, top: 810, width: 375, height: 34, opacity: 0.25, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
       </div>
+      )}
     </div>
   );
 }

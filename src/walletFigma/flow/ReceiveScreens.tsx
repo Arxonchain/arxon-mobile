@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 
 const art = (name: string) => `/wallet-figma/receive/${name}`;
@@ -241,6 +242,8 @@ function Back({ top, onClick }: { top: number; onClick: () => void }) {
 }
 
 function PhoneStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28, zIndex: 2 }}>9:41</span>
@@ -250,6 +253,8 @@ function PhoneStatus() {
 }
 
 function NoteStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600, zIndex: 3 }}>9:41</span>
@@ -259,6 +264,8 @@ function NoteStatus() {
 }
 
 function HomeBar() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <div style={{ position: 'absolute', left: 8, top: 810, width: 375, height: 34, opacity: 0.25, pointerEvents: 'none' }}>
       <div style={{ position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', width: 134, height: 5, borderRadius: 100, background: '#fff' }} />

@@ -4,6 +4,7 @@ import { font } from '@/walletFigma/tokens';
 import { rememberFromActivity, tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame, type LiveActivity } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -334,6 +335,8 @@ function Tabs({ go, here }: { go: Go; here: string }) {
 }
 
 function PhoneStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
@@ -343,6 +346,8 @@ function PhoneStatus() {
 }
 
 function NoteStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600 }}>9:41</span>

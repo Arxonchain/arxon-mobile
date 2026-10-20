@@ -4,6 +4,7 @@ import { font } from '@/walletFigma/tokens';
 import { tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 
 const art = (name: string) => `/wallet-figma/account/${name}`;
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
@@ -275,6 +276,8 @@ function Back({ onClick }: { onClick: () => void }) {
 }
 
 function PhoneStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
@@ -284,6 +287,8 @@ function PhoneStatus() {
 }
 
 function NoteStatus() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600 }}>9:41</span>
@@ -293,6 +298,8 @@ function NoteStatus() {
 }
 
 function HomeBar() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return <div style={{ position: 'absolute', left: 128, top: 831, width: 134, height: 5, borderRadius: 100, background: '#fff', opacity: 0.25 }} />;
 }
 

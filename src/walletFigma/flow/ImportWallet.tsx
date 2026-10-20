@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 import { font } from '@/walletFigma/tokens';
 
 type Go = (id: string, remember?: boolean) => void;
@@ -7,6 +8,7 @@ type Mode = 'phrase' | 'key';
 
 export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) {
   const live = useLiveFrame();
+  const hideChrome = useAppHidesFigmaChrome();
   const [mode, setMode] = useState<Mode>('phrase');
   const [err, setErr] = useState<string | null>(null);
   const [phrase, setPhrase] = useState('');
@@ -32,10 +34,12 @@ export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`textarea::placeholder { color: #5c5f64; }`}</style>
+      {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
         <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
         <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
       </div>
+      )}
       <button type="button" onClick={() => (back ? back() : go('slide16', false))} aria-label="Back" style={backBtn}>
         <img src="/wallet-figma/create/chev.svg" alt="" width={20} height={20} />
       </button>
@@ -84,9 +88,11 @@ export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) 
       }} style={{ ...importBtn, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64', cursor: ready ? 'pointer' : 'default' }}>
         Import wallet
       </button>
+      {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 8, display: 'flex', justifyContent: 'center', opacity: 0.25 }}>
         <div style={{ width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
       </div>
+      )}
     </div>
   );
 }

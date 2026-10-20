@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
 
 const art = (name: string) => `/wallet-figma/receipt/${name}`;
 const CODE = 'ARX-7K2M-93QD-LX4P';
@@ -198,6 +199,8 @@ function Card({ top, rows }: { top: number; rows: string[][] }) {
 }
 
 function Status() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return (
     <>
       <span style={{ position: 'absolute', left: 28, top: 13, fontSize: 15, fontWeight: 600 }}>9:41</span>
@@ -207,6 +210,8 @@ function Status() {
 }
 
 function HomeBar() {
+  const hide = useAppHidesFigmaChrome();
+  if (hide) return null;
   return <div style={{ position: 'absolute', left: 128, top: 831, width: 134, height: 5, borderRadius: 100, background: '#fff', opacity: 0.25 }} />;
 }
 
