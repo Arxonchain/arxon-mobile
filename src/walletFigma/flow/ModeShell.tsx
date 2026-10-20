@@ -61,20 +61,18 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           style={{
             flexShrink: 0,
             zIndex: 60,
-            height: 48,
+            height: 28,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: 8,
             background: '#050505',
           }}
         >
-          <Toggle on={mode === 'wallet'} onClick={() => choose('wallet')}>Wallet</Toggle>
-          <Toggle on={mode === 'mining'} onClick={() => choose('mining')}>Mining</Toggle>
+          <ModeToggle mode={mode} onChoose={choose} />
         </div>
         ) : null}
         {mode === 'wallet' ? (
-          <div style={{ flex: 1, minHeight: 0, overflow: 'auto' }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
             <LiveFrameProvider>
               <FlowStudio app />
             </LiveFrameProvider>
@@ -89,25 +87,59 @@ export default function ModeShell({ children }: { children: ReactNode }) {
   );
 }
 
-function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; children: ReactNode }) {
+function ModeToggle({ mode, onChoose }: { mode: Mode; onChoose: (next: Mode) => void }) {
+  const mining = mode === 'mining';
   return (
-    <button
-      type="button"
-      onClick={onClick}
+    <div
+      role="tablist"
+      aria-label="Wallet or Mining"
       style={{
-        height: 32,
-        minWidth: 96,
-        borderRadius: 8,
-        border: 'none',
-        cursor: 'pointer',
-        background: on ? '#accafe' : '#1c2025',
-        color: on ? '#0c1018' : '#fff',
-        fontFamily: font.sans,
-        fontSize: 14,
-        fontWeight: 600,
+        position: 'relative',
+        width: 118,
+        height: 22,
+        boxSizing: 'border-box',
+        padding: 2,
+        borderRadius: 11,
+        background: '#1c2025',
       }}
     >
-      {children}
-    </button>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          top: 2,
+          left: mining ? 59 : 2,
+          width: 57,
+          height: 18,
+          borderRadius: 9,
+          background: '#accafe',
+          transition: 'left 160ms ease',
+        }}
+      />
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', height: 18 }}>
+        <button type="button" role="tab" aria-selected={!mining} onClick={() => onChoose('wallet')} style={modeBtn(!mining)}>
+          Wallet
+        </button>
+        <button type="button" role="tab" aria-selected={mining} onClick={() => onChoose('mining')} style={modeBtn(mining)}>
+          Mining
+        </button>
+      </div>
+    </div>
   );
+}
+
+function modeBtn(on: boolean) {
+  return {
+    flex: 1,
+    height: 18,
+    border: 'none',
+    background: 'transparent',
+    cursor: 'pointer',
+    color: on ? '#0c1018' : '#8c8f99',
+    fontFamily: font.sans,
+    fontSize: 10,
+    fontWeight: 600,
+    lineHeight: '18px',
+    padding: 0,
+  };
 }

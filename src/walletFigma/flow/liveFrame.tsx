@@ -4,7 +4,7 @@ import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/ac
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import type { EthereumToken, WalletNetworkId } from '@/chainWallet/networks';
-import { quoteFor, usdFromAmount } from '@/chainWallet/prices';
+import { quoteFor } from '@/chainWallet/prices';
 import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
 import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
@@ -153,6 +153,29 @@ function usd(n: number | null) {
   return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
 }
 
+/** Mainnet ETH/USDC/USDT: a zero or unknown amount is $0.00, never a dash. */
+function mainnetQty(amount: string | null | undefined, digits: number) {
+  const n = Number(amount);
+  const qtyN = amount == null || amount === '' || !Number.isFinite(n) ? 0 : n;
+  return qtyN.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: Math.min(2, digits) });
+}
+
+function mainnetFiat(amount: string | null | undefined, quoteUsd: number | null | undefined) {
+  const n = Number(amount);
+  const qtyN = amount == null || amount === '' || !Number.isFinite(n) ? 0 : n;
+  if (qtyN === 0) return '$0.00';
+  if (quoteUsd != null && Number.isFinite(quoteUsd)) return usd(qtyN * quoteUsd);
+  return '$0.00';
+}
+
+function mainnetUsdN(amount: string | null | undefined, quoteUsd: number | null | undefined) {
+  const n = Number(amount);
+  const qtyN = amount == null || amount === '' || !Number.isFinite(n) ? 0 : n;
+  if (qtyN === 0) return 0;
+  if (quoteUsd != null && Number.isFinite(quoteUsd)) return qtyN * quoteUsd;
+  return 0;
+}
+
 function toneOf(change: number | null): LiveTone {
   if (change == null || change === 0) return 'flat';
   return change > 0 ? 'up' : 'down';
@@ -282,14 +305,13 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   }, [wallet, words]);
 
   const eth = wallet.ethBalances;
-  const ethUsd = usdFromAmount(eth.ETH, quoteFor('ETH', prices).usd);
-  const usdcUsd = usdFromAmount(eth.USDC, quoteFor('USDC', prices).usd);
-  const usdtUsd = usdFromAmount(eth.USDT, quoteFor('USDT', prices).usd);
-  const parts = [ethUsd, usdcUsd, usdtUsd].filter((n): n is number => n != null);
-  const totalN = parts.length ? parts.reduce((a, b) => a + b, 0) : null;
   const ethQ = quoteFor('ETH', prices);
   const usdcQ = quoteFor('USDC', prices);
   const usdtQ = quoteFor('USDT', prices);
+  const ethUsd = mainnetUsdN(eth.ETH, ethQ.usd);
+  const usdcUsd = mainnetUsdN(eth.USDC, usdcQ.usd);
+  const usdtUsd = mainnetUsdN(eth.USDT, usdtQ.usd);
+  const totalN = ethUsd + usdcUsd + usdtUsd;
 
   const weighted = (() => {
     const rows: [number, number][] = [];
@@ -304,8 +326,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const tokens: LiveTok[] = [
     {
       name: 'Ethereum',
-      amount: `${qty(eth.ETH, 6)} ETH`,
-      value: usd(ethUsd),
+      amount: `${mainnetQty(eth.ETH, 6)} ETH`,
+      value: mainnetFiat(eth.ETH, ethQ.usd),
       change: pct(ethQ.change24h),
       tone: toneOf(ethQ.change24h),
       icon: 'eth',
@@ -334,8 +356,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     {
       name: 'Tether',
-      amount: `${qty(eth.USDT, 2)} USDT`,
-      value: usd(usdtUsd),
+      amount: `${mainnetQty(eth.USDT, 2)} USDT`,
+      value: mainnetFiat(eth.USDT, usdtQ.usd),
       change: pct(usdtQ.change24h),
       tone: toneOf(usdtQ.change24h),
       icon: 'usdt',
@@ -344,8 +366,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     {
       name: 'USD Coin',
-      amount: `${qty(eth.USDC, 2)} USDC`,
-      value: usd(usdcUsd),
+      amount: `${mainnetQty(eth.USDC, 2)} USDC`,
+      value: mainnetFiat(eth.USDC, usdcQ.usd),
       change: pct(usdcQ.change24h),
       tone: toneOf(usdcQ.change24h),
       icon: 'usdc',

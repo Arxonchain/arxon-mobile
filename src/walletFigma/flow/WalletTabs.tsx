@@ -57,9 +57,7 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSele
   const net = useWalletNetwork();
   const live = useLiveFrame();
   return (
-    <nav style={live?.app
-      ? { position: 'absolute', left: 0, right: 0, bottom: 0, background: '#050505', zIndex: 2 }
-      : { position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 2 }}>
+    <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 8 }}>
       {net === 'testnet' && (
         <p style={{ margin: 0, height: 16, textAlign: 'center', fontFamily: font.sans, fontSize: 11, fontWeight: 600, color: '#accafe', lineHeight: '16px' }}>Arxon Testnet</p>
       )}

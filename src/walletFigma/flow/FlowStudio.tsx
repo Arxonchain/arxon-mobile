@@ -122,7 +122,11 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!app) return;
     const stage = stageRef.current;
     if (!stage) return;
-    const measure = () => setAppScale(Math.max(stage.clientWidth, 1) / 390);
+    const measure = () => {
+      const w = Math.max(stage.clientWidth, 1);
+      const h = Math.max(stage.clientHeight, 1);
+      setAppScale(Math.min(w / 390, h / 844));
+    };
     measure();
     const watcher = new ResizeObserver(measure);
     watcher.observe(stage);
@@ -256,7 +260,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, []);
 
   return (
-    <div style={{ height: app ? 'auto' : '100vh', minHeight: app ? '100%' : undefined, overflow: app ? 'visible' : 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
+    <div style={{ height: app ? '100%' : '100vh', minHeight: app ? 0 : undefined, overflow: 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
       {!app && <aside style={{ width: menu ? 320 : 0, height: '100vh', flexShrink: 0, overflow: 'auto', borderRight: menu ? '1px solid #1c2025' : 'none', background: '#0c0e14' }}>
         <div style={{ padding: 16, position: 'sticky', top: 0, background: '#0c0e14' }}>
           <strong>Every screen</strong>
@@ -296,14 +300,14 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           </div>
         ))}
       </aside>}
-      <main style={{ flex: app ? 'none' : 1, width: app ? '100%' : undefined, minWidth: 0, height: app ? 'auto' : '100vh', overflow: app ? 'visible' : 'hidden', display: 'flex', flexDirection: 'column', padding: app ? 0 : '12px 16px 16px' }}>
+      <main style={{ flex: 1, width: app ? '100%' : undefined, minWidth: 0, minHeight: 0, height: app ? '100%' : '100vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', padding: app ? 0 : '12px 16px 16px' }}>
         {!app && (
         <div style={{ width: '100%', maxWidth: 390, alignSelf: 'center', display: 'flex', justifyContent: 'space-between', marginBottom: 8, flexShrink: 0 }}>
           <button type="button" onClick={() => setMenu((v) => !v)} style={linkBtn}>{menu ? 'Hide list' : 'All screens'}</button>
           <span style={{ color: ink.secondary, fontSize: 12 }}>{screen.name}</span>
         </div>
         )}
-        <div ref={stageRef} style={{ flex: app ? 'none' : 1, width: '100%', minHeight: app ? undefined : 0, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
+        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}>
         <WalletNetworkContext.Provider value={net}>
         <div style={app
           ? { width: 390, height: 844, zoom: appScale, background: ink.page, position: 'relative', overflow: 'hidden' }

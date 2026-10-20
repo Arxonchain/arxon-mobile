@@ -114,7 +114,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   }
 
   return (
-    <div style={{ position: 'relative', width: 390, height: liveRows && empty ? 1040 : 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+    <div style={{ position: 'relative', width: 390, height: live?.app || !(liveRows && empty) ? 844 : 1040, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.home-cards::-webkit-scrollbar{display:none}.home-cards{scrollbar-width:none}`}</style>
       {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
@@ -181,7 +181,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
         <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354 }}>
+      <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const } : {}) }}>
         {tokens.map((token) => (
           <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
             <TokenIcon kind={token.icon} />
