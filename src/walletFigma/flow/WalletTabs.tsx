@@ -1,6 +1,5 @@
 import { createContext, useContext, type CSSProperties } from 'react';
 import { useLiveFrame } from './liveFrame';
-import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 
 export type WalletTabName = 'Home' | 'Explore' | 'History' | 'Account' | 'Testnet';
@@ -48,6 +47,10 @@ export function pickWalletTab(
   go('account', false);
 }
 
+const ACCENT = '#accafe';
+const IDLE = '#8c8f99';
+const ACTIVE_GLOW = 'rgba(172, 202, 254, 0.14)';
+
 export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSelect: (tab: WalletTabName) => void }) {
   const live = useLiveFrame();
   return (
@@ -56,9 +59,15 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSele
         {TABS.map((tab) => {
           const on = tab.name === active;
           return (
-            <button key={tab.name} type="button" onClick={() => onSelect(tab.name)} style={tabBtn(on)}>
-              <span style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <FigmaImg src={tab.src} width={tab.w} height={tab.h} />
+            <button
+              key={tab.name}
+              type="button"
+              aria-current={on ? 'page' : undefined}
+              onClick={() => onSelect(tab.name)}
+              style={tabBtn(on)}
+            >
+              <span style={iconHalo(on)}>
+                <span style={tabGlyph(tab.src, tab.w, tab.h, on)} />
               </span>
               {tab.name}
             </button>
@@ -80,16 +89,46 @@ function tabBtn(on: boolean): CSSProperties {
     height: 64,
     border: 'none',
     background: 'none',
-    color: on ? '#accafe' : '#8c8f99',
+    color: on ? ACCENT : IDLE,
     fontFamily: font.sans,
     fontSize: 10,
     lineHeight: '12px',
+    fontWeight: on ? 600 : 500,
     cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: 2,
     padding: 0,
+  };
+}
+
+function iconHalo(on: boolean): CSSProperties {
+  return {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: on ? ACTIVE_GLOW : 'transparent',
+  };
+}
+
+function tabGlyph(src: string, width: number, height: number, on: boolean): CSSProperties {
+  return {
+    width,
+    height,
+    display: 'block',
+    backgroundColor: on ? ACCENT : IDLE,
+    WebkitMaskImage: `url(${src})`,
+    WebkitMaskRepeat: 'no-repeat',
+    WebkitMaskPosition: 'center',
+    WebkitMaskSize: 'contain',
+    maskImage: `url(${src})`,
+    maskRepeat: 'no-repeat',
+    maskPosition: 'center',
+    maskSize: 'contain',
   };
 }
