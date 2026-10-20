@@ -249,7 +249,7 @@ function Review({ pay, recv, amount, quote, go, leave }: { pay: Tok; recv: Tok; 
       {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
       <button type="button" onClick={() => {
         if (live?.app) {
-          setErr('No swap quote is available. This wallet does not run a DEX.');
+          setErr('Coming soon');
           return;
         }
         go('swap-success');

@@ -24,6 +24,10 @@ const ALLOW_NAVIGATION = [
   '*.supabase.co',
   'rpc-test.arxon.io',
   'scan.arxon.io',
+  'accounts.google.com',
+  '*.google.com',
+  '*.googleapis.com',
+  'googleapis.com',
 ];
 
 const config: CapacitorConfig = {

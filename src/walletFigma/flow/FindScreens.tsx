@@ -310,12 +310,17 @@ function Status({ clock }: { clock: 'flow' | 'note' }) {
   );
 }
 
-function TokenIcon({ kind }: { kind: 'arx' | 'btc' | 'eth' | 'usdc' | 'usdt' }) {
+function TokenIcon({ kind }: { kind: 'arx' | 'btc' | 'eth' | 'usdc' | 'usdt' | 'sol' }) {
   if (kind === 'arx') {
     return (
       <span style={{ width: 40, height: 40, borderRadius: 20, background: '#90b9ff', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
         <span style={{ position: 'absolute', left: 10, top: 11.5, width: 20.923, height: 16, background: '#050505', WebkitMaskImage: `url(${art('arx-mask.png')})`, maskImage: `url(${art('arx-mask.png')})`, WebkitMaskSize: '20.923px 16px', maskSize: '20.923px 16px', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat' }} />
       </span>
+    );
+  }
+  if (kind === 'sol') {
+    return (
+      <span style={{ width: 40, height: 40, borderRadius: 20, background: '#9945ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 13, fontWeight: 700 }}>S</span>
     );
   }
   if (kind === 'btc') return <FigmaImg src={art('btc.svg')} width={40} height={40} />;

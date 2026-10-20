@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
@@ -29,6 +29,8 @@ export function isSendScreen(id: string) {
 }
 
 export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
+  const net = useWalletNetwork();
   const [tokenId, setTokenId] = useState('arx');
   const [query, setQuery] = useState('');
   const [who, setWho] = useState('');
@@ -36,7 +38,13 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const [amount, setAmount] = useState('0');
   const [priv, setPriv] = useState(true);
   const [flags, setFlags] = useState([false, false, true, true]);
-  const token = TOKENS.find((item) => item.id === tokenId) ?? TOKENS[0];
+  const tokenBase = TOKENS.find((item) => item.id === tokenId)
+    ?? (tokenId === 'sol'
+      ? { id: 'sol', name: 'Solana', amount: '0.00 SOL', fiat: '$0.00', symbol: 'SOL', hidden: false, home: 0, vault: '' }
+      : TOKENS[0]);
+  const token = live?.app && tokenBase.id === 'arx' && net === 'testnet'
+    ? { ...tokenBase, symbol: 'ARXt' }
+    : tokenBase;
   const leave = () => (back ? back() : go('home-funded', false));
   const vaulted = id === 'send-amount-vault';
   const available = vaulted && token.id === 'arx' ? 1400 : id === 'send-amount' && token.id === 'arx' ? 0 : token.home;
@@ -79,15 +87,30 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
       {id === 'send-success' && <Success amount={shownAmount} symbol={token.symbol} privateSend={priv && token.id === 'arx'} to={picked || 'arx1q8x4…t7c2n4p'} go={go} />}
       {id === 'send-privacy' && <Privacy flags={flags} setFlags={setFlags} go={go} leave={leave} />}
       {id === 'send-failed' && <Failed to={picked || 'arx1q8x4…t7c2n4p'} amount={shownAmount} symbol={token.symbol} go={go} />}
-      {id === 'send-qr' && <Scan go={go} leave={leave} />}
+      {id === 'send-qr' && <Scan go={go} leave={leave} onRead={(addr) => { setPicked(addr); setWho(addr); go('send-who'); }} />}
       <HomeBar />
     </div>
   );
 }
 
 function PickToken({ query, setQuery, tokenId, onPick, leave }: { query: string; setQuery: (v: string) => void; tokenId: string; onPick: (id: string) => void; leave: () => void }) {
+  const live = useLiveFrame();
+  const net = useWalletNetwork();
   const q = query.trim().toLowerCase();
-  const rows = TOKENS.filter((token) => !q || token.name.toLowerCase().includes(q) || token.symbol.toLowerCase().includes(q));
+  const liveRows = live?.app ? (net === 'testnet' ? live.testnetTokens : live.tokens) : null;
+  const mapped = liveRows
+    ? liveRows.map((row) => ({
+        id: row.icon === 'arx' ? 'arx' : row.icon,
+        name: row.name,
+        amount: row.amount,
+        fiat: row.value,
+        symbol: row.symbol || row.name,
+        hidden: false,
+        home: 0,
+        vault: '',
+      }))
+    : TOKENS;
+  const rows = mapped.filter((token) => !q || token.name.toLowerCase().includes(q) || token.symbol.toLowerCase().includes(q));
   return (
     <>
       <Back top={52} left={16} icon="back" onClick={leave} />
@@ -359,14 +382,29 @@ function Failed({ to, amount, symbol, go }: { to: string; amount: string; symbol
   );
 }
 
-function Scan({ go, leave }: { go: Go; leave: () => void }) {
+function Scan({ go, leave, onRead }: { go: Go; leave: () => void; onRead?: (addr: string) => void }) {
+  const live = useLiveFrame();
+  const [err, setErr] = useState<string | null>(null);
   const corners: [string, number, number][] = [['corner-tl.svg', 73, 248], ['corner-tr.svg', 273, 248], ['corner-bl.svg', 73, 448], ['corner-br.svg', 273, 448]];
+  useEffect(() => {
+    if (!live?.app) return;
+    let cancel = false;
+    void live.scanQr().then((addr) => {
+      if (!cancel && addr) onRead?.(addr);
+    }).catch((e) => {
+      if (!cancel) setErr(e instanceof Error ? e.message : 'Could not scan.');
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [live?.app]);
   return (
     <>
       {corners.map(([name, left, top]) => <img key={name} src={art(name)} alt="" width={44} height={44} style={{ position: 'absolute', left, top }} />)}
       <Back top={56} left={18} icon="chev" onClick={leave} />
       <p style={{ position: 'absolute', left: 0, top: 64, width: 390, margin: 0, textAlign: 'center', fontSize: 20, fontWeight: 700 }}>Scan QR code</p>
       <p style={{ position: 'absolute', left: 55, top: 520, width: 280, margin: 0, textAlign: 'center', fontSize: 15, lineHeight: '22px', color: '#8c8f96' }}>Point your camera at an Arxon address QR code.</p>
+      {err ? <p style={{ position: 'absolute', left: 40, top: 580, width: 310, margin: 0, textAlign: 'center', fontSize: 12, color: '#f25252' }}>{err}</p> : null}
       <button type="button" onClick={() => go('send-who')} style={{ position: 'absolute', left: 19, top: 714, width: 353, height: 55, borderRadius: 8, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Enter address instead</button>
     </>
   );
@@ -378,6 +416,11 @@ function TokenMark({ id }: { id: string }) {
       <span style={{ width: 44, height: 44, borderRadius: 22, background: '#90b9ff', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
         <span style={{ position: 'absolute', left: 9, top: 11, width: 26.985, height: 20.635, background: '#050505', WebkitMaskImage: `url(${art('arx-mask.png')})`, maskImage: `url(${art('arx-mask.png')})`, WebkitMaskSize: '26.985px 20.635px', maskSize: '26.985px 20.635px', WebkitMaskRepeat: 'no-repeat', maskRepeat: 'no-repeat' }} />
       </span>
+    );
+  }
+  if (id === 'sol') {
+    return (
+      <span style={{ width: 44, height: 44, borderRadius: 22, background: '#9945ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 14, fontWeight: 700 }}>S</span>
     );
   }
   if (id === 'btc') return <img src={art('btc.svg')} alt="" width={46} height={46} style={{ margin: -1 }} />;

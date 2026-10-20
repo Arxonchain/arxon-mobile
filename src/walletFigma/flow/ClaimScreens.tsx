@@ -61,7 +61,7 @@ function Claim({ leave, go }: { leave: () => void; go: Go }) {
       {err ? <p style={{ position: 'absolute', left: 24, top: 680, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
       <button type="button" onClick={() => {
         if (live?.app) {
-          setErr('Claim did not credit Account ARX. Open Mining to claim ARX-P when a session is running.');
+          setErr('Coming soon');
           return;
         }
         claimed = true;

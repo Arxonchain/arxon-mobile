@@ -1,9 +1,10 @@
 import type { PrivacyFlags } from '@/chainWallet/privacy';
-import { addHdAccount, currentPassword, saveDeviceBackup, sessionStore, setUnlockPassword } from '@/chainWallet/session';
-import { enableBiometrics, verifyBiometrics } from '@/chainWallet/biometrics';
+import { addHdAccount, currentPassword, sessionStore, setUnlockPassword } from '@/chainWallet/session';
+import { enableBiometrics } from '@/chainWallet/biometrics';
 import { createDisclosureCode } from '@/chainWallet/disclosure';
 import { saveSupportReport } from '@/chainWallet/reports';
 import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
+import { downloadDriveBackup, driveConfigured, uploadDriveBackup } from '@/chainWallet/googleDrive';
 import { setVaultLockRequired } from './VaultScreens';
 
 export type NavDecision = { block?: boolean; replace?: string; note?: string };
@@ -22,6 +23,7 @@ type WalletApi = {
   setRpcUrl: (url: string) => Promise<string>;
   setAccountIndex: (index: number) => Promise<void>;
   logout: () => Promise<void>;
+  importWallet: (phrase: string) => Promise<void>;
 };
 
 type LiveNavInput = {
@@ -53,22 +55,46 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (to === 'drive-confirm') {
-    return {
-      note: 'Google Drive is not connected. Confirm your password to save an encrypted backup on this device.',
-    };
+    if (!driveConfigured()) {
+      return {
+        block: true,
+        note: 'Set VITE_GOOGLE_DRIVE_CLIENT_ID to your Google OAuth web client ID, then rebuild. Drive backup was not started.',
+      };
+    }
+    try {
+      const { connectGoogleDrive } = await import('@/chainWallet/googleDrive');
+      await connectGoogleDrive();
+      return { note: 'Google account connected. Confirm your password to encrypt the backup.' };
+    } catch (e) {
+      return { block: true, note: e instanceof Error ? e.message : 'Google Drive sign-in failed.' };
+    }
   }
 
   if (to === 'drive-done') {
-    const secret = wallet.mnemonic;
     const pass = currentPassword() || password;
-    if (!secret || !pass) {
-      return { block: true, note: 'Google Drive is not connected, and there is no password to encrypt a device backup.' };
+    if (!pass) {
+      return { block: true, note: 'Enter the wallet password to encrypt the Google Drive backup.' };
     }
-    await saveDeviceBackup(pass, secret);
-    return {
-      replace: 'ready-skip',
-      note: 'Google Drive is not connected. An encrypted backup was saved on this device.',
-    };
+    try {
+      try {
+        const restored = await downloadDriveBackup(pass);
+        await wallet.importWallet(restored);
+        return { note: 'Wallet restored from Google Drive.' };
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '';
+        if (!msg.includes('No Arxon backup')) {
+          return { block: true, note: msg || 'Google Drive backup failed.' };
+        }
+      }
+      if (!wallet.mnemonic) {
+        return { block: true, note: 'No wallet on this device and no Google Drive backup opened with that password.' };
+      }
+      const box = await uploadDriveBackup(pass, wallet.mnemonic);
+      sessionStore.setBackup(box);
+      return { note: 'Encrypted backup saved to Google Drive.' };
+    } catch (e) {
+      return { block: true, note: e instanceof Error ? e.message : 'Google Drive backup failed.' };
+    }
   }
 
   if (from === 'face' && to === 'ready-skip') {
@@ -89,17 +115,12 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return {};
   }
 
-  if (to === 'swap-success' || to === 'swap-review' && from === 'swap') {
-    if (to === 'swap-success') {
-      return { block: true, note: 'No swap quote is available. This wallet does not run a DEX.' };
-    }
-  }
   if (to === 'swap-success') {
-    return { block: true, note: 'No swap quote is available. This wallet does not run a DEX.' };
+    return { block: true, note: 'Coming soon' };
   }
 
   if (to === 'buy-status') {
-    return { block: true, note: 'This provider is not connected yet.' };
+    return { block: true, note: 'Coming soon' };
   }
 
   if (to === 'vault-pending' || to === 'priv-pending' || to === 'unshield-pending') {
@@ -107,7 +128,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (to === 'claim-done') {
-    return { block: true, note: 'Claim did not credit Account ARX. Open Mining to claim ARX-P, or try again when a mint path exists.' };
+    return { block: true, note: 'Coming soon' };
   }
 
   if (to === 'mine-entry' || to === 'mine-dash' || to === 'mine-ready' || to === 'mine-access' || to === 'mine-bg') {
@@ -162,6 +183,15 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (to === 'testnet') {
+    await wallet.setNetwork('arxon');
+    return {};
+  }
+  if (
+    to.startsWith('vault') ||
+    to.startsWith('priv-') ||
+    to.startsWith('unshield-') ||
+    to === 'send-amount-vault'
+  ) {
     await wallet.setNetwork('arxon');
     return {};
   }

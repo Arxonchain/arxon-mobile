@@ -131,14 +131,31 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         if (decision.replace) dest = decision.replace;
       }
       if (live?.app) {
-        if (dest === 'testnet') void live.setNetwork('arxon');
-        else if (dest === 'home' || dest.startsWith('home-') || dest === 'more') void live.setNetwork('ethereum');
+        if (
+          dest === 'testnet' ||
+          dest.startsWith('vault') ||
+          dest.startsWith('priv-') ||
+          dest.startsWith('unshield-') ||
+          dest === 'send-amount-vault'
+        ) {
+          void live.setNetwork('arxon');
+        } else if (dest === 'home' || dest.startsWith('home-') || dest === 'more') {
+          void live.setNetwork('ethereum');
+        }
       }
       if (dest === 'testnet') {
         setNet('testnet');
         if (remember) setStack((prev) => [...prev, id]);
         setId('testnet');
         return;
+      }
+      if (
+        dest.startsWith('vault') ||
+        dest.startsWith('priv-') ||
+        dest.startsWith('unshield-') ||
+        dest === 'send-amount-vault'
+      ) {
+        setNet('testnet');
       }
       if (dest === 'home' || dest === 'home-funded' || dest === 'home-hidden' || dest === 'home-vaulted' || dest === 'home-unvaulted' || dest === 'more') {
         setNet('mainnet');

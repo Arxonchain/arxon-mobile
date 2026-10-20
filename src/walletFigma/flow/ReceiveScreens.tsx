@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
+import { useWalletNetwork } from './WalletTabs';
 
 const art = (name: string) => `/wallet-figma/receive/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -23,8 +24,9 @@ export function isReceiveScreen(id: string) {
 
 export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
+  const net = useWalletNetwork();
   const [nets, setNets] = useState<Net[]>(BUILT);
-  const [selected, setSelected] = useState('mainnet');
+  const [selected, setSelected] = useState(net === 'testnet' ? 'testnet' : 'mainnet');
   const [pub, setPub] = useState(true);
   const [copied, setCopied] = useState(false);
   const [focus, setFocus] = useState('name');
@@ -35,8 +37,13 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   function pick(netId: string) {
     setSelected(netId);
     if (live?.app) {
-      if (netId === 'testnet') void live.setNetwork('arxon');
-      else if (netId === 'mainnet') void live.setNetwork('ethereum');
+      if (netId === 'testnet') {
+        void live.setNetwork('arxon');
+        live.setReceiveAsset('ARXt');
+      } else if (netId === 'mainnet') {
+        void live.setNetwork('ethereum');
+        live.setReceiveAsset(live.receiveAsset === 'ARXt' ? 'ETH' : live.receiveAsset);
+      }
     }
     if (back) back();
     else go('receive', false);
@@ -56,7 +63,8 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     else go('network', false);
   }
 
-  const address = live?.address ?? ADDRESS;
+  const address = live?.app && live.receiveAddress ? live.receiveAddress : live?.address ?? ADDRESS;
+  const qrSrc = live?.app && live.receiveQr ? live.receiveQr : art('qr.svg');
 
   async function copy() {
     try { await navigator.clipboard?.writeText(address); } catch { /* preview still confirms */ }
@@ -76,7 +84,7 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.recv-field::placeholder{color:#8b9097}`}</style>
       {id === 'receive' && (
-        <Receive current={current} pub={pub} setPub={setPub} copied={copied} onCopy={copy} onShare={share} go={go} leave={leave} address={address} />
+        <Receive current={current} pub={pub} setPub={setPub} copied={copied} onCopy={copy} onShare={share} go={go} leave={leave} address={address} qrSrc={qrSrc} />
       )}
       {id === 'network' && (
         <Networks nets={nets} selected={selected} onPick={pick} onAdd={() => go('add-network')} onClose={leave} />
@@ -88,8 +96,8 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, address }: {
-  current: Net; pub: boolean; setPub: (v: boolean) => void; copied: boolean; onCopy: () => void; onShare: () => void; go: Go; leave: () => void; address: string;
+function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, address, qrSrc }: {
+  current: Net; pub: boolean; setPub: (v: boolean) => void; copied: boolean; onCopy: () => void; onShare: () => void; go: Go; leave: () => void; address: string; qrSrc: string;
 }) {
   return (
     <>
@@ -102,7 +110,7 @@ function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, add
         <FigmaImg src={art('chev-down.svg')} width={16} height={16} />
       </button>
       <div style={{ position: 'absolute', left: 63, top: 180, width: 264, height: 264, borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
-        <img src={art('qr.svg')} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32 }} />
+        <img src={qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32 }} />
         <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>A</div>
       </div>
       <p style={{ position: 'absolute', left: 18, top: 466, width: 354, margin: 0, textAlign: 'center', fontSize: 13, color: '#8b9097' }}>Your Arxon address</p>

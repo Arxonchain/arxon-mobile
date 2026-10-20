@@ -28,9 +28,11 @@ import { dappLabel, requestLabel } from '@/chainWallet/wc';
 import { useWc } from '@/chainWallet/wcProvider';
 import { beforeGo, type NavDecision } from './liveNav';
 import { useWalletModeActions } from './ModeShell';
+import { addressesFromMnemonic, type AltAddresses } from '@/chainWallet/altChains';
+import { qrDataUrl, scanAddressQr } from '@/chainWallet/receiveQr';
 
 export type LiveTone = 'up' | 'down' | 'flat';
-export type LiveIcon = 'arx' | 'btc' | 'eth' | 'usdt' | 'usdc';
+export type LiveIcon = 'arx' | 'btc' | 'eth' | 'usdt' | 'usdc' | 'sol';
 
 export type LiveTok = {
   name: string;
@@ -123,6 +125,11 @@ type LiveFrame = {
   approveWc: () => Promise<void>;
   rejectWc: () => Promise<void>;
   disconnectWc: (topic: string) => Promise<void>;
+  receiveAsset: string;
+  receiveAddress: string;
+  receiveQr: string | null;
+  setReceiveAsset: (symbol: string) => void;
+  scanQr: () => Promise<string>;
 };
 
 const LiveFrameContext = createContext<LiveFrame | null>(null);
@@ -165,6 +172,16 @@ function isEthSymbol(value: string): value is EthereumToken {
   return value === 'ETH' || value === 'USDC' || value === 'USDT';
 }
 
+function isArxonSymbol(value: string) {
+  const s = value.toUpperCase();
+  return s === 'ARX' || s === 'ARXT' || s === 'TARX' || s === 'USDTARX' || s === 'USDCARX';
+}
+
+function isArxonStable(value: string) {
+  const s = value.toUpperCase();
+  return s === 'USDTARX' || s === 'USDCARX';
+}
+
 export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const wallet = useChainWallet();
   const { prices } = useTokenPrices();
@@ -179,6 +196,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [tick, setTick] = useState(0);
   const [inspect, setInspect] = useState<LiveInspect | null>(null);
   const [listed, setListed] = useState<ListedToken[]>([]);
+  const [receiveAsset, setReceiveAsset] = useState('ETH');
+  const [receiveQr, setReceiveQr] = useState<string | null>(null);
+  const [alt, setAlt] = useState<AltAddresses | null>(null);
 
   useEffect(() => {
     if (wallet.network === 'arxon') setArx(wallet.balance);
@@ -212,6 +232,41 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       window.clearInterval(t);
     };
   }, []);
+
+  useEffect(() => {
+    let cancel = false;
+    if (!wallet.mnemonic) {
+      setAlt(wallet.address ? { eth: wallet.address, btc: null, sol: null } : null);
+      return;
+    }
+    void addressesFromMnemonic(wallet.mnemonic, wallet.accountIndex).then((next) => {
+      if (!cancel) setAlt(next);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [wallet.mnemonic, wallet.accountIndex, wallet.address]);
+
+  const receiveAddress = (() => {
+    const s = receiveAsset.toUpperCase();
+    if (s === 'BTC') return alt?.btc || '';
+    if (s === 'SOL') return alt?.sol || '';
+    return wallet.address || alt?.eth || '';
+  })();
+
+  useEffect(() => {
+    if (!receiveAddress) {
+      setReceiveQr(null);
+      return;
+    }
+    let cancel = false;
+    void qrDataUrl(receiveAddress).then((url) => {
+      if (!cancel) setReceiveQr(url);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [receiveAddress]);
 
   const ensureWords = useCallback(async () => {
     if (words && words.length >= 12) return words;
@@ -248,26 +303,6 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
 
   const tokens: LiveTok[] = [
     {
-      name: 'Arxon',
-      amount: `${qty(arx, 4)} ARX`,
-      value: 'No USD price',
-      change: 'Arxon Testnet',
-      tone: 'flat',
-      icon: 'arx',
-      to: 'token-arx',
-      symbol: 'ARX',
-    },
-    {
-      name: 'Bitcoin',
-      amount: '0.00 BTC',
-      value: '$0.00',
-      change: 'Not on this wallet',
-      tone: 'flat',
-      icon: 'btc',
-      to: 'token-btc',
-      symbol: 'BTC',
-    },
-    {
       name: 'Ethereum',
       amount: `${qty(eth.ETH, 6)} ETH`,
       value: usd(ethUsd),
@@ -276,6 +311,26 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       icon: 'eth',
       to: 'token-eth',
       symbol: 'ETH',
+    },
+    {
+      name: 'Solana',
+      amount: '0.00 SOL',
+      value: '$0.00',
+      change: alt?.sol ? 'Mainnet · send later' : 'Not on this wallet',
+      tone: 'flat',
+      icon: 'sol',
+      to: 'receive',
+      symbol: 'SOL',
+    },
+    {
+      name: 'Bitcoin',
+      amount: '0.00 BTC',
+      value: '$0.00',
+      change: alt?.btc ? 'Mainnet · send later' : 'Not on this wallet',
+      tone: 'flat',
+      icon: 'btc',
+      to: 'token-btc',
+      symbol: 'BTC',
     },
     {
       name: 'Tether',
@@ -302,13 +357,33 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const testnetTokens: LiveTok[] = [
     {
       name: 'Arxon',
-      amount: `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} tARX`,
+      amount: `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} ARXt`,
       value: 'No USD price',
       change: 'Arxon Testnet',
       tone: 'flat',
       icon: 'arx',
       to: 'token-arx',
-      symbol: 'ARX',
+      symbol: 'ARXt',
+    },
+    {
+      name: 'Tether',
+      amount: '0.00 USDTarx',
+      value: 'No USD price',
+      change: 'Arxon Testnet',
+      tone: 'flat',
+      icon: 'usdt',
+      to: 'token-usdt',
+      symbol: 'USDTarx',
+    },
+    {
+      name: 'USD Coin',
+      amount: '0.00 USDCarx',
+      value: 'No USD price',
+      change: 'Arxon Testnet',
+      tone: 'flat',
+      icon: 'usdc',
+      to: 'token-usdc',
+      symbol: 'USDCarx',
     },
   ];
 
@@ -326,31 +401,39 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const send = useCallback(
     async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home') => {
       const flags = readDefaultPrivacy();
-      if (mode === 'vault' || symbol === 'ARX' && testnet && mode !== 'home') {
-        /* continue */
+      if (symbol === 'SOL' || symbol === 'BTC') {
+        throw new Error(`${symbol} send is not available yet.`);
+      }
+      if (mode === 'vault' || mode === 'private' || mode === 'unshield') {
+        if (!isArxonSymbol(symbol) && !testnet) {
+          throw new Error('Vault and private send are on Arxon Testnet only.');
+        }
+        if (isArxonStable(symbol) || (testnet && (symbol === 'USDT' || symbol === 'USDC'))) {
+          throw new Error('USDT/USDC ARX-20 vault notes are not wired yet.');
+        }
+        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
       }
       if (mode === 'vault') {
-        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-        if (symbol !== 'ARX' && symbol !== 'tARX') {
-          throw new Error('Only ARX can move to the Vault on this build. USDT/USDC vault sends need Arxon ARX-20.');
-        }
         await wallet.sendShielded(amount, VAULT_FLAGS);
         return;
       }
       if (mode === 'unshield') {
         const dest = to.trim();
         if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) throw new Error('Unshield needs a 0x address.');
-        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
         await wallet.sendUnshield(getAddress(dest) as Address, amount, UNSHIELD_FLAGS);
         return;
       }
       if (mode === 'private') {
-        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-        await wallet.sendPrivate(to.trim(), amount, flags.hideSender || flags.hideReceiver || flags.hideAmount ? flags : VAULT_FLAGS);
+        const dest = to.trim() || wallet.shieldedPk || '';
+        if (!dest) throw new Error('Private send needs a shielded destination on Arxon Testnet.');
+        await wallet.sendPrivate(dest, amount, flags.hideSender || flags.hideReceiver || flags.hideAmount ? flags : VAULT_FLAGS);
         return;
       }
       const dest = to.trim();
-      if (testnet || symbol === 'ARX' || symbol === 'tARX') {
+      if (isArxonStable(symbol)) {
+        throw new Error('USDT/USDC ARX-20 transfers are not wired yet.');
+      }
+      if (testnet || isArxonSymbol(symbol)) {
         if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
         const routed = routeSend({
           to: dest,
@@ -395,6 +478,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     [wallet],
   );
+
+  const scanQr = useCallback(() => scanAddressQr(), []);
 
   const value: LiveFrame = useMemo(() => ({
     app: true,
@@ -468,7 +553,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     search: (query: string) => {
       const q = query.trim().toLowerCase();
-      const extra: LiveTok[] = listed.map((row) => ({
+      const extra: LiveTok[] = listed
+        .filter((row) => (wallet.network === 'arxon' ? row.standard === 'arx20' : row.standard !== 'arx20'))
+        .map((row) => ({
         name: row.name,
         amount: row.symbol,
         value: short(row.address),
@@ -478,7 +565,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         to: 'manage',
         symbol: row.symbol,
       }));
-      const rows = [...tokens, ...extra].filter(
+      const rows = [...(wallet.network === 'arxon' ? testnetTokens : tokens), ...extra].filter(
         (row) => !q || row.name.toLowerCase().includes(q) || (row.symbol && row.symbol.toLowerCase().includes(q)) || row.value.toLowerCase().includes(q),
       );
       if (/^0x[0-9a-fA-F]{40}$/.test(query.trim())) {
@@ -530,6 +617,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           setRpcUrl: wallet.setRpcUrl,
           setAccountIndex: wallet.setAccountIndex,
           logout: wallet.logout,
+          importWallet: wallet.importWallet,
         },
         openMining: mode?.openMining,
         wc: wc
@@ -585,6 +673,11 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     disconnectWc: async (topic: string) => {
       await wc?.disconnect(topic);
     },
+    receiveAsset,
+    receiveAddress,
+    receiveQr,
+    setReceiveAsset,
+    scanQr,
   }), [
     wallet,
     hide,
@@ -606,6 +699,11 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     ensureWords,
     send,
     tick,
+    receiveAsset,
+    receiveAddress,
+    receiveQr,
+    scanQr,
+    alt,
   ]);
 
   return <LiveFrameContext.Provider value={value}>{children}</LiveFrameContext.Provider>;

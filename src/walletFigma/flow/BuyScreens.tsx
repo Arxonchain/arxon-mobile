@@ -1,6 +1,7 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/buy/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -75,6 +76,8 @@ function Amount({ amount, setAmount, arx, ready, go, leave }: { amount: string; 
 }
 
 function Review({ dollars, arx, total, hide, setHide, go, leave }: { dollars: number; arx: number; total: number; hide: boolean; setHide: (v: boolean) => void; go: Go; leave: () => void }) {
+  const live = useLiveFrame();
+  const [err, setErr] = useState<string | null>(null);
   return (
     <>
       <Back onClick={leave} />
@@ -111,7 +114,14 @@ function Review({ dollars, arx, total, hide, setHide, go, leave }: { dollars: nu
         </div>
       </div>
       <p style={{ position: 'absolute', left: 16, top: 714, width: 358, margin: 0, textAlign: 'center', fontSize: 12, color: '#8b9097' }}>By continuing you agree to the provider’s terms.</p>
-      <button type="button" onClick={() => go('buy-status')} style={{ ...primary, top: 744 }}>Pay ${money(total)}</button>
+      {err ? <p style={{ position: 'absolute', left: 24, top: 690, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+      <button type="button" onClick={() => {
+        if (live?.app) {
+          setErr('Coming soon');
+          return;
+        }
+        go('buy-status');
+      }} style={{ ...primary, top: 744 }}>Pay ${money(total)}</button>
     </>
   );
 }

@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { vaultEntry } from './VaultScreens';
 import { useLiveFrame } from './liveFrame';
+import { useWalletNetwork } from './WalletTabs';
 
 const art = (name: string) => `/wallet-figma/token/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -91,9 +92,11 @@ const RANGES = ['1H', '1D', '1W', '1M', '1Y', 'All'];
 
 export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
+  const net = useWalletNetwork();
   const frame = FRAMES[id] ?? FRAMES['token-arx'];
   const liveTok = live?.app
-    ? live.tokens.find((row) => row.name === frame.title) ?? (frame.title === 'Arxon' ? live.testnetTokens[0] : undefined)
+    ? (net === 'testnet' ? live.testnetTokens : live.tokens).find((row) => row.name === frame.title)
+      ?? (frame.title === 'Arxon' ? live.testnetTokens[0] : undefined)
     : undefined;
   const amount = liveTok?.amount ?? frame.amount;
   const fiat = liveTok?.value ?? frame.fiat;
@@ -108,7 +111,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
   const liveRows = live?.app
     ? live.activity.flatMap((group) => group.items).filter((row) => {
         const sym = liveTok?.symbol ?? '';
-        return !sym || row.token === sym || row.token === `t${sym}` || (sym === 'ARX' && !row.token);
+        return !sym || row.token === sym || row.token === `t${sym}` || ((sym === 'ARX' || sym === 'ARXt') && (row.token === 'ARX' || row.token === 'tARX' || !row.token));
       }).slice(0, 2)
     : undefined;
   const activityTop = frame.card ? 636 : 544;
@@ -156,7 +159,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
 
       <div style={{ position: 'absolute', left: 18, top: 432, width: 354, height: 84, display: 'flex', justifyContent: 'space-between', padding: '0 40px', boxSizing: 'border-box' }}>
         <Action label="Send" onClick={() => go(sendTo)}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-        <Action label="Receive" onClick={() => go('receive')}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+        <Action label="Receive" onClick={() => { live?.setReceiveAsset(liveTok?.symbol ?? (frame.title === 'Bitcoin' ? 'BTC' : frame.title === 'Arxon' ? 'ARXt' : frame.title === 'Tether' ? 'USDT' : frame.title === 'USD Coin' ? 'USDC' : 'ETH')); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
         <Action label="Swap" onClick={() => go(swapTo)}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
       </div>
 

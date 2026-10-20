@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Arxon · Google Drive</title>
+  </head>
+  <body>
+    <script>
+      (function () {
+        var hash = new URLSearchParams(location.hash.replace(/^#/, ''));
+        var search = new URLSearchParams(location.search);
+        var token = hash.get('access_token');
+        var err = hash.get('error') || search.get('error');
+        var payload = { type: 'arxon-google-oauth', token: token, err: err };
+        try {
+          localStorage.setItem('arxon.googleOauth', JSON.stringify(payload));
+        } catch (e) {}
+        if (window.opener) {
+          window.opener.postMessage(payload, '*');
+          window.close();
+        } else {
+          location.replace('/');
+        }
+      })();
+    </script>
+  </body>
+</html>

@@ -15,8 +15,9 @@ type Tok = {
   value: string;
   change: string;
   tone: 'up' | 'down' | 'flat';
-  icon: 'arx' | 'btc' | 'eth' | 'usdt' | 'usdc';
+  icon: 'arx' | 'btc' | 'eth' | 'usdt' | 'usdc' | 'sol';
   to: string;
+  symbol?: string;
 };
 
 const ZERO: Tok[] = [
@@ -151,7 +152,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
 
       <div style={{ position: 'absolute', left: 18, top: 292, width: 354, display: 'flex', gap: 14 }}>
         <Action label="Send" onClick={() => go(sendTo())}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-        <Action label="Receive" onClick={() => go('receive')}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+        <Action label="Receive" onClick={() => { live?.setReceiveAsset(network === 'testnet' ? 'ARXt' : 'ETH'); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
         <Action label="Swap" onClick={() => go(vaulted ? 'swap-vault' : 'swap')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
         <button type="button" onClick={() => go('more')} style={actionBtn}>
           <FigmaImg src={art('more.svg')} width={58} height={58} />
@@ -178,7 +179,7 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
 
       <div style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354 }}>
         {tokens.map((token) => (
-          <button key={token.name} type="button" onClick={() => go(token.to)} style={tokenRow}>
+          <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
             <TokenIcon kind={token.icon} />
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left' }}>
               <span style={{ fontSize: 16, fontWeight: 600 }}>{token.name}</span>
@@ -282,6 +283,13 @@ function TokenIcon({ kind }: { kind: Tok['icon'] }) {
     return (
       <span style={{ width: 40, height: 40, borderRadius: 20, background: '#627eeb', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <FigmaImg src={art('eth.svg')} width={15.6465} height={25} />
+      </span>
+    );
+  }
+  if (kind === 'sol') {
+    return (
+      <span style={{ width: 40, height: 40, borderRadius: 20, background: '#9945ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 13, fontWeight: 700 }}>
+        S
       </span>
     );
   }
