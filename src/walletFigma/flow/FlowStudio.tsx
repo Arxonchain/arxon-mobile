@@ -152,6 +152,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [live?.sessionPassword]);
 
   useEffect(() => {
+    if (!app || !note) return;
+    const t = window.setTimeout(() => setNote(null), Math.max(2600, note.length * 60));
+    return () => window.clearTimeout(t);
+  }, [app, note]);
+
+  useEffect(() => {
     if (!app || !live?.app || !live.wcKind) return;
     if (live.wcKind === 'proposal' && id !== 'dapp') setId('dapp');
     if (live.wcKind === 'request' && id !== 'dapp-tx') setId('dapp-tx');
@@ -472,7 +478,9 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         </div>
         </WalletNetworkContext.Provider>
         </div>
-        {note && <p style={{ color: ink.accent, fontSize: 13, margin: '8px 0 0', flexShrink: 0 }}>{note}</p>}
+        {note && (app ? (
+          <p role="status" style={{ position: 'fixed', left: '50%', bottom: 100, transform: 'translateX(-50%)', width: 'max-content', maxWidth: 342, margin: 0, padding: '10px 16px', borderRadius: 12, background: '#1C2126', border: '1px solid #29333D', color: '#FFFFFF', fontFamily: font.sans, fontSize: 13, lineHeight: 1.35, textAlign: 'center', zIndex: 50, pointerEvents: 'none' }}>{note}</p>
+        ) : <p style={{ color: ink.accent, fontSize: 13, margin: '8px 0 0', flexShrink: 0 }}>{note}</p>)}
       </main>
     </div>
   );
