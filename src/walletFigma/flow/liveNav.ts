@@ -130,6 +130,10 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return { block: true, note: 'Coming soon' };
   }
 
+  if (to === 'send-privacy' && wallet.network !== 'arxon') {
+    return { block: true, note: 'Privacy is available on Arxon Testnet only.' };
+  }
+
   if (to === 'buy-status') {
     return { block: true, note: 'Coming soon' };
   }

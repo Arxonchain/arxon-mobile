@@ -235,6 +235,8 @@ function Amount({ token, who, amount, available, vaulted, priv, setPriv, onKey, 
   token: (typeof TOKENS)[number]; who: string; amount: string; available: number; vaulted: boolean; priv: boolean; setPriv: (v: boolean) => void;
   onKey: (key: string) => void; onMax: () => void; onPaste: (text: string) => void; ready: boolean; fiat: number; go: Go; leave: () => void;
 }) {
+  const live = useLiveFrame();
+  const net = useWalletNetwork();
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
   return (
     <>
@@ -261,7 +263,7 @@ function Amount({ token, who, amount, available, vaulted, priv, setPriv, onKey, 
           <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
         </p>
       )}
-      {token.id === 'arx' && (
+      {token.id === 'arx' && (!live?.app || net === 'testnet') && (
         <div style={{ position: 'absolute', left: 18, top: vaulted ? 412 : 372, width: 354, height: 64, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 12 }}>
           <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FigmaImg src={art('shield.svg')} width={18} height={18} /></span>
           <span style={{ flex: 1 }}>
@@ -341,6 +343,7 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
         <Line label="To" value={to} />
         <Line label="From" value="Account 01" />
         <Line label="Network" value={networkLabel} />
+        {(!live?.app || net === 'testnet') && (
         <button type="button" onClick={() => go('send-privacy')} style={{ ...lineBtn }}>
           <span style={{ color: '#8b9097' }}>Privacy</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#accafe', fontWeight: 500 }}>
@@ -348,6 +351,7 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
             {priv && token.id === 'arx' ? 'Private' : 'Public'}
           </span>
         </button>
+        )}
         <Line label="Network fee" value={feeLabel} />
         <div style={{ height: 1, background: '#2a3447' }} />
         <Line label="Total" value={total} />
