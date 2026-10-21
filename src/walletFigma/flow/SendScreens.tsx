@@ -464,7 +464,7 @@ function Scan({ go, leave, onRead }: { go: Go; leave: () => void; onRead?: (addr
     <>
       {corners.map(([name, left, top]) => <img key={name} src={art(name)} alt="" width={44} height={44} style={{ position: 'absolute', left, top }} />)}
       <Back top={56} left={18} icon="chev" onClick={leave} />
-      <p style={{ position: 'absolute', left: 0, top: 64, width: 390, margin: 0, textAlign: 'center', fontSize: 20, fontWeight: 700 }}>Scan QR code</p>
+      <p style={{ position: 'absolute', left: 0, top: 64, width: 390, margin: 0, textAlign: 'center', fontSize: 20, fontWeight: 700, pointerEvents: 'none' }}>Scan QR code</p>
       <p style={{ position: 'absolute', left: 55, top: 520, width: 280, margin: 0, textAlign: 'center', fontSize: 15, lineHeight: '22px', color: '#8c8f96' }}>Point your camera at an Arxon address QR code.</p>
       {err ? <p style={{ position: 'absolute', left: 40, top: 580, width: 310, margin: 0, textAlign: 'center', fontSize: 12, color: '#f25252' }}>{err}</p> : null}
       <button type="button" onClick={() => go('send-who')} style={{ position: 'absolute', left: 19, top: 714, width: 353, height: 55, borderRadius: 8, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Enter address instead</button>

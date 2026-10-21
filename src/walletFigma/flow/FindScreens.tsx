@@ -307,7 +307,7 @@ function Header({ title, leave }: { title: string; leave: () => void }) {
       <button type="button" aria-label="Back" onClick={leave} style={{ ...backBtn, left: 18, top: 56 }}>
         <FigmaImg src={art('chev.svg')} width={20} height={20} />
       </button>
-      <p style={{ position: 'absolute', left: 0, top: 65.5, width: 390, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>{title}</p>
+      <p style={{ position: 'absolute', left: 0, top: 65.5, width: 390, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 700, pointerEvents: 'none' }}>{title}</p>
     </>
   );
 }
