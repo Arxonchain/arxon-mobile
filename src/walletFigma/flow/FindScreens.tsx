@@ -3,6 +3,8 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { useWalletNetwork } from './WalletTabs';
+import { hiddenTokens, setTokenHidden } from './tokenVisibility';
 
 const art = (name: string) => `/wallet-figma/find/${name}`;
 
@@ -14,12 +16,14 @@ const SUGGESTED = [
   { name: 'Ethereum', amount: '0.00 ETH', value: '$0.00', change: '+0.66%', tone: '#3ddc84', icon: 'eth' as const, to: 'token-eth' },
 ];
 
-const MANAGED = [
-  { id: 'arx', name: 'Arxon', symbol: 'ARX', icon: 'arx' as const, on: true },
-  { id: 'btc', name: 'Bitcoin', symbol: 'BTC', icon: 'btc' as const, on: true },
-  { id: 'eth', name: 'Ethereum', symbol: 'ETH', icon: 'eth' as const, on: true },
-  { id: 'usdc', name: 'USD Coin', symbol: 'USDC', icon: 'usdc' as const, on: false },
-  { id: 'usdt', name: 'Tether', symbol: 'USDT', icon: 'usdt' as const, on: false },
+type ManagedToken = { id: string; name: string; symbol: string; icon: 'arx' | 'btc' | 'eth' | 'usdc' | 'usdt' | 'sol'; on: boolean };
+
+const MANAGED: ManagedToken[] = [
+  { id: 'arx', name: 'Arxon', symbol: 'ARX', icon: 'arx', on: true },
+  { id: 'btc', name: 'Bitcoin', symbol: 'BTC', icon: 'btc', on: true },
+  { id: 'eth', name: 'Ethereum', symbol: 'ETH', icon: 'eth', on: true },
+  { id: 'usdc', name: 'USD Coin', symbol: 'USDC', icon: 'usdc', on: false },
+  { id: 'usdt', name: 'Tether', symbol: 'USDT', icon: 'usdt', on: false },
 ];
 
 type NoteIcon = 'down' | 'up' | 'shield' | 'lock' | 'check';
@@ -68,7 +72,7 @@ function Search({ go, leave }: { go: Go; leave: () => void }) {
         change: row.change,
         tone: row.tone === 'up' ? '#3ddc84' : row.tone === 'down' ? '#ff5c5c' : '#8b9097',
         icon: row.icon,
-        to: row.to,
+        to: row.symbol === 'ADDR' ? 'send-token' : row.to,
       }))
     : SUGGESTED.filter((row) => !q || row.name.toLowerCase().includes(q) || row.amount.toLowerCase().includes(q));
   return (
@@ -109,12 +113,28 @@ function Search({ go, leave }: { go: Go; leave: () => void }) {
 }
 
 function Manage({ go, leave }: { go: Go; leave: () => void }) {
+  const live = useLiveFrame();
+  const net = useWalletNetwork();
+  const list: ManagedToken[] = live?.app
+    ? (net === 'testnet' ? live.testnetTokens : live.tokens).map((token) => ({
+        id: token.symbol || token.name,
+        name: token.name,
+        symbol: token.symbol || token.name,
+        icon: token.icon,
+        on: !hiddenTokens(net).includes(token.symbol || token.name),
+      }))
+    : MANAGED;
   const [query, setQuery] = useState('');
-  const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(MANAGED.map((token) => [token.id, token.on])));
+  const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(list.map((token) => [token.id, token.on])));
   const q = query.trim().toLowerCase();
-  const tokens = MANAGED.filter((token) => !q || token.name.toLowerCase().includes(q) || token.symbol.toLowerCase().includes(q));
-  const shown = tokens.filter((token) => on[token.id]);
-  const more = tokens.filter((token) => !on[token.id]);
+  const tokens = list.filter((token) => !q || token.name.toLowerCase().includes(q) || token.symbol.toLowerCase().includes(q));
+  const shown = tokens.filter((token) => on[token.id] ?? token.on);
+  const more = tokens.filter((token) => !(on[token.id] ?? token.on));
+  const toggle = (token: ManagedToken) => {
+    const next = !(on[token.id] ?? token.on);
+    if (live?.app) setTokenHidden(net, token.symbol, !next);
+    setOn((prev) => ({ ...prev, [token.id]: next }));
+  };
   return (
     <>
       <Header title="Manage tokens" leave={leave} />
@@ -125,11 +145,11 @@ function Manage({ go, leave }: { go: Go; leave: () => void }) {
       <div style={{ position: 'absolute', left: 18, top: 178, width: 354 }}>
         {shown.length > 0 && <p style={heading}>Shown on Home</p>}
         {shown.length > 0 && <div style={{ height: 6 }} />}
-        {shown.map((token) => <ManageRow key={token.id} token={token} on={!!on[token.id]} toggle={() => setOn((prev) => ({ ...prev, [token.id]: !prev[token.id] }))} />)}
+        {shown.map((token) => <ManageRow key={token.id} token={token} on toggle={() => toggle(token)} />)}
         {more.length > 0 && <div style={{ height: 12 }} />}
         {more.length > 0 && <p style={heading}>More tokens</p>}
         {more.length > 0 && <div style={{ height: 6 }} />}
-        {more.map((token) => <ManageRow key={token.id} token={token} on={!!on[token.id]} toggle={() => setOn((prev) => ({ ...prev, [token.id]: !prev[token.id] }))} />)}
+        {more.map((token) => <ManageRow key={token.id} token={token} on={false} toggle={() => toggle(token)} />)}
       </div>
       <button type="button" onClick={() => go('add-token')} style={secondaryBtn}>
         <FigmaImg src={art('plus.svg')} width={24} height={24} />
@@ -139,7 +159,7 @@ function Manage({ go, leave }: { go: Go; leave: () => void }) {
   );
 }
 
-function ManageRow({ token, on, toggle }: { token: (typeof MANAGED)[number]; on: boolean; toggle: () => void }) {
+function ManageRow({ token, on, toggle }: { token: ManagedToken; on: boolean; toggle: () => void }) {
   return (
     <div style={{ height: 64, display: 'flex', alignItems: 'center', gap: 12 }}>
       <TokenIcon kind={token.icon} />
@@ -157,6 +177,7 @@ function ManageRow({ token, on, toggle }: { token: (typeof MANAGED)[number]; on:
 
 function AddToken({ go, leave }: { go: Go; leave: () => void }) {
   const live = useLiveFrame();
+  const net = useWalletNetwork();
   const [address, setAddress] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const ready = address.trim().length > 0;
@@ -167,7 +188,7 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
         <Field label="Network">
           <div style={{ ...box, height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px' }}>
             <FigmaImg src={art('globe.svg')} width={18} height={18} />
-            <span style={{ fontSize: 15, fontWeight: 500 }}>Arxon Mainnet</span>
+            <span style={{ fontSize: 15, fontWeight: 500 }}>{live?.app ? (net === 'testnet' ? 'Arxon Testnet' : 'Ethereum') : 'Arxon Mainnet'}</span>
           </div>
         </Field>
         <Field label="Token contract address">
@@ -176,7 +197,10 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
             <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text) setAddress(text.trim()); }).catch(() => undefined)} style={iconBtn}>
               <FigmaImg src={art('paste.svg')} width={20} height={20} />
             </button>
-            <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}>
+            <button type="button" aria-label="Scan" onClick={() => {
+              if (!live?.app) { go('send-qr'); return; }
+              void live.scanQr().then((text) => { if (text) setAddress(text.trim()); }).catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Could not scan that code'));
+            }} style={iconBtn}>
               <FigmaImg src={art('scan.svg')} width={20} height={20} />
             </button>
           </div>

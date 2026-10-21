@@ -261,7 +261,7 @@ function Amount({ id, token, amount, leave, onKey, go }: { id: string; token: Sy
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: 8, color: '#8b9097', fontSize: 13 }}>
         <span>{movingIn ? 'From  Home' : id === 'move-home' ? 'From  Vault' : 'To'}</span>
         <span style={{ color: '#accafe' }}>→</span>
-        <span style={{ color: '#fff' }}>{movingIn ? 'To  Vault' : id === 'move-home' ? 'To  Home' : id === 'priv-amount' ? 'arx1q8…m2d9' : 'arx1q8x4…t7c2n4p'}</span>
+        <span style={{ color: '#fff' }}>{movingIn ? 'To  Vault' : id === 'move-home' ? 'To  Home' : vaultDest(id === 'priv-amount', live?.app ? live.address : undefined)}</span>
       </div>
       <div style={{ textAlign: 'center', marginTop: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
@@ -529,9 +529,16 @@ function Unlock({ wrong, locked, clock, typed, setTyped, onUnlock, onFace, leave
   );
 }
 
+function vaultDest(priv: boolean, address: string | null | undefined) {
+  if (address === undefined) return priv ? 'arx1q8…m2d9' : 'arx1q8x4…t7c2n4p';
+  if (priv) return 'Shielded note';
+  return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'Your address';
+}
+
 function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
+  const live = useLiveFrame();
   const title = id === 'vault-pending' ? 'Moving to Vault' : id === 'priv-pending' ? 'Sending privately' : 'Unshielding';
-  const to = id === 'vault-pending' ? 'Vault' : id === 'priv-pending' ? 'arx1q8…m2d9' : 'arx1q8x4…t7c2n4p';
+  const to = id === 'vault-pending' ? 'Vault' : vaultDest(id === 'priv-pending', live?.app ? live.address : undefined);
   const shown = `${qty(num(amount || '0'))} ARX`;
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

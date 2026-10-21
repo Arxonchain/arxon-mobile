@@ -95,7 +95,7 @@ function Review({ dollars, arx, total, hide, setHide, go, leave }: { dollars: nu
           <Line label="Rate" value="1 ARX = $0.42" />
           <Line label="Provider fee" value={`$${money(PROVIDER)}`} />
           <Line label="Network fee" value="$0.00" />
-          <Line label="Deliver to" value="Account 01 · arx1q7…m2d9" />
+          <Line label="Deliver to" value={live?.app ? `${live.accountLabel}${live.address ? ` · ${live.address.slice(0, 6)}…${live.address.slice(-4)}` : ''}` : 'Account 01 · arx1q7…m2d9'} />
           <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
             <span>Total</span>
             <span>${money(total)}</span>
