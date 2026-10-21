@@ -2,9 +2,11 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { PendingTxError } from '@/chainWallet/chain';
+import type { PrivacyFlags } from '@/chainWallet/privacy';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
+import { isLiveSendDest, parseTokenQty } from './sendDest';
 
 const art = (name: string) => `/wallet-figma/send/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -33,7 +35,8 @@ export function isSendScreen(id: string) {
 export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
-  const [tokenId, setTokenId] = useState('arx');
+  const [tokenId, setTokenId] = useState(() => (live?.app && net !== 'testnet' ? 'eth' : 'arx'));
+  const [unavailable, setUnavailable] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [who, setWho] = useState('');
   const [picked, setPicked] = useState('');
@@ -49,18 +52,49 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
     : tokenBase;
   const leave = () => (back ? back() : go('home-funded', false));
   const vaulted = id === 'send-amount-vault';
-  const available = vaulted && token.id === 'arx' ? 1400 : id === 'send-amount' && token.id === 'arx' ? 0 : token.home;
+  const liveQty = live?.app ? liveTokenQty(live, net, token.id) : null;
+  const available = liveQty != null
+    ? liveQty
+    : vaulted && token.id === 'arx' ? 1400 : id === 'send-amount' && token.id === 'arx' ? 0 : token.home;
+  const paymentFlags: PrivacyFlags = {
+    hideSender: flags[0],
+    hideReceiver: flags[1],
+    hideAmount: flags[2],
+    hideBalance: flags[3],
+  };
+  const networkLabel = live?.app ? (net === 'testnet' ? 'Arxon Testnet' : 'Ethereum') : 'Arxon';
+  const feeLabel = live?.app ? 'Set by the network' : token.id === 'arx' ? `0.0004 ${token.symbol}` : `0 ${token.symbol}`;
+  const privSend = priv && token.id === 'arx' && (!live?.app || net === 'testnet');
+  const dest = (picked || who).trim();
+  const shownTo = live?.app ? dest : picked || 'arx1q8x4…t7c2n4p';
   const numeric = Number(amount);
   const readyAmount = Number.isFinite(numeric) && numeric > 0;
-  const shownAmount = readyAmount ? formatAmount(numeric) : '25.00';
-  const fiat = (readyAmount ? numeric : 25) * (token.id === 'arx' ? 0.42 : token.home ? Number(token.fiat.replace(/[$,]/g, '')) / token.home : 0);
+  const shownAmount = readyAmount ? formatAmount(numeric) : live?.app ? '0.00' : '25.00';
+  const unitUsd = live?.app ? liveTokenUsd(live, net, token.id) : rate(token) || (token.id === 'arx' ? 0.42 : 0);
+  const fiat = (readyAmount ? numeric : live?.app ? 0 : 25) * unitUsd;
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: id === 'send-qr' ? '#0a0f17' : '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.send-input::placeholder{color:#8b9097}`}</style>
       <Status />
       {id === 'send-token' && (
-        <PickToken query={query} setQuery={setQuery} tokenId={tokenId} onPick={(next) => { setTokenId(next); setAmount('0'); go('send-who'); }} leave={leave} />
+        <PickToken
+          query={query}
+          setQuery={setQuery}
+          tokenId={tokenId}
+          note={unavailable}
+          onPick={(next) => {
+            if (live?.app && (next === 'btc' || next === 'sol')) {
+              setUnavailable(`${next.toUpperCase()} send is not available yet. You can still receive ${next.toUpperCase()}.`);
+              return;
+            }
+            setUnavailable(null);
+            setTokenId(next);
+            setAmount('0');
+            go('send-who');
+          }}
+          leave={leave}
+        />
       )}
       {id === 'send-who' && (
         <PickWho query={who} setQuery={setWho} picked={picked} onPick={(address) => { setPicked(address); setWho(address); }} go={go} leave={leave} />
@@ -75,27 +109,27 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
           priv={priv}
           setPriv={setPriv}
           onKey={(key) => setAmount((prev) => punch(prev, key))}
-          onMax={() => setAmount(rawNum(Math.max(0, available - (token.id === 'arx' ? 0.0004 : 0))))}
+          onMax={() => setAmount(rawNum(Math.max(0, live?.app ? available : available - (token.id === 'arx' ? 0.0004 : 0))))}
           onPaste={(text) => setWho(text)}
           ready={readyAmount}
-          fiat={readyAmount ? numeric * rate(token) : 0}
+          fiat={readyAmount ? numeric * unitUsd : 0}
           go={go}
           leave={leave}
         />
       )}
       {id === 'send-review' && (
-        <Review token={token} to={picked || 'arx1q8x4…t7c2n4p'} amount={shownAmount} fiat={fiat} priv={priv} go={go} leave={leave} />
+        <Review token={token} to={shownTo} amount={shownAmount} fiat={fiat} priv={privSend} flags={paymentFlags} networkLabel={networkLabel} feeLabel={feeLabel} go={go} leave={leave} />
       )}
-      {id === 'send-success' && <Success amount={shownAmount} symbol={token.symbol} privateSend={priv && token.id === 'arx'} to={picked || 'arx1q8x4…t7c2n4p'} go={go} />}
+      {id === 'send-success' && <Success amount={shownAmount} symbol={token.symbol} privateSend={privSend} to={shownTo} feeLabel={feeLabel} go={go} />}
       {id === 'send-privacy' && <Privacy flags={flags} setFlags={setFlags} go={go} leave={leave} />}
-      {id === 'send-failed' && <Failed to={picked || 'arx1q8x4…t7c2n4p'} amount={shownAmount} symbol={token.symbol} go={go} />}
+      {id === 'send-failed' && <Failed to={shownTo} amount={shownAmount} symbol={token.symbol} go={go} />}
       {id === 'send-qr' && <Scan go={go} leave={leave} onRead={(addr) => { setPicked(addr); setWho(addr); go('send-who'); }} />}
       <HomeBar />
     </div>
   );
 }
 
-function PickToken({ query, setQuery, tokenId, onPick, leave }: { query: string; setQuery: (v: string) => void; tokenId: string; onPick: (id: string) => void; leave: () => void }) {
+function PickToken({ query, setQuery, tokenId, note, onPick, leave }: { query: string; setQuery: (v: string) => void; tokenId: string; note?: string | null; onPick: (id: string) => void; leave: () => void }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
   const q = query.trim().toLowerCase();
@@ -142,15 +176,20 @@ function PickToken({ query, setQuery, tokenId, onPick, leave }: { query: string;
         <FigmaImg src={art('lock.svg')} width={18} height={18} />
         <p style={{ margin: 0, width: 330, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Only Arxon supports private transfers. Other tokens are sent publicly.</p>
       </div>
+      {note ? <p role="alert" style={{ position: 'absolute', left: 16, top: 650, width: 358, margin: 0, fontSize: 13, color: '#fabf33', lineHeight: 1.35 }}>{note}</p> : null}
     </>
   );
 }
 
 function PickWho({ query, setQuery, picked, onPick, go, leave }: { query: string; setQuery: (v: string) => void; picked: string; onPick: (address: string) => void; go: Go; leave: () => void }) {
+  const live = useLiveFrame();
+  const net = useWalletNetwork();
   const q = query.trim().toLowerCase();
-  const accounts = PEOPLE.filter((person) => person.group === 'account' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q)));
-  const recent = PEOPLE.filter((person) => person.group === 'recent' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q)));
-  const ready = picked.trim().length > 0 || query.trim().length > 0;
+  const sample = !live?.app;
+  const accounts = sample ? PEOPLE.filter((person) => person.group === 'account' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q))) : [];
+  const recent = sample ? PEOPLE.filter((person) => person.group === 'recent' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q))) : [];
+  const dest = (picked || query).trim();
+  const ready = live?.app ? isLiveSendDest(dest, net === 'testnet') : dest.length > 0;
   return (
     <>
       <Back top={52} left={16} icon="back" onClick={leave} />
@@ -186,6 +225,7 @@ function PickWho({ query, setQuery, picked, onPick, go, leave }: { query: string
           ))}
         </div>
       )}
+      {live?.app ? <p style={{ position: 'absolute', left: 24, top: 700, width: 342, margin: 0, fontSize: 12, color: '#8b9097' }}>Paste a 0x address{net === 'testnet' ? ' or shielded key' : ''}.</p> : null}
       <button type="button" disabled={!ready} onClick={() => go('send-amount')} style={{ ...primary, top: 744, opacity: ready ? 1 : 0.4 }}>Continue</button>
     </>
   );
@@ -245,24 +285,32 @@ function Amount({ token, who, amount, available, vaulted, priv, setPriv, onKey, 
   );
 }
 
-function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof TOKENS)[number]; to: string; amount: string; fiat: number; priv: boolean; go: Go; leave: () => void }) {
+function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, go, leave }: {
+  token: (typeof TOKENS)[number]; to: string; amount: string; fiat: number; priv: boolean; flags: PrivacyFlags; networkLabel: string; feeLabel: string; go: Go; leave: () => void;
+}) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<string | null>(null);
-  const fee = token.id === 'arx' ? 0.0004 : 0;
-  const total = `${(Number(amount) + fee).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
+  const total = live?.app
+    ? `${amount} ${token.symbol} + fee`
+    : `${(Number(amount.replace(/,/g, '')) + (token.id === 'arx' ? 0.0004 : 0)).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
   async function confirm() {
     if (!live?.app) {
       go('send-success');
       return;
     }
     if (submitted) return;
+    if (live.app && !isLiveSendDest(to, net === 'testnet')) {
+      setErr(net === 'testnet' ? 'Enter a 0x address or shielded destination.' : 'Enter a 0x address.');
+      return;
+    }
     setBusy(true);
     setErr(null);
     try {
-      await live.send(token.symbol, to, amount, net === 'testnet', priv && token.id === 'arx' ? 'private' : 'home');
+      const testnet = net === 'testnet';
+      await live.send(token.symbol, to, amount.replace(/,/g, ''), testnet, testnet && priv && token.id === 'arx' ? 'private' : 'home', testnet ? flags : undefined);
       go('send-success');
     } catch (e) {
       if (e instanceof PendingTxError) {
@@ -292,7 +340,7 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
       <div style={{ position: 'absolute', left: 18, top: 262, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
         <Line label="To" value={to} />
         <Line label="From" value="Account 01" />
-        <Line label="Network" value="Arxon" />
+        <Line label="Network" value={networkLabel} />
         <button type="button" onClick={() => go('send-privacy')} style={{ ...lineBtn }}>
           <span style={{ color: '#8b9097' }}>Privacy</span>
           <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#accafe', fontWeight: 500 }}>
@@ -300,7 +348,7 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
             {priv && token.id === 'arx' ? 'Private' : 'Public'}
           </span>
         </button>
-        <Line label="Network fee" value={fee ? `${fee} ${token.symbol}` : `0 ${token.symbol}`} />
+        <Line label="Network fee" value={feeLabel} />
         <div style={{ height: 1, background: '#2a3447' }} />
         <Line label="Total" value={total} />
       </div>
@@ -312,7 +360,7 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
   );
 }
 
-function Success({ amount, symbol, privateSend, to, go }: { amount: string; symbol: string; privateSend: boolean; to: string; go: Go }) {
+function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: string; symbol: string; privateSend: boolean; to: string; feeLabel: string; go: Go }) {
   return (
     <>
       <img src={art('glow.svg')} alt="" width={168} height={168} style={{ position: 'absolute', left: 111, top: 130 }} />
@@ -324,7 +372,7 @@ function Success({ amount, symbol, privateSend, to, go }: { amount: string; symb
       <p style={{ position: 'absolute', left: 35, top: 376, width: 320, margin: 0, textAlign: 'center', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{amount} {symbol}</p>
       <div style={{ position: 'absolute', left: 18, top: 440, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
         <Line label="To" value={to} />
-        <Line label="Network fee" value="0.0004 ARX" />
+        <Line label="Network fee" value={feeLabel} />
         <Line label="Status" value="Confirmed" valueColor="#3ddc84" />
       </div>
       <button type="button" onClick={() => go('home-funded')} style={{ ...primary, top: 649, borderRadius: 8, height: 55 }}>Done</button>
@@ -513,6 +561,18 @@ function showAmount(amount: string) {
 function showAvail(value: number) {
   const digits = value > 0 && value < 1 ? 4 : 2;
   return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits });
+}
+
+function liveTokenQty(live: NonNullable<ReturnType<typeof useLiveFrame>>, net: string, id: string) {
+  const row = (net === 'testnet' ? live.testnetTokens : live.tokens).find((token) => token.icon === id);
+  return row ? parseTokenQty(row.amount) : 0;
+}
+
+function liveTokenUsd(live: NonNullable<ReturnType<typeof useLiveFrame>>, net: string, id: string) {
+  const row = (net === 'testnet' ? live.testnetTokens : live.tokens).find((token) => token.icon === id);
+  if (!row || !/\$\s*\d/.test(row.value)) return 0;
+  const qty = parseTokenQty(row.amount);
+  return qty > 0 ? parseTokenQty(row.value) / qty : 0;
 }
 
 function formatAmount(value: number) {

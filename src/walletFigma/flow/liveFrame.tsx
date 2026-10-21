@@ -109,7 +109,7 @@ type LiveFrame = {
   testnetAdded: boolean;
   enableTestnet: (rpc?: string) => Promise<void>;
   openFaucet: () => void;
-  send: (symbol: string, to: string, amount: string, testnet: boolean, mode?: LiveSendMode) => Promise<void>;
+  send: (symbol: string, to: string, amount: string, testnet: boolean, mode?: LiveSendMode, flags?: PrivacyFlags) => Promise<void>;
   chainNetwork: WalletNetworkId;
   unlock: (password: string) => Promise<boolean>;
   unlockBiometric: () => Promise<boolean>;
@@ -448,10 +448,13 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         : 'splash';
 
   const send = useCallback(
-    async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home') => {
-      const flags = readDefaultPrivacy();
+    async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home', paymentFlags?: PrivacyFlags) => {
+      const flags = (testnet ? paymentFlags : undefined) ?? readDefaultPrivacy();
       if (symbol === 'SOL' || symbol === 'BTC') {
         throw new Error(`${symbol} send is not available yet.`);
+      }
+      if (!testnet && (mode !== 'home' || isArxonSymbol(symbol))) {
+        throw new Error('Arxon, Vault and private sends are on Arxon Testnet only.');
       }
       if (mode === 'vault' || mode === 'private' || mode === 'unshield') {
         if (!isArxonSymbol(symbol) && !testnet) {
@@ -517,9 +520,6 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       }
       if (!isEthSymbol(symbol)) {
         throw new Error(`${symbol} sends are not available on this wallet.`);
-      }
-      if (symbol !== 'ETH' && wallet.network === 'ethereum' && mode === 'vault') {
-        throw new Error('USDT and USDC on Ethereum cannot move to the Vault.');
       }
       const addr = getAddress(dest) as Address;
       if (wallet.network !== 'ethereum') await wallet.setNetwork('ethereum');
