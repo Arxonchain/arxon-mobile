@@ -5,6 +5,7 @@ import { rememberFromActivity, tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame, type LiveActivity } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { explorerTxUrl, openExternal } from './openExternal';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -230,19 +231,34 @@ function Empty({ title, body, action, onAction }: { title: string; body: string;
 
 function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
   const live = useLiveFrame();
+  const net = useWalletNetwork();
   const inspect = live?.app ? live.inspect : null;
+  const loading = !!live?.app && !inspect;
   const vault = inspect ? inspect.vault : id === 'tx-vault';
   const rows = inspect
     ? inspect.rows
+    : loading
+    ? [['Status', 'Loading…']]
     : vault
     ? [['Date', 'Oct 7, 2026 · 11:02 AM'], ['From', 'Home'], ['To', 'Vault'], ['Amount', '1,000.00 ARX'], ['Network fee', '0.0004 ARX'], ['Privacy', 'Private']]
     : [['Date', 'Oct 7, 2026 · 4:12 PM'], ['To', 'arx1q8x4…t7c2'], ['From', 'Account 01'], ['Network', 'Arxon Mainnet'], ['Network fee', '0.0004 ARX'], ['Privacy', 'Private']];
-  const title = inspect?.title ?? (vault ? 'Moved to Vault' : 'Sent privately');
-  const amount = inspect?.amount ?? (vault ? '1,000.00 ARX' : '25.00 ARX');
-  const fiat = inspect?.fiat ?? (vault ? '$420.00' : '≈ $10.50');
-  const status = inspect?.status ?? 'Confirmed';
-  const hash = inspect?.hash ?? '0x7f3a…c91e';
-  const hashLabel = inspect ? `${inspect.hash.slice(0, 10)}…${inspect.hash.slice(-4)}` : '0x7f3a…c91e';
+  const title = inspect?.title ?? (loading ? 'Transaction' : vault ? 'Moved to Vault' : 'Sent privately');
+  const amount = inspect?.amount ?? (loading ? '—' : vault ? '1,000.00 ARX' : '25.00 ARX');
+  const fiat = inspect?.fiat ?? (loading ? '' : vault ? '$420.00' : '≈ $10.50');
+  const status = inspect?.status ?? (loading ? 'Pending' : 'Confirmed');
+  const hash = inspect?.hash ?? (loading ? '' : '0x7f3a…c91e');
+  const hashLabel = inspect ? `${inspect.hash.slice(0, 10)}…${inspect.hash.slice(-4)}` : loading ? '—' : '0x7f3a…c91e';
+
+  function explorer() {
+    if (!live?.app) {
+      go('activity');
+      return;
+    }
+    if (!hash) return;
+    const row = live.activity.flatMap((group) => group.items).find((item) => item.hash === hash);
+    const onEthereum = row ? row.fiat === 'Ethereum' : net === 'mainnet';
+    void openExternal(explorerTxUrl(hash, onEthereum ? 'ethereum' : 'arxon'));
+  }
   return (
     <>
       <NoteStatus />
@@ -276,7 +292,7 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
         <span style={{ position: 'absolute', right: 15, top: 17 }}><FigmaImg src={art('copy.svg')} width={20} height={20} /></span>
       </button>
       <button type="button" onClick={() => go(vault ? 'activity-vault' : 'receipt')} style={{ ...barBtn, top: 708, background: '#accafe', color: '#0c1018', border: 'none' }}>{vault ? 'Back to Activity' : 'View private receipt'}</button>
-      {!vault && <button type="button" onClick={() => go('activity')} style={{ ...barBtn, top: 770, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>View on explorer</button>}
+      {!vault && <button type="button" onClick={explorer} style={{ ...barBtn, top: 770, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>View on explorer</button>}
     </>
   );
 }

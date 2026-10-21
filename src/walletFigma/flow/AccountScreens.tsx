@@ -1,4 +1,4 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { tabTarget, vaultEntry } from './VaultScreens';
@@ -6,6 +6,7 @@ import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { selectedNetwork } from './homeNetworks';
+import { appVersion, HELP_URL, openExternal, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL, WEB_VERSION } from './openExternal';
 
 const art = (name: string) => `/wallet-figma/account/${name}`;
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
@@ -26,8 +27,19 @@ export function isAccountScreen(id: string) {
   return SCREENS.has(id);
 }
 
+const CURRENCY_KEY = 'arxon.currency';
+
+function readCurrency() {
+  try {
+    const saved = localStorage.getItem(CURRENCY_KEY);
+    return CURRENCIES.some(([id]) => id === saved) ? saved! : 'USD';
+  } catch {
+    return 'USD';
+  }
+}
+
 export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
-  const [code, setCode] = useState('USD');
+  const [code, setCode] = useState(readCurrency);
   const [copied, setCopied] = useState(false);
   const [kind, setKind] = useState('Bug');
   const [note, setNote] = useState('');
@@ -51,7 +63,11 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
         }} />
       )}
       {id === 'currency' && (
-        <Currency code={code} onPick={(next) => { setCode(next); go('account', false); }} onBack={() => leave('account')} />
+        <Currency code={code} onPick={(next) => {
+          setCode(next);
+          try { localStorage.setItem(CURRENCY_KEY, next); } catch { /* the choice still applies this session */ }
+          leave('account');
+        }} onBack={() => leave('account')} />
       )}
       {id === 'help' && <Help sent={sent} go={go} onBack={() => leave('account')} />}
       {id === 'report' && (
@@ -65,6 +81,11 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
           onBack={() => leave('help')}
           onSend={() => {
             live?.report(kind, note);
+            void appVersion().then((version) => {
+              const lines = [`Category: ${kind}`, '', note.trim()];
+              if (diagnostics) lines.push('', `App version: ${version}`, `Device: ${navigator.userAgent}`);
+              void openExternal(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Arxon wallet report · ${kind}`)}&body=${encodeURIComponent(lines.join('\n'))}`);
+            });
             setSent(true);
             setNote('');
             go('help', false);
@@ -172,6 +193,14 @@ function Help({ sent, go, onBack }: { sent: boolean; go: Go; onBack: () => void 
     ['Contact support', 'We usually reply within a day'],
     ['Report a problem', 'Tell us what went wrong', 'report'],
   ];
+  const about: [string, string][] = [
+    ['Terms of Service', TERMS_URL],
+    ['Privacy Policy', PRIVACY_URL],
+  ];
+  const [version, setVersion] = useState(WEB_VERSION);
+  useEffect(() => {
+    void appVersion().then(setVersion);
+  }, []);
   return (
     <>
       <NoteStatus />
@@ -183,8 +212,8 @@ function Help({ sent, go, onBack }: { sent: boolean; go: Go; onBack: () => void 
         {support.map(([title, sub, target], index) => (
           <button key={title} type="button" onClick={() => {
             if (target) go(target);
-            else if (title === 'Help center') window.open('https://arxon.io', '_blank', 'noopener,noreferrer');
-            else if (title === 'Contact support') window.open('https://arxon.io', '_blank', 'noopener,noreferrer');
+            else if (title === 'Help center') void openExternal(HELP_URL);
+            else if (title === 'Contact support') void openExternal(`mailto:${SUPPORT_EMAIL}?subject=${encodeURIComponent(`Arxon wallet ${version}`)}`);
           }} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none', cursor: 'pointer' }}>
             <span>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{title}</span>
@@ -196,15 +225,15 @@ function Help({ sent, go, onBack }: { sent: boolean; go: Go; onBack: () => void 
       </div>
       <p style={kicker(436)}>ABOUT</p>
       <div style={{ ...listCard, top: 462 }}>
-        {['Terms of Service', 'Privacy Policy'].map((title, index) => (
-          <button key={title} type="button" onClick={() => window.open('https://arxon.io', '_blank', 'noopener,noreferrer')} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none', cursor: 'pointer', width: '100%', background: 'none', color: '#fff', fontFamily: font.sans }}>
+        {about.map(([title, url], index) => (
+          <button key={title} type="button" onClick={() => void openExternal(url)} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none', cursor: 'pointer', width: '100%', background: 'none', color: '#fff', fontFamily: font.sans }}>
             <span style={{ fontSize: 15, fontWeight: 600 }}>{title}</span>
             <FigmaImg src={art('chev-sm.svg')} width={16} height={16} />
           </button>
         ))}
         <div style={{ ...listRow, borderTop: '1px solid #2a3447' }}>
           <span style={{ fontSize: 15, fontWeight: 600 }}>Version</span>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#8b9097' }}>1.0.0</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#8b9097' }}>{version}</span>
         </div>
       </div>
       <HomeBar />

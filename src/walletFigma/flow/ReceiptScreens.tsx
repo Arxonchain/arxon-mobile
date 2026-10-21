@@ -63,7 +63,7 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
         <FigmaImg src={art('back.svg')} width={20} height={20} />
       </button>
       <HomeBar />
-      {id === 'receipt' && <Receipt go={go} onShare={() => share(shareText)} inspect={liveInspect} />}
+      {id === 'receipt' && <Receipt go={go} onShare={() => share(shareText)} inspect={liveInspect} loading={!!live?.app && !liveInspect} />}
       {id === 'code-create' && (
         <Create who={who} setWho={setWho} note={note} setNote={setNote} onGenerate={() => {
           if (live?.app) live.makeCode(who, note);
@@ -77,9 +77,11 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Receipt({ go, onShare, inspect }: { go: Go; onShare: () => void; inspect: { hash: string; amount: string; rows: [string, string][]; status: string } | null }) {
+function Receipt({ go, onShare, inspect, loading }: { go: Go; onShare: () => void; inspect: { hash: string; amount: string; rows: [string, string][]; status: string } | null; loading: boolean }) {
   const payment = inspect
     ? inspect.rows.slice(0, 6).map(([label, value], index) => [label, value, index === inspect.rows.length - 1 ? '#accafe' : '#fff'])
+    : loading
+    ? [['Status', 'Loading…', '#fff']]
     : [
     ['Sender', 'arx1q8x4…t7c2n4p', '#fff'],
     ['Receiver', 'arx1q7p2…m2d9', '#fff'],
@@ -91,13 +93,15 @@ function Receipt({ go, onShare, inspect }: { go: Go; onShare: () => void; inspec
   ];
   const beforeAfter = inspect
     ? [['Hash', `${inspect.hash.slice(0, 10)}…${inspect.hash.slice(-4)}`, '#fff'], ['Status', inspect.status, '#fff']]
+    : loading
+    ? [['Hash', '—', '#fff']]
     : [['Before', '2,425.0000 ARX', '#fff'], ['After', '2,399.9996 ARX', '#fff']];
   return (
     <>
       <h1 style={title}>Private receipt</h1>
       <p style={sub}>Proof of this payment, stored permanently on the Arxon chain.</p>
       <Card top={210} rows={payment} />
-      <p style={{ ...eyebrow, top: 470 }}>{inspect ? 'ON THIS DEVICE' : 'YOUR BALANCE AT THAT MOMENT'}</p>
+      <p style={{ ...eyebrow, top: 470 }}>{inspect || loading ? 'ON THIS DEVICE' : 'YOUR BALANCE AT THAT MOMENT'}</p>
       <Card top={492} rows={beforeAfter} />
       <p style={{ position: 'absolute', left: 30, top: 586, width: 330, margin: 0, fontSize: 12, color: '#8b9097', lineHeight: 1.25 }}>Only you can see your balance. The other person sees theirs on their own receipt.</p>
       <button type="button" onClick={() => go('code-create')} style={{ ...fillBtn, top: 649 }}>Generate disclosure code</button>
