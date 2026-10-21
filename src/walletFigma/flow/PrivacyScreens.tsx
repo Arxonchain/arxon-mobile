@@ -95,7 +95,7 @@ export function PrivacyScreens({ id, go, back, password, setPassword }: { id: st
       {id === 'view-verify' && <Verify expected={expected} unlock={live?.unlock} unlockBiometric={live?.unlockBiometric} onBack={() => leave('privacy')} onNext={() => { void live?.ensureWords(); go('view-hidden', false); }} />}
       {id === 'view-hidden' && <Hidden onBack={() => leave('view-verify')} onReveal={() => go('view-shown')} />}
       {id === 'view-shown' && <Shown onBack={() => leave('view-hidden')} onHide={() => go('view-hidden', false)} onDone={() => go('privacy', false)} />}
-      {id === 'autolock' && <LockSheet value={lock} onClose={() => go('privacy', false)} onPick={(next) => { setLock(next); sessionStore.setAutoLock(next as AutoLock); go('privacy', false); }} />}
+      {id === 'autolock' && <LockSheet value={lock} onClose={() => go('privacy', false)} onPick={(next) => { setLock(next as AutoLock); sessionStore.setAutoLock(next as AutoLock); go('privacy', false); }} />}
     </div>
   );
 }
