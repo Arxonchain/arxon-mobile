@@ -6,6 +6,7 @@ import { saveSupportReport } from '@/chainWallet/reports';
 import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 import { downloadDriveBackup, driveConfigured, uploadDriveBackup } from '@/chainWallet/googleDrive';
 import { setVaultLockRequired } from './VaultScreens';
+import { resolvePhraseWords } from './phraseWords';
 
 export type NavDecision = { block?: boolean; replace?: string; note?: string };
 
@@ -109,7 +110,19 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return {};
   }
 
-  if (to === 'ready-skip' || to === 'phrase-done' || (from === 'phrase-confirm' && to === 'phrase-done')) {
+  if (from === 'phrase-confirm' && to === 'phrase-done') {
+    const resolved = resolvePhraseWords({
+      app: true,
+      words: wallet.mnemonic ? wallet.mnemonic.trim().split(/\s+/) : null,
+    });
+    if (!resolved.usable) {
+      return { block: true, note: 'Recovery phrase is not ready to confirm.' };
+    }
+    sessionStore.setPhraseVerified(true);
+    return {};
+  }
+
+  if (to === 'ready-skip' || to === 'phrase-done') {
     if (to === 'phrase-done') sessionStore.setPhraseVerified(true);
     if (!wallet.mnemonic) await wallet.createWallet();
     return {};

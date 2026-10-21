@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { setVaultLockRequired } from './VaultScreens';
@@ -6,11 +6,11 @@ import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { sessionStore, type AutoLock } from '@/chainWallet/session';
 import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
+import { resolvePhraseWords } from './phraseWords';
 
 const art = (name: string) => `/wallet-figma/privacy/${name}`;
 const onToggle = '/wallet-figma/send/toggle-on.svg';
 const offToggle = '/wallet-figma/send/toggle-off.svg';
-const WORDS = ['river', 'cloud', 'mango', 'window', 'candle', 'ocean', 'tiger', 'garden', 'silver', 'mountain', 'paper', 'apple'];
 const LOCKS = ['Immediately', '1 minute', '5 minutes', '15 minutes', '1 hour'];
 const SCREENS = new Set(['privacy', 'defaults', 'balance-privacy', 'autolock', 'face-settings', 'change-pass', 'view-verify', 'view-hidden', 'view-shown']);
 type Go = (id: string, remember?: boolean) => void;
@@ -392,6 +392,23 @@ function Verify({ expected, unlock, unlockBiometric, onBack, onNext }: { expecte
 }
 
 function Hidden({ onBack, onReveal }: { onBack: () => void; onReveal: () => void }) {
+  const live = useLiveFrame();
+  const usable = resolvePhraseWords({ app: !!live?.app, words: live?.words }).usable;
+  const [error, setError] = useState<string | null>(null);
+  async function load() {
+    if (!live?.app) return;
+    setError(null);
+    try {
+      await live.ensureWords();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load recovery phrase.');
+    }
+  }
+  useEffect(() => {
+    if (live?.app && !usable) void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [live?.app, usable]);
+  const canReveal = usable && !error;
   return (
     <>
       <div style={scrollAboveButton}>
@@ -401,22 +418,37 @@ function Hidden({ onBack, onReveal }: { onBack: () => void; onReveal: () => void
           <PhraseHead />
           <div style={{ position: 'relative', marginTop: 18 }}>
             <WordGrid blur />
-            <button type="button" onClick={onReveal} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(5,5,5,0.35)', color: '#fff', fontFamily: font.sans, cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12 }}>
+            <button type="button" disabled={!canReveal} onClick={onReveal} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(5,5,5,0.35)', color: '#fff', fontFamily: font.sans, cursor: canReveal ? 'pointer' : 'default', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 12 }}>
               <FigmaImg src="/wallet-figma/phrase/lock.svg" width={26} height={26} />
-              Tap to reveal your phrase
+              {error || (canReveal ? 'Tap to reveal your phrase' : 'Loading recovery phrase…')}
+              {live?.app && !usable ? (
+                <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); void load(); }} style={{ color: '#accafe', fontWeight: 600, fontSize: 14 }}>Try again</span>
+              ) : null}
             </button>
           </div>
         </div>
       </div>
-      <button type="button" onClick={onReveal} style={{ ...primary, height: 55, borderRadius: 8 }}>Reveal phrase</button>
+      <button type="button" disabled={!canReveal} onClick={onReveal} style={{ ...primary, height: 55, borderRadius: 8, opacity: canReveal ? 1 : 0.45 }}>{canReveal ? 'Reveal phrase' : 'Phrase not ready'}</button>
     </>
   );
 }
 
 function Shown({ onBack, onHide, onDone }: { onBack: () => void; onHide: () => void; onDone: () => void }) {
   const live = useLiveFrame();
-  const words = live?.words && live.words.length >= 12 ? live.words.slice(0, 12) : WORDS;
+  const resolved = resolvePhraseWords({ app: !!live?.app, words: live?.words });
+  const words = resolved.words;
+  const usable = resolved.usable;
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  async function load() {
+    if (!live?.app) return;
+    setError(null);
+    try {
+      await live.ensureWords();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not load recovery phrase.');
+    }
+  }
   return (
     <>
       <div style={scrollAboveButton}>
@@ -427,13 +459,19 @@ function Shown({ onBack, onHide, onDone }: { onBack: () => void; onHide: () => v
           <div style={{ marginTop: 18 }}>
             <WordGrid />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 12 }}>
-              <button type="button" onClick={() => { navigator.clipboard?.writeText(words.join(' ')).catch(() => undefined); setCopied(true); }} style={textBtn}>{copied ? 'Copied' : 'Copy'}</button>
+              <button type="button" disabled={!usable} onClick={() => { if (!usable) return; navigator.clipboard?.writeText(words.join(' ')).catch(() => undefined); setCopied(true); }} style={{ ...textBtn, opacity: usable ? 1 : 0.45 }}>{copied ? 'Copied' : 'Copy'}</button>
               <button type="button" onClick={onHide} style={textBtn}>Hide</button>
             </div>
+            {live?.app && !usable ? (
+              <p style={{ margin: '10px 0 0', color: '#8b9097', fontSize: 13 }}>
+                {error || 'Recovery phrase is not ready.'}{' '}
+                <button type="button" onClick={() => void load()} style={{ ...textBtn, display: 'inline', padding: 0 }}>Try again</button>
+              </p>
+            ) : null}
           </div>
         </div>
       </div>
-      <button type="button" onClick={onDone} style={primary}>Done</button>
+      <button type="button" disabled={!usable} onClick={onDone} style={{ ...primary, opacity: usable ? 1 : 0.45 }}>Done</button>
     </>
   );
 }
@@ -450,13 +488,14 @@ function PhraseHead() {
 
 function WordGrid({ blur }: { blur?: boolean }) {
   const live = useLiveFrame();
-  const words = live?.words && live.words.length >= 12 ? live.words.slice(0, 12) : WORDS;
+  const resolved = resolvePhraseWords({ app: !!live?.app, words: live?.words });
+  const slots = resolved.usable ? resolved.words : Array.from({ length: 12 }, () => '');
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', border: '1px solid #accafe', borderRadius: 12, overflow: 'hidden', filter: blur ? 'blur(6px)' : undefined }}>
-      {words.map((word, index) => (
-        <div key={word} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', boxSizing: 'border-box', borderTop: index > 1 ? '1px solid #2a3447' : undefined, borderLeft: index % 2 ? '1px solid #2a3447' : undefined }}>
+      {slots.map((word, index) => (
+        <div key={index} style={{ minHeight: 44, display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', boxSizing: 'border-box', borderTop: index > 1 ? '1px solid #2a3447' : undefined, borderLeft: index % 2 ? '1px solid #2a3447' : undefined }}>
           <span style={{ width: 20, color: '#8b9097', fontSize: 12, flexShrink: 0 }}>{index + 1}</span>
-          <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.3 }}>{word}</span>
+          <span style={{ fontSize: 14, fontWeight: 500, lineHeight: 1.3 }}>{resolved.usable ? word : '••••••'}</span>
         </div>
       ))}
     </div>

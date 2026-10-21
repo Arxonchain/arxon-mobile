@@ -325,10 +325,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       setWords(next);
       return next;
     }
-    const created = await wallet.createWallet();
-    const next = created.trim().split(/\s+/);
-    setWords(next);
-    return next;
+    throw new Error('Recovery phrase is not available on this device.');
   }, [wallet, words]);
 
   const eth = wallet.ethBalances;

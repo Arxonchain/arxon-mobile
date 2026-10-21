@@ -2,18 +2,11 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { phraseQuiz, phraseQuizReady, resolvePhraseWords } from './phraseWords';
 
 const art = (name: string) => `/wallet-figma/phrase/${name}`;
 
 type Go = (id: string, remember?: boolean) => void;
-
-const WORDS = ['river', 'cloud', 'mango', 'window', 'candle', 'ocean', 'tiger', 'garden', 'silver', 'mountain', 'paper', 'apple'];
-
-const CHECKS: { label: string; options: string[]; answer: string }[] = [
-  { label: '#1', options: ['river', 'rebel', 'cactus'], answer: 'river' },
-  { label: '#10', options: ['spoil', 'mountain', 'diet'], answer: 'mountain' },
-  { label: '#12', options: ['apple', 'tiger', 'ocean'], answer: 'apple' },
-];
 
 const CAUTIONS = [
   {
@@ -47,10 +40,32 @@ const CAUTIONS = [
 
 export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
-  const words = live?.words && live.words.length >= 12 ? live.words.slice(0, 12) : WORDS;
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const resolved = resolvePhraseWords({ app: !!live?.app, words: live?.words });
+  const words = resolved.words;
+  const usable = resolved.usable;
+
+  async function loadPhrase() {
+    if (!live?.app) return;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      await live.ensureWords();
+    } catch (e) {
+      setLoadError(e instanceof Error ? e.message : 'Could not load recovery phrase.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
-    if (live?.app && (id === 'phrase-hidden' || id === 'phrase-shown' || id === 'phrase-done')) void live.ensureWords();
-  }, [id, live]);
+    if (live?.app && (id === 'phrase-hidden' || id === 'phrase-shown' || id === 'phrase-confirm' || id === 'phrase-done')) {
+      void loadPhrase();
+    }
+    // load from the live wallet whenever this backup step is shown
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, live?.app]);
   const caution = CAUTIONS.find((item) => item.id === id);
   if (caution) {
     return (
@@ -69,17 +84,31 @@ export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back
   if (id === 'phrase-hidden' || id === 'phrase-shown') {
     return (
       <Phrase
-        words={words}
-        revealed={id === 'phrase-shown'}
+        words={usable ? words : []}
+        revealed={id === 'phrase-shown' && usable}
+        ready={usable}
+        loading={loading}
+        error={loadError}
+        onRetry={() => void loadPhrase()}
         onBack={() => (back ? back() : go(id === 'phrase-shown' ? 'phrase-hidden' : 'caution3', false))}
-        onReveal={() => go('phrase-shown')}
+        onReveal={() => { if (usable) go('phrase-shown'); }}
         onHide={() => (back ? back() : go('phrase-hidden', false))}
-        onWritten={() => go('phrase-confirm')}
+        onWritten={() => { if (usable) go('phrase-confirm'); }}
       />
     );
   }
   if (id === 'phrase-confirm') {
-    return <Confirm words={words} onBack={() => (back ? back() : go('phrase-shown', false))} onVerify={() => go('phrase-done')} />;
+    return (
+      <Confirm
+        words={usable ? words : []}
+        ready={usable}
+        loading={loading}
+        error={loadError}
+        onRetry={() => void loadPhrase()}
+        onBack={() => (back ? back() : go('phrase-shown', false))}
+        onVerify={() => { if (usable) go('phrase-done'); }}
+      />
+    );
   }
   return <Ready onEnter={() => { if (live?.app) void live.ensureWords(); go('home'); }} />;
 }
@@ -129,6 +158,10 @@ function Caution({
 function Phrase({
   words,
   revealed,
+  ready,
+  loading,
+  error,
+  onRetry,
   onBack,
   onReveal,
   onHide,
@@ -136,11 +169,16 @@ function Phrase({
 }: {
   words: string[];
   revealed: boolean;
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
   onBack: () => void;
   onReveal: () => void;
   onHide: () => void;
   onWritten: () => void;
 }) {
+  const canReveal = ready && !loading;
   return (
     <Screen>
       <Back top={56} onClick={onBack} />
@@ -156,7 +194,7 @@ function Phrase({
               return (
                 <span key={index} style={wordChip}>
                   <span style={{ width: 26, color: '#5c5f64', fontSize: 13 }}>{String(index + 1).padStart(2, '0')}</span>
-                  <span style={{ color: revealed ? '#fff' : '#8b9097', fontWeight: 500, fontSize: 16 }}>{revealed ? words[index] : '••••••'}</span>
+                  <span style={{ color: revealed && ready ? '#fff' : '#8b9097', fontWeight: 500, fontSize: 16 }}>{revealed && ready ? words[index] : '••••••'}</span>
                 </span>
               );
             })}
@@ -164,11 +202,24 @@ function Phrase({
         ))}
       </div>
       {!revealed && (
-        <button type="button" onClick={onReveal} style={veil}>
+        <button type="button" disabled={!canReveal} onClick={onReveal} style={{ ...veil, cursor: canReveal ? 'pointer' : 'default' }}>
           <span style={{ width: 56, height: 56, borderRadius: 28, background: '#1c2025', border: '1px solid #2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <img src={art('lock.svg')} alt="" width={26} height={26} />
           </span>
-          <span style={{ color: '#fff', fontWeight: 600, fontSize: 15 }}>Tap to reveal your phrase</span>
+          <span style={{ color: '#fff', fontWeight: 600, fontSize: 15 }}>
+            {loading ? 'Loading your phrase…' : error ? error : canReveal ? 'Tap to reveal your phrase' : 'Recovery phrase not ready'}
+          </span>
+          {error ? (
+            <span
+              role="button"
+              tabIndex={0}
+              onClick={(e) => { e.stopPropagation(); onRetry(); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onRetry(); } }}
+              style={{ color: '#accafe', fontWeight: 600, fontSize: 14 }}
+            >
+              Try again
+            </span>
+          ) : null}
         </button>
       )}
       {revealed && (
@@ -177,22 +228,26 @@ function Phrase({
           Hide
         </button>
       )}
-      <button type="button" onClick={revealed ? onWritten : onReveal} style={{ ...primary, top: 712 }}>
+      <button type="button" disabled={!canReveal} onClick={revealed ? onWritten : onReveal} style={{ ...primary, top: 712, opacity: canReveal ? 1 : 0.45, cursor: canReveal ? 'pointer' : 'default' }}>
         {revealed ? 'I’ve written it down' : 'Reveal phrase'}
       </button>
     </Screen>
   );
 }
 
-function Confirm({ words, onBack, onVerify }: { words: string[]; onBack: () => void; onVerify: () => void }) {
-  const checks = words === WORDS ? CHECKS : [
-    { label: '#1', options: [words[0], 'rebel', 'cactus'], answer: words[0] },
-    { label: '#10', options: ['spoil', words[9], 'diet'], answer: words[9] },
-    { label: '#12', options: [words[11], 'tiger', 'ocean'], answer: words[11] },
-  ];
+function Confirm({ words, ready: phraseReady, loading, error, onRetry, onBack, onVerify }: {
+  words: string[];
+  ready: boolean;
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+  onBack: () => void;
+  onVerify: () => void;
+}) {
+  const checks = phraseReady ? phraseQuiz(words) : [];
   const [picks, setPicks] = useState<Array<string | null>>([null, null, null]);
   const selected = picks.filter(Boolean).length;
-  const ready = checks.every((check, i) => picks[i] === check.answer);
+  const ready = phraseReady && phraseQuizReady(words, picks);
   return (
     <Screen>
       <Back top={56} onClick={onBack} />
@@ -200,7 +255,7 @@ function Confirm({ words, onBack, onVerify }: { words: string[]; onBack: () => v
       <p style={{ ...copy, top: 158, width: 336, fontSize: 15 }}>
         Tap the correct word for each position to make sure you saved it.
       </p>
-      {checks.map((check, group) => (
+      {phraseReady ? checks.map((check, group) => (
         <div key={check.label}>
           <p style={{ position: 'absolute', left: 24, top: 232 + group * 104, margin: 0, fontSize: 14 }}>
             <span style={{ color: '#8b9097', fontWeight: 400 }}>Word </span>
@@ -217,8 +272,15 @@ function Confirm({ words, onBack, onVerify }: { words: string[]; onBack: () => v
             })}
           </div>
         </div>
-      ))}
-      <p style={{ position: 'absolute', left: 24, top: 548, margin: 0, color: '#8b9097', fontSize: 13 }}>{selected} of 3 words selected</p>
+      )) : (
+        <p style={{ position: 'absolute', left: 24, top: 240, width: 342, margin: 0, color: '#8b9097', fontSize: 15, lineHeight: 1.4 }}>
+          {loading ? 'Loading your phrase…' : error || 'Recovery phrase is not ready to confirm.'}
+          {error ? (
+            <button type="button" onClick={onRetry} style={{ display: 'block', marginTop: 12, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 14, cursor: 'pointer', padding: 0 }}>Try again</button>
+          ) : null}
+        </p>
+      )}
+      <p style={{ position: 'absolute', left: 24, top: 548, margin: 0, color: '#8b9097', fontSize: 13 }}>{phraseReady ? `${selected} of 3 words selected` : ''}</p>
       <button type="button" disabled={!ready} onClick={onVerify} style={{ ...primary, top: 712, opacity: ready ? 1 : 0.45, cursor: ready ? 'pointer' : 'default' }}>Verify</button>
     </Screen>
   );
