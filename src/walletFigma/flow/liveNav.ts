@@ -209,7 +209,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     await wallet.setNetwork('arxon');
     return {};
   }
-  if (to === 'home' || to.startsWith('home-') || to === 'more') {
+  if (to === 'home' || to.startsWith('home-') || (to === 'more' && from !== 'testnet')) {
     await wallet.setNetwork('ethereum');
     return {};
   }

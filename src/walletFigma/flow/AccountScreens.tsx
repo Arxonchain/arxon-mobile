@@ -5,6 +5,7 @@ import { tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { selectedNetwork } from './homeNetworks';
 
 const art = (name: string) => `/wallet-figma/account/${name}`;
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
@@ -75,6 +76,7 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
 }
 
 function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { code: string; copied: boolean; onCopy: () => void; go: Go; label: string; shortAddr: string; onLogout: () => void | Promise<void> }) {
+  const net = useWalletNetwork();
   return (
     <>
       <PhoneStatus />
@@ -95,7 +97,7 @@ function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { cod
           <div style={accountCard}>
             <Row icon={art('key.svg')} label="Recovery phrase" onClick={() => go('view-verify')} />
             <Row icon={art('face.svg')} label="Face ID & password" onClick={() => go('face-settings')} />
-            <Row icon={art('shield.svg')} label="Private mode" value="On" onClick={() => go('privacy')} />
+            {net === 'testnet' && <Row icon={art('shield.svg')} label="Private mode" value="On" onClick={() => go('privacy')} />}
           </div>
           <p style={accountKicker}>EXTENSIONS</p>
           <div style={accountCard}>
@@ -104,7 +106,7 @@ function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { cod
           <p style={accountKicker}>PREFERENCES</p>
           <div style={accountCard}>
             <Row icon={art('dollar.svg')} label="Currency" value={code} onClick={() => go('currency')} />
-            <Row icon={art('globe.svg')} label="Network" value="Arxon" onClick={() => go('network')} />
+            <Row icon={art('globe.svg')} label="Network" value={selectedNetwork(net).name} onClick={() => go('network')} />
             <Row icon={art('help.svg')} label="Help & support" onClick={() => go('help')} />
           </div>
           <div style={{ ...accountCard, marginTop: 22 }}>

@@ -116,7 +116,8 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           aria-hidden={mode !== 'mining'}
           style={{ flex: 1, minHeight: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none' }}
         >
-          {children}
+          {/* Legacy wallet routes lock the chain network; keep them unmounted behind the live wallet. */}
+          {mode === 'mining' || isMiningPath(location.pathname) ? children : null}
         </div>
       </div>
       </ModeChromeContext.Provider>

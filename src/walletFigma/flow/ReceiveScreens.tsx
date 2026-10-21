@@ -6,18 +6,14 @@ import { sessionStore } from '@/chainWallet/session';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
+import { applyNetwork, listNetworks, saveNetwork, selectedNetwork, type HomeNetwork } from './homeNetworks';
 
 const art = (name: string) => `/wallet-figma/receive/${name}`;
 type Go = (id: string, remember?: boolean) => void;
 
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
 
-type Net = { id: string; name: string; sub: string; icon: string; pill: string };
-
-const BUILT: Net[] = [
-  { id: 'mainnet', name: 'Arxon Mainnet', sub: 'Private · Layer 1', icon: 'globe.svg', pill: 'Arxon Network' },
-  { id: 'testnet', name: 'Arxon Testnet', sub: 'For testing only', icon: 'globe-test.svg', pill: 'Arxon Testnet' },
-];
+type Net = HomeNetwork;
 
 const SCREENS = new Set(['receive', 'network', 'add-network']);
 
@@ -28,55 +24,45 @@ export function isReceiveScreen(id: string) {
 export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
-  const [nets, setNets] = useState<Net[]>(BUILT);
-  const [selected, setSelected] = useState(net === 'testnet' ? 'testnet' : 'mainnet');
+  const [nets, setNets] = useState<Net[]>(() => listNetworks(net));
+  const [selected, setSelected] = useState(() => selectedNetwork(net).id);
   const [pub, setPub] = useState(true);
   const [copied, setCopied] = useState(false);
   const [focus, setFocus] = useState('name');
   const [form, setForm] = useState(() =>
-    net === 'testnet'
+    net === 'testnet' && !(live?.app ? live.testnetAdded : sessionStore.testnetAdded())
       ? { name: 'Arxon Testnet', rpc: DEFAULT_RPC, chain: String(ARXON.id), symbol: 'tARX', explorer: SCAN_URL }
       : { name: '', rpc: '', chain: '', symbol: '', explorer: '' },
   );
-  const current = nets.find((net) => net.id === selected) ?? nets[0];
+  const forAsset = live?.app ? nets.find((row) => row.asset === live.receiveAsset && !row.custom) : undefined;
+  const current = forAsset ?? nets.find((row) => row.id === selected) ?? nets[0];
   const leave = () => (back ? back() : go(id === 'receive' ? 'home-funded' : 'receive', false));
 
   function pick(netId: string) {
+    const row = nets.find((item) => item.id === netId);
+    if (!row) return;
     setSelected(netId);
-    if (live?.app) {
-      if (netId === 'testnet') {
-        void live.enableTestnet();
-        live.setReceiveAsset('ARXt');
-      } else if (netId === 'mainnet') {
-        void live.setNetwork('ethereum');
-        live.setReceiveAsset(live.receiveAsset === 'ARXt' ? 'ETH' : live.receiveAsset);
-      }
-    }
+    void applyNetwork(live, row);
     if (back) back();
     else go('receive', false);
   }
 
   function save() {
-    const name = form.name.trim();
-    const rpc = form.rpc.trim();
-    const chain = form.chain.trim();
-    const arxon = chain === String(ARXON.id) || rpc.includes('rpc-test.arxon.io') || /arxon/i.test(name);
-    if (name || rpc) {
-      const id = `custom-${nets.length}`;
-      setNets((prev) => [...prev, { id, name: name || 'Custom network', sub: rpc || 'Custom RPC', icon: 'plus.svg', pill: name || 'Custom network' }]);
-      setSelected(id);
-    }
-    if (live?.app && arxon) {
-      void live.enableTestnet(rpc || DEFAULT_RPC).then(() => go('testnet', false));
-      return;
-    }
-    if (arxon) {
-      sessionStore.setTestnetAdded(true);
-      go('testnet', false);
-      return;
-    }
-    if (live?.app && rpc) void live.setRpcUrl(rpc);
+    const row = saveNetwork(form, net);
     setForm({ name: '', rpc: '', chain: '', symbol: '', explorer: '' });
+    if (!row) {
+      if (back) back();
+      else go('network', false);
+      return;
+    }
+    if (row.scope === 'testnet' && !live?.app) sessionStore.setTestnetAdded(true);
+    setNets(listNetworks(net));
+    setSelected(row.id);
+    const done = applyNetwork(live, row);
+    if (row.scope === 'testnet' && net !== 'testnet') {
+      void done.then(() => go('testnet', false));
+      return;
+    }
     if (back) back();
     else go('network', false);
   }
@@ -168,14 +154,24 @@ function Networks({ nets, selected, onPick, onAdd, onClose }: { nets: Net[]; sel
       <NoteStatus />
       <div style={{ position: 'absolute', left: 16, top: 64, width: 358, height: 48, borderRadius: 24, background: '#11161f' }} />
       <div style={{ position: 'absolute', left: 16, top: 140, width: 358, height: 220, borderRadius: 20, background: '#0b0f16' }} />
+      <NetworkSheet nets={nets} selected={selected} onPick={onPick} onAdd={onAdd} onClose={onClose} />
+    </>
+  );
+}
+
+/** 12.02 Select network as a bottom sheet. `fixed` pins it to the app frame so it covers the tab bar. */
+export function NetworkSheet({ nets, selected, onPick, onAdd, onClose, fixed = false }: { nets: Net[]; selected: string; onPick: (id: string) => void; onAdd: () => void; onClose: () => void; fixed?: boolean }) {
+  const height = Math.max(524, 83 + (nets.length + 1) * 84 + 100 + 52 + 24);
+  return (
+    <div style={{ position: fixed ? 'fixed' : 'absolute', inset: 0, zIndex: fixed ? 9 : 'auto' }}>
       <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.55)', padding: 0, cursor: 'pointer' }} />
       <NoteStatus />
-      <div style={{ position: 'absolute', left: 0, top: 320, width: 390, height: 524, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '28px 28px 0 0' }}>
+      <div style={{ position: 'absolute', left: 0, ...(fixed ? { bottom: 0, maxHeight: '100%', overflowY: 'auto' as const } : { top: 844 - height }), width: 390, height, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '28px 28px 0 0' }}>
         <div style={{ position: 'absolute', left: 170, top: 9, width: 48, height: 4, borderRadius: 2, background: '#2a3447' }} />
         <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 20, fontWeight: 700 }}>Select network</p>
         {nets.map((net, index) => (
           <button key={net.id} type="button" onClick={() => onPick(net.id)} style={{ ...netBtn, top: 83 + index * 84, borderColor: net.id === selected ? '#accafe' : '#2a3447', background: net.id === selected ? '#11161f' : '#1c2025' }}>
-            <span style={{ width: 44, height: 44, borderRadius: 22, background: net.id === 'mainnet' ? '#1c2a44' : '#11161f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ width: 44, height: 44, borderRadius: 22, background: net.scope === 'mainnet' && !net.custom ? '#1c2a44' : '#11161f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <FigmaImg src={art(net.icon)} width={20} height={20} />
             </span>
             <span style={{ flex: 1, textAlign: 'left' }}>
@@ -200,7 +196,7 @@ function Networks({ nets, selected, onPick, onAdd, onClose }: { nets: Net[]; sel
         </button>
         <button type="button" onClick={onAdd} style={{ position: 'absolute', left: 15, top: 83 + nets.length * 84 + 100, width: 358, height: 52, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Add network</button>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -212,6 +208,7 @@ function AddNetwork({ form, setForm, focus, setFocus, onSave, leave }: {
   onSave: () => void;
   leave: () => void;
 }) {
+  const hideChrome = useAppHidesFigmaChrome();
   const fields: { key: keyof typeof form; label: string; placeholder: string }[] = [
     { key: 'name', label: 'Network name', placeholder: 'e.g. My Arxon node' },
     { key: 'rpc', label: 'RPC URL', placeholder: 'https://' },
@@ -244,7 +241,7 @@ function AddNetwork({ form, setForm, focus, setFocus, onSave, leave }: {
           <p style={{ margin: 0, width: 290, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>Only add networks you trust. A malicious network can see your activity.</p>
         </div>
       </div>
-      <button type="button" onClick={onSave} style={{ position: 'absolute', left: 16, top: 744, width: 358, height: 52, borderRadius: 14, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Save network</button>
+      <button type="button" onClick={onSave} style={{ position: hideChrome ? 'fixed' : 'absolute', left: 16, ...(hideChrome ? { bottom: 16, zIndex: 9 } : { top: 744 }), width: 358, height: 52, borderRadius: 14, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Save network</button>
       <HomeBar />
     </>
   );

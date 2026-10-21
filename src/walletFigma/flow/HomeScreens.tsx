@@ -3,9 +3,11 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { START_URL } from '@/chainWallet/chain';
 import { sessionStore } from '@/chainWallet/session';
 import { rememberTabs, vaultEntry } from './VaultScreens';
-import { pickWalletTab, WalletTabs, type WalletTabName } from './WalletTabs';
+import { pickWalletTab, WalletTabs, type WalletNet, type WalletTabName } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { NetworkSheet } from './ReceiveScreens';
+import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { font } from '@/walletFigma/tokens';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
@@ -57,9 +59,38 @@ export function HomeScreens({ id, go, back, behind, network = 'mainnet' }: { id:
   return <MainnetHome id={id} go={go} back={back} behind={behind} />;
 }
 
+function useNetworkSheet(scope: WalletNet, go: Go) {
+  const live = useLiveFrame();
+  const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState(() => selectedNetwork(scope));
+  const nets = open ? listNetworks(scope) : [];
+  const sheet = open ? (
+    <NetworkSheet
+      nets={nets}
+      selected={picked.id}
+      fixed={!!live?.app}
+      onClose={() => setOpen(false)}
+      onPick={(netId) => {
+        const row = nets.find((item) => item.id === netId);
+        if (row) {
+          setPicked(row);
+          void applyNetwork(live, row);
+        }
+        setOpen(false);
+      }}
+      onAdd={() => {
+        setOpen(false);
+        go('add-network');
+      }}
+    />
+  ) : null;
+  return { show: () => setOpen(true), picked, sheet };
+}
+
 function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () => void; behind?: string }) {
   const live = useLiveFrame();
   const hideChrome = useAppHidesFigmaChrome();
+  const network = useNetworkSheet('mainnet', go);
   const [localHide, setLocalHide] = useState(false);
   const cards = useRef<HTMLDivElement>(null);
   const sheet = id === 'more';
@@ -127,7 +158,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       )}
 
       <header style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button type="button" onClick={() => go('accounts')} style={plain}>
+        <button type="button" aria-label="Select network" onClick={network.show} style={plain}>
           <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />
           <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
           <FigmaImg src={art('chev.svg')} width={16} height={16} />
@@ -152,14 +183,9 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         <span style={{ fontSize: 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
       </div>
 
-      <button type="button" onClick={() => go('defaults')} style={pill}>
-        <FigmaImg src={art('shield.svg')} width={16} height={16} />
-        {live?.app ? live.privacyPill : 'Custom · 2 of 4 hidden'}
-      </button>
-
-      <div style={{ position: 'absolute', left: 18, top: 292, width: 354, display: 'flex', gap: 14 }}>
+      <div style={{ position: 'absolute', left: 18, top: 236, width: 354, display: 'flex', gap: 14 }}>
         <Action label="Send" onClick={() => go(sendTo())}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-        <Action label="Receive" onClick={() => { live?.setReceiveAsset('ETH'); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+        <Action label="Receive" onClick={() => { live?.setReceiveAsset(network.picked.asset); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
         <Action label="Swap" onClick={() => go(vaulted ? 'swap-vault' : 'swap')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
         <button type="button" onClick={() => go('more')} style={actionBtn}>
           <FigmaImg src={art('more.svg')} width={58} height={58} />
@@ -168,19 +194,19 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       </div>
 
       {empty && (
-        <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 396, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
+        <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 340, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
           {CARDS.map((card) => (
             <StartCard key={card.title} kind={card.kind} title={card.title} body={card.body} onClick={() => go(card.to)} />
           ))}
         </div>
       )}
 
-      <div style={{ position: 'absolute', left: 18, top: empty ? 548 : 400, width: 354, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ position: 'absolute', left: 18, top: empty ? 492 : 344, width: 354, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18, fontWeight: 700 }}>Tokens</span>
         <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
       </div>
 
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: empty ? 587 : 439, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : {}) }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: empty ? 531 : 383, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : {}) }}>
         {tokens.map((token) => (
           <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
             <TokenIcon kind={token.icon} />
@@ -213,9 +239,9 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       />
 
       {sheet && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 6 }}>
+        <div style={live?.app ? appSheetLayer : { position: 'absolute', inset: 0, zIndex: 6 }}>
           <button type="button" aria-label="Close" onClick={() => (back ? back() : go('home-funded', false))} style={scrim} />
-          <div style={sheetBox}>
+          <div style={live?.app ? appSheetBox : sheetBox}>
             <div style={{ position: 'absolute', left: 174, top: 9, width: 40, height: 4, borderRadius: 4, background: '#293347' }} />
             <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 18, fontWeight: 700 }}>More</p>
             <button type="button" onClick={() => go('buy')} style={{ ...actionBtn, position: 'absolute', left: 17, top: 79 }}>
@@ -229,6 +255,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
           </div>
         </div>
       )}
+      {network.sheet}
     </div>
   );
 }
@@ -236,6 +263,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
 function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () => void; behind?: string }) {
   const live = useLiveFrame();
   const hideChrome = useAppHidesFigmaChrome();
+  const network = useNetworkSheet('testnet', go);
   const [added, setAdded] = useState(() => sessionStore.testnetAdded());
   const sheet = id === 'more';
   const on = live?.app ? live.testnetAdded : added;
@@ -277,7 +305,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
 
       <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, marginBottom: 16 }}>
-          <button type="button" onClick={() => go('accounts')} style={plain}>
+          <button type="button" aria-label="Select network" onClick={network.show} style={plain}>
             <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />
             <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
             <FigmaImg src={art('chev.svg')} width={16} height={16} />
@@ -297,7 +325,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
               </button>
             )}
           </div>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#accafe' }}>Arxon Testnet</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#accafe' }}>{on ? network.picked.name : 'Arxon Testnet'}</span>
         </div>
 
         {on && (
@@ -370,9 +398,9 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       />
 
       {sheet && (
-        <div style={{ position: 'absolute', inset: 0, zIndex: 6 }}>
+        <div style={live?.app ? appSheetLayer : { position: 'absolute', inset: 0, zIndex: 6 }}>
           <button type="button" aria-label="Close" onClick={() => (back ? back() : go('testnet', false))} style={scrim} />
-          <div style={sheetBox}>
+          <div style={live?.app ? appSheetBox : sheetBox}>
             <div style={{ position: 'absolute', left: 174, top: 9, width: 40, height: 4, borderRadius: 4, background: '#293347' }} />
             <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 18, fontWeight: 700 }}>More</p>
             <button type="button" onClick={() => go('buy')} style={{ ...actionBtn, position: 'absolute', left: 17, top: 79 }}>
@@ -386,6 +414,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
           </div>
         </div>
       )}
+      {network.sheet}
     </div>
   );
 }
@@ -487,7 +516,6 @@ function TokenIcon({ kind }: { kind: Tok['icon'] }) {
 
 const plain: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
 const iconBtn: CSSProperties = { width: 22, height: 22, padding: 0, border: 'none', background: 'none', cursor: 'pointer' };
-const pill: CSSProperties = { position: 'absolute', left: 22, top: 232, display: 'flex', alignItems: 'center', gap: 6, background: '#11161f', border: '1px solid #2a3447', borderRadius: 20, padding: '7px 14px 7px 12px', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 500, cursor: 'pointer' };
 function subTab(on: boolean): CSSProperties {
   return {
     height: 26,
@@ -536,3 +564,5 @@ const mineCardBtn: CSSProperties = { width: 220, height: 132, flexShrink: 0, bor
 const tokenRow: CSSProperties = { width: '100%', height: 64, display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
 const scrim: CSSProperties = { position: 'absolute', inset: 0, border: 'none', padding: 0, background: 'rgba(0,0,0,0.6)', cursor: 'pointer' };
 const sheetBox: CSSProperties = { position: 'absolute', left: 0, top: 608, width: 390, height: 236, background: '#12171f', border: '1px solid #293347', borderBottom: 'none', borderRadius: '24px 24px 0 0', boxSizing: 'border-box', textAlign: 'left', zIndex: 1 };
+const appSheetLayer: CSSProperties = { position: 'fixed', inset: 0, zIndex: 9 };
+const appSheetBox: CSSProperties = { ...sheetBox, top: 'auto', bottom: 0 };

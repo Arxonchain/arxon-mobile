@@ -44,7 +44,8 @@ function Explore({ go }: { go: Go }) {
     ['codes.svg', 'Disclosure codes', 'Prove a private payment on request', 'code-log'],
     ['apps.svg', 'Connected apps', 'Apps that can access your wallet', 'connected'],
   ];
-  const rows = tools.filter((row) => row[3] !== 'claim' || !hasClaimed());
+  const net = useWalletNetwork();
+  const rows = tools.filter((row) => (row[3] !== 'claim' || !hasClaimed()) && (row[3] !== 'code-log' || net === 'testnet'));
   return (
     <>
       <PhoneStatus />
