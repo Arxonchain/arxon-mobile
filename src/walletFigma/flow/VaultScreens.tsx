@@ -193,7 +193,7 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
           set((prev) => press(prev, key));
         }} go={go} />
       ) : id === 'vault-review' || id === 'priv-review' || id === 'unshield-review' ? (
-        <Review id={id} token={token} amount={id === 'vault-review' ? moveIn : id === 'move-home' ? moveOut : sendAmt} go={go} leave={leave} />
+        <Review id={id} token={token} amount={id === 'vault-review' ? moveIn : sendAmt} go={go} leave={leave} />
       ) : id === 'vault-pending' || id === 'priv-pending' || id === 'unshield-pending' ? (
         <Pending id={id} go={go} amount={id === 'vault-pending' ? moveIn : sendAmt} />
       ) : id === 'vault-done' || id === 'move-home-done' || id === 'priv-done' || id === 'unshield-done' || id === 'vault-failed' ? (
@@ -317,10 +317,11 @@ function Review({ id, token, amount, go, leave }: { id: string; token: Sym; amou
   const [err, setErr] = useState<string | null>(null);
   const value = num(amount || '0');
   const fiat = value * price(token);
-  const total = token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`;
+  const total = live?.app ? `${qty(value)} ${token} + fee` : token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`;
+  const fee = feeText(!!live?.app);
   const rows: [string, string, string?][] = id === 'vault-review'
-    ? [['From', live?.accountLabel ? `Home · ${live.accountLabel}` : 'Home · Account 01'], ['To', 'Vault'], ['Home balance after', live?.app ? 'Excluded from Home' : money(HOME_FUNDED - fiat)], ['Privacy', 'Hidden from Home', '#accafe'], ['Network fee', '0.0004 ARX'], ['Total', total]]
-    : [['To', id === 'priv-review' ? (live?.app ? 'Shielded note' : 'arx1q8…m2d9') : (live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8x4…t7c2n4p')], ['From', 'Your Vault'], ['Network', 'Arxon'], ['Privacy', id === 'priv-review' ? 'Private' : 'Public', id === 'priv-review' ? '#accafe' : '#fff'], ['Network fee', '0.0004 ARX'], ['Total', total]];
+    ? [['From', live?.accountLabel ? `Home · ${live.accountLabel}` : 'Home · Account 01'], ['To', 'Vault'], ['Home balance after', live?.app ? 'Excluded from Home' : money(HOME_FUNDED - fiat)], ['Privacy', 'Hidden from Home', '#accafe'], ['Network fee', fee], ['Total', total]]
+    : [['To', id === 'priv-review' ? (live?.app ? 'Shielded note' : 'arx1q8…m2d9') : vaultDest(false, live?.app ? live.address : undefined)], ['From', 'Your Vault'], ['Network', live?.app ? 'Arxon Testnet' : 'Arxon'], ['Privacy', id === 'priv-review' ? 'Private' : 'Public', id === 'priv-review' ? '#accafe' : '#fff'], ['Network fee', fee], ['Total', total]];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PhoneStatus />
@@ -535,6 +536,10 @@ function vaultDest(priv: boolean, address: string | null | undefined) {
   return address ? `${address.slice(0, 6)}…${address.slice(-4)}` : 'Your address';
 }
 
+function feeText(live: boolean) {
+  return live ? 'Set by the network' : '0.0004 ARX';
+}
+
 function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
   const live = useLiveFrame();
   const title = id === 'vault-pending' ? 'Moving to Vault' : id === 'priv-pending' ? 'Sending privately' : 'Unshielding';
@@ -548,7 +553,7 @@ function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
       <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{shown}</p>
       <div style={{ marginTop: 24, width: 354, background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
         <Line label="To" value={to} />
-        <Line label="Network fee" value="0.0004 ARX" />
+        <Line label="Network fee" value={feeText(!!live?.app)} />
         <Line label="Status" value="Pending" color="#accafe" />
       </div>
       <p style={{ margin: '16px 28px 0', textAlign: 'center', color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>You can leave this screen. Your balances update once the move is confirmed.</p>
@@ -571,8 +576,8 @@ function Result({ id, go, fundedVault, amount }: { id: string; go: Go; fundedVau
       : id === 'move-home-done'
         ? [['Home balance now', live?.app ? live.publicArx : '$1,188.60'], ['Vault balance', vaultNow ?? '$210.00'], ['Status', 'Confirmed', '#3ddb85']]
         : id === 'priv-done'
-          ? [['To', 'Shielded note'], ['Network fee', '0.0004 ARX'], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$315.00']]
-          : [['To', live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8x4…t7c2n4p'], ['Network fee', '0.0004 ARX'], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$210.00']];
+          ? [['To', 'Shielded note'], ['Network fee', feeText(!!live?.app)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$315.00']]
+          : [['To', vaultDest(false, live?.app ? live.address : undefined)], ['Network fee', feeText(!!live?.app)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$210.00']];
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <PhoneStatus />

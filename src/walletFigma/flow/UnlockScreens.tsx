@@ -136,7 +136,7 @@ function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
           <img src={art('avatar.svg')} alt="" width={32} height={32} />
           <span>
             <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>{live?.accountLabel ?? 'Account 01'}</span>
-            <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>{live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : 'arx1q8x4…t7c2n4p'}</span>
+            <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>{live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : live?.app ? '' : 'arx1q8x4…t7c2n4p'}</span>
           </span>
           <span style={{ flex: 1 }} />
           <img src={art('chev-down.svg')} alt="" width={18} height={18} />

@@ -46,14 +46,15 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const [diagnostics, setDiagnostics] = useState(true);
   const [sent, setSent] = useState(false);
   const live = useLiveFrame();
-  const full = live?.address ?? ADDRESS;
-  const shortAddr = live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : SHORT;
+  const full = live?.app ? live.address ?? '' : ADDRESS;
+  const shortAddr = live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : live?.app ? '' : SHORT;
   const leave = (fallback: string) => (back ? back() : go(fallback, false));
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       {id === 'account' && (
         <Account code={code} copied={copied} label={live?.accountLabel ?? 'Account 01'} shortAddr={shortAddr} onCopy={() => {
+          if (!full) return;
           navigator.clipboard?.writeText(full).catch(() => undefined);
           setCopied(true);
           window.setTimeout(() => setCopied(false), 1200);

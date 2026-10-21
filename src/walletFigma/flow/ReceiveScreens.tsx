@@ -67,16 +67,18 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     else go('network', false);
   }
 
-  const address = live?.app && live.receiveAddress ? live.receiveAddress : live?.address ?? ADDRESS;
+  const address = live?.app ? live.receiveAddress || live.address || '' : ADDRESS;
   const qrSrc = live?.app && live.receiveQr ? live.receiveQr : art('qr.svg');
 
   async function copy() {
+    if (!address) return;
     try { await navigator.clipboard?.writeText(address); } catch { /* preview still confirms */ }
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1400);
   }
 
   function share() {
+    if (!address) return;
     if (navigator.share) {
       navigator.share({ title: 'Arxon address', text: address }).catch(() => undefined);
       return;
