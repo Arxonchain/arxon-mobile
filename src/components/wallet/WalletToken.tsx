@@ -23,7 +23,7 @@ import { useLockNetwork } from '@/chainWallet/walletNav';
 import { asBits, SEND_FLAGS, UNSHIELD_FLAGS, VAULT_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import { proveShield, proveTransfer, proveUnshield } from '@/chainWallet/prove';
-import { storage } from '@/chainWallet/storage';
+import { persistShieldedSk, readShieldedSk } from '@/chainWallet/session';
 import {
   arx20ShieldCalldata,
   arx20TransferCalldata,
@@ -190,7 +190,7 @@ export default function WalletToken() {
       const clocks = startClocks();
       const wei = requireUnits(amount, meta.decimals);
       const expiry = await expiryBlock(rpcUrl);
-      const sk = await storage.getShieldedSk();
+      const sk = await readShieldedSk();
       if (mode === 'shield') {
         const proof = await proveShield({
           amountWei: wei,
@@ -201,7 +201,7 @@ export default function WalletToken() {
         });
         stampProved(clocks);
         setPhase('Proved');
-        await storage.setShieldedSk(proof.sk_hex);
+        await persistShieldedSk(proof.sk_hex);
         const hash = await sendTx(arx20ShieldCalldata(proof), 'Shield', 'shield', clocks);
         await commitTokenOutputs(token, [
           {

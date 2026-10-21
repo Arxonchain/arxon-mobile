@@ -33,6 +33,10 @@ export const sessionStore = {
   setBox: (box: SecretBox) => localStorage.setItem('arxon.mnemonicBox', JSON.stringify(box)),
   clearBox: () => localStorage.removeItem('arxon.mnemonicBox'),
 
+  getSkBox: () => parse<SecretBox | null>(localStorage.getItem('arxon.shieldedSkBox'), null),
+  setSkBox: (box: SecretBox) => localStorage.setItem('arxon.shieldedSkBox', JSON.stringify(box)),
+  clearSkBox: () => localStorage.removeItem('arxon.shieldedSkBox'),
+
   getBackup: () => parse<SecretBox | null>(localStorage.getItem('arxon.deviceBackup'), null),
   setBackup: (box: SecretBox) => localStorage.setItem('arxon.deviceBackup', JSON.stringify(box)),
 
@@ -96,7 +100,10 @@ export async function setUnlockPassword(password: string) {
   sessionStore.setPass(await hashPassword(password));
   rememberPassword(password);
   const mnemonic = await storage.getMnemonic();
-  if (mnemonic) sessionStore.setBox(await sealSecret(password, mnemonic));
+  if (mnemonic) {
+    sessionStore.setBox(await sealSecret(password, mnemonic));
+    await storage.clearMnemonic();
+  }
 }
 
 export async function checkUnlockPassword(password: string) {
@@ -107,6 +114,58 @@ export async function checkUnlockPassword(password: string) {
 
 export async function sealMnemonic(password: string, mnemonic: string) {
   sessionStore.setBox(await sealSecret(password, mnemonic));
+}
+
+/** Encrypt with the session password when set. Never keep plaintext next to an encrypted box. */
+export async function persistWalletSecret(plain: string) {
+  const pass = currentPassword();
+  if (pass) {
+    await sealMnemonic(pass, plain);
+    await storage.clearMnemonic();
+    return;
+  }
+  await storage.setMnemonic(plain);
+}
+
+export async function persistShieldedSk(sk: string) {
+  const pass = currentPassword();
+  if (pass) {
+    sessionStore.setSkBox(await sealSecret(pass, sk));
+    await storage.clearShieldedSk();
+    return;
+  }
+  await storage.setShieldedSk(sk);
+}
+
+export async function readShieldedSk(): Promise<string | null> {
+  const pass = currentPassword();
+  const box = sessionStore.getSkBox();
+  if (box && pass) {
+    try {
+      return await openSecret(pass, box);
+    } catch {
+      return null;
+    }
+  }
+  return storage.getShieldedSk();
+}
+
+export async function migratePlainSecrets(password: string, mnemonic?: string | null) {
+  const plain = mnemonic ?? (await storage.getMnemonic());
+  if (plain) {
+    await sealMnemonic(password, plain);
+    await storage.clearMnemonic();
+  }
+  const sk = await storage.getShieldedSk();
+  if (sk) {
+    sessionStore.setSkBox(await sealSecret(password, sk));
+    await storage.clearShieldedSk();
+  }
+}
+
+export async function dropPlainSecretsIfEncrypted() {
+  if (sessionStore.getBox()) await storage.clearMnemonic();
+  if (sessionStore.getSkBox()) await storage.clearShieldedSk();
 }
 
 export async function unlockWithPassword(password: string): Promise<string | null> {

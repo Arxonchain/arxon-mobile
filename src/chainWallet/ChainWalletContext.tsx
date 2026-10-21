@@ -28,7 +28,16 @@ import {
 import { isWalletNetworkId, type EthereumToken, type WalletNetworkId } from './networks';
 import { relayUrl, submitRelayed } from './relay';
 import { newMnemonic, resolveAccount } from './keys';
-import { currentPassword, sealMnemonic, sessionStore, unlockWithPassword } from './session';
+import {
+  currentPassword,
+  dropPlainSecretsIfEncrypted,
+  migratePlainSecrets,
+  persistShieldedSk,
+  persistWalletSecret,
+  readShieldedSk,
+  sessionStore,
+  unlockWithPassword,
+} from './session';
 import {
   commitOutputs,
   hydrateLeaves,
@@ -190,10 +199,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   }, [rpcUrl]);
 
   const ensureKeys = useCallback(async () => {
-    const saved = await storage.getShieldedSk();
+    const saved = await readShieldedSk();
     try {
       const keys = await proveKeys(saved);
-      await storage.setShieldedSk(keys.sk_hex);
+      await persistShieldedSk(keys.sk_hex);
       setShieldedPk(keys.pk_hex);
       setKeysError(null);
     } catch (e) {
@@ -211,10 +220,12 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         storage.getNetwork(),
       ]);
       if (cancelled) return;
+      await dropPlainSecretsIfEncrypted();
+      const plain = sessionStore.getBox() ? null : saved;
       setAccountIndexState(sessionStore.accountIndex());
-      const needsLock = sessionStore.hasPassword() && (!!saved || !!sessionStore.getBox());
+      const needsLock = sessionStore.hasPassword() && (!!plain || !!sessionStore.getBox());
       setLocked(needsLock);
-      if (saved && !needsLock) setMnemonic(saved);
+      if (plain && !needsLock) setMnemonic(plain);
       if (isWalletNetworkId(storedNetwork)) setNetworkState(storedNetwork);
       let rpc = storedRpc;
       if (rpc && rpc.includes('trycloudflare.com')) {
@@ -275,9 +286,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
 
   const createWallet = useCallback(async () => {
     const phrase = newMnemonic();
-    await storage.setMnemonic(phrase);
-    const password = currentPassword();
-    if (password) await sealMnemonic(password, phrase);
+    await persistWalletSecret(phrase);
     setMnemonic(phrase);
     setLocked(false);
     return phrase;
@@ -286,18 +295,14 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const importWallet = useCallback(async (phrase: string) => {
     const trimmed = phrase.trim().split(/\s+/).join(' ');
     resolveAccount(trimmed, 0);
-    await storage.setMnemonic(trimmed);
-    const password = currentPassword();
-    if (password) await sealMnemonic(password, trimmed);
+    await persistWalletSecret(trimmed);
     setMnemonic(trimmed);
     setLocked(false);
   }, []);
 
   const importPrivateKey = useCallback(async (key: string) => {
     resolveAccount(key, 0);
-    await storage.setMnemonic(key.trim());
-    const password = currentPassword();
-    if (password) await sealMnemonic(password, key.trim());
+    await persistWalletSecret(key.trim());
     setMnemonic(key.trim());
     setLocked(false);
   }, []);
@@ -310,7 +315,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   const unlockSession = useCallback(async (password: string) => {
     const secret = await unlockWithPassword(password);
     if (!secret) return false;
-    await storage.setMnemonic(secret);
+    await migratePlainSecrets(password, secret);
     setMnemonic(secret);
     setLocked(false);
     return true;
@@ -318,6 +323,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
 
   const lockSession = useCallback(async () => {
     if (sessionStore.hasPassword()) {
+      await dropPlainSecretsIfEncrypted();
       setMnemonic(null);
       setLocked(true);
     }
@@ -339,6 +345,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     setNotesStatus(null);
     sessionStore.clearPass();
     sessionStore.clearBox();
+    sessionStore.clearSkBox();
     setLocked(false);
   }, []);
 
@@ -365,11 +372,11 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         amountWei: wei,
         maskBits: asBits(flags),
         expiryBlock: expiry,
-        skHex: await storage.getShieldedSk(),
+        skHex: await readShieldedSk(),
       });
       stampProved(clocks);
       onPhase?.('Proved');
-      await storage.setShieldedSk(proof.sk_hex);
+      await persistShieldedSk(proof.sk_hex);
       setShieldedPk(proof.pk_hex);
       const hash = await sendLegacy(rpcUrl, mnemonic, {
         to: PRECOMPILE.submit,
@@ -421,7 +428,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       onPhase?.('Processing');
       const live = await loadLiveNotes(rpcUrl);
       const wei = requireWei(amount);
-      const sk = await storage.getShieldedSk();
+      const sk = await readShieldedSk();
       if (!sk) throw new Error('No shielded key. Shield once first.');
       const note = pickNote(live.notes, wei);
       const expiry = await expiryBlock(rpcUrl);
@@ -475,7 +482,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       onPhase?.('Processing');
       const live = await loadLiveNotes(rpcUrl);
       const wei = requireWei(amount);
-      const sk = await storage.getShieldedSk();
+      const sk = await readShieldedSk();
       if (!sk) throw new Error('No shielded key. Shield once first.');
       const note = pickNote(live.notes, wei);
       const expiry = await expiryBlock(rpcUrl);
