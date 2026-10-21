@@ -1,8 +1,6 @@
 import type { PrivacyFlags } from '@/chainWallet/privacy';
 import { addHdAccount, currentPassword, sessionStore, setUnlockPassword } from '@/chainWallet/session';
 import { enableBiometrics } from '@/chainWallet/biometrics';
-import { createDisclosureCode } from '@/chainWallet/disclosure';
-import { saveSupportReport } from '@/chainWallet/reports';
 import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 import { downloadDriveBackup, driveConfigured, uploadDriveBackup } from '@/chainWallet/googleDrive';
 import { setVaultLockRequired } from './VaultScreens';
@@ -156,9 +154,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (to === 'dapp' && !wc?.proposal && !wc?.request) {
-    return {
-      note: 'No WalletConnect request is waiting. Paste a wc: URI from the dApp to pair. This overlay does not invent a connection.',
-    };
+    return { block: true, note: 'Coming soon' };
   }
 
   if (from === 'dapp' && (to === 'home' || to === 'home-funded')) {
@@ -183,16 +179,6 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
       /* reject is best-effort */
     }
     return { replace: 'home' };
-  }
-
-  if (to === 'code-ready') {
-    const row = createDisclosureCode('Lawyer', '');
-    return { note: `Code ${row.code} saved on this device. It is single-use and is not a key.` };
-  }
-
-  if (from === 'report' && to === 'help') {
-    saveSupportReport({ kind: 'Other', note: 'Report from Account', diagnostics: true });
-    return { note: 'Report saved on this device. No keys or balances were included.' };
   }
 
   if (to === 'testnet') {
@@ -222,11 +208,6 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return {};
   }
 
-  if (to === 'arxswap' || (from === 'arxswap' && to === 'dapp')) {
-    return {
-      note: 'Arxswap is a WalletConnect dApp, not an in-app DEX. Paste a wc: URI from the dApp to pair.',
-    };
-  }
   if (from === 'dapp' && to !== 'home' && to !== 'home-funded' && !wc?.proposal) {
     return {};
   }

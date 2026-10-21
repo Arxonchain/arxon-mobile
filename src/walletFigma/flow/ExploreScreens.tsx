@@ -5,6 +5,7 @@ import { font } from '@/walletFigma/tokens';
 import { hasClaimed } from './ClaimScreens';
 import { tabTarget, vaultEntry } from './VaultScreens';
 import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
 
 const art = (name: string) => `/wallet-figma/explore/${name}`;
 const SCREENS = new Set(['explore', 'dapps', 'arxswap']);
@@ -24,20 +25,29 @@ export function isExploreScreen(id: string) {
 }
 
 export function ExploreScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const [chip, setChip] = useState('All');
+  const [soon, setSoon] = useState<string | null>(null);
   const leave = (fallback: string) => (back ? back() : go(fallback, false));
-  const open = (app: App) => go(app.detail ? 'arxswap' : 'dapp');
+  const connect = (app: App) => {
+    if (live?.app && !live.wcKind) {
+      setSoon(app.name);
+      return;
+    }
+    go('dapp');
+  };
+  const open = (app: App) => (app.detail ? go('arxswap') : connect(app));
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.dapp-row{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}.dapp-row::-webkit-scrollbar{display:none;width:0;height:0}`}</style>
-      {id === 'explore' && <Explore go={go} />}
-      {id === 'dapps' && <Dapps chip={chip} setChip={setChip} onBack={() => leave('explore')} open={open} />}
-      {id === 'arxswap' && <Detail onBack={() => leave('dapps')} onConnect={() => go('dapp')} />}
+      {id === 'explore' && <Explore go={go} open={open} soon={soon} />}
+      {id === 'dapps' && <Dapps chip={chip} setChip={setChip} onBack={() => leave('explore')} open={open} soon={soon} />}
+      {id === 'arxswap' && <Detail onBack={() => leave('dapps')} onConnect={() => connect(APPS[0])} soon={soon === APPS[0].name} />}
     </div>
   );
 }
 
-function Explore({ go }: { go: Go }) {
+function Explore({ go, open, soon }: { go: Go; open: (app: App) => void; soon: string | null }) {
   const tools: [string, string, string, string][] = [
     ['claim.svg', 'Claim ARX', 'Claim your ARX-P allocation', 'claim'],
     ['buy.svg', 'Buy', 'Buy crypto with a card', 'buy'],
@@ -64,10 +74,10 @@ function Explore({ go }: { go: Go }) {
       <div className="dapp-row" style={{ position: 'absolute', left: 0, top: 268, width: 390, height: 120 }}>
         <div style={{ display: 'flex', gap: 12, padding: '0 18px', width: 'max-content' }}>
           {APPS.slice(0, 3).map((app) => (
-            <button key={app.name} type="button" onClick={() => go(app.detail ? 'arxswap' : 'dapp')} style={dappCard}>
+            <button key={app.name} type="button" onClick={() => open(app)} style={dappCard}>
               <span style={avatar}><span style={{ color: '#accafe', fontSize: 18, fontWeight: 700 }}>{app.letter}</span></span>
               <span style={{ display: 'block', marginTop: 12, fontSize: 15, fontWeight: 600 }}>{app.name}</span>
-              <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#8c8f99' }}>{app.blurb}</span>
+              <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#8c8f99' }}>{soon === app.name ? 'Coming soon' : app.blurb}</span>
             </button>
           ))}
         </div>
@@ -91,7 +101,7 @@ function Explore({ go }: { go: Go }) {
   );
 }
 
-function Dapps({ chip, setChip, onBack, open }: { chip: string; setChip: (v: string) => void; onBack: () => void; open: (app: App) => void }) {
+function Dapps({ chip, setChip, onBack, open, soon }: { chip: string; setChip: (v: string) => void; onBack: () => void; open: (app: App) => void; soon: string | null }) {
   const rows = APPS.filter((app) => chip === 'All' || app.category === chip);
   return (
     <>
@@ -111,7 +121,7 @@ function Dapps({ chip, setChip, onBack, open }: { chip: string; setChip: (v: str
             <span style={{ position: 'absolute', left: 16, top: 16, width: 40, height: 40, borderRadius: 20, background: 'rgba(172,202,254,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#accafe', fontSize: 16, fontWeight: 700 }}>{app.letter}</span>
             <span style={{ position: 'absolute', left: 68, top: 16, fontSize: 15, fontWeight: 600 }}>{app.name}</span>
             <span style={{ position: 'absolute', left: 68, top: 38, fontSize: 13, color: '#8b9097' }}>{app.line}</span>
-            <span style={{ position: 'absolute', right: 16, top: 26, color: '#accafe', fontSize: 14, fontWeight: 600 }}>Connect</span>
+            <span style={{ position: 'absolute', right: 16, top: 26, color: '#accafe', fontSize: 14, fontWeight: 600 }}>{soon === app.name ? 'Coming soon' : 'Connect'}</span>
           </button>
         ))}
       </div>
@@ -120,7 +130,7 @@ function Dapps({ chip, setChip, onBack, open }: { chip: string; setChip: (v: str
   );
 }
 
-function Detail({ onBack, onConnect }: { onBack: () => void; onConnect: () => void }) {
+function Detail({ onBack, onConnect, soon }: { onBack: () => void; onConnect: () => void; soon: boolean }) {
   const rows = [
     ['See your public address', '/wallet-figma/home/eye.svg', 22],
     ['Ask you to approve transactions', '/wallet-figma/buy/check.svg', 20],
@@ -146,7 +156,7 @@ function Detail({ onBack, onConnect }: { onBack: () => void; onConnect: () => vo
         ))}
       </div>
       <p style={{ position: 'absolute', left: 18, top: 604, width: 354, boxSizing: 'border-box', margin: 0, background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '15px 17px', color: '#8b9097', fontSize: 13, lineHeight: 1.35 }}>Only connect to apps you trust. You can disconnect any time in Connected apps.</p>
-      <button type="button" onClick={onConnect} style={{ position: 'absolute', left: 18, top: 727, width: 354, height: 55, border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Connect</button>
+      <button type="button" onClick={onConnect} style={{ position: 'absolute', left: 18, top: 727, width: 354, height: 55, border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>{soon ? 'Coming soon' : 'Connect'}</button>
     </>
   );
 }

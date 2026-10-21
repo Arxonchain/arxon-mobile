@@ -23,7 +23,7 @@ export function UnlockScreens({
   if (id === 'dapp' || id === 'dapp-tx') {
     return <Request id={id} go={go} back={back} />;
   }
-  return <Connected back={() => (back ? back() : go('privacy', false))} />;
+  return <Connected back={() => (back ? back() : go('privacy', false))} go={go} />;
 }
 
 function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go: Go }) {
@@ -148,7 +148,7 @@ function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   );
 }
 
-function Connected({ back }: { back: () => void }) {
+function Connected({ back, go }: { back: () => void; go: Go }) {
   const live = useLiveFrame();
   const [arxswap, setArxswap] = useState(true);
   const sessions = live?.app ? live.wcSessions : arxswap ? [{ name: 'Arxswap', url: 'app.arxswap.io', topic: 'demo' }] : [];
@@ -179,7 +179,7 @@ function Connected({ back }: { back: () => void }) {
           </div>
         ))}
         {sessions.length > 0 && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
-        <AppRow mark="M" title="Arxon Mining" detail="Extension · Wallet access" action="Manage" />
+        <AppRow mark="M" title="Arxon Mining" detail="Extension · Wallet access" action="Manage" onAction={() => go('mine-entry')} />
       </div>
       <div style={{ position: 'absolute', left: 18, top: sessions.length ? 388 : 316, width: 354, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '14px 16px', color: '#8b9097', fontSize: 13 }}>
         Disconnecting stops an app from seeing your address. You can connect it again later.
