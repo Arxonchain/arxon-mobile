@@ -10,6 +10,7 @@ import {
   type Hex,
 } from 'viem';
 import { resolveAccount } from './keys';
+import { PendingTxError } from './chain';
 
 import {
   ETHEREUM,
@@ -130,8 +131,9 @@ export async function fetchEthereumBalances(
 }
 
 async function waitEth(rpcUrl: string, hash: Hex) {
+  const client = ethereumPublicClient(rpcUrl);
   try {
-    const receipt = await ethereumPublicClient(rpcUrl).waitForTransactionReceipt({
+    const receipt = await client.waitForTransactionReceipt({
       hash,
       timeout: 90_000,
     });
@@ -139,8 +141,17 @@ async function waitEth(rpcUrl: string, hash: Hex) {
       throw new Error(`Send reverted on Ethereum (${hash}).`);
     }
   } catch (e) {
+    if (e instanceof PendingTxError) throw e;
     if (e instanceof Error && /reverted on Ethereum/.test(e.message)) throw e;
-    throw rpcFail(e);
+    try {
+      const receipt = await client.getTransactionReceipt({ hash });
+      if (receipt.status !== 'success') {
+        throw new Error(`Send reverted on Ethereum (${hash}).`);
+      }
+    } catch (inner) {
+      if (inner instanceof Error && /reverted on Ethereum/.test(inner.message)) throw inner;
+      throw new PendingTxError(hash);
+    }
   }
 }
 
@@ -160,6 +171,7 @@ export async function sendEthereumNative(
     await waitEth(rpcUrl, hash);
     return hash;
   } catch (e) {
+    if (e instanceof PendingTxError) throw e;
     throw rpcFail(e);
   }
 }
@@ -201,6 +213,7 @@ export async function sendEthereumToken(
     await waitEth(rpcUrl, hash);
     return hash;
   } catch (e) {
+    if (e instanceof PendingTxError) throw e;
     throw rpcFail(e);
   }
 }

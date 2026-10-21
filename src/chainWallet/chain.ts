@@ -95,12 +95,31 @@ export function publicClient(rpcUrl: string) {
   });
 }
 
+export class PendingTxError extends Error {
+  hash: Hex;
+  constructor(hash: Hex) {
+    super(`Transaction submitted (${hash}). Waiting for the network to include it. Do not send again.`);
+    this.name = 'PendingTxError';
+    this.hash = hash;
+  }
+}
+
+export function receiptOutcome(receipt: { status?: string } | null | undefined): 'success' | 'reverted' | 'pending' {
+  if (!receipt || receipt.status == null) return 'pending';
+  if (receipt.status === 'success') return 'success';
+  return 'reverted';
+}
+
 export async function waitIncluded(rpcUrl: string, hash: Hex) {
   const client = publicClient(rpcUrl);
   try {
     return await client.waitForTransactionReceipt({ hash, timeout: 180_000 });
   } catch {
-    return client.getTransactionReceipt({ hash });
+    try {
+      return await client.getTransactionReceipt({ hash });
+    } catch {
+      throw new PendingTxError(hash);
+    }
   }
 }
 

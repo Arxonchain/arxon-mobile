@@ -1,6 +1,7 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { PendingTxError } from '@/chainWallet/chain';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
@@ -249,6 +250,7 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
   const net = useWalletNetwork();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<string | null>(null);
   const fee = token.id === 'arx' ? 0.0004 : 0;
   const total = `${(Number(amount) + fee).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
   async function confirm() {
@@ -256,13 +258,24 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
       go('send-success');
       return;
     }
+    if (submitted) return;
     setBusy(true);
     setErr(null);
     try {
       await live.send(token.symbol, to, amount, net === 'testnet', priv && token.id === 'arx' ? 'private' : 'home');
       go('send-success');
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Send failed');
+      if (e instanceof PendingTxError) {
+        setSubmitted(e.hash);
+        setErr(e.message);
+        return;
+      }
+      const msg = e instanceof Error ? e.message : 'Send failed';
+      if (/reverted/i.test(msg)) {
+        go('send-failed');
+        return;
+      }
+      setErr(msg);
     } finally {
       setBusy(false);
     }
@@ -292,8 +305,8 @@ function Review({ token, to, amount, fiat, priv, go, leave }: { token: (typeof T
         <Line label="Total" value={total} />
       </div>
       {priv && token.id === 'arx' && <p style={{ position: 'absolute', left: 30, top: 527, width: 330, margin: 0, fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Private transactions hide the amount and sender on-chain. This can’t be undone once confirmed.</p>}
-      {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, fontSize: 12, color: '#f25252', lineHeight: 1.35 }}>{err}</p> : null}
-      <button type="button" disabled={busy} onClick={() => void confirm()} style={{ ...primary, top: 649, borderRadius: 8, height: 55, opacity: busy ? 0.6 : 1 }}>{busy ? 'Sending' : 'Confirm and send'}</button>
+      {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, fontSize: 12, color: submitted ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{err}</p> : null}
+      <button type="button" disabled={busy || !!submitted} onClick={() => void confirm()} style={{ ...primary, top: 649, borderRadius: 8, height: 55, opacity: busy || submitted ? 0.6 : 1 }}>{submitted ? 'Submitted' : busy ? 'Sending' : 'Confirm and send'}</button>
       <button type="button" onClick={leave} style={{ ...ghost, top: 714 }}>Cancel</button>
     </>
   );
