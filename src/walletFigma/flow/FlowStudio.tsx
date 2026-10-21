@@ -103,6 +103,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const [net, setNet] = useState<WalletNet>('mainnet');
   const stageRef = useRef<HTMLDivElement>(null);
   const jumpRef = useRef<string | null>(null);
+  const netSynced = useRef(false);
   const [fit, setFit] = useState(1);
 
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
@@ -134,6 +135,17 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       setId(live.startId);
     }
   }, [app, live?.ready, live?.startId, live?.locked, id]);
+
+  useEffect(() => {
+    if (!app || !live?.app || !live.ready || netSynced.current) return;
+    if (jumpRef.current === 'testnet') {
+      netSynced.current = true;
+      setNet('testnet');
+      return;
+    }
+    netSynced.current = true;
+    setNet(live.chainNetwork === 'arxon' ? 'testnet' : 'mainnet');
+  }, [app, live?.app, live?.ready, live?.chainNetwork]);
 
   useEffect(() => {
     if (live?.sessionPassword && !password) setPassword(live.sessionPassword);

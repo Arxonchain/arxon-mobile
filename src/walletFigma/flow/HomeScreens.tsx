@@ -193,20 +193,18 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         </button>
       </div>
 
-      {empty && (
-        <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 340, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
-          {CARDS.map((card) => (
-            <StartCard key={card.title} kind={card.kind} title={card.title} body={card.body} onClick={() => go(card.to)} />
-          ))}
-        </div>
-      )}
+      <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 340, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
+        {CARDS.map((card) => (
+          <StartCard key={card.title} kind={card.kind} title={card.title} body={card.body} onClick={() => go(card.to)} />
+        ))}
+      </div>
 
-      <div style={{ position: 'absolute', left: 18, top: empty ? 492 : 344, width: 354, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ position: 'absolute', left: 18, top: 492, width: 354, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 18, fontWeight: 700 }}>Tokens</span>
         <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
       </div>
 
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: empty ? 531 : 383, width: 354, ...(live?.app ? { bottom: 80, overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : {}) }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: 531, width: 354, bottom: 80, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
         {tokens.map((token) => (
           <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
             <TokenIcon kind={token.icon} />

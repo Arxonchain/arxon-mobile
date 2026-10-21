@@ -110,6 +110,7 @@ type LiveFrame = {
   enableTestnet: (rpc?: string) => Promise<void>;
   openFaucet: () => void;
   send: (symbol: string, to: string, amount: string, testnet: boolean, mode?: LiveSendMode) => Promise<void>;
+  chainNetwork: WalletNetworkId;
   unlock: (password: string) => Promise<boolean>;
   unlockBiometric: () => Promise<boolean>;
   persistPassword: (password: string) => Promise<void>;
@@ -576,6 +577,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     ensureWords,
     importPhrase: wallet.importWallet,
     importKey: wallet.importPrivateKey,
+    chainNetwork: wallet.network,
     setNetwork: wallet.setNetwork,
     setRpcUrl: wallet.setRpcUrl,
     testnetAdded,
