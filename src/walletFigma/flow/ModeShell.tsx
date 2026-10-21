@@ -88,7 +88,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     <AppModeContext.Provider value={mode}>
       <WalletModeActionsContext.Provider value={actions}>
       <ModeChromeContext.Provider value={chrome}>
-      <div style={{ height: '100vh', background: '#050505', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ height: '100%', background: '#050505', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {showBar ? (
         <div
           style={{
@@ -114,6 +114,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
         </div>
         <div
           aria-hidden={mode !== 'mining'}
+          className="arxon-mode-scroll"
           style={{ flex: 1, minHeight: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none' }}
         >
           {/* Legacy wallet routes lock the chain network; keep them unmounted behind the live wallet. */}

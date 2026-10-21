@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
@@ -28,22 +29,43 @@ import com.getcapacitor.BridgeWebViewClient;
 public class MainActivity extends BridgeActivity {
 
   private static final String TAG = "ArxonCapacitor";
-  /** Matches V2 neon deep background — avoids white flash before OTA paints. */
-  private static final int WEBVIEW_BG = Color.parseColor("#02060e");
+  /** Matches the wallet page background — avoids white flash before OTA paints. */
+  private static final int WEBVIEW_BG = Color.parseColor("#050505");
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     SplashScreen.installSplashScreen(this);
     WebView.setWebContentsDebuggingEnabled(true);
     super.onCreate(savedInstanceState);
+    getWindow().getDecorView().setBackgroundColor(WEBVIEW_BG);
 
     Bridge bridge = getBridge();
     if (bridge != null) {
+      disableWebViewOverscroll(bridge.getWebView());
       configureWebViewForTurnstile(bridge.getWebView());
       bridge.setWebViewClient(new DiagnosticBridgeWebViewClient(bridge, this));
     } else {
       Log.w(TAG, "Bridge was null after onCreate; skipping WebViewClient wrapper");
     }
+  }
+
+  @Override
+  public void onStart() {
+    super.onStart();
+    Bridge bridge = getBridge();
+    if (bridge != null) {
+      disableWebViewOverscroll(bridge.getWebView());
+    }
+  }
+
+  /** No edge glow / stretch: the page itself never moves, only in-app scrollers do. */
+  private static void disableWebViewOverscroll(WebView webView) {
+    if (webView == null) {
+      return;
+    }
+    webView.setOverScrollMode(View.OVER_SCROLL_NEVER);
+    webView.setVerticalScrollBarEnabled(false);
+    webView.setHorizontalScrollBarEnabled(false);
   }
 
   /** Best-effort WebView settings so Turnstile iframes can load and persist challenge state. */

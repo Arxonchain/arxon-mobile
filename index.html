@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#050505" />
     <title>Arxon Mining | Mine ARX-P Tokens & Earn $ARX Rewards</title>
     <meta name="description" content="Arxon Mining - Mine ARX-P tokens, participate in Vote-Fi battles, and earn $ARX rewards. Join the decentralized mining platform at arxonchain.xyz" />
     <meta name="author" content="Arxon" />
@@ -100,8 +101,17 @@
       html, body {
         margin: 0;
         min-height: 100%;
-        background: #02060e;
+        background: #050505;
         color: #e8fcff;
+      }
+      html.arxon-shell, html.arxon-shell body {
+        height: 100%;
+        overflow: hidden;
+        overscroll-behavior: none;
+      }
+      html.arxon-shell body {
+        position: fixed;
+        inset: 0;
       }
       #arxon-boot {
         position: fixed;
@@ -230,6 +240,7 @@
           !!(window.Capacitor &&
             typeof window.Capacitor.isNativePlatform === "function" &&
             window.Capacitor.isNativePlatform());
+        if (isNative) document.documentElement.classList.add("arxon-shell");
         var walletBoot =
           host === "localhost" ||
           host === "127.0.0.1" ||

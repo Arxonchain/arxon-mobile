@@ -170,6 +170,7 @@ const queryClient = new QueryClient({
 
 const isNative = Capacitor.isNativePlatform();
 const walletShell = isNative || import.meta.env.VITE_WALLET_SHELL === 'true';
+if (walletShell && typeof document !== 'undefined') document.documentElement.classList.add('arxon-shell');
 /**
  * Test APK (bundled on localhost) and the local preview.
  * Play Store OTA is served from arxon-mobile.pages.dev and keeps MobileSplash.
