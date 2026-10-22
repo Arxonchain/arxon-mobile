@@ -32,7 +32,10 @@
     "test": "vitest run",
     "preview": "vite preview",
     "maestro:dump": "node scripts/maestro-cdp.mjs dump",
-    "maestro:walk": "node scripts/maestro-cdp.mjs walk"
+    "maestro:walk": "node scripts/maestro-cdp.mjs walk",
+    "phone:live": "powershell -ExecutionPolicy Bypass -File scripts/phone-live.ps1 serve",
+    "phone:live:install": "powershell -ExecutionPolicy Bypass -File scripts/phone-live.ps1 install",
+    "phone:live:reverse": "powershell -ExecutionPolicy Bypass -File scripts/phone-live.ps1 reverse"
   },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.1",

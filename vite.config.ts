@@ -38,8 +38,14 @@ export default defineConfig(({ mode }) => {
   },
 
   server: {
-    host: "::",
+    host: process.env.CAPACITOR_LIVE_USB === "true" ? "127.0.0.1" : "::",
     port: 8080,
+    strictPort: process.env.CAPACITOR_LIVE_USB === "true",
+    allowedHosts: true,
+    hmr:
+      process.env.CAPACITOR_LIVE_USB === "true"
+        ? { host: "127.0.0.1", protocol: "ws", clientPort: 8080 }
+        : undefined,
     // Ignore Capacitor copied OTA bundles — Vite must not prebundle android/.../App-*.js.
     watch: {
       ignored: ["**/android/**", "**/ios/**"],
