@@ -1,27 +1,62 @@
+import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { bioEnableLabel, biometricsCaps, enableBiometrics, type BioKind } from '@/chainWallet/biometrics';
+import { currentPassword } from '@/chainWallet/session';
 import { useAppHidesFigmaChrome } from './appChrome';
-import type { CSSProperties, ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { useLiveFrame } from './liveFrame';
+import { FingerprintMark } from './BioMark';
 
 const art = (name: string) => `/wallet-figma/finish/${name}`;
 type Go = (id: string, remember?: boolean) => void;
 
+function EnableBiometrics({ go }: { go: Go }) {
+  const live = useLiveFrame();
+  const [kind, setKind] = useState<BioKind>('face');
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (!live?.app) return;
+    void biometricsCaps().then((caps) => setKind(caps.kind === 'none' ? 'fingerprint' : caps.kind));
+  }, [live?.app]);
+  const livePhone = !!live?.app;
+  const title = livePhone ? bioEnableLabel(kind) : 'Enable Face ID';
+  async function onEnable() {
+    if (!livePhone) {
+      go('ready-skip');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      await enableBiometrics(currentPassword() || live?.sessionPassword || undefined);
+      go('ready-skip');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Could not enable fingerprint or Face ID.');
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Screen>
+      <img src={art('face-glow.svg')} alt="" width={168} height={168} style={{ position: 'absolute', left: 111, top: 170 }} />
+      <img src={art('face-ring.svg')} alt="" width={132} height={132} style={{ position: 'absolute', left: 129, top: 188 }} />
+      <div style={{ position: 'absolute', left: 147, top: 206, width: 96, height: 96, borderRadius: 48, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#accafe' }}>
+        {livePhone && kind === 'fingerprint' ? <FingerprintMark size={44} /> : <img src={art('face.svg')} alt="" width={44} height={44} />}
+      </div>
+      <h1 style={{ ...centerTitle, top: 374, width: 320, left: 35, fontSize: 26 }}>{title}</h1>
+      <p style={{ ...centerCopy, top: 418, width: 300, left: 45, fontSize: 15 }}>
+        Unlock Arxon and approve transactions faster. Your recovery phrase stays protected on this device.
+      </p>
+      {err ? <p style={{ ...centerCopy, top: 500, width: 320, left: 35, fontSize: 13, color: '#f25252' }}>{err}</p> : null}
+      <button type="button" disabled={busy} onClick={() => void onEnable()} style={{ ...primary, top: 649, width: 352 }}>{busy ? 'Waiting…' : title}</button>
+      <button type="button" onClick={() => go('ready-skip')} style={later}>Maybe later</button>
+    </Screen>
+  );
+}
+
 export function FinishScreens({ id, go }: { id: string; go: Go }) {
   if (id === 'face') {
-    return (
-      <Screen>
-        <img src={art('face-glow.svg')} alt="" width={168} height={168} style={{ position: 'absolute', left: 111, top: 170 }} />
-        <img src={art('face-ring.svg')} alt="" width={132} height={132} style={{ position: 'absolute', left: 129, top: 188 }} />
-        <div style={{ position: 'absolute', left: 147, top: 206, width: 96, height: 96, borderRadius: 48, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <img src={art('face.svg')} alt="" width={44} height={44} />
-        </div>
-        <h1 style={{ ...centerTitle, top: 374, width: 320, left: 35, fontSize: 26 }}>Enable Face ID</h1>
-        <p style={{ ...centerCopy, top: 418, width: 300, left: 45, fontSize: 15 }}>
-          Unlock Arxon and approve transactions faster. Your recovery phrase stays protected on this device.
-        </p>
-        <button type="button" onClick={() => go('ready-skip')} style={{ ...primary, top: 649, width: 352 }}>Enable Face ID</button>
-        <button type="button" onClick={() => go('ready-skip')} style={later}>Maybe later</button>
-      </Screen>
-    );
+    return <EnableBiometrics go={go} />;
   }
   return (
     <Screen>

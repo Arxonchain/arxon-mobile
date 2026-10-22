@@ -124,8 +124,8 @@ function CreatePassword({
         }
       />
       <div style={{ position: 'absolute', left: 18, top: 350, width: 354, height: 20, display: 'flex', alignItems: 'center', gap: 6 }}>
-        {[0, 1, 2, 3].map((i) => (
-          <span key={i} style={{ width: 56, height: 4, borderRadius: 2, background: i < met ? '#3ddc84' : '#26292f' }} />
+        {[0, 1, 2].map((i) => (
+          <span key={i} style={{ width: 76, height: 4, borderRadius: 2, background: i < met ? '#3ddc84' : '#26292f' }} />
         ))}
         <span style={{ flex: 1 }} />
         {strong && <span style={{ color: '#3ddc84', fontFamily: font.sans, fontWeight: 600, fontSize: 13 }}>Strong</span>}
@@ -415,7 +415,7 @@ function Option({
 
 function Continue({ top, onClick, disabled = false, label = 'Continue' }: { top: number; onClick: () => void; disabled?: boolean; label?: string }) {
   return (
-    <button type="button" disabled={disabled} onClick={onClick} style={{ position: 'absolute', left: 19, top, width: 353, height: 55, border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1 }}>
+    <button type="button" disabled={disabled} onClick={() => { if (!disabled) onClick(); }} style={{ position: 'absolute', left: 19, top, width: 353, height: 55, border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : 1 }}>
       {label}
     </button>
   );
@@ -424,7 +424,7 @@ function Continue({ top, onClick, disabled = false, label = 'Continue' }: { top:
 const title: CSSProperties = { margin: 0, fontFamily: font.sans, fontWeight: 700, fontSize: 30, lineHeight: 'normal', color: '#fff' };
 const body: CSSProperties = { margin: 0, fontFamily: font.sans, fontWeight: 400, fontSize: 16, lineHeight: 'normal', color: '#8b9097' };
 const pill: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, background: '#11161f', color: '#8b9097', borderRadius: 18, padding: '7px 12px 7px 10px', fontFamily: font.sans, fontWeight: 500, fontSize: 12 };
-const iconBtn: CSSProperties = { width: 20, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' };
+const iconBtn: CSSProperties = { width: 40, height: 40, margin: -10, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const later: CSSProperties = { position: 'absolute', left: 18, top: 721, width: 354, height: 55, border: 'none', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 15, cursor: 'pointer' };
 const wideBtn: CSSProperties = { height: 55, width: '100%', border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: 'pointer' };
 const textBtn: CSSProperties = { border: 'none', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 15, cursor: 'pointer', padding: 0 };

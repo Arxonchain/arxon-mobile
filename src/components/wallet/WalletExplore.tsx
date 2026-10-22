@@ -1,23 +1,14 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
 import { START_URL } from '@/chainWallet/chain';
+import { openExternal } from '@/walletFigma/flow/openExternal';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { walletBtn, walletField, walletGhost, walletPage } from '@/chainWallet/ui';
 import NetworkSwitcher from '@/components/wallet/NetworkSwitcher';
 
 async function openUrl(url: string) {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      const { Browser } = await import('@capacitor/browser');
-      await Browser.open({ url });
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  window.open(url, '_blank', 'noopener,noreferrer');
+  await openExternal(url);
 }
 
 function looksLikeTx(value: string) {

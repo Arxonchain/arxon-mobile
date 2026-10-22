@@ -30,6 +30,7 @@ export async function scanAddressQr(): Promise<string> {
 
 function stripQrPayload(raw: string) {
   const trimmed = raw.trim();
+  if (trimmed.startsWith('wc:')) return trimmed;
   const ethereum = trimmed.match(/ethereum:([0-9a-zA-Z]+)/i);
   if (ethereum) return ethereum[1].startsWith('0x') ? ethereum[1] : `0x${ethereum[1]}`;
   const bitcoin = trimmed.match(/^(bitcoin:)?(bc1[a-z0-9]+|[13][a-km-zA-HJ-NP-Z1-9]{25,})/i);

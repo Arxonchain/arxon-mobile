@@ -524,7 +524,7 @@ function Unlock({ wrong, locked, clock, typed, setTyped, onUnlock, onFace, leave
       <button type="button" onClick={() => { if (!locked) go('home-funded', false); }} style={{ marginTop: 12, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Forgot password?</button>
       <div style={{ marginTop: 'auto', width: 354, paddingBottom: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <button type="button" disabled={locked || !typed} onClick={onUnlock} style={{ ...btn, background: locked || !typed ? '#1c2025' : '#accafe', color: locked || !typed ? '#5c5f64' : '#0c1018', border: 'none' }}>Unlock</button>
-        <button type="button" disabled={locked} onClick={onFace} style={{ ...btn, background: 'transparent', color: locked ? '#5c5f64' : '#fff', border: '1px solid #2a3447' }}>Use Face ID</button>
+        <button type="button" disabled={locked} onClick={onFace} style={{ ...btn, background: 'transparent', color: locked ? '#5c5f64' : '#fff', border: '1px solid #2a3447' }}>Use fingerprint or Face ID</button>
       </div>
     </div>
   );

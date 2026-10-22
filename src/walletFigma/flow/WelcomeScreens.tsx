@@ -26,8 +26,8 @@ function Phone({ children, onClick }: { children: ReactNode; onClick?: () => voi
       onClick={onClick}
       style={{
         position: 'relative',
-        width: 390,
-        minHeight: 844,
+        width: live?.app ? '100%' : 390,
+        minHeight: live?.app ? '100%' : 844,
         height: live?.app ? '100%' : 844,
         background: '#050505',
         overflow: 'hidden',
@@ -45,10 +45,6 @@ function Phone({ children, onClick }: { children: ReactNode; onClick?: () => voi
 }
 
 function Splash({ onNext }: { onNext: () => void }) {
-  useEffect(() => {
-    markBootOk();
-  }, []);
-
   return (
     <Phone onClick={onNext}>
       <img
@@ -91,8 +87,11 @@ export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; on
       onClick={() => ready && onFinish()}
       style={{
         minHeight: '100dvh',
+        height: '100%',
         width: '100%',
-        background: 'radial-gradient(ellipse 120% 70% at 50% -10%, #3d6dff 0%, #1a3d9e 28%, #0a1630 58%, #050505 78%)',
+        backgroundColor: '#050505',
+        backgroundImage:
+          'radial-gradient(ellipse 160% 95% at 50% 0%, #3d6dff 0%, #1a3d9e 20%, #0c1c3c 42%, #08101c 64%, rgba(5,5,5,0) 86%)',
         border: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -256,6 +255,17 @@ function Glow() {
       <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -691, top: -408, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
       <img src={asset('arc-pink.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -251, top: -494, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
       <img src={asset('arc-pink-2.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -338, top: 68, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: '48%',
+          background: 'linear-gradient(180deg, rgba(5,5,5,0) 0%, rgba(5,5,5,0.55) 38%, #050505 78%, #050505 100%)',
+        }}
+      />
     </div>
   );
 }
@@ -379,8 +389,9 @@ function Copy({
   secondary?: string;
   onSecondary?: () => void;
 }) {
+  const live = useLiveFrame();
   return (
-    <div style={{ position: 'absolute', left: 19, top, width: 353, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 55, zIndex: 2 }}>
+    <div style={{ position: 'absolute', left: 19, ...(live?.app ? { bottom: 32, top: 'auto' as const } : { top }), width: 353, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 55, zIndex: 2 }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 17 }}>
         <img src={asset(dots)} alt="" width={164.61} height={3.26856} style={{ width: 164.61, height: 3.26856, maxWidth: 'none' }} />
         <h1 style={headline}>{title}</h1>

@@ -1,7 +1,10 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { bioVerb, biometricsCaps, enableBiometrics } from '@/chainWallet/biometrics';
+import { sessionStore } from '@/chainWallet/session';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { FingerprintMark } from './BioMark';
 
 const art = (name: string) => `/wallet-figma/unlock/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -23,14 +26,40 @@ export function UnlockScreens({
   if (id === 'dapp' || id === 'dapp-tx') {
     return <Request id={id} go={go} back={back} />;
   }
-  return <Connected back={() => (back ? back() : go('privacy', false))} go={go} />;
+  return <Connected back={() => (back ? back() : go('account', false))} go={go} />;
 }
 
 function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go: Go }) {
   const live = useLiveFrame();
   const [value, setValue] = useState(wrong ? 'incorrect' : '');
   const [show, setShow] = useState(false);
+  const [finger, setFinger] = useState(false);
+  const [face, setFace] = useState(!live?.app);
   const expected = password || 'Arxon123!';
+
+  useEffect(() => {
+    if (!live?.app) {
+      setFinger(false);
+      setFace(true);
+      return;
+    }
+    setFinger(true);
+    setFace(true);
+    void biometricsCaps().then((caps) => {
+      if (caps.available === false && caps.reason) return;
+      setFinger(caps.fingerprint || caps.available);
+      setFace(caps.face || caps.available);
+    });
+  }, [live?.app]);
+
+  const autoBio = useRef(false);
+  useEffect(() => {
+    if (!live?.app || wrong || autoBio.current || !sessionStore.biometrics()) return;
+    autoBio.current = true;
+    void live.unlockBiometric().then((ok) => {
+      if (ok) go('home', false);
+    });
+  }, [live, go, wrong]);
 
   function unlock() {
     if (live?.app) {
@@ -40,6 +69,32 @@ function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go:
     const typed = value;
     if (typed === expected) go('home-funded');
     else go('unlock-wrong', false);
+  }
+
+  function bioUnlock() {
+    if (!live?.app) {
+      go('home-funded');
+      return;
+    }
+    void (async () => {
+      if (!sessionStore.biometrics()) {
+        if (!value) return;
+        const ok = await live.unlock(value);
+        if (!ok) {
+          go('unlock-wrong', false);
+          return;
+        }
+        try {
+          await enableBiometrics(value);
+        } catch {
+          /* wallet is already unlocked */
+        }
+        go('home', false);
+        return;
+      }
+      const ok = await live.unlockBiometric();
+      go(ok ? 'home' : 'unlock-wrong', false);
+    })();
   }
 
   return (
@@ -60,20 +115,26 @@ function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go:
           <img src="/wallet-figma/create/eye.svg" alt="" width={20} height={20} />
         </button>
       </label>
-      <button type="button" onClick={() => go('import')} style={{ position: 'absolute', left: wrong ? 18 : 18, top: wrong ? 466 : 444, width: wrong ? undefined : 354, border: 'none', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 14, cursor: 'pointer', textAlign: wrong ? 'left' : 'center' }}>
+      <button type="button" onClick={() => go('import')} style={{ position: 'absolute', left: 18, top: wrong ? 466 : 444, width: 354, minHeight: 40, border: 'none', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 14, cursor: 'pointer', textAlign: 'center' }}>
         Forgot password?
       </button>
-      <button type="button" onClick={unlock} style={{ ...unlockBtn, background: '#90b9ff', color: '#0c1018', top: 649 }}>Unlock</button>
-      <button type="button" onClick={() => {
-        if (live?.app) {
-          void live.unlockBiometric().then((ok) => go(ok ? 'home' : 'unlock-wrong', false));
-          return;
-        }
-        go('home-funded');
-      }} style={{ ...unlockBtn, top: 714, background: 'transparent', color: '#accafe', border: '1.5px solid #2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-        <img src={art('face.svg')} alt="" width={20} height={20} />
-        Use Face ID
-      </button>
+      {(finger || face) ? (
+        <div style={{ position: 'absolute', left: 18, top: wrong ? 508 : 486, width: 354, display: 'flex', gap: 10 }}>
+          {finger ? (
+            <button type="button" onClick={bioUnlock} style={{ ...bioChip, flex: 1 }}>
+              <FingerprintMark />
+              {bioVerb('fingerprint')}
+            </button>
+          ) : null}
+          {face ? (
+            <button type="button" onClick={bioUnlock} style={{ ...bioChip, flex: 1 }}>
+              <img src={art('face.svg')} alt="" width={18} height={18} />
+              Use Face ID
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+      <button type="button" onClick={unlock} style={{ ...unlockBtn, background: '#90b9ff', color: '#0c1018', top: (finger || face) ? (wrong ? 572 : 550) : 649 }}>Unlock</button>
     </Screen>
   );
 }
@@ -82,15 +143,15 @@ function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
   const pay = id === 'dapp-tx';
   const peer = live?.app ? live.wcPeer : null;
-  const host = peer?.url ? peer.url.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'app.arxswap.io';
+  const host = peer?.url ? peer.url.replace(/^https?:\/\//, '').replace(/\/$/, '') : 'dapp';
   const title = pay ? 'Approve transaction' : 'Connection request';
   const body = peer
     ? pay
       ? `${peer.name} wants to send from ${live?.accountLabel ?? 'Account 01'}.`
       : `${peer.name} wants to connect to your wallet.`
     : pay
-      ? 'Arxswap wants to send from Account 01.'
-      : 'Arxswap wants to connect to your wallet.';
+      ? 'This dapp wants to send from Account 01.'
+      : 'This dapp wants to connect to your wallet.';
   const close = () => {
     if (live?.app) {
       void live.rejectWc().finally(() => go('home', false));
@@ -148,41 +209,104 @@ function Request({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   );
 }
 
-function Connected({ back, go }: { back: () => void; go: Go }) {
+function Connected({ back }: { back: () => void; go: Go }) {
   const live = useLiveFrame();
-  const [arxswap, setArxswap] = useState(true);
-  const sessions = live?.app ? live.wcSessions : arxswap ? [{ name: 'Arxswap', url: 'app.arxswap.io', topic: 'demo' }] : [];
+  const sessions = live?.app ? live.wcSessions : [];
+  const [uri, setUri] = useState('');
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function pair(raw?: string) {
+    const value = (raw ?? uri).trim();
+    if (!live?.app) {
+      setNote('Open this wallet on your phone to connect apps.');
+      return;
+    }
+    if (!value.startsWith('wc:')) {
+      setNote('Paste a WalletConnect link from the dapp (starts with wc:).');
+      return;
+    }
+    setBusy(true);
+    setNote('Connecting…');
+    try {
+      await live.pairWc(value);
+      setUri('');
+      setNote('Approve the connection when the dapp asks.');
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Could not connect that app.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function scan() {
+    if (!live?.scanQr) {
+      setNote('Camera scan is not available here.');
+      return;
+    }
+    try {
+      const raw = await live.scanQr();
+      const value = raw.trim();
+      setUri(value);
+      if (value.startsWith('wc:')) await pair(value);
+      else setNote('That QR is not a WalletConnect link.');
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : 'Could not scan.');
+    }
+  }
+
+  const noteColor = note && (note.includes('Approve') || note.includes('Connecting')) ? '#accafe' : '#f25252';
+
   return (
     <Screen clock="ready">
-      <button type="button" onClick={back} aria-label="Back" style={{ position: 'absolute', left: 18, top: 56, width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+      <button type="button" onClick={back} aria-label="Back" style={{ position: 'absolute', left: 18, top: 56, width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', zIndex: 2 }}>
         <img src={art('chev.svg')} alt="" width={20} height={20} />
       </button>
-      <h1 style={{ position: 'absolute', left: 24, top: 106, margin: 0, fontSize: 30, fontWeight: 700 }}>Connected apps</h1>
-      <p style={{ position: 'absolute', left: 24, top: 152, width: 336, margin: 0, color: '#8c8f96', fontSize: 15, lineHeight: '22px' }}>
-        Apps that can see your address and ask you to approve transactions.
-      </p>
-      <div style={{ position: 'absolute', left: 18, top: 222, width: 354, background: '#1c2126', border: '1px solid #293347', borderRadius: 16, overflow: 'hidden' }}>
-        {sessions.map((row, index) => (
-          <div key={row.topic}>
-            {index > 0 && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
-            <AppRow
-              mark={(row.name[0] || 'A').toUpperCase()}
-              title={row.name}
-              detail={`${row.url.replace(/^https?:\/\//, '') || 'WalletConnect'} · Connected`}
-              action="Disconnect"
-              danger
-              onAction={() => {
-                if (live?.app) void live.disconnectWc(row.topic);
-                else setArxswap(false);
-              }}
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 100, bottom: 0, overflowY: 'auto', padding: '0 18px 32px', boxSizing: 'border-box' }}>
+        <h1 style={{ margin: '6px 6px 0', fontSize: 30, fontWeight: 700 }}>Connected apps</h1>
+        <p style={{ margin: '10px 6px 18px', width: 336, color: '#8c8f96', fontSize: 15, lineHeight: '22px' }}>
+          Apps that can see your address and ask you to approve transactions.
+        </p>
+        <div style={{ width: '100%', background: '#1c2126', border: '1px solid #293347', borderRadius: 16, overflow: 'hidden' }}>
+          {sessions.length === 0 ? (
+            <p style={{ margin: 0, padding: '22px 16px', color: '#8b9097', fontSize: 14, lineHeight: 1.4 }}>
+              No apps connected. Open a dapp from Explore, then paste or scan its WalletConnect link here.
+            </p>
+          ) : sessions.map((row, index) => (
+            <div key={row.topic}>
+              {index > 0 && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
+              <AppRow
+                mark={(row.name[0] || 'A').toUpperCase()}
+                title={row.name}
+                detail={`${row.url.replace(/^https?:\/\//, '') || 'WalletConnect'} · Connected`}
+                action="Disconnect"
+                danger
+                onAction={() => { void live?.disconnectWc(row.topic); }}
+              />
+            </div>
+          ))}
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <label style={{ height: 52, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', padding: '0 10px 0 14px', gap: 8 }}>
+            <input
+              value={uri}
+              onChange={(e) => { setUri(e.target.value); setNote(null); }}
+              placeholder="Paste wc: link from a dapp"
+              aria-label="WalletConnect link"
+              style={{ flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 14 }}
             />
-          </div>
-        ))}
-        {sessions.length > 0 && <div style={{ height: 1, margin: '0 16px', background: '#293347' }} />}
-        <AppRow mark="M" title="Arxon Mining" detail="Extension · Wallet access" action="Manage" onAction={() => go('mine-entry')} />
-      </div>
-      <div style={{ position: 'absolute', left: 18, top: sessions.length ? 388 : 316, width: 354, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '14px 16px', color: '#8b9097', fontSize: 13 }}>
-        Disconnecting stops an app from seeing your address. You can connect it again later.
+            <button type="button" onClick={() => void scan()} aria-label="Scan WalletConnect QR" style={iconBtn}>
+              <img src="/wallet-figma/send/scan.svg" alt="" width={20} height={20} />
+            </button>
+          </label>
+          <button type="button" disabled={busy} onClick={() => void pair()} style={{ width: '100%', minHeight: 48, marginTop: 10, border: 'none', borderRadius: 12, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>
+            {busy ? 'Connecting...' : 'Connect app'}
+          </button>
+          {note ? <p style={{ margin: '10px 4px 0', fontSize: 13, color: noteColor }}>{note}</p> : null}
+          <p style={{ margin: '12px 4px 0', color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>
+            Disconnecting stops an app from seeing your address. You can connect it again later.
+          </p>
+        </div>
       </div>
     </Screen>
   );
@@ -196,7 +320,7 @@ function AppRow({ mark, title, detail, action, danger, onAction }: { mark: strin
         <span style={{ display: 'block', fontWeight: 600, fontSize: 15 }}>{title}</span>
         <span style={{ display: 'block', marginTop: 2, color: '#8c8f96', fontSize: 12 }}>{detail}</span>
       </span>
-      <button type="button" onClick={onAction} style={{ border: 'none', background: 'transparent', color: danger ? '#f55c5c' : '#abc9ff', fontFamily: font.sans, fontWeight: 600, fontSize: 13, cursor: onAction ? 'pointer' : 'default' }}>{action}</button>
+      <button type="button" onClick={onAction} style={{ minHeight: 40, minWidth: 72, border: 'none', background: 'transparent', color: danger ? '#f55c5c' : '#abc9ff', fontFamily: font.sans, fontWeight: 600, fontSize: 13, cursor: onAction ? 'pointer' : 'default' }}>{action}</button>
     </div>
   );
 }
@@ -245,6 +369,7 @@ function Screen({ children, clock = 'flow' }: { children: ReactNode; clock?: 'fl
 }
 
 const center: CSSProperties = { position: 'absolute', margin: 0, textAlign: 'center', fontWeight: 400, lineHeight: 'normal' };
-const iconBtn: CSSProperties = { width: 20, height: 20, padding: 0, border: 'none', background: 'none', cursor: 'pointer' };
+const iconBtn: CSSProperties = { width: 40, height: 40, margin: -10, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const unlockBtn: CSSProperties = { position: 'absolute', left: 19, width: 353, height: 55, borderRadius: 8, fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: 'pointer' };
+const bioChip: CSSProperties = { height: 48, borderRadius: 12, border: '1.5px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 0 };
 const pair: CSSProperties = { position: 'absolute', top: 463, width: 171, height: 55, borderRadius: 8, fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: 'pointer' };

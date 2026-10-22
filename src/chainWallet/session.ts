@@ -52,8 +52,16 @@ export const sessionStore = {
     else localStorage.setItem('arxon.setupPath', value);
   },
 
+  importedOk: () => sessionStorage.getItem('arxon.importedOk') === '1',
+  markImported: () => sessionStorage.setItem('arxon.importedOk', '1'),
+  clearImported: () => sessionStorage.removeItem('arxon.importedOk'),
+
   biometrics: () => localStorage.getItem('arxon.biometrics') === '1',
   setBiometrics: (on: boolean) => localStorage.setItem('arxon.biometrics', on ? '1' : '0'),
+  bioFinger: () => localStorage.getItem('arxon.bio.finger') === '1',
+  setBioFinger: (on: boolean) => localStorage.setItem('arxon.bio.finger', on ? '1' : '0'),
+  bioFace: () => localStorage.getItem('arxon.bio.face') === '1',
+  setBioFace: (on: boolean) => localStorage.setItem('arxon.bio.face', on ? '1' : '0'),
 
   vaultLock: () => localStorage.getItem('arxon.vaultLock') !== '0',
   setVaultLock: (on: boolean) => localStorage.setItem('arxon.vaultLock', on ? '1' : '0'),
@@ -112,6 +120,14 @@ export async function setUnlockPassword(password: string) {
   if (mnemonic) {
     sessionStore.setBox(await sealSecret(password, mnemonic));
     await storage.clearMnemonic();
+  }
+  if (sessionStore.biometrics()) {
+    try {
+      const { saveBiometricSecret } = await import('./biometrics');
+      await saveBiometricSecret(password);
+    } catch {
+      /* keystore save is best-effort */
+    }
   }
 }
 

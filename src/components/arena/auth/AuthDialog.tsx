@@ -68,8 +68,8 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
   }, [initialReferralCode]);
 
   useEffect(() => {
-    invalidateCaptcha();
-  }, [mode, invalidateCaptcha]);
+    setCaptchaToken(null);
+  }, [mode]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,7 +395,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
               </div>
 
               <TurnstileWidget
-                key={`forgot-${captchaResetKey}`}
+                key="forgot"
                 action="forgot"
                 resetKey={captchaResetKey}
                 onVerify={setCaptchaToken}
@@ -513,7 +513,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
 
               {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
               <TurnstileWidget
-                key={`${mode}-${captchaResetKey}`}
+                key={mode}
                 action={mode}
                 resetKey={captchaResetKey}
                 onVerify={setCaptchaToken}

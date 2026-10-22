@@ -1,163 +1,281 @@
-import { useAppHidesFigmaChrome } from './appChrome';
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
-import { hasClaimed } from './ClaimScreens';
+import { SCAN_URL } from '@/chainWallet/chain';
 import { tabTarget, vaultEntry } from './VaultScreens';
-import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { pickWalletTab, useWalletNetwork, WALLET_TAB_CLEAR, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
+import { openExternal } from './openExternal';
+import { hostOf, readBrowseHistory, recordBrowseVisit, toBrowseUrl } from './browseHistory';
+import { usePullRefresh } from './pullRefresh';
+import { subscribeInAppBrowse } from './inAppBrowse';
 
 const art = (name: string) => `/wallet-figma/explore/${name}`;
 const SCREENS = new Set(['explore', 'dapps', 'arxswap']);
 type Go = (id: string, remember?: boolean) => void;
-type App = { name: string; letter: string; category: string; line: string; blurb: string; detail?: boolean };
+type Section = 'all' | 'browser' | 'dapps' | 'tools';
 
-const APPS: App[] = [
-  { name: 'Arxswap', letter: 'S', category: 'Trade', line: 'Trade · app.arxswap.io', blurb: 'Swap and trade', detail: true },
-  { name: 'Arxlend', letter: 'L', category: 'Lend', line: 'Lend · app.arxlend.io', blurb: 'Lend and borrow' },
-  { name: 'Arxmarket', letter: 'M', category: 'Market', line: 'Market · app.arxmarket.io', blurb: 'Buy and sell' },
-  { name: 'Arxbridge', letter: 'B', category: 'Trade', line: 'Trade · app.arxbridge.io', blurb: 'Bridge tokens' },
+type Dapp = { name: string; url: string; category: string; chain: string; blurb: string; letter: string; color: string };
+
+const DAPPS: Dapp[] = [
+  { name: 'Uniswap', url: 'https://app.uniswap.org', category: 'Trade', chain: 'Ethereum', blurb: 'Swap on Ethereum', letter: 'U', color: '#ff007a' },
+  { name: 'Jupiter', url: 'https://jup.ag', category: 'Trade', chain: 'Solana', blurb: 'Swap on Solana', letter: 'J', color: '#00d18c' },
+  { name: '1inch', url: 'https://app.1inch.io', category: 'Trade', chain: 'Ethereum', blurb: 'Aggregator', letter: '1', color: '#94a6c4' },
+  { name: 'Raydium', url: 'https://raydium.io/swap/', category: 'Trade', chain: 'Solana', blurb: 'Swap on Solana', letter: 'R', color: '#22d1ee' },
+  { name: 'Aave', url: 'https://app.aave.com', category: 'Lend', chain: 'Ethereum', blurb: 'Lend and borrow', letter: 'A', color: '#b6509e' },
+  { name: 'Lido', url: 'https://stake.lido.fi', category: 'Stake', chain: 'Ethereum', blurb: 'Stake ETH', letter: 'L', color: '#00a3ff' },
+  { name: 'OpenSea', url: 'https://opensea.io', category: 'Market', chain: 'Ethereum', blurb: 'NFTs and markets', letter: 'O', color: '#2081e2' },
+  { name: 'Magic Eden', url: 'https://magiceden.io', category: 'Market', chain: 'Solana', blurb: 'NFTs on Solana', letter: 'M', color: '#e42575' },
 ];
-const CHIPS = ['All', 'Trade', 'Lend', 'Market'];
+
+const EXPLORERS = [
+  { name: 'Etherscan', url: 'https://etherscan.io', chain: 'Ethereum' },
+  { name: 'Solscan', url: 'https://solscan.io', chain: 'Solana' },
+  { name: 'Mempool', url: 'https://mempool.space', chain: 'Bitcoin' },
+  { name: 'Arxon Scan', url: SCAN_URL, chain: 'Arxon Testnet' },
+];
+
+const TABS: { id: Section; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'browser', label: 'Browser' },
+  { id: 'dapps', label: 'dApps' },
+  { id: 'tools', label: 'Tools' },
+];
 
 export function isExploreScreen(id: string) {
   return SCREENS.has(id);
 }
 
+async function openSite(title: string, url: string) {
+  recordBrowseVisit(title, url);
+  await openExternal(url);
+}
+
 export function ExploreScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
-  const live = useLiveFrame();
-  const [chip, setChip] = useState('All');
-  const [soon, setSoon] = useState<string | null>(null);
   const leave = (fallback: string) => (back ? back() : go(fallback, false));
-  const connect = (app: App) => {
-    if (live?.app && !live.wcKind) {
-      setSoon(app.name);
-      return;
-    }
-    go('dapp');
-  };
-  const open = (app: App) => (app.detail ? go('arxswap') : connect(app));
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      <style>{`.dapp-row{overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-ms-overflow-style:none}.dapp-row::-webkit-scrollbar{display:none;width:0;height:0}`}</style>
-      {id === 'explore' && <Explore go={go} open={open} soon={soon} />}
-      {id === 'dapps' && <Dapps chip={chip} setChip={setChip} onBack={() => leave('explore')} open={open} soon={soon} />}
-      {id === 'arxswap' && <Detail onBack={() => leave('dapps')} onConnect={() => connect(APPS[0])} soon={soon === APPS[0].name} />}
+      {id === 'dapps' ? <DappList onBack={() => leave('explore')} /> : <Explore go={go} />}
     </div>
   );
 }
 
-function Explore({ go, open, soon }: { go: Go; open: (app: App) => void; soon: string | null }) {
+function Explore({ go }: { go: Go }) {
   const live = useLiveFrame();
-  const tools: [string, string, string, string][] = [
-    ['claim.svg', 'Claim ARX', 'Claim your ARX-P allocation', 'claim'],
-    ['buy.svg', 'Buy', 'Buy crypto with a card', 'buy'],
-    ['codes.svg', 'Disclosure codes', 'Prove a private payment on request', 'code-log'],
-    ['apps.svg', 'Connected apps', 'Apps that can access your wallet', 'connected'],
-  ];
-  const net = useWalletNetwork();
-  const rows = tools.filter((row) => (row[3] !== 'claim' || !hasClaimed()) && (row[3] !== 'code-log' || net === 'testnet'));
+  const [query, setQuery] = useState('');
+  const [section, setSection] = useState<Section>('all');
+  const [visits, setVisits] = useState(readBrowseHistory);
+  const [notice, setNotice] = useState<string | null>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  const refresh = async () => {
+    await live?.refresh?.();
+    setVisits(readBrowseHistory());
+  };
+  const pull = usePullRefresh(refresh);
+  useEffect(() => {
+    scroller.current && (scroller.current.scrollTop = 0);
+  }, [section]);
+  useEffect(() => subscribeInAppBrowse((open) => {
+    if (!open) setVisits(readBrowseHistory());
+  }), []);
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    const url = toBrowseUrl(query);
+    if (!url) {
+      setNotice('Enter a site or search.');
+      return;
+    }
+    setNotice(null);
+    void openSite(query.trim(), url);
+    setVisits(readBrowseHistory());
+  };
+
+  const connected = live?.app ? live.wcSessions.length : 0;
+  const show = (which: Section) => section === 'all' || section === which;
+  const headTop = live?.app ? 72 : 44;
+
   return (
     <>
       <PhoneStatus />
-      <p style={{ position: 'absolute', left: 18, top: 64, margin: 0, fontSize: 26, fontWeight: 700 }}>Explore</p>
-      <p style={{ position: 'absolute', left: 18, top: 106, margin: 0, fontSize: 13, color: '#8c8f99' }}>Tools and apps for your wallet</p>
-      <button type="button" onClick={() => go('mine-entry')} style={{ position: 'absolute', left: 18, top: 140, width: 354, height: 84, border: 'none', borderRadius: 16, background: '#1c2126', color: '#fff', fontFamily: font.sans, textAlign: 'left', cursor: 'pointer', padding: 0 }}>
-        <span style={{ position: 'absolute', left: 18, top: 22, width: 40, height: 40, borderRadius: 20, background: 'rgba(172,202,254,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FigmaImg src={art('bolt.svg')} width={20} height={20} />
-        </span>
-        <span style={{ position: 'absolute', left: 70, top: 21, fontSize: 15, fontWeight: 600 }}>Arxon Mining</span>
-        <span style={{ position: 'absolute', left: 70, top: 43, fontSize: 12.5, color: '#8c8f99' }}>{live?.app ? 'Earn ARX-P in the mining app' : 'Mine ARX in your wallet'}</span>
-        <span style={{ position: 'absolute', left: 255, top: 29, width: 81, height: 26, borderRadius: 13, background: 'rgba(172,202,254,0.16)', color: '#accafe', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Extension</span>
-      </button>
-      <p style={section}>DAPPS</p>
-      <button type="button" onClick={() => go('dapps')} style={{ position: 'absolute', left: 330, top: 244, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 500, cursor: 'pointer', padding: 0 }}>See all</button>
-      <div className="dapp-row" style={{ position: 'absolute', left: 0, top: 268, width: 390, height: 120 }}>
-        <div style={{ display: 'flex', gap: 12, padding: '0 18px', width: 'max-content' }}>
-          {APPS.slice(0, 3).map((app) => (
-            <button key={app.name} type="button" onClick={() => open(app)} style={dappCard}>
-              <span style={avatar}><span style={{ color: '#accafe', fontSize: 18, fontWeight: 700 }}>{app.letter}</span></span>
-              <span style={{ display: 'block', marginTop: 12, fontSize: 15, fontWeight: 600 }}>{app.name}</span>
-              <span style={{ display: 'block', marginTop: 2, fontSize: 12.5, color: '#8c8f99' }}>{soon === app.name ? 'Coming soon' : app.blurb}</span>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: headTop, padding: '8px 18px 0', boxSizing: 'border-box', background: '#050505', zIndex: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>Explore</p>
+          <button type="button" aria-label="Refresh" onClick={() => void refresh()} style={iconRound}>
+            <RefreshMark spinning={pull.busy} />
+          </button>
+        </div>
+        <form onSubmit={submit} style={searchBox}>
+          <FigmaImg src={art('apps.svg')} width={18} height={18} />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search or enter a site"
+            aria-label="Search or enter a site"
+            style={searchInput}
+          />
+          <button type="submit" style={goBtn}>Open</button>
+        </form>
+        {notice ? <p style={{ margin: '8px 0 0', fontSize: 12, color: '#fabf33' }}>{notice}</p> : null}
+        <div role="tablist" aria-label="Explore sections" style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '12px 0 8px', paddingBottom: 2, width: '100%', maxWidth: '100%', minWidth: 0 }}>
+          {TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={section === tab.id}
+              onClick={() => setSection(tab.id)}
+              style={{
+                ...chip,
+                background: section === tab.id ? '#accafe' : '#1c2025',
+                color: section === tab.id ? '#0c1018' : '#fff',
+              }}
+            >
+              {tab.label}
             </button>
           ))}
         </div>
       </div>
-      <p style={{ ...section, top: 412 }}>WALLET TOOLS</p>
-      <div style={{ position: 'absolute', left: 18, top: 434, width: 354, background: '#1c2126', borderRadius: 16, overflow: 'hidden' }}>
-        {rows.map(([icon, title, sub, target], index) => (
-          <button key={title} type="button" onClick={() => go(target)} style={{ position: 'relative', width: '100%', height: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, textAlign: 'left', cursor: 'pointer', padding: 0 }}>
-            {index > 0 && <span style={{ position: 'absolute', left: 66, top: 0, width: 288, height: 1, background: '#29333d' }} />}
-            <span style={{ position: 'absolute', left: 14, top: 12, width: 40, height: 40, borderRadius: 20, background: '#293342', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <FigmaImg src={art(icon)} width={20} height={20} />
-            </span>
-            <span style={{ position: 'absolute', left: 66, top: 13, fontSize: 15, fontWeight: 600 }}>{title}</span>
-            <span style={{ position: 'absolute', left: 66, top: 34, fontSize: 12.5, color: '#8c8f99' }}>{sub}</span>
-            <span style={{ position: 'absolute', left: 320, top: 22 }}><FigmaImg src={art('chev.svg')} width={20} height={20} /></span>
-          </button>
-        ))}
+      <div
+        ref={scroller}
+        style={{ position: 'absolute', left: 0, right: 0, top: headTop + (notice ? 196 : 176), bottom: WALLET_TAB_CLEAR, overflowX: 'hidden', overflowY: 'auto', padding: '4px 18px 24px', boxSizing: 'border-box' }}
+        onTouchStart={pull.onTouchStart}
+        onTouchMove={pull.onTouchMove}
+        onTouchEnd={pull.onTouchEnd}
+      >
+        {pull.pull > 8 || pull.busy ? (
+          <p style={{ margin: '0 0 8px', textAlign: 'center', fontSize: 12, color: '#accafe' }}>
+            {pull.busy ? 'Refreshing…' : 'Release to refresh'}
+          </p>
+        ) : null}
+
+        {show('browser') ? (
+          <Section first label="RECENT">
+            {visits.length > 0 ? (
+              <div style={card}>
+                {visits.slice(0, 8).map((visit, index) => (
+                  <button key={visit.url + visit.at} type="button" onClick={() => void openSite(visit.title, visit.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+                    <span style={{ ...mark, background: '#293347' }}>{(hostOf(visit.url)[0] || 'A').toUpperCase()}</span>
+                    <span style={copy}>
+                      <span style={title}>{visit.title}</span>
+                      <span style={sub}>{hostOf(visit.url)}</span>
+                    </span>
+                    <span style={openMark}>Open</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p style={{ margin: 0, padding: '16px 14px', fontSize: 13, color: '#8b9097', lineHeight: 1.35, background: '#1c2126', borderRadius: 16, minHeight: 0 }}>
+                Sites you open in Arxon show up here.
+              </p>
+            )}
+            <p style={kicker}>EXPLORERS</p>
+            <div style={card}>
+              {EXPLORERS.map((rowItem, index) => (
+                <button key={rowItem.url} type="button" onClick={() => void openSite(rowItem.name, rowItem.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+                  <span style={{ ...mark, background: '#2a3447' }}>{rowItem.name.slice(0, 1)}</span>
+                  <span style={copy}>
+                    <span style={title}>{rowItem.name}</span>
+                    <span style={sub}>{rowItem.chain} · {hostOf(rowItem.url)}</span>
+                  </span>
+                  <span style={openMark}>Open</span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
+        {show('dapps') ? (
+          <Section
+            first={!show('browser')}
+            label="DAPPS"
+            extra={section === 'dapps' ? null : <button type="button" onClick={() => go('dapps')} style={seeAll}>See all</button>}
+          >
+            <div style={card}>
+              {(section === 'dapps' ? DAPPS : DAPPS.slice(0, 6)).map((app, index) => (
+                <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+                  <span style={{ ...mark, background: app.color }}>{app.letter}</span>
+                  <span style={copy}>
+                    <span style={title}>{app.name}</span>
+                    <span style={sub}>{app.chain} · {app.blurb}</span>
+                  </span>
+                  <span style={openMark}>Open</span>
+                </button>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+
+        {show('tools') ? (
+          <Section first={!show('browser') && !show('dapps')} label="WALLET TOOLS">
+            <div style={card}>
+              <button type="button" onClick={() => go('buy')} style={row}>
+                <span style={{ ...mark, background: '#293342' }}><FigmaImg src={art('buy.svg')} width={18} height={18} /></span>
+                <span style={copy}>
+                  <span style={title}>Buy crypto</span>
+                  <span style={sub}>Buy with a card in your local currency</span>
+                </span>
+                <FigmaImg src={art('chev.svg')} width={18} height={18} />
+              </button>
+              <button type="button" onClick={() => go('connected')} style={{ ...row, borderTop: '1px solid #29333d' }}>
+                <span style={{ ...mark, background: '#293342' }}><FigmaImg src={art('apps.svg')} width={18} height={18} /></span>
+                <span style={copy}>
+                  <span style={title}>Connected apps</span>
+                  <span style={sub}>{live?.app ? (connected ? `${connected} connected` : 'None connected') : 'Manage WalletConnect sessions'}</span>
+                </span>
+                <FigmaImg src={art('chev.svg')} width={18} height={18} />
+              </button>
+              <div style={{ ...row, borderTop: '1px solid #29333d', cursor: 'default' }}>
+                <span style={{ ...mark, background: '#293342' }}>P</span>
+                <span style={copy}>
+                  <span style={title}>Partners</span>
+                  <span style={sub}>On-ramps and tools we add with partners</span>
+                </span>
+                <span style={{ color: '#5c5f64', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Soon</span>
+              </div>
+            </div>
+          </Section>
+        ) : null}
       </div>
       <Tabs go={go} />
     </>
   );
 }
 
-function Dapps({ chip, setChip, onBack, open, soon }: { chip: string; setChip: (v: string) => void; onBack: () => void; open: (app: App) => void; soon: string | null }) {
-  const rows = APPS.filter((app) => chip === 'All' || app.category === chip);
+function Section({ first, label, extra, children }: { first?: boolean; label: string; extra?: ReactNode; children: ReactNode }) {
   return (
-    <>
-      <NoteStatus />
-      <Back onClick={onBack} />
-      <p style={headline}>dApps</p>
-      <p style={lead}>Apps you can connect to your wallet.</p>
-      <div className="dapp-row" style={{ position: 'absolute', left: 18, top: 190, display: 'flex', gap: 10, maxWidth: 354, overflowX: 'auto' }}>
-        {CHIPS.map((label) => (
-          <button key={label} type="button" onClick={() => setChip(label)} style={{ height: 36, padding: '0 18px', borderRadius: 18, border: 'none', background: chip === label ? '#accafe' : '#1c2025', color: chip === label ? '#0c1018' : '#8b9097', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer' }}>{label}</button>
-        ))}
+    <div style={{ marginTop: first ? 0 : 10, width: '100%', maxWidth: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 28, minHeight: 28, maxHeight: 28, margin: '0 4px 6px' }}>
+        <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#5c5f64', letterSpacing: 0.6 }}>{label}</p>
+        {extra}
       </div>
-      <div style={{ position: 'absolute', left: 18, top: 246, width: 354, background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, overflow: 'hidden' }}>
-        {rows.map((app, index) => (
-          <button key={app.name} type="button" onClick={() => open(app)} style={{ position: 'relative', width: '100%', height: 72, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, textAlign: 'left', cursor: 'pointer', padding: 0 }}>
-            {index > 0 && <span style={{ position: 'absolute', left: 16, top: 0, width: 320, height: 1, background: '#2a3447' }} />}
-            <span style={{ position: 'absolute', left: 16, top: 16, width: 40, height: 40, borderRadius: 20, background: 'rgba(172,202,254,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#accafe', fontSize: 16, fontWeight: 700 }}>{app.letter}</span>
-            <span style={{ position: 'absolute', left: 68, top: 16, fontSize: 15, fontWeight: 600 }}>{app.name}</span>
-            <span style={{ position: 'absolute', left: 68, top: 38, fontSize: 13, color: '#8b9097' }}>{app.line}</span>
-            <span style={{ position: 'absolute', right: 16, top: 26, color: '#accafe', fontSize: 14, fontWeight: 600 }}>{soon === app.name ? 'Coming soon' : 'Connect'}</span>
-          </button>
-        ))}
-      </div>
-      <p style={{ position: 'absolute', left: 18, top: 556, width: 354, boxSizing: 'border-box', margin: 0, background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '15px 17px', color: '#8b9097', fontSize: 13, lineHeight: 1.35 }}>You decide what each app can see. Every request asks for your approval.</p>
-    </>
+      {children}
+    </div>
   );
 }
 
-function Detail({ onBack, onConnect, soon }: { onBack: () => void; onConnect: () => void; soon: boolean }) {
-  const rows = [
-    ['See your public address', '/wallet-figma/home/eye.svg', 22],
-    ['Ask you to approve transactions', '/wallet-figma/buy/check.svg', 20],
-    ['Balances stay hidden in Private mode', '/wallet-figma/privacy/shield.svg', 22],
-  ] as const;
+function DappList({ onBack }: { onBack: () => void }) {
   return (
     <>
       <NoteStatus />
       <Back onClick={onBack} />
-      <span style={{ position: 'absolute', left: 24, top: 112, width: 64, height: 64, borderRadius: 32, background: 'rgba(172,202,254,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#accafe', fontSize: 26, fontWeight: 700 }}>S</span>
-      <p style={{ position: 'absolute', left: 24, top: 192, margin: 0, fontSize: 26, fontWeight: 700 }}>Arxswap</p>
-      <p style={{ position: 'absolute', left: 24, top: 232, margin: 0, fontSize: 14, color: '#8b9097' }}>app.arxswap.io</p>
-      <span style={{ position: 'absolute', left: 24, top: 262, height: 26, padding: '0 12px', borderRadius: 13, background: 'rgba(172,202,254,0.16)', color: '#accafe', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center' }}>Trade</span>
-      <p style={{ position: 'absolute', left: 24, top: 308, width: 342, margin: 0, fontSize: 15, lineHeight: 1.4 }}>Swap tokens from inside the app. When you connect, it can see your public address and ask you to approve transactions.</p>
-      <p style={{ position: 'absolute', left: 22, top: 392, margin: 0, fontSize: 12, fontWeight: 600, color: '#5c5f64' }}>WHEN YOU CONNECT</p>
-      <div style={{ position: 'absolute', left: 18, top: 416, width: 354, background: '#1c2025', borderRadius: 16 }}>
-        {rows.map(([label, icon, size], index) => (
-          <div key={label} style={{ position: 'relative', height: 56, display: 'flex', alignItems: 'center', gap: 16, padding: '0 18px' }}>
-            {index > 0 && <span style={{ position: 'absolute', left: 18, top: 0, width: 318, height: 1, background: '#29333d' }} />}
-            <FigmaImg src={icon} width={size} height={size} />
-            <span style={{ fontSize: 14 }}>{label}</span>
-          </div>
-        ))}
+      <p style={{ position: 'absolute', left: 24, top: 106, margin: 0, fontSize: 30, fontWeight: 700 }}>dApps</p>
+      <p style={{ position: 'absolute', left: 24, top: 152, margin: 0, width: 336, color: '#8b9097', fontSize: 15 }}>Working sites for the chains in this wallet.</p>
+      <div style={{ position: 'absolute', left: 18, top: 200, width: 354, bottom: 24, overflowX: 'hidden', overflowY: 'auto' }}>
+        <div style={card}>
+          {DAPPS.map((app, index) => (
+            <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+              <span style={{ ...mark, background: app.color }}>{app.letter}</span>
+              <span style={copy}>
+                <span style={title}>{app.name}</span>
+                <span style={sub}>{hostOf(app.url)} · {app.chain}</span>
+              </span>
+              <span style={openMark}>Open</span>
+            </button>
+          ))}
+        </div>
       </div>
-      <p style={{ position: 'absolute', left: 18, top: 604, width: 354, boxSizing: 'border-box', margin: 0, background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '15px 17px', color: '#8b9097', fontSize: 13, lineHeight: 1.35 }}>Only connect to apps you trust. You can disconnect any time in Connected apps.</p>
-      <button type="button" onClick={onConnect} style={{ position: 'absolute', left: 18, top: 727, width: 354, height: 55, border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>{soon ? 'Coming soon' : 'Connect'}</button>
     </>
   );
 }
@@ -187,6 +305,15 @@ function Back({ onClick }: { onClick: () => void }) {
   );
 }
 
+function RefreshMark({ spinning }: { spinning: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style={{ transform: spinning ? 'rotate(180deg)' : undefined, transition: 'transform 0.3s linear' }}>
+      <path d="M14.5 9A5.5 5.5 0 1 1 9 3.5" fill="none" stroke="#accafe" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9 1.5v4h3.4" fill="none" stroke="#accafe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function NoteStatus() {
   const hide = useAppHidesFigmaChrome();
   if (hide) return null;
@@ -209,8 +336,17 @@ function PhoneStatus() {
   );
 }
 
-const section: CSSProperties = { position: 'absolute', left: 22, top: 244, margin: 0, fontSize: 12, fontWeight: 600, color: '#5c5f64' };
-const dappCard: CSSProperties = { width: 160, height: 120, flexShrink: 0, border: 'none', borderRadius: 16, background: '#1c2126', color: '#fff', fontFamily: font.sans, textAlign: 'left', cursor: 'pointer', padding: 14 };
-const avatar: CSSProperties = { width: 44, height: 44, borderRadius: 22, background: 'rgba(172,202,254,0.16)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const headline: CSSProperties = { position: 'absolute', left: 24, top: 106, margin: 0, fontSize: 30, fontWeight: 700 };
-const lead: CSSProperties = { position: 'absolute', left: 24, top: 152, margin: 0, width: 336, color: '#8b9097', fontSize: 15 };
+const kicker: CSSProperties = { margin: '12px 4px 8px', fontSize: 12, fontWeight: 600, color: '#5c5f64', letterSpacing: 0.6 };
+const card: CSSProperties = { width: '100%', maxWidth: '100%', background: '#1c2126', borderRadius: 16, overflow: 'hidden', height: 'auto' };
+const row: CSSProperties = { width: '100%', height: 64, minHeight: 64, maxHeight: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' };
+const mark: CSSProperties = { width: 40, height: 40, borderRadius: 20, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, flexShrink: 0 };
+const copy: CSSProperties = { flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden' };
+const title: CSSProperties = { display: 'block', fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+const sub: CSSProperties = { display: 'block', marginTop: 2, fontSize: 12, color: '#8c8f99', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+const openMark: CSSProperties = { color: '#accafe', fontSize: 13, fontWeight: 600, flexShrink: 0 };
+const searchBox: CSSProperties = { height: 48, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px', width: '100%', maxWidth: '100%' };
+const searchInput: CSSProperties = { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 };
+const goBtn: CSSProperties = { minHeight: 36, minWidth: 56, border: 'none', borderRadius: 10, background: '#2a3447', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 };
+const iconRound: CSSProperties = { width: 40, height: 40, border: 'none', borderRadius: 20, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 };
+const seeAll: CSSProperties = { border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 500, cursor: 'pointer', minHeight: 28, padding: '0 4px' };
+const chip: CSSProperties = { flexShrink: 0, height: 36, minHeight: 36, padding: '0 14px', border: 'none', borderRadius: 18, fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer' };

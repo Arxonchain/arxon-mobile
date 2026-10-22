@@ -39,3 +39,39 @@ export function hiddenCount(flags: PrivacyFlags) {
 export function privacyPill(flags: PrivacyFlags) {
   return `Custom · ${hiddenCount(flags)} of 4 hidden`;
 }
+
+const UI = 'arxon.privacyUi';
+
+export type PrivacyUi = {
+  privateMode: boolean;
+  hideLaunch: boolean;
+  hideActivity: boolean;
+  shots: boolean;
+};
+
+const DEFAULT_UI: PrivacyUi = {
+  privateMode: true,
+  hideLaunch: true,
+  hideActivity: true,
+  shots: false,
+};
+
+export function readPrivacyUi(): PrivacyUi {
+  try {
+    const raw = localStorage.getItem(UI);
+    if (!raw) return { ...DEFAULT_UI };
+    const parsed = JSON.parse(raw) as Partial<PrivacyUi>;
+    return {
+      privateMode: parsed.privateMode !== false,
+      hideLaunch: parsed.hideLaunch !== false,
+      hideActivity: parsed.hideActivity !== false,
+      shots: !!parsed.shots,
+    };
+  } catch {
+    return { ...DEFAULT_UI };
+  }
+}
+
+export function writePrivacyUi(next: PrivacyUi) {
+  localStorage.setItem(UI, JSON.stringify(next));
+}

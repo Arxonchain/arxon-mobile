@@ -132,6 +132,7 @@ function Caution({
   onNext: () => void;
   onLater: () => void;
 }) {
+  const live = useLiveFrame();
   return (
     <Screen>
       <div style={{ position: 'absolute', left: 18, top: 58, display: 'flex', gap: 6 }}>
@@ -149,8 +150,8 @@ function Caution({
       <span style={{ position: 'absolute', left: 24, top: 410, background: '#accafe', color: '#0c1018', borderRadius: 14, padding: '5px 12px', fontWeight: 600, fontSize: 12 }}>Caution {step}/3</span>
       <h1 style={{ ...headline, top: 448, width: 342, fontSize: 28 }}>{title}</h1>
       <p style={{ ...copy, top: 530, width: 330, fontSize: 16 }}>{body}</p>
-      <button type="button" onClick={onNext} style={{ ...primary, top: 649 }}>{action}</button>
-      <button type="button" onClick={onLater} style={later}>Maybe later</button>
+      <button type="button" onClick={onNext} style={{ ...primary, top: live?.app ? 712 : 649 }}>{action}</button>
+      {live?.app ? null : <button type="button" onClick={onLater} style={later}>Maybe later</button>}
     </Screen>
   );
 }

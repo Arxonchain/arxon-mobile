@@ -94,6 +94,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
             go('send-who');
           }}
           leave={leave}
+          go={go}
         />
       )}
       {id === 'send-who' && (
@@ -129,7 +130,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   );
 }
 
-function PickToken({ query, setQuery, tokenId, note, onPick, leave }: { query: string; setQuery: (v: string) => void; tokenId: string; note?: string | null; onPick: (id: string) => void; leave: () => void }) {
+function PickToken({ query, setQuery, tokenId, note, onPick, leave, go }: { query: string; setQuery: (v: string) => void; tokenId: string; note?: string | null; onPick: (id: string) => void; leave: () => void; go: Go }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
   const q = query.trim().toLowerCase();
@@ -157,7 +158,21 @@ function PickToken({ query, setQuery, tokenId, note, onPick, leave }: { query: s
       </label>
       <p style={kicker(184)}>YOUR TOKENS</p>
       <div style={{ position: 'absolute', left: 16, top: 208, width: 358, background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, overflow: 'hidden' }}>
-        {rows.map((token, index) => (
+        {rows.length === 0 ? (
+          <div style={{ padding: '28px 18px', textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>No tokens on this network</p>
+            <p style={{ margin: '8px 0 16px', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>
+              {net === 'testnet' ? 'Add Arxon Testnet first. Tokens stay hidden until chain 7171 is on.' : 'Add an asset, then try send again.'}
+            </p>
+            <button
+              type="button"
+              onClick={() => (net === 'testnet' ? go('add-network') : leave())}
+              style={{ minHeight: 44, padding: '0 18px', border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {net === 'testnet' ? 'Add Arxon Testnet' : 'Back'}
+            </button>
+          </div>
+        ) : rows.map((token, index) => (
           <button key={token.id} type="button" onClick={() => onPick(token.id)} style={{ ...rowBtn, height: 76, borderTop: index ? '1px solid #2a3447' : 'none' }}>
             <TokenMark id={token.id} />
             <span style={{ flex: 1, textAlign: 'left' }}>
@@ -591,7 +606,7 @@ function rate(token: (typeof TOKENS)[number]) {
 const round: CSSProperties = { position: 'absolute', width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };
 const search: CSSProperties = { position: 'absolute', left: 16, width: 358, height: 52, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: '0 15px' };
 const input: CSSProperties = { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 };
-const iconBtn: CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' };
+const iconBtn: CSSProperties = { width: 40, height: 40, minWidth: 40, minHeight: 40, border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const kicker = (top: number): CSSProperties => ({ position: 'absolute', left: 24, top, margin: 0, fontSize: 12, fontWeight: 600, color: '#8b9097' });
 const rowBtn: CSSProperties = { width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '0 15px', border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, cursor: 'pointer', boxSizing: 'border-box' };
 const cardBtn: CSSProperties = { position: 'absolute', left: 16, width: 358, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: '0 15px', color: '#fff', fontFamily: font.sans, cursor: 'pointer' };

@@ -27,7 +27,7 @@ import {
 } from './ethereum';
 import { isWalletNetworkId, type EthereumToken, type WalletNetworkId } from './networks';
 import { relayUrl, submitRelayed } from './relay';
-import { newMnemonic, resolveAccount } from './keys';
+import { assertWalletSecret, newMnemonic, resolveAccount } from './keys';
 import {
   currentPassword,
   dropPlainSecretsIfEncrypted,
@@ -294,14 +294,18 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
 
   const importWallet = useCallback(async (phrase: string) => {
     const trimmed = phrase.trim().split(/\s+/).join(' ');
+    assertWalletSecret(trimmed, 'phrase');
     resolveAccount(trimmed, 0);
+    sessionStore.markImported();
     await persistWalletSecret(trimmed);
     setMnemonic(trimmed);
     setLocked(false);
   }, []);
 
   const importPrivateKey = useCallback(async (key: string) => {
+    assertWalletSecret(key, 'key');
     resolveAccount(key, 0);
+    sessionStore.markImported();
     await persistWalletSecret(key.trim());
     setMnemonic(key.trim());
     setLocked(false);
@@ -348,6 +352,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     sessionStore.clearSkBox();
     sessionStore.setPhraseVerified(false);
     sessionStore.setSetupPath(null);
+    sessionStore.clearImported();
     setLocked(false);
   }, []);
 

@@ -2,10 +2,11 @@ import { useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { rememberFromActivity, tabTarget, vaultEntry } from './VaultScreens';
-import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { pickWalletTab, useWalletNetwork, WALLET_TAB_CLEAR, WalletTabs } from './WalletTabs';
 import { useLiveFrame, type LiveActivity } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { explorerTxUrl, openExternal } from './openExternal';
+import { usePullRefresh } from './pullRefresh';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -118,7 +119,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
       ) : (
         <>
           <PhoneStatus />
-          <Header onFilter={openFilter} />
+          <Header onFilter={openFilter} onRefresh={() => void live?.refresh?.()} />
           {vaultList || none ? (
             <button type="button" onClick={clear} style={{ ...chip, position: 'absolute', left: 18, top: 122, background: '#accafe', color: '#0c1018', fontWeight: 600 }}>Vault moves  ✕</button>
           ) : (
@@ -131,7 +132,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
           {empty && <Empty title="No activity yet" body="Your sent, received and swapped transactions will show up here." action="Fund your wallet" onAction={() => go('receive')} />}
           {none && <Empty title="No Vault moves" body="Moves between Home and your Vault will show up here." action="Clear filter" onAction={clear} />}
           {filteredBlank && <Empty title="No activity yet" body="Nothing in this range. Try another date or token." action="Clear filter" onAction={clear} />}
-          {!empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash); }} />}
+          {!empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash); }} onRefresh={() => live?.refresh?.()} />}
           <Tabs go={go} here={empty ? 'activity-empty' : vaultList ? 'activity-filtered' : none ? 'activity-none' : 'activity'} />
           {showSheet && (
             <Filter draft={draft} setDraft={setDraft} onClose={leave} onReset={() => { setDraft({ type: 'All', token: 'All tokens', date: 'Any time' }); clear(); }} onApply={apply} />
@@ -171,18 +172,29 @@ function filterRows(type: string, token: string, date = 'Any time') {
   })).filter((group) => group.items.length);
 }
 
-function Header({ onFilter }: { onFilter: () => void }) {
+function Header({ onFilter, onRefresh }: { onFilter: () => void; onRefresh?: () => void }) {
   return (
     <div style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>Activity</p>
-      <button type="button" aria-label="Filter" onClick={onFilter} style={round}><FigmaImg src={art('filter.svg')} width={20} height={20} /></button>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {onRefresh ? (
+          <button type="button" aria-label="Refresh" onClick={onRefresh} style={round}>
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
+              <path d="M14.5 9A5.5 5.5 0 1 1 9 3.5" fill="none" stroke="#8c8f99" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M9 1.5v4h3.4" fill="none" stroke="#8c8f99" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        ) : null}
+        <button type="button" aria-label="Filter" onClick={onFilter} style={round}><FigmaImg src={art('filter.svg')} width={20} height={20} /></button>
+      </div>
     </div>
   );
 }
 
-function List({ groups, go, onOpen }: { groups: { day: string; items: (Row & { hash?: string })[] }[]; go: Go; onOpen?: (hash?: string) => void }) {
+function List({ groups, go, onOpen, onRefresh }: { groups: { day: string; items: (Row & { hash?: string })[] }[]; go: Go; onOpen?: (hash?: string) => void; onRefresh?: () => Promise<void> | void }) {
+  const pull = usePullRefresh(() => onRefresh?.());
   return (
-    <div style={{ position: 'absolute', left: 18, top: 176, width: 354, bottom: 110, overflow: 'auto' }}>
+    <div style={{ position: 'absolute', left: 18, top: 176, width: 354, bottom: WALLET_TAB_CLEAR, overflow: 'auto' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
       {groups.map((group) => (
         <div key={group.day}>
           <p style={{ margin: '6px 0 4px', fontSize: 13, fontWeight: 500, color: '#8b9097' }}>{group.day}</p>
@@ -318,7 +330,7 @@ function Filter({ draft, setDraft, onClose, onReset, onApply }: {
               {options.map((option) => {
                 const on = draft[key as 'type'] === option;
                 return (
-                  <button key={option} type="button" onClick={() => setDraft({ ...draft, [key]: option })} style={{ height: 34, padding: '0 14px', borderRadius: 16, border: on ? '1px solid #accafe' : '1px solid transparent', background: on ? '#2a3447' : '#1c2025', color: on ? '#accafe' : '#8b9097', fontFamily: font.sans, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{option}</button>
+                  <button key={option} type="button" onClick={() => setDraft({ ...draft, [key]: option })} style={{ minHeight: 40, padding: '0 14px', borderRadius: 16, border: on ? '1px solid #accafe' : '1px solid transparent', background: on ? '#2a3447' : '#1c2025', color: on ? '#accafe' : '#8b9097', fontFamily: font.sans, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>{option}</button>
                 );
               })}
             </div>
@@ -373,7 +385,7 @@ function NoteStatus() {
 }
 
 const round: CSSProperties = { width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 };
-const chip: CSSProperties = { border: 'none', borderRadius: 30, padding: '9px 18px', fontFamily: font.sans, fontSize: 14, cursor: 'pointer' };
+const chip: CSSProperties = { border: 'none', borderRadius: 30, minHeight: 40, padding: '10px 18px', fontFamily: font.sans, fontSize: 14, cursor: 'pointer' };
 const rowBtn: CSSProperties = { width: '100%', height: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: 0, cursor: 'pointer' };
 const iconWrap: CSSProperties = { width: 40, height: 40, borderRadius: 20, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const barBtn: CSSProperties = { position: 'absolute', left: 16, width: 358, height: 52, borderRadius: 14, fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' };

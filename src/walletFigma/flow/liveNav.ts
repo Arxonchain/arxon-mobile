@@ -1,6 +1,6 @@
 import type { PrivacyFlags } from '@/chainWallet/privacy';
+import { isValidMnemonic, looksLikePrivateKey } from '@/chainWallet/keys';
 import { addHdAccount, currentPassword, sessionStore, setUnlockPassword } from '@/chainWallet/session';
-import { enableBiometrics } from '@/chainWallet/biometrics';
 import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 import { downloadDriveBackup, driveConfigured, uploadDriveBackup } from '@/chainWallet/googleDrive';
 import { setVaultLockRequired } from './VaultScreens';
@@ -44,12 +44,12 @@ type LiveNavInput = {
   } | null;
 };
 
-function phraseWordCount(mnemonic: string | null) {
-  return mnemonic ? mnemonic.trim().split(/\s+/).filter(Boolean).length : 0;
-}
-
 export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   const { from, to, password, wallet, openMining, wc } = input;
+
+  if ((from === 'caution1' || from === 'caution2' || from === 'caution3') && (to === 'create' || to === 'ready-skip' || to === 'home' || to.startsWith('home-'))) {
+    return { block: true, note: 'Tap the button on this screen to continue.' };
+  }
 
   if (from === 'slide16' && (to === 'create' || to === 'caution1')) {
     sessionStore.setSetupPath('create');
@@ -59,25 +59,37 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
 
   if (from === 'slide16' && to === 'import') {
     sessionStore.setSetupPath('import');
+    sessionStore.clearImported();
     return {};
   }
 
   if (from === 'import' && (to === 'phrase-confirm' || to === 'create')) {
+    const secret = wallet.mnemonic ?? '';
+    const imported = sessionStore.importedOk();
+    if (to === 'phrase-confirm' && !imported && !isValidMnemonic(secret)) {
+      return { block: true, note: 'Enter a valid 12 or 24-word recovery phrase.' };
+    }
+    if (to === 'create' && !imported && !looksLikePrivateKey(secret) && !isValidMnemonic(secret)) {
+      return { block: true, note: 'Enter a valid recovery phrase or private key.' };
+    }
     sessionStore.setSetupPath('import');
     return {};
   }
 
-  if (from === 'import' && (to === 'ready-skip' || to === 'home' || to.startsWith('home-'))) {
-    sessionStore.setSetupPath('import');
-    return { replace: phraseWordCount(wallet.mnemonic) >= 12 ? 'phrase-confirm' : 'create' };
+  if (from === 'import' && (to === 'ready-skip' || to === 'home' || to.startsWith('home-') || to === 'caution1')) {
+    return { block: true, note: 'Import a valid recovery phrase or private key first.' };
   }
 
-  if ((from === 'phrase-confirm' || from === 'phrase-shown') && (to === 'phrase-done' || to === 'create')) {
+  if (from === 'phrase-shown' && (to === 'phrase-done' || to === 'create')) {
+    return { replace: 'phrase-confirm', note: 'Confirm your recovery phrase before continuing.' };
+  }
+
+  if (from === 'phrase-confirm' && (to === 'phrase-done' || to === 'create')) {
     const resolved = resolvePhraseWords({
       app: true,
       words: wallet.mnemonic ? wallet.mnemonic.trim().split(/\s+/) : null,
     });
-    if (!resolved.usable && sessionStore.setupPath() !== 'import') {
+    if (!resolved.usable) {
       return { block: true, note: 'Recovery phrase is not ready to confirm.' };
     }
     sessionStore.setPhraseVerified(true);
@@ -85,8 +97,8 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (from === 'create' && (to === 'backup' || to === 'backup-manual' || to === 'ready-skip')) {
-    if (password.length < 8) {
-      return { block: true, note: 'Create a password of at least 8 characters.' };
+    if (password.length < 8 || !/\d/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      return { block: true, note: 'Create a password with 8+ characters, a number, and a symbol.' };
     }
     await setUnlockPassword(password);
     if (!wallet.mnemonic) await wallet.createWallet();
@@ -138,13 +150,6 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   }
 
   if (from === 'face' && to === 'ready-skip') {
-    try {
-      await enableBiometrics();
-    } catch (e) {
-      return {
-        note: e instanceof Error ? e.message : 'Face ID is not available on this device.',
-      };
-    }
     if (!wallet.mnemonic) await wallet.createWallet();
     if (!sessionStore.hasPassword()) return { replace: 'create' };
     return {};
@@ -166,7 +171,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return { block: true, note: 'Privacy is available on Arxon Testnet only.' };
   }
 
-  if (to === 'buy' || to === 'buy-review' || to === 'buy-status') {
+  if (to === 'buy-status') {
     return { block: true, note: 'Coming soon' };
   }
 
@@ -231,7 +236,10 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     await wallet.setNetwork('arxon');
     return {};
   }
-  if (to === 'home' || to.startsWith('home-') || (to === 'more' && from !== 'testnet')) {
+  if (to === 'more') {
+    return { replace: from === 'testnet' ? 'testnet' : 'home-funded' };
+  }
+  if (to === 'home' || to.startsWith('home-')) {
     if (!sessionStore.hasPassword()) return { replace: 'create' };
     sessionStore.setSetupPath(null);
     await wallet.setNetwork('ethereum');

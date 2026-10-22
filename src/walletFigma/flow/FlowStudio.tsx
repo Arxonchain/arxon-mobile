@@ -22,6 +22,7 @@ import { isVaultScreen, tabTarget, VaultScreens } from './VaultScreens';
 import { isAccountScreen, AccountScreens } from './AccountScreens';
 import { isPrivacyScreen, PrivacyScreens } from './PrivacyScreens';
 import { isExploreScreen, ExploreScreens } from './ExploreScreens';
+import { InAppBrowserHost } from './InAppBrowserHost';
 import { WalletNetworkContext, type WalletNet } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { isHomeRoot, isOnboardingScreen, isSetupScreen, isWelcomeScreen, useModeChrome } from './modeChrome';
@@ -62,8 +63,10 @@ const HIDE_SCROLLBARS_CSS = `
 
 const APP_SCROLL_CSS = `
 .arxon-app-frame { transform: translateZ(0); }
-.arxon-app-scroll > div {
-  min-height: 100%;
+.arxon-app-frame > .arxon-app-scroll > div {
+  min-height: 100% !important;
+  height: 100% !important;
+  width: 100% !important;
   box-sizing: border-box;
 }
 .arxon-app-scroll {
@@ -80,21 +83,65 @@ const APP_SCROLL_CSS = `
   overscroll-behavior-x: contain;
 }
 .arxon-app-frame nav {
-  position: fixed !important;
+  position: absolute !important;
   top: auto !important;
   bottom: 0 !important;
   left: 0 !important;
   width: 390px !important;
   z-index: 8;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 `;
 const CHECKS = [3, 7, 12];
+const SPLASH_HOLD_MS = 3500;
+const SPLASH_DONE_KEY = 'arxon.splash.done';
+const LIVE_SCREEN_KEY = 'arxon.live.screen';
+
+function splashAlreadyPlayed(): boolean {
+  try {
+    return sessionStorage.getItem(SPLASH_DONE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function markSplashPlayed() {
+  try {
+    sessionStorage.setItem(SPLASH_DONE_KEY, '1');
+  } catch {
+    /* private mode */
+  }
+}
+
+function initialLiveScreen(app: boolean): string {
+  if (!app) return 'splash';
+  if (splashAlreadyPlayed()) {
+    try {
+      const saved = sessionStorage.getItem(LIVE_SCREEN_KEY);
+      if (saved && saved !== 'splash' && SCREEN_MAP[saved]) return saved;
+    } catch {
+      /* ignore */
+    }
+    return 'gateway';
+  }
+  const started = window.__ARXON_SPLASH_AT__;
+  if (started && Date.now() - started >= SPLASH_HOLD_MS) {
+    markSplashPlayed();
+    return 'gateway';
+  }
+  return 'splash';
+}
 
 export default function FlowStudio({ app = false }: { app?: boolean }) {
   const live = useLiveFrame();
   const { setShowToggle } = useModeChrome();
-  const [id, setId] = useState('splash');
-  const [appScale, setAppScale] = useState(1);
+  const [id, setId] = useState(() => initialLiveScreen(app));
+  const [appScale, setAppScale] = useState(() => {
+    if (typeof window === 'undefined') return 1;
+    return Math.max(window.innerWidth / 390, window.innerHeight / 844);
+  });
+  const [appOffsetX, setAppOffsetX] = useState(0);
+  const [appOffsetY, setAppOffsetY] = useState(0);
   const [appFrameH, setAppFrameH] = useState(844);
   const [stack, setStack] = useState<string[]>([]);
   const [hidden, setHidden] = useState(false);
@@ -115,8 +162,19 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
 
   useEffect(() => {
+    if (app && id === 'splash') return;
     markBootOk();
-  }, []);
+  }, [app, id]);
+
+  useEffect(() => {
+    if (!app || !id || id === 'splash') return;
+    markSplashPlayed();
+    try {
+      sessionStorage.setItem(LIVE_SCREEN_KEY, id);
+    } catch {
+      /* private mode */
+    }
+  }, [app, id]);
 
   useEffect(() => {
     if (!app) return;
@@ -137,7 +195,9 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   useEffect(() => {
     if (!app || !live?.app || !live.ready) return;
     if (jumpRef.current) return;
-    if (live.startId && live.startId !== 'splash' && (id === 'splash' || (live.locked && id !== 'unlock' && id !== 'unlock-wrong'))) {
+    if (!live.startId || live.startId === 'splash') return;
+    const lockedAway = live.locked && id !== 'unlock' && id !== 'unlock-wrong';
+    if (id === 'splash' || isWelcomeScreen(id) || lockedAway) {
       setId(live.startId);
     }
   }, [app, live?.ready, live?.startId, live?.locked, id]);
@@ -173,13 +233,22 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (id !== 'splash') return;
     if (jumpRef.current) return;
     if (app && live?.startId && live.startId !== 'splash') return;
-    const t = window.setTimeout(() => go('gateway', false), 2800);
+    if (app && splashAlreadyPlayed()) {
+      setId('gateway');
+      return;
+    }
+    const started = window.__ARXON_SPLASH_AT__ || Date.now();
+    const remain = Math.max(0, SPLASH_HOLD_MS - (Date.now() - started));
+    const t = window.setTimeout(() => {
+      markSplashPlayed();
+      setId('gateway');
+    }, remain);
     return () => window.clearTimeout(t);
   }, [id, app, live?.startId]);
 
   useEffect(() => {
     if (!app) return;
-    setShowToggle(!isOnboardingScreen(id) && !live?.locked);
+    setShowToggle(!isOnboardingScreen(id) && !live?.locked && isHomeRoot(id));
   }, [app, id, live?.locked, setShowToggle]);
 
   useEffect(() => {
@@ -213,14 +282,24 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     const measure = () => {
       const w = Math.max(stage.clientWidth, 1);
       const h = Math.max(stage.clientHeight, 1);
-      const scale = w / 390;
+      const cover = Math.max(w / 390, h / 844);
+      const scale = 844 * cover - h > 16 ? h / 844 : cover;
       setAppScale(scale);
-      setAppFrameH(Math.max(844, h / scale));
+      setAppFrameH(844);
+      setAppOffsetX((w - 390 * scale) / 2);
+      setAppOffsetY((h - 844 * scale) / 2);
     };
     measure();
     const watcher = new ResizeObserver(measure);
     watcher.observe(stage);
-    return () => watcher.disconnect();
+    window.addEventListener('resize', measure);
+    const view = window.visualViewport;
+    view?.addEventListener('resize', measure);
+    return () => {
+      watcher.disconnect();
+      window.removeEventListener('resize', measure);
+      view?.removeEventListener('resize', measure);
+    };
   }, [app]);
 
   useEffect(() => {
@@ -360,7 +439,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, []);
 
   return (
-    <div style={{ height: app ? '100%' : '100vh', minHeight: app ? 0 : undefined, overflow: 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
+    <div style={{ height: app ? '100%' : '100vh', width: app ? '100%' : undefined, minHeight: app ? 0 : undefined, overflow: 'hidden', display: 'flex', background: app ? '#050505' : '#07080c', color: ink.text, fontFamily: font.sans }}>
       {!app && <aside style={{ width: menu ? 320 : 0, height: '100vh', flexShrink: 0, overflow: 'auto', borderRight: menu ? '1px solid #1c2025' : 'none', background: '#0c0e14' }}>
         <div style={{ padding: 16, position: 'sticky', top: 0, background: '#0c0e14' }}>
           <strong>Every screen</strong>
@@ -407,7 +486,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           <span style={{ color: ink.secondary, fontSize: 12 }}>{screen.name}</span>
         </div>
         )}
-        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', overflow: 'hidden' }}>
+        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: app ? undefined : 'center', alignItems: 'flex-start', overflow: 'hidden', position: app ? 'relative' : undefined }}>
         <WalletNetworkContext.Provider value={net}>
         <div
           className={app ? 'arxon-app-frame' : 'arxon-flow-frame'}
@@ -415,10 +494,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           ? {
             width: 390,
             height: appFrameH,
-            transform: appScale > 0 && appScale !== 1 ? `scale(${appScale})` : 'translateZ(0)',
-            transformOrigin: 'top center',
+            transform: `translate(${appOffsetX}px, ${appOffsetY}px) scale(${appScale})`,
+            transformOrigin: 'top left',
             background: ink.page,
-            position: 'relative',
+            position: 'absolute',
+            left: 0,
+            top: 0,
             overflow: 'hidden',
           }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'auto', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
@@ -481,6 +562,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           )}
           {shown.tab && !homeDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
           </div>
+          <InAppBrowserHost />
           {overlay && (
             <button type="button" onClick={() => go(overlay.parent || 'home', false)} style={{ position: 'absolute', inset: 0, zIndex: 6, background: 'rgba(0,0,0,0.55)', border: 'none', padding: 0 }}>
               <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: ink.card, borderRadius: '16px 16px 0 0', padding: 18, textAlign: 'left' }}>
@@ -646,7 +728,6 @@ function HomeMock({ id, hidden, go, onToggleHide }: { id: string; hidden: boolea
         <Mini label="Send" onClick={() => go(vaulted ? 'send-amount-vault' : 'send-token')} />
         <Mini label="Receive" onClick={() => go('receive')} />
         <Mini label="Swap" onClick={() => go(vaulted ? 'swap-vault' : 'swap')} />
-        <Mini label="More" onClick={() => go('more')} />
       </div>
       {!funded && (
         <div style={{ display: 'flex', gap: 10, overflowX: 'auto', marginTop: 18 }}>
@@ -723,7 +804,7 @@ function act(screen: Scr, props: { backup: 'drive' | 'manual'; password: string;
 function rowTarget(row: string, go: (id: string) => void) {
   if (row.startsWith('Buy')) go('buy');
   else if (row.startsWith('Mine')) go('mine-entry');
-  else if (row.startsWith('Arxswap')) go('arxswap');
+  else if (row.startsWith('Arxswap') || row.startsWith('Uniswap') || row.startsWith('Jupiter')) go('explore');
   else if (row.includes('Claim')) go('claim');
   else if (row.includes('Disclosure')) go('code-log');
   else if (row.includes('Connected')) go('connected');

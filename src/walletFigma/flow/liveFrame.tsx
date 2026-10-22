@@ -13,7 +13,7 @@ import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
 import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { hiddenCount, privacyPill as pillText, readDefaultPrivacy, writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
-import { enableBiometrics, verifyBiometrics } from '@/chainWallet/biometrics';
+import { verifyBiometrics } from '@/chainWallet/biometrics';
 import {
   addHdAccount,
   autoLockDue,
@@ -32,6 +32,7 @@ import { beforeGo, type NavDecision } from './liveNav';
 import { useWalletModeActions } from './ModeShell';
 import { addressesFromMnemonic, type AltAddresses } from '@/chainWallet/altChains';
 import { qrDataUrl, scanAddressQr } from '@/chainWallet/receiveQr';
+import { useDisplayCurrency } from './displayCurrency';
 
 export type LiveTone = 'up' | 'down' | 'flat';
 export type LiveIcon = 'arx' | 'btc' | 'eth' | 'usdt' | 'usdc' | 'sol';
@@ -131,11 +132,13 @@ type LiveFrame = {
   approveWc: () => Promise<void>;
   rejectWc: () => Promise<void>;
   disconnectWc: (topic: string) => Promise<void>;
+  pairWc: (uri: string) => Promise<void>;
   receiveAsset: string;
   receiveAddress: string;
   receiveQr: string | null;
   setReceiveAsset: (symbol: string) => void;
   scanQr: () => Promise<string>;
+  refresh: () => Promise<void>;
 };
 
 const LiveFrameContext = createContext<LiveFrame | null>(null);
@@ -156,7 +159,7 @@ function qty(v: string | null, digits: number) {
 
 function usd(n: number | null) {
   if (n == null) return '—';
-  return n.toLocaleString(undefined, { style: 'currency', currency: 'USD' });
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD', currencyDisplay: 'narrowSymbol' });
 }
 
 /** Mainnet ETH/USDC/USDT: a zero or unknown amount is $0.00, never a dash. */
@@ -166,12 +169,16 @@ function mainnetQty(amount: string | null | undefined, digits: number) {
   return qtyN.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: Math.min(2, digits) });
 }
 
-function mainnetFiat(amount: string | null | undefined, quoteUsd: number | null | undefined) {
+function mainnetFiat(
+  amount: string | null | undefined,
+  quoteUsd: number | null | undefined,
+  format: (usdAmount: number) => string,
+) {
   const n = Number(amount);
   const qtyN = amount == null || amount === '' || !Number.isFinite(n) ? 0 : n;
-  if (qtyN === 0) return '$0.00';
-  if (quoteUsd != null && Number.isFinite(quoteUsd)) return usd(qtyN * quoteUsd);
-  return '$0.00';
+  if (qtyN === 0) return format(0);
+  if (quoteUsd != null && Number.isFinite(quoteUsd)) return format(qtyN * quoteUsd);
+  return format(0);
 }
 
 function mainnetUsdN(amount: string | null | undefined, quoteUsd: number | null | undefined) {
@@ -215,16 +222,8 @@ function listedStable(listed: ListedToken[], kind: 'USDT' | 'USDC') {
 }
 
 async function openArxonFaucet() {
-  try {
-    if (Capacitor.isNativePlatform()) {
-      const { Browser } = await import('@capacitor/browser');
-      await Browser.open({ url: START_URL });
-      return;
-    }
-  } catch {
-    /* fall through */
-  }
-  window.open(START_URL, '_blank', 'noopener,noreferrer');
+  const { openExternal } = await import('./openExternal');
+  await openExternal(START_URL);
 }
 
 function isArxonStable(value: string) {
@@ -234,7 +233,8 @@ function isArxonStable(value: string) {
 
 export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const wallet = useChainWallet();
-  const { prices } = useTokenPrices();
+  const { prices, refresh: refreshPrices } = useTokenPrices();
+  const { format } = useDisplayCurrency();
   const hide = useHideBalance();
   const wc = useWc();
   const mode = useWalletModeActions();
@@ -271,18 +271,37 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const onVis = () => {
       if (document.visibilityState === 'hidden') touchSession();
+      if (document.visibilityState === 'visible') {
+        void wallet.refreshBalance();
+        void refreshPrices();
+        void loadActivity().then((items) => setActivity(groupActivity(items)));
+      }
       setTick((n) => n + 1);
     };
     const onMove = () => touchSession();
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pointerdown', onMove);
     const t = window.setInterval(() => setTick((n) => n + 1), 15_000);
+    let appHandle: { remove: () => Promise<void> } | undefined;
+    if (Capacitor.isNativePlatform()) {
+      void import('@capacitor/app').then(({ App }) =>
+        App.addListener('appStateChange', ({ isActive }) => {
+          if (!isActive) return;
+          void wallet.refreshBalance();
+          void refreshPrices();
+          void loadActivity().then((items) => setActivity(groupActivity(items)));
+        }).then((handle) => {
+          appHandle = handle;
+        }),
+      );
+    }
     return () => {
       document.removeEventListener('visibilitychange', onVis);
       window.removeEventListener('pointerdown', onMove);
       window.clearInterval(t);
+      void appHandle?.remove();
     };
-  }, []);
+  }, [wallet.refreshBalance, refreshPrices]);
 
   useEffect(() => {
     let cancel = false;
@@ -335,6 +354,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       }
       throw new Error('Recovery phrase is not available on this device.');
     }
+    if (sessionStore.setupPath() === 'import') {
+      throw new Error('Import a valid recovery phrase first.');
+    }
     const phrase = await wallet.createWallet();
     const next = phrase.trim().split(/\s+/).filter(Boolean);
     if (next.length < 12) throw new Error('Recovery phrase is not available on this device.');
@@ -346,6 +368,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const ethQ = quoteFor('ETH', prices);
   const usdcQ = quoteFor('USDC', prices);
   const usdtQ = quoteFor('USDT', prices);
+  const btcQ = quoteFor('BTC', prices);
+  const solQ = quoteFor('SOL', prices);
   const ethUsd = mainnetUsdN(eth.ETH, ethQ.usd);
   const usdcUsd = mainnetUsdN(eth.USDC, usdcQ.usd);
   const usdtUsd = mainnetUsdN(eth.USDT, usdtQ.usd);
@@ -365,7 +389,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     {
       name: 'Ethereum',
       amount: `${mainnetQty(eth.ETH, 6)} ETH`,
-      value: mainnetFiat(eth.ETH, ethQ.usd),
+      value: mainnetFiat(eth.ETH, ethQ.usd, format),
       change: pct(ethQ.change24h),
       tone: toneOf(ethQ.change24h),
       icon: 'eth',
@@ -375,19 +399,19 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     {
       name: 'Solana',
       amount: '0.00 SOL',
-      value: '$0.00',
-      change: alt?.sol ? 'Mainnet · send later' : 'Not on this wallet',
-      tone: 'flat',
+      value: format(0),
+      change: pct(solQ.change24h),
+      tone: toneOf(solQ.change24h),
       icon: 'sol',
-      to: 'receive',
+      to: 'token-sol',
       symbol: 'SOL',
     },
     {
       name: 'Bitcoin',
       amount: '0.00 BTC',
-      value: '$0.00',
-      change: alt?.btc ? 'Mainnet · send later' : 'Not on this wallet',
-      tone: 'flat',
+      value: format(0),
+      change: pct(btcQ.change24h),
+      tone: toneOf(btcQ.change24h),
       icon: 'btc',
       to: 'token-btc',
       symbol: 'BTC',
@@ -395,7 +419,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     {
       name: 'Tether',
       amount: `${mainnetQty(eth.USDT, 2)} USDT`,
-      value: mainnetFiat(eth.USDT, usdtQ.usd),
+      value: mainnetFiat(eth.USDT, usdtQ.usd, format),
       change: pct(usdtQ.change24h),
       tone: toneOf(usdtQ.change24h),
       icon: 'usdt',
@@ -405,7 +429,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     {
       name: 'USD Coin',
       amount: `${mainnetQty(eth.USDC, 2)} USDC`,
-      value: mainnetFiat(eth.USDC, usdcQ.usd),
+      value: mainnetFiat(eth.USDC, usdcQ.usd, format),
       change: pct(usdcQ.change24h),
       tone: toneOf(usdcQ.change24h),
       icon: 'usdc',
@@ -458,11 +482,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       ? 'unlock'
       : wallet.address && sessionStore.hasPassword()
         ? 'home'
-        : wallet.address && sessionStore.phraseVerified()
-          ? 'create'
-          : wallet.address
-            ? 'caution1'
-            : 'splash';
+        : 'splash';
 
   const send = useCallback(
     async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home', paymentFlags?: PrivacyFlags) => {
@@ -556,7 +576,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     accounts,
     accountIndex: wallet.accountIndex,
     setAccountIndex: wallet.setAccountIndex,
-    total: usd(totalN),
+    total: format(totalN),
     day: weighted == null ? 'Ethereum' : `${weighted > 0 ? '+' : ''}${weighted.toFixed(2)}% Today`,
     dayTone: toneOf(weighted),
     privacyPill: pillText(defaults),
@@ -614,11 +634,18 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       return ok;
     },
     unlockBiometric: async () => {
-      const ok = await verifyBiometrics();
-      if (!ok) return false;
-      const pass = currentPassword();
-      if (pass) return wallet.unlockSession(pass);
-      return sessionStore.hasPassword() ? false : true;
+      try {
+        const result = await verifyBiometrics();
+        if (!result.ok) return false;
+        const pass = result.password || currentPassword();
+        if (pass) {
+          rememberPassword(pass);
+          return wallet.unlockSession(pass);
+        }
+        return sessionStore.hasPassword() ? false : true;
+      } catch {
+        return false;
+      }
     },
     persistPassword: async (password: string) => {
       await setUnlockPassword(password);
@@ -750,11 +777,22 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     disconnectWc: async (topic: string) => {
       await wc?.disconnect(topic);
     },
+    pairWc: async (uri: string) => {
+      if (!wc) throw new Error('WalletConnect is not ready.');
+      await wc.pair(uri);
+    },
     receiveAsset,
     receiveAddress,
     receiveQr,
     setReceiveAsset,
     scanQr,
+    refresh: async () => {
+      await Promise.all([
+        wallet.refreshBalance(),
+        refreshPrices(),
+        loadActivity().then((items) => setActivity(groupActivity(items))),
+      ]);
+    },
   }), [
     wallet,
     hide,
@@ -782,6 +820,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     receiveQr,
     scanQr,
     alt,
+    format,
+    refreshPrices,
   ]);
 
   return <LiveFrameContext.Provider value={value}>{children}</LiveFrameContext.Provider>;
@@ -844,4 +884,3 @@ function toLiveInspect(row: InspectedTx): LiveInspect {
 void hiddenCount;
 void checkUnlockPassword;
 void addHdAccount;
-void enableBiometrics;

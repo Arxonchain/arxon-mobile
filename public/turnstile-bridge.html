@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Arxon security check</title>
+    <style>
+      html, body { margin: 0; background: transparent; }
+      body { min-height: 65px; display: flex; justify-content: center; align-items: center; }
+    </style>
+  </head>
+  <body>
+    <div id="cf"></div>
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"></script>
+    <script>
+      (function () {
+        var KEY = '0x4AAAAAAELKREYgfx_ebd18';
+        function send(type, extra) {
+          try {
+            parent.postMessage(Object.assign({ source: 'arxon-turnstile-bridge', type: type }, extra || {}), '*');
+          } catch (e) {}
+        }
+        function render() {
+          if (!window.turnstile || !window.turnstile.render) {
+            window.setTimeout(render, 50);
+            return;
+          }
+          window.turnstile.render('#cf', {
+            sitekey: KEY,
+            theme: 'dark',
+            size: 'normal',
+            appearance: 'always',
+            retry: 'never',
+            callback: function (token) { send('token', { token: token }); },
+            'expired-callback': function () { send('expire'); },
+            'timeout-callback': function () { send('error', { code: 'timeout' }); },
+            'error-callback': function (code) { send('error', { code: code || '' }); },
+          });
+        }
+        render();
+      })();
+    </script>
+  </body>
+</html>

@@ -1,11 +1,13 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { setVaultLockRequired } from './VaultScreens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
-import { sessionStore, type AutoLock } from '@/chainWallet/session';
-import { writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
+import { disableBiometrics, enableBiometrics } from '@/chainWallet/biometrics';
+import { currentPassword, sessionStore, type AutoLock } from '@/chainWallet/session';
+import { FingerprintMark } from './BioMark';
+import { readPrivacyUi, writeDefaultPrivacy, writePrivacyUi, type PrivacyUi } from '@/walletFigma/privacyPrefs';
 import { resolvePhraseWords } from './phraseWords';
 
 const art = (name: string) => `/wallet-figma/privacy/${name}`;
@@ -21,16 +23,21 @@ export function isPrivacyScreen(id: string) {
 
 export function PrivacyScreens({ id, go, back, password, setPassword }: { id: string; go: Go; back?: () => void; password: string; setPassword: (value: string) => void }) {
   const live = useLiveFrame();
-  const [privateMode, setPrivateMode] = useState(true);
-  const [hideLaunch, setHideLaunch] = useState(true);
-  const [hideActivity, setHideActivity] = useState(true);
-  const [shots, setShots] = useState(false);
+  const [ui, setUi] = useState<PrivacyUi>(readPrivacyUi);
+  const patchUi = (part: Partial<PrivacyUi>) => {
+    setUi((prev) => {
+      const next = { ...prev, ...part };
+      writePrivacyUi(next);
+      return next;
+    });
+  };
   const [hideSender, setHideSender] = useState(() => live?.defaults.hideSender ?? false);
   const [hideReceiver, setHideReceiver] = useState(() => live?.defaults.hideReceiver ?? false);
   const [hideAmount, setHideAmount] = useState(() => live?.defaults.hideAmount ?? true);
   const [hideBalance, setHideBalance] = useState(() => live?.defaults.hideBalance ?? true);
   const [lock, setLock] = useState(sessionStore.autoLock());
-  const [face, setFace] = useState(true);
+  const [face, setFace] = useState(() => sessionStore.bioFace() || sessionStore.biometrics());
+  const [finger, setFinger] = useState(() => sessionStore.bioFinger() || sessionStore.biometrics());
   const [faceSend, setFaceSend] = useState(true);
   const [facePhrase, setFacePhrase] = useState(true);
   const [faceVault, setFaceVault] = useState(true);
@@ -41,14 +48,14 @@ export function PrivacyScreens({ id, go, back, password, setPassword }: { id: st
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       {(id === 'privacy' || id === 'autolock') && (
         <Settings
-          privateMode={privateMode}
-          setPrivateMode={setPrivateMode}
-          hideLaunch={hideLaunch}
-          setHideLaunch={setHideLaunch}
-          hideActivity={hideActivity}
-          setHideActivity={setHideActivity}
-          shots={shots}
-          setShots={setShots}
+          privateMode={ui.privateMode}
+          setPrivateMode={(v) => patchUi({ privateMode: v })}
+          hideLaunch={ui.hideLaunch}
+          setHideLaunch={(v) => patchUi({ hideLaunch: v })}
+          hideActivity={ui.hideActivity}
+          setHideActivity={(v) => patchUi({ hideActivity: v })}
+          shots={ui.shots}
+          setShots={(v) => patchUi({ shots: v })}
           lock={lock}
           onBack={() => leave('account')}
           go={go}
@@ -81,12 +88,15 @@ export function PrivacyScreens({ id, go, back, password, setPassword }: { id: st
         <Face
           face={face}
           setFace={setFace}
+          finger={finger}
+          setFinger={setFinger}
           send={faceSend}
           setSend={setFaceSend}
           phrase={facePhrase}
           setPhrase={setFacePhrase}
           vault={faceVault}
           setVault={(on) => { setFaceVault(on); setVaultLockRequired(on); sessionStore.setVaultLock(on); }}
+          walletPassword={live?.sessionPassword || password}
           onBack={() => leave('account')}
           go={go}
         />
@@ -107,6 +117,7 @@ function Settings(props: {
   shots: boolean; setShots: (v: boolean) => void;
   lock: string; onBack: () => void; go: Go;
 }) {
+  const live = useLiveFrame();
   return (
     <div style={scroll}>
       <NoteStatus />
@@ -120,7 +131,7 @@ function Settings(props: {
             <span style={rowTitle}>Private mode</span>
             <span style={rowSub}>Applies your default privacy</span>
           </span>
-          <Toggle on={props.privateMode} onClick={() => props.setPrivateMode(!props.privateMode)} />
+          <Toggle name="Private mode" on={props.privateMode} onClick={() => props.setPrivateMode(!props.privateMode)} />
         </div>
         <p style={kicker}>DISPLAY</p>
         <div style={group}>
@@ -152,7 +163,7 @@ function Settings(props: {
           <div style={divider} />
           <button type="button" onClick={() => props.go('connected')} style={linkRow}>
             <span style={copy}><span style={rowTitle}>Connected apps</span></span>
-            <span style={valueText}>2</span>
+            <span style={valueText}>{live?.app ? String(live.wcSessions.length) : '2'}</span>
             <FigmaImg src={art('chev.svg')} width={16} height={16} />
           </button>
         </div>
@@ -189,7 +200,7 @@ function Defaults(props: {
                 <span style={rowTitle}>Hide my balance</span>
                 <span style={rowSub}>Keep my wallet balance off public view</span>
               </button>
-              <Toggle on={props.hideBalance} onClick={() => props.setHideBalance(!props.hideBalance)} />
+              <Toggle name="Hide my balance" on={props.hideBalance} onClick={() => props.setHideBalance(!props.hideBalance)} />
             </div>
           </div>
           <p style={kicker}>YOUR CURRENT MODE</p>
@@ -255,31 +266,134 @@ function LockSheet({ value, onClose, onPick }: { value: string; onClose: () => v
 
 function Face(props: {
   face: boolean; setFace: (v: boolean) => void;
+  finger: boolean; setFinger: (v: boolean) => void;
   send: boolean; setSend: (v: boolean) => void;
   phrase: boolean; setPhrase: (v: boolean) => void;
   vault: boolean; setVault: (v: boolean) => void;
+  walletPassword?: string;
   onBack: () => void; go: Go;
 }) {
+  const live = useLiveFrame();
+  const [noteText, setNoteText] = useState<string | null>(null);
+  const [gate, setGate] = useState('');
+  const [busy, setBusy] = useState<'finger' | 'face' | null>(null);
+  const lock = useRef(false);
+
+  function walletPass() {
+    return (currentPassword() || live?.sessionPassword || props.walletPassword || gate || '').trim();
+  }
+
+  async function setBio(on: boolean, which: 'finger' | 'face') {
+    if (busy || lock.current) return;
+    lock.current = true;
+    try {
+      if (on) {
+        const pass = walletPass();
+        if (!pass) {
+          setNoteText('Type your wallet password below, then tap the toggle.');
+          return;
+        }
+        setBusy(which);
+        setNoteText(which === 'finger' ? 'Use your fingerprint…' : 'Use Face ID…');
+        try {
+          await enableBiometrics(pass);
+          if (which === 'finger') {
+            props.setFinger(true);
+            sessionStore.setBioFinger(true);
+          } else {
+            props.setFace(true);
+            sessionStore.setBioFace(true);
+          }
+          sessionStore.setBiometrics(true);
+          setNoteText(which === 'finger' ? 'Fingerprint unlock is on.' : 'Face ID unlock is on.');
+        } catch (e) {
+          setNoteText(e instanceof Error ? e.message : 'Could not enable biometrics on this phone.');
+        } finally {
+          setBusy(null);
+        }
+        return;
+      }
+      if (which === 'finger') {
+        props.setFinger(false);
+        sessionStore.setBioFinger(false);
+      } else {
+        props.setFace(false);
+        sessionStore.setBioFace(false);
+      }
+      const otherOn = which === 'finger' ? props.face : props.finger;
+      if (!otherOn) {
+        sessionStore.setBiometrics(false);
+        await disableBiometrics();
+      }
+      setNoteText(null);
+    } finally {
+      lock.current = false;
+    }
+  }
+
   return (
     <div style={scroll}>
       <NoteStatus />
-      <div style={page}>
+      <div style={{ ...page, paddingTop: live?.app ? 72 : 56 }}>
         <Back onClick={props.onBack} />
-        <p style={headline}>Face ID & password</p>
+        <p style={headline}>{live?.app ? 'Fingerprint, Face ID & password' : 'Face ID & password'}</p>
         <p style={lead}>Control how you unlock Arxon.</p>
-        <div style={heroCard}>
+        {live?.app ? (
+          <div role="switch" aria-label="Fingerprint" aria-checked={props.finger} onClick={() => void setBio(!props.finger, 'finger')} style={{ ...heroCard, cursor: 'pointer' }}>
+            <span style={{ ...iconWrap, color: '#accafe' }}><FingerprintMark /></span>
+            <span style={copy}>
+              <span style={rowTitle}>Fingerprint</span>
+              <span style={rowSub}>{busy === 'finger' ? 'Waiting for fingerprint…' : 'Unlock Arxon with your phone fingerprint'}</span>
+            </span>
+            <Toggle name="Fingerprint" on={props.finger} onClick={() => void setBio(!props.finger, 'finger')} />
+          </div>
+        ) : null}
+        <div
+          role="switch"
+          aria-label="Face ID"
+          aria-checked={props.face}
+          onClick={() => {
+            if (live?.app) {
+              void setBio(!props.face, 'face');
+              return;
+            }
+            const next = !props.face;
+            props.setFace(next);
+            sessionStore.setBiometrics(next);
+          }}
+          style={{ ...heroCard, marginTop: live?.app ? 12 : 0, cursor: 'pointer' }}
+        >
           <span style={iconWrap}><FigmaImg src="/wallet-figma/unlock/face.svg" width={20} height={20} /></span>
           <span style={copy}>
             <span style={rowTitle}>Face ID</span>
-            <span style={rowSub}>Unlock Arxon with Face ID</span>
+            <span style={rowSub}>{busy === 'face' ? 'Waiting for Face ID…' : live?.app ? 'Unlock with face unlock if this phone has it' : 'Unlock Arxon with Face ID'}</span>
           </span>
-          <Toggle on={props.face} onClick={() => {
+          <Toggle name="Face ID" on={props.face} onClick={() => {
+            if (live?.app) {
+              void setBio(!props.face, 'face');
+              return;
+            }
             const next = !props.face;
             props.setFace(next);
             sessionStore.setBiometrics(next);
           }} />
         </div>
-        <p style={kicker}>REQUIRE FACE ID FOR</p>
+        {live?.app ? (
+          <label style={{ display: 'block', marginTop: 16 }}>
+            <span style={{ display: 'block', marginBottom: 8, fontSize: 13, color: '#8b9097' }}>Wallet password</span>
+            <span style={{ height: 52, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', padding: '0 14px' }}>
+              <input
+                type="password"
+                value={gate}
+                onChange={(e) => setGate(e.target.value)}
+                placeholder={walletPass() && !gate ? 'Already unlocked on this session' : 'Required to turn this on'}
+                style={input}
+              />
+            </span>
+          </label>
+        ) : null}
+        {noteText ? <p style={{ ...note, color: noteText.includes('is on.') ? '#3ddc84' : busy ? '#accafe' : '#f25252' }}>{noteText}</p> : null}
+        <p style={kicker}>{live?.app ? 'REQUIRE BIOMETRICS FOR' : 'REQUIRE FACE ID FOR'}</p>
         <div style={group}>
           <ToggleRow title="Sending funds" sub="Confirm every transfer" on={props.send} onClick={() => props.setSend(!props.send)} />
           <div style={divider} />
@@ -384,7 +498,7 @@ function Verify({ expected, unlock, unlockBiometric, onBack, onNext }: { expecte
           onNext();
         }} style={{ marginTop: 12, width: '100%', height: 52, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
           <FigmaImg src="/wallet-figma/unlock/face.svg" width={20} height={20} />
-          Unlock with Face ID
+          Unlock with fingerprint or Face ID
         </button>
       </div>
     </div>
@@ -528,19 +642,28 @@ function Who({ label, value, accent }: { label: string; value: string; accent?: 
 
 function ToggleRow({ title, sub, on, onClick }: { title: string; sub: string; on: boolean; onClick: () => void }) {
   return (
-    <div style={linkRow}>
+    <div role="switch" aria-checked={on} aria-label={title} onClick={onClick} style={linkRow}>
       <span style={copy}>
         <span style={rowTitle}>{title}</span>
         <span style={rowSub}>{sub}</span>
       </span>
-      <Toggle on={on} onClick={onClick} />
+      <Toggle name={title} on={on} onClick={onClick} />
     </div>
   );
 }
 
-function Toggle({ on, onClick }: { on: boolean; onClick: () => void }) {
+function Toggle({ name, on, onClick }: { name: string; on: boolean; onClick: () => void }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick} style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}>
+    <button
+      type="button"
+      aria-label={`${name}, ${on ? 'on' : 'off'}`}
+      aria-pressed={on}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      style={{ border: 'none', background: 'none', padding: 8, margin: -8, minWidth: 44, minHeight: 44, cursor: 'pointer', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
       <FigmaImg src={on ? onToggle : offToggle} width={on ? 46 : 48} height={28} />
     </button>
   );
@@ -596,5 +719,5 @@ const divider: CSSProperties = { height: 1, margin: '0 16px', background: '#2a34
 const note: CSSProperties = { marginTop: 16, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, padding: '14px 16px', color: '#8b9097', fontSize: 13, lineHeight: 1.45 };
 const primary: CSSProperties = { position: 'absolute', left: 16, bottom: 16, width: 358, height: 52, border: 'none', borderRadius: 14, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' };
 const input: CSSProperties = { flex: 1, border: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 16, outline: 'none' };
-const eyeBtn: CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer' };
+const eyeBtn: CSSProperties = { width: 40, height: 40, margin: -8, border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const textBtn: CSSProperties = { border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' };

@@ -1,6 +1,7 @@
 declare global {
   interface Window {
     __ARXON_BOOT_OK__?: boolean;
+    __ARXON_SPLASH_AT__?: number;
     __ARXON_DISMISS_BOOT__?: () => void;
     __ARXON_MARK_BOOT_FAILED__?: (reason?: string) => void;
   }

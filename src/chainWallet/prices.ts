@@ -1,6 +1,6 @@
 import { cacheGet, cacheSet } from '@/lib/localCache';
 
-export type PricedSymbol = 'ETH' | 'USDC' | 'USDT';
+export type PricedSymbol = 'ETH' | 'USDC' | 'USDT' | 'BTC' | 'SOL';
 export type WalletSymbol = PricedSymbol | 'tARX' | 'ARX';
 
 export type TokenUsd = {
@@ -15,13 +15,15 @@ export type PriceMap = Record<PricedSymbol, TokenUsd> & {
   ARX: TokenUsd;
 };
 
-const CACHE_KEY = 'arxon.tokenUsd.v1';
+const CACHE_KEY = 'arxon.tokenUsd.v2';
 export const PRICE_TTL_MS = 60_000;
 
-const CG_IDS: Record<PricedSymbol, string> = {
+export const CG_IDS: Record<PricedSymbol, string> = {
   ETH: 'ethereum',
   USDC: 'usd-coin',
   USDT: 'tether',
+  BTC: 'bitcoin',
+  SOL: 'solana',
 };
 
 const NO_MARKET: TokenUsd = { usd: null, change24h: null, sparkline: [], noMarket: true };
@@ -39,6 +41,8 @@ export function emptyPriceMap(): PriceMap {
     ETH: emptyPriced(),
     USDC: emptyPriced(),
     USDT: emptyPriced(),
+    BTC: emptyPriced(),
+    SOL: emptyPriced(),
     tARX: noMarketQuote(),
     ARX: noMarketQuote(),
   };
@@ -49,6 +53,7 @@ export function formatUsd(n: number | null | undefined): string | null {
   return n.toLocaleString('en-US', {
     style: 'currency',
     currency: 'USD',
+    currencyDisplay: 'narrowSymbol',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -70,7 +75,9 @@ export function usdFromAmount(amount: string | null | undefined, usd: number | n
 
 export function quoteFor(symbol: string, prices: PriceMap | null | undefined): TokenUsd {
   const key = symbol.toUpperCase();
-  if (key === 'ETH' || key === 'USDC' || key === 'USDT') return prices?.[key] ?? emptyPriced();
+  if (key === 'ETH' || key === 'USDC' || key === 'USDT' || key === 'BTC' || key === 'SOL') {
+    return prices?.[key] ?? emptyPriced();
+  }
   return noMarketQuote();
 }
 
@@ -111,15 +118,15 @@ export function readCachedPrices(): { data: PriceMap; savedAt: number } | null {
   return hit;
 }
 
-export async function loadTokenPrices(now = Date.now()): Promise<PriceMap> {
+export async function loadTokenPrices(now = Date.now(), opts?: { force?: boolean }): Promise<PriceMap> {
   const cached = readCachedPrices();
-  if (cached && now - cached.savedAt < PRICE_TTL_MS) {
+  if (!opts?.force && cached && now - cached.savedAt < PRICE_TTL_MS) {
     return { ...emptyPriceMap(), ...cached.data, tARX: noMarketQuote(), ARX: noMarketQuote() };
   }
 
   try {
     const url =
-      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=ethereum,usd-coin,tether&sparkline=true&price_change_percentage=24h';
+      'https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=ethereum,usd-coin,tether,bitcoin,solana&sparkline=true&price_change_percentage=24h';
     const res = await fetch(url);
     if (!res.ok) throw new Error(`prices ${res.status}`);
     const json = (await res.json()) as CgMarket[];

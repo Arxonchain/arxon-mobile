@@ -14,6 +14,35 @@ export const TURNSTILE_SITE_KEY =
   (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined)?.trim() ||
   PUBLIC_FALLBACK_SITE_KEY;
 
+export function isTurnstileLocalHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0';
+}
+
+/** Play Store / public OTA / website — never the USB laptop preview. */
+export function isPublicTurnstileHost(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return (
+    host === 'arxon-mobile.pages.dev' ||
+    host === 'arxonchain.xyz' ||
+    host === 'www.arxonchain.xyz' ||
+    (host === 'localhost' && window.location.protocol === 'https:')
+  );
+}
+
+/**
+ * Debug APK USB live reload (`http://127.0.0.1:8080`). Play Store OTA is
+ * `https://arxon-mobile.pages.dev` and must not use this branch.
+ */
+export function isUsbLiveOrigin(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  if (host === '127.0.0.1' || host === '0.0.0.0') return true;
+  return host === 'localhost' && window.location.protocol === 'http:';
+}
+
 export function isTurnstileConfigured(): boolean {
   return TURNSTILE_SITE_KEY.length > 0;
 }
@@ -38,3 +67,6 @@ export const TURNSTILE_REQUIRED_HOSTNAMES = [
   'arxon-mobile.pages.dev',
   'localhost',
 ] as const;
+
+export const TURNSTILE_OTA_BRIDGE_ORIGIN = 'https://arxon-mobile.pages.dev';
+export const TURNSTILE_OTA_BRIDGE_URL = `${TURNSTILE_OTA_BRIDGE_ORIGIN}/turnstile-bridge.html`;

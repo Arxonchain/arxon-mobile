@@ -4,6 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#050505" />
+    <link rel="preload" as="image" href="/wallet-figma/wordmark.png" />
+    <link rel="preload" as="image" href="/wallet-figma/welcome/blob.svg" />
+    <script>
+      (function () {
+        try {
+          var host = location.hostname;
+          var native =
+            !!(window.Capacitor &&
+              typeof window.Capacitor.isNativePlatform === "function" &&
+              window.Capacitor.isNativePlatform());
+          if (native || host === "127.0.0.1" || host === "localhost") {
+            document.documentElement.classList.add("arxon-shell", "arxon-wallet-boot");
+            try {
+              if (sessionStorage.getItem("arxon.splash.done") === "1") {
+                document.documentElement.classList.add("arxon-splash-skip");
+              }
+            } catch (e) {}
+            if (!document.documentElement.classList.contains("arxon-splash-skip")) {
+              window.__ARXON_SPLASH_AT__ = Date.now();
+            }
+            try {
+              var splash = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen;
+              if (splash && typeof splash.hide === "function") splash.hide();
+            } catch (e) {}
+          }
+        } catch (e) {}
+      })();
+    </script>
     <title>Arxon Mining | Mine ARX-P Tokens & Earn $ARX Rewards</title>
     <meta name="description" content="Arxon Mining - Mine ARX-P tokens, participate in Vote-Fi battles, and earn $ARX rewards. Join the decentralized mining platform at arxonchain.xyz" />
     <meta name="author" content="Arxon" />
@@ -126,9 +154,43 @@
           radial-gradient(ellipse 80% 60% at 50% 20%, rgba(79,216,235,0.12), transparent 55%),
           #02060e;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-        transition: opacity 0.25s ease;
       }
-      #arxon-boot.hidden { opacity: 0; pointer-events: none; }
+      #arxon-boot.hidden { display: none !important; }
+      html.arxon-wallet-boot #arxon-boot {
+        background: #050505;
+        padding: 0;
+        gap: 0;
+        align-items: stretch;
+        justify-content: stretch;
+        pointer-events: none;
+      }
+      html.arxon-wallet-boot #arxon-boot-error {
+        pointer-events: auto;
+      }
+      html.arxon-wallet-boot #arxon-boot-logo,
+      html.arxon-wallet-boot #arxon-boot-spinner,
+      html.arxon-wallet-boot #arxon-boot-title,
+      html.arxon-wallet-boot #arxon-boot-slow {
+        display: none !important;
+      }
+      #arxon-boot-stage {
+        display: none;
+      }
+      html.arxon-wallet-boot #arxon-boot-stage {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 390px;
+        height: 844px;
+        overflow: hidden;
+        background: #050505;
+        transform-origin: top left;
+        pointer-events: none;
+      }
+      html.arxon-splash-skip #arxon-boot-stage {
+        display: none !important;
+      }
       #arxon-boot-logo {
         width: 72px;
         height: 72px;
@@ -209,6 +271,18 @@
       <div id="arxon-boot-spinner" aria-hidden="true"></div>
       <p id="arxon-boot-title">Loading ARXON…</p>
       <p id="arxon-boot-slow">Still loading — check your connection</p>
+      <div id="arxon-boot-stage" aria-hidden="true">
+        <div style="position:absolute;inset:0;overflow:hidden;pointer-events:none">
+          <img src="/wallet-figma/welcome/blob.svg" alt="" width="1147" height="1094" style="position:absolute;left:-378px;top:-500px;width:1147px;height:1094px;max-width:none" />
+          <img src="/wallet-figma/welcome/arc-white.svg" alt="" width="1028" height="598" style="position:absolute;left:-281px;top:-330px;width:1028px;height:598px;max-width:none;mix-blend-mode:overlay" />
+          <img src="/wallet-figma/welcome/arc-white.svg" alt="" width="1028" height="598" style="position:absolute;left:189px;top:-408px;width:1028px;height:598px;max-width:none;mix-blend-mode:overlay" />
+          <img src="/wallet-figma/welcome/arc-white.svg" alt="" width="1028" height="598" style="position:absolute;left:-691px;top:-408px;width:1028px;height:598px;max-width:none;mix-blend-mode:overlay" />
+          <img src="/wallet-figma/welcome/arc-pink.svg" alt="" width="1028" height="598" style="position:absolute;left:-251px;top:-494px;width:1028px;height:598px;max-width:none;mix-blend-mode:overlay" />
+          <img src="/wallet-figma/welcome/arc-pink-2.svg" alt="" width="1028" height="598" style="position:absolute;left:-338px;top:68px;width:1028px;height:598px;max-width:none;mix-blend-mode:overlay" />
+          <div style="position:absolute;left:0;right:0;bottom:0;height:48%;background:linear-gradient(180deg, rgba(5,5,5,0) 0%, rgba(5,5,5,0.55) 38%, #050505 78%, #050505 100%)"></div>
+        </div>
+        <img src="/wallet-figma/wordmark.png" alt="Arxon" width="1280" height="500" style="position:absolute;left:77px;top:375.9px;width:236px;height:92.19px;max-width:none;object-fit:contain" />
+      </div>
       <div id="arxon-boot-error">
         <h2>Can't load Arxon</h2>
         <p id="arxon-boot-error-msg">The app could not start. Check your internet connection and try again.</p>
@@ -230,6 +304,8 @@
             var el = document.getElementById(id);
             if (el) el.style.display = "none";
           });
+          var stage = document.getElementById("arxon-boot-stage");
+          if (stage) stage.style.display = "none";
           if (errMsg && message) errMsg.textContent = message;
           errBox.style.display = "block";
         }
@@ -240,7 +316,7 @@
           !!(window.Capacitor &&
             typeof window.Capacitor.isNativePlatform === "function" &&
             window.Capacitor.isNativePlatform());
-        if (isNative) document.documentElement.classList.add("arxon-shell");
+        if (isNative) document.documentElement.classList.add("arxon-shell", "arxon-wallet-boot");
         var walletBoot =
           host === "localhost" ||
           host === "127.0.0.1" ||
@@ -248,59 +324,33 @@
           path === "/flow" ||
           path.indexOf("/flow/") === 0;
         if (boot && walletBoot) {
-          var bits = ["arxon-boot-logo", "arxon-boot-spinner", "arxon-boot-title", "arxon-boot-slow"];
-          bits.forEach(function (id) {
-            var el = document.getElementById(id);
-            if (el) el.style.display = "none";
-          });
+          document.documentElement.classList.add("arxon-wallet-boot");
           document.documentElement.style.background = "#050505";
           document.body.style.background = "#050505";
-          boot.style.background = "#050505";
-          boot.style.justifyContent = "center";
-          boot.style.alignItems = "center";
-          boot.style.gap = "0";
-          var phone = document.createElement("div");
-          phone.id = "arxon-boot-phone";
-          phone.style.cssText =
-            "position:relative;width:390px;height:844px;overflow:hidden;background:#050505;flex-shrink:0;transform-origin:center center;";
-          var scale = Math.min(1, (window.innerWidth || 390) / 390, (window.innerHeight || 844) / 844);
-          phone.style.transform = "scale(" + scale + ")";
-          var glow = document.createElement("div");
-          glow.style.cssText =
-            "position:absolute;left:0;top:0;width:390px;height:572px;overflow:hidden;pointer-events:none;";
-          function absImg(src, w, h, left, top, extra) {
-            var img = document.createElement("img");
-            img.src = src;
-            img.alt = "";
-            img.width = w;
-            img.height = h;
-            img.style.cssText =
-              "position:absolute;left:" + left + "px;top:" + top + "px;max-width:none;" + (extra || "");
-            return img;
+          if (!window.__ARXON_SPLASH_AT__) window.__ARXON_SPLASH_AT__ = Date.now();
+          var stage = document.getElementById("arxon-boot-stage");
+          if (stage) {
+            var vw = Math.max(window.innerWidth || 390, 1);
+            var vh = Math.max(window.innerHeight || 844, 1);
+            var cover = Math.max(vw / 390, vh / 844);
+            stage.style.transform =
+              "translate(" + (vw - 390 * cover) / 2 + "px," + (vh - 844 * cover) / 2 + "px) scale(" + cover + ")";
           }
-          glow.appendChild(absImg("/wallet-figma/welcome/blob.svg", 1147, 1094, -378, -500));
-          glow.appendChild(absImg("/wallet-figma/welcome/arc-white.svg", 1028, 598, -281, -330, "mix-blend-mode:overlay;"));
-          glow.appendChild(absImg("/wallet-figma/welcome/arc-white.svg", 1028, 598, 189, -408, "mix-blend-mode:overlay;"));
-          glow.appendChild(absImg("/wallet-figma/welcome/arc-white.svg", 1028, 598, -691, -408, "mix-blend-mode:overlay;"));
-          glow.appendChild(absImg("/wallet-figma/welcome/arc-pink.svg", 1028, 598, -251, -494, "mix-blend-mode:overlay;"));
-          glow.appendChild(absImg("/wallet-figma/welcome/arc-pink-2.svg", 1028, 598, -338, 68, "mix-blend-mode:overlay;"));
-          phone.appendChild(glow);
-          var mark = absImg("/wallet-figma/wordmark.png", 1280, 500, 77, 375.90625);
-          mark.alt = "Arxon";
-          mark.style.width = "236px";
-          mark.style.height = "92.1875px";
-          mark.style.objectFit = "contain";
-          phone.appendChild(mark);
-          boot.appendChild(phone);
+          try {
+            var splash = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.SplashScreen;
+            if (splash && typeof splash.hide === "function") splash.hide();
+          } catch (e) {}
         }
 
         window.__ARXON_DISMISS_BOOT__ = function () {
           if (!boot) return;
           boot.classList.add("hidden");
-          window.setTimeout(function () {
-            if (boot && boot.parentNode) boot.parentNode.removeChild(boot);
-          }, 280);
+          if (boot.parentNode) boot.parentNode.removeChild(boot);
         };
+
+        if (document.documentElement.classList.contains("arxon-splash-skip")) {
+          window.__ARXON_DISMISS_BOOT__();
+        }
 
         window.__ARXON_MARK_BOOT_FAILED__ = function (reason) {
           showBootError(reason || "The app could not start. Check your connection and try again.");

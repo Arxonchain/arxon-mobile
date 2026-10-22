@@ -58,8 +58,9 @@ export default function AuthPage() {
   }, []);
 
   useEffect(() => {
-    invalidateCaptcha();
-  }, [mode, invalidateCaptcha]);
+    setCaptchaToken(null);
+    setCaptchaVerifiedAt(null);
+  }, [mode]);
 
   // FIX BUG-28: Use useEffect instead of useState() with side effects
   useEffect(() => {
@@ -325,12 +326,18 @@ export default function AuthPage() {
 
             {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
             <TurnstileWidget
-              key={`${mode}-${captchaResetKey}`}
+              key={mode}
               action={mode}
               resetKey={captchaResetKey}
               onVerify={handleCaptchaVerify}
-              onExpire={invalidateCaptcha}
-              onError={invalidateCaptcha}
+              onExpire={() => {
+                setCaptchaToken(null);
+                setCaptchaVerifiedAt(null);
+              }}
+              onError={() => {
+                setCaptchaToken(null);
+                setCaptchaVerifiedAt(null);
+              }}
             />
 
             {/* Forgot password link */}

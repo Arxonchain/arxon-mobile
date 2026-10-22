@@ -71,8 +71,9 @@ export default function AuthLandingV2() {
   }, [searchParams]);
 
   useEffect(() => {
-    invalidateCaptcha();
-  }, [mode, invalidateCaptcha]);
+    setCaptchaToken(null);
+    setCaptchaVerifiedAt(null);
+  }, [mode]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -195,7 +196,7 @@ export default function AuthLandingV2() {
   };
 
   return (
-    <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-4">
+    <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-4 pt-20">
       <style>{`
         @keyframes arxonEarthRoll {
           0% { transform: translate(-50%, -46%) rotate(0deg) scale(1.05); }
@@ -306,8 +307,9 @@ export default function AuthLandingV2() {
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
@@ -351,14 +353,22 @@ export default function AuthLandingV2() {
               </>
             )}
 
+            {captchaRequired ? (
             <TurnstileWidget
-              key={`${mode}-${captchaResetKey}`}
+              key={mode}
               action={mode}
               resetKey={captchaResetKey}
               onVerify={handleCaptchaVerify}
-              onExpire={invalidateCaptcha}
-              onError={invalidateCaptcha}
+              onExpire={() => {
+                setCaptchaToken(null);
+                setCaptchaVerifiedAt(null);
+              }}
+              onError={() => {
+                setCaptchaToken(null);
+                setCaptchaVerifiedAt(null);
+              }}
             />
+            ) : null}
 
             {mode === 'signin' && (
               <button type="button" onClick={() => setMode('forgot')} className="text-sm text-accent hover:text-accent/80">

@@ -5,6 +5,10 @@ import { vaultEntry } from './VaultScreens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
+import { LivePriceChart } from './LivePriceChart';
+import { useDisplayCurrency } from './displayCurrency';
+import { CHART_RANGES, RANGE_SUFFIX, pricedChartSymbol, type ChartRange } from '@/chainWallet/marketChart';
+import { useMarketChart } from '@/hooks/useMarketChart';
 
 const art = (name: string) => `/wallet-figma/token/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -87,26 +91,47 @@ const FRAMES: Record<string, {
       { title: 'Sent', sub: 'To 0x6e5…c310', amount: '-20.00 USDC', fiat: '$20.00', tone: 'out', to: 'tx' },
     ],
   },
+  'token-sol': {
+    title: 'Solana', amount: '0.00 SOL', fiat: '$0.00', change: '0.00% Today', up: true, flat: true,
+    card: { kind: 'receive', title: 'Receive SOL', body: 'Share your address to get started', to: 'receive' },
+    empty: 'Your SOL activity will show up here.',
+  },
 };
-
-const RANGES = ['1H', '1D', '1W', '1M', '1Y', 'All'];
 
 export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
   const hideChrome = useAppHidesFigmaChrome();
   const net = useWalletNetwork();
+  const { format } = useDisplayCurrency();
   const frame = FRAMES[id] ?? FRAMES['token-arx'];
   const liveTok = live?.app
     ? (net === 'testnet' ? live.testnetTokens : live.tokens).find((row) => row.name === frame.title)
       ?? (frame.title === 'Arxon' ? live.testnetTokens[0] : undefined)
     : undefined;
+  const marketSym = live?.app ? pricedChartSymbol(liveTok?.symbol ?? titleSymbol(frame.title)) : null;
+  const [range, setRange] = useState<ChartRange>('1D');
+  const chart = useMarketChart(live?.app ? marketSym : null, range);
+  const chartMove = chart.change;
   const amount = liveTok?.amount ?? frame.amount;
   const fiat = liveTok?.value ?? frame.fiat;
-  const change = liveTok ? `${liveTok.change}${liveTok.change.includes('Today') ? '' : ''}` : frame.change;
+  const change = live?.app && chartMove != null
+    ? `${chartMove > 0 ? '+' : ''}${chartMove.toFixed(2)}% ${RANGE_SUFFIX[range]}`
+    : liveTok
+      ? liveTok.change
+      : frame.change;
+  const changeUp = live?.app && chartMove != null
+    ? chartMove > 0
+    : liveTok
+      ? liveTok.tone === 'up'
+      : frame.up && !frame.flat;
+  const changeFlat = live?.app && chartMove != null
+    ? chartMove === 0
+    : liveTok
+      ? liveTok.tone === 'flat'
+      : !!frame.flat;
   const vaultLabel = live?.app
     ? (net === 'testnet' && frame.title === 'Arxon' && Number(live.shielded) > 0 ? `${live.shielded} ARX in Vault` : undefined)
     : frame.vault;
-  const [range, setRange] = useState('1D');
   const [star, setStar] = useState(false);
   const liveN = liveTok ? Number(liveTok.amount.replace(/[^0-9.]/g, '')) : 0;
   const empty = live?.app ? !(Number.isFinite(liveN) && liveN > 0) : !!frame.empty;
@@ -141,7 +166,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
       <p style={{ position: 'absolute', left: 22, top: 118, margin: 0, fontSize: 34, fontWeight: 700 }}>{amount}</p>
       <p style={{ position: 'absolute', left: 22, top: 166, margin: 0, display: 'flex', gap: 12, fontSize: 15, fontWeight: 500 }}>
         <span style={{ color: '#8b9097' }}>{fiat}</span>
-        <span style={{ color: liveTok ? (liveTok.tone === 'up' ? '#3ddc84' : liveTok.tone === 'down' ? '#ff5c5c' : '#8b9097') : frame.flat ? '#8b9097' : frame.up ? '#3ddc84' : '#ff5c5c' }}>{change}</span>
+        <span style={{ color: changeFlat ? '#8b9097' : changeUp ? '#3ddc84' : '#ff5c5c' }}>{change}</span>
       </p>
 
       {vaultLabel && (
@@ -152,11 +177,15 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
       )}
 
       <div style={{ position: 'absolute', left: 18, top: vaultLabel ? 232 : 206, width: 354, height: vaultLabel ? 124 : 150, overflow: 'hidden' }}>
-        <img src={art(frame.up ? 'chart-up.svg' : 'chart-down.svg')} alt="" width={354} height={150} />
+        {live?.app ? (
+          <LivePriceChart symbol={marketSym} points={chart.points} loading={chart.loading} error={chart.error} width={354} height={vaultLabel ? 124 : 150} formatUsd={format} />
+        ) : (
+          <img src={art(frame.up ? 'chart-up.svg' : 'chart-down.svg')} alt="" width={354} height={150} />
+        )}
       </div>
 
       <div style={{ position: 'absolute', left: 18, top: 372, width: 354, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {RANGES.map((label) => (
+        {CHART_RANGES.map((label) => (
           <button key={label} type="button" onClick={() => setRange(label)} style={{ width: 52, height: 34, border: 'none', borderRadius: 17, background: range === label ? '#2a3447' : 'transparent', color: range === label ? '#accafe' : '#8b9097', fontFamily: font.sans, fontSize: 13, fontWeight: range === label ? 600 : 500, cursor: 'pointer' }}>
             {label}
           </button>
@@ -165,7 +194,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
 
       <div style={{ position: 'absolute', left: 18, top: 432, width: 354, height: 84, display: 'flex', justifyContent: 'space-between', padding: '0 40px', boxSizing: 'border-box' }}>
         <Action label="Send" onClick={() => go(sendTo)}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-        <Action label="Receive" onClick={() => { live?.setReceiveAsset(liveTok?.symbol ?? (frame.title === 'Bitcoin' ? 'BTC' : frame.title === 'Arxon' ? 'ARXt' : frame.title === 'Tether' ? 'USDT' : frame.title === 'USD Coin' ? 'USDC' : 'ETH')); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+        <Action label="Receive" onClick={() => { live?.setReceiveAsset(liveTok?.symbol ?? titleSymbol(frame.title)); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
         <Action label="Swap" onClick={() => go(swapTo)}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
       </div>
 
@@ -187,7 +216,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
 
       <p style={{ position: 'absolute', left: 18, top: activityTop, margin: 0, fontSize: 18, fontWeight: 700 }}>Recent activity</p>
       {(liveRows ? liveRows.length > 0 : frame.rows) && (
-        <button type="button" onClick={() => go('activity')} style={{ position: 'absolute', left: 316, top: activityTop + 5, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: 0 }}>
+        <button type="button" onClick={() => go('activity')} style={{ position: 'absolute', left: 286, top: activityTop - 6, minWidth: 72, minHeight: 40, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer', padding: '8px 4px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           See all
         </button>
       )}
@@ -228,6 +257,15 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
       )}
     </div>
   );
+}
+
+function titleSymbol(title: string) {
+  if (title === 'Bitcoin') return 'BTC';
+  if (title === 'Solana') return 'SOL';
+  if (title === 'Arxon') return 'ARXt';
+  if (title === 'Tether') return 'USDT';
+  if (title === 'USD Coin') return 'USDC';
+  return 'ETH';
 }
 
 function Action({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {

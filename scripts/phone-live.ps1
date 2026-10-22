@@ -25,12 +25,26 @@ function Reverse-Port {
   Write-Host "adb reverse tcp:8080 tcp:8080 ($Udid)"
 }
 
+function Keep-Reverse {
+  # USB reverse dies on cable glitches / adb restarts. Re-apply it while Vite is up.
+  $adbPath = $adb
+  $serial = $Udid
+  Start-Job -Name 'arxon-adb-reverse' -ScriptBlock {
+    param($adbPath, $serial)
+    while ($true) {
+      try { & $adbPath -s $serial reverse tcp:8080 tcp:8080 | Out-Null } catch {}
+      Start-Sleep -Seconds 8
+    }
+  } -ArgumentList $adbPath, $serial | Out-Null
+}
+
 function Serve-Vite {
   $env:CAPACITOR_LIVE_USB = 'true'
   $env:VITE_WALLET_SHELL = 'true'
   $env:VITE_ARXON_UI_V2 = 'true'
   $env:VITE_WORD_FORGE_ENABLED = 'true'
   Reverse-Port
+  Keep-Reverse
   Write-Host 'Vite on http://127.0.0.1:8080 - keep this window open and the cable in.'
   npx vite --mode word-forge --host 127.0.0.1 --port 8080 --strictPort
 }

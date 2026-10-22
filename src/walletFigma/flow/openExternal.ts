@@ -20,22 +20,10 @@ export async function appVersion() {
   return WEB_VERSION;
 }
 
-/** Native WebViews drop window.open, so use the in-app browser there. */
+/** Open http(s) inside Arxon. Never send the user out to Chrome. */
 export async function openExternal(url: string) {
-  if (url.startsWith('mailto:')) {
-    window.location.href = url;
-    return;
-  }
-  try {
-    if (Capacitor.isNativePlatform()) {
-      const { Browser } = await import('@capacitor/browser');
-      await Browser.open({ url });
-      return;
-    }
-  } catch {
-    /* fall through to the web path */
-  }
-  window.open(url, '_blank', 'noopener,noreferrer');
+  const { openInAppBrowse } = await import('./inAppBrowse');
+  openInAppBrowse(url);
 }
 
 export function explorerTxUrl(hash: string, network: WalletNetworkId) {

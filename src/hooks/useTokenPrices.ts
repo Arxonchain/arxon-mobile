@@ -18,7 +18,7 @@ export function useTokenPrices() {
   });
 
   const refresh = useCallback(async () => {
-    setPrices(await loadTokenPrices());
+    setPrices(await loadTokenPrices(Date.now(), { force: true }));
   }, []);
 
   useEffect(() => {

@@ -1,15 +1,9 @@
 /**
- * Cloudflare Turnstile widget — lightweight script-loader wrapper (no extra dependency).
+ * Cloudflare Turnstile widget — explicit render, visible checkbox.
  *
- * Uses explicit rendering + visible managed widget so Capacitor WebViews and locked-down
- * networks get a clear checkbox/challenge instead of a silent interaction-only failure.
- *
- * Script load follows Cloudflare's explicit-render guidance:
- *   api.js?render=explicit  — no async/defer; wait for script.onload, then call render().
- * Do not call turnstile.ready() with an async/defer script tag (Cloudflare warns and can fail).
- *
- * Tokens are single-use. Parents should bump `resetKey` only after a failed auth response
- * (or on mode change / Retry) — never before the request finishes.
+ * Do not remount on error/expire. Remounting is what made "Verifying…" blink and
+ * fail in a loop on the mining login WebView. Parents should bump `resetKey` only
+ * after a failed sign-in, or when the user taps Retry.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { TURNSTILE_SITE_KEY, isTurnstileConfigured } from '@/lib/turnstile';
@@ -31,7 +25,9 @@ interface TurnstileRenderOptions {
   theme?: 'auto' | 'light' | 'dark';
   size?: 'normal' | 'flexible' | 'compact';
   appearance?: 'always' | 'execute' | 'interaction-only';
+  execution?: 'render' | 'execute';
   retry?: 'auto' | 'never';
+  'refresh-expired'?: 'auto' | 'manual' | 'never';
   callback?: (token: string) => void;
   'expired-callback'?: () => void;
   'error-callback'?: (errorCode?: string) => void;
@@ -41,7 +37,12 @@ interface TurnstileRenderOptions {
 const SCRIPT_SRC = 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
 let scriptLoadPromise: Promise<void> | null = null;
 
-/** Poll briefly until window.turnstile.render is available after script load. */
+/** Transient codes: widget is still challenging — do not tear it down. */
+function isTransientTurnstileError(errorCode?: string) {
+  const code = String(errorCode ?? '').trim();
+  return !code || code === '300010';
+}
+
 function waitForTurnstileApi(): Promise<void> {
   if (window.turnstile?.render) return Promise.resolve();
 
@@ -60,10 +61,6 @@ function waitForTurnstileApi(): Promise<void> {
   });
 }
 
-/**
- * Load Turnstile api.js without async/defer, then wait until turnstile.render is available.
- * We gate on script.onload + API presence — never turnstile.ready() with async scripts.
- */
 function loadTurnstileScript(): Promise<void> {
   if (typeof window === 'undefined') {
     return Promise.reject(new Error('Turnstile requires a browser environment'));
@@ -91,7 +88,6 @@ function loadTurnstileScript(): Promise<void> {
         resolve();
         return;
       }
-      // Already finished loading in a prior attempt.
       if (existing.dataset.turnstileLoaded === '1') {
         onReady();
         return;
@@ -103,7 +99,6 @@ function loadTurnstileScript(): Promise<void> {
 
     const script = document.createElement('script');
     script.src = SCRIPT_SRC;
-    // Intentionally NO async/defer — coordinate via onload before render().
     script.onload = () => {
       script.dataset.turnstileLoaded = '1';
       onReady();
@@ -123,10 +118,8 @@ export function TurnstileWidget({
   onExpire,
   onError,
   className,
-  /** Bump after every auth attempt so Success UI cannot outlive a consumed token. */
   resetKey = 0,
 }: {
-  /** Optional Turnstile "action" label, e.g. "signup" / "signin". */
   action?: string;
   onVerify: (token: string) => void;
   onExpire?: () => void;
@@ -159,81 +152,98 @@ export function TurnstileWidget({
   useEffect(() => {
     if (!TURNSTILE_SITE_KEY) return;
     let cancelled = false;
+    setFailed(false);
+    setFailReason(null);
 
-    loadTurnstileScript()
-      .then(() => {
-        if (cancelled || !window.turnstile || !containerRef.current) return;
+    const start = window.setTimeout(() => {
+      loadTurnstileScript()
+        .then(() => {
+          if (cancelled || !window.turnstile || !containerRef.current) return;
 
-        // Clear previous mount artifacts before re-render.
-        containerRef.current.innerHTML = '';
+          if (widgetIdRef.current) {
+            try {
+              window.turnstile.remove(widgetIdRef.current);
+            } catch {
+              /* already gone */
+            }
+            widgetIdRef.current = null;
+          }
+          containerRef.current.innerHTML = '';
 
-        widgetIdRef.current = window.turnstile.render(containerRef.current, {
-          sitekey: TURNSTILE_SITE_KEY,
-          action,
-          theme: 'auto',
-          size: 'flexible',
-          // Visible widget is far more reliable in Capacitor WebViews than interaction-only.
-          appearance: 'always',
-          retry: 'auto',
-          callback: (token) => {
-            setFailed(false);
-            setFailReason(null);
-            onVerifyRef.current(token);
-          },
-          'expired-callback': () => {
-            onExpireRef.current?.();
-          },
-          'timeout-callback': () => {
-            onExpireRef.current?.();
-            setFailed(true);
-            setFailReason(turnstileErrorMessage('timeout'));
-            onErrorRef.current?.('timeout');
-          },
-          'error-callback': (errorCode) => {
-            setFailed(true);
-            setFailReason(turnstileErrorMessage(errorCode));
-            onErrorRef.current?.(errorCode);
-          },
+          widgetIdRef.current = window.turnstile.render(containerRef.current, {
+            sitekey: TURNSTILE_SITE_KEY,
+            action,
+            theme: 'dark',
+            size: 'normal',
+            appearance: 'always',
+            execution: 'render',
+            retry: 'never',
+            'refresh-expired': 'auto',
+            callback: (token) => {
+              setFailed(false);
+              setFailReason(null);
+              onVerifyRef.current(token);
+            },
+            'expired-callback': () => {
+              onExpireRef.current?.();
+            },
+            'timeout-callback': () => {
+              onExpireRef.current?.();
+              setFailed(true);
+              setFailReason(turnstileErrorMessage('timeout'));
+              onErrorRef.current?.('timeout');
+            },
+            'error-callback': (errorCode) => {
+              onExpireRef.current?.();
+              if (isTransientTurnstileError(errorCode)) return;
+              setFailed(true);
+              setFailReason(turnstileErrorMessage(errorCode));
+              onErrorRef.current?.(errorCode);
+            },
+          });
+        })
+        .catch((err: unknown) => {
+          if (cancelled) return;
+          scriptLoadPromise = null;
+          setFailed(true);
+          const networkMsg = turnstileErrorMessage('script_load_failed');
+          setFailReason(
+            err instanceof Error ? `${err.message}. ${networkMsg}` : networkMsg,
+          );
+          onErrorRef.current?.('script_load_failed');
         });
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        scriptLoadPromise = null;
-        setFailed(true);
-        // Script/iframe fetch failures are almost always carrier/DNS blocks of challenges.cloudflare.com
-        const networkMsg = turnstileErrorMessage('script_load_failed');
-        setFailReason(
-          err instanceof Error ? `${err.message}. ${networkMsg}` : networkMsg,
-        );
-        onErrorRef.current?.('script_load_failed');
-      });
+    }, 50);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(start);
       if (widgetIdRef.current && window.turnstile) {
         try {
           window.turnstile.remove(widgetIdRef.current);
         } catch {
-          // widget already gone
+          /* widget already gone */
         }
       }
       widgetIdRef.current = null;
     };
   }, [action, retryNonce, resetKey]);
 
-  if (!TURNSTILE_SITE_KEY) return null;
+  if (!isTurnstileConfigured()) return null;
 
   return (
-    <div className={className}>
-      <div ref={containerRef} className="flex min-h-[65px] justify-center" />
+    <div className={className} data-turnstile-host={typeof window !== 'undefined' ? window.location.hostname : ''}>
+      <div
+        ref={containerRef}
+        className="mx-auto overflow-visible"
+        style={{ width: 300, minHeight: 65 }}
+      />
       {failed && (
         <div className="mt-2 space-y-2 text-center">
           <p className="text-xs text-destructive whitespace-pre-wrap">
             {failReason || turnstileErrorMessage()}
           </p>
           <p className="text-[11px] text-muted-foreground leading-snug">
-            Login requires Cloudflare Turnstile. If your carrier blocks challenges.cloudflare.com,
-            switch to Wi‑Fi — captcha cannot be skipped while Supabase Attack Protection is on.
+            Tap Retry, complete the check, then sign in. If this keeps failing, switch to Wi‑Fi.
           </p>
           <button
             type="button"

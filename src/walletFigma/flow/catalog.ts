@@ -178,7 +178,7 @@ export const SCREENS: Scr[] = [
   s('connected', '07.05 Connected apps', '07 · Unlock & app requests', 'list', {
     title: 'Connected apps',
     body: 'Disconnect any time. This does not move funds.',
-    rows: ['Arxswap · arxswap.arxon', 'Preview dApp · Not connected'],
+    rows: ['WalletConnect sessions'],
     primary: ['Done', 'account'],
   }),
 
@@ -233,6 +233,12 @@ export const SCREENS: Scr[] = [
   s('token-eth', '10.03 Token detail – Ethereum (first-timer)', '10 · Token detail', 'detail', {
     title: 'Ethereum',
     body: '0.00 ETH on Home. Ethereum cannot move into the Vault.',
+    primary: ['Receive', 'receive'],
+    tab: 'home',
+  }),
+  s('token-sol', '10.10 Token detail – Solana', '10 · Token detail', 'detail', {
+    title: 'Solana',
+    body: '0.00 SOL on Home. Live market chart.',
     primary: ['Receive', 'receive'],
     tab: 'home',
   }),
@@ -782,20 +788,19 @@ export const SCREENS: Scr[] = [
 
   s('explore', '23.01 Explore', '23 · Explore', 'list', {
     title: 'Explore',
-    rows: ['Mine ARX', 'Arxswap', 'Claim your ARX', 'Buy', 'Disclosure codes', 'Connected apps'],
+    rows: ['Search', 'dApps', 'Explorers', 'Buy', 'Connected apps'],
     tab: 'explore',
   }),
   s('dapps', '23.02 dApps', '23 · Explore', 'list', {
     title: 'dApps',
-    body: 'Names are placeholders until the list is final.',
-    rows: ['Arxswap · Swap', 'More soon'],
-    primary: ['Arxswap', 'arxswap'],
+    body: 'Uniswap, Jupiter, 1inch, Raydium, Aave, Lido, OpenSea, Magic Eden',
+    rows: ['Uniswap', 'Jupiter', '1inch', 'Raydium', 'Aave', 'OpenSea'],
+    primary: ['Uniswap', 'explore'],
   }),
-  s('arxswap', '23.03 dApp – Arxswap', '23 · Explore', 'detail', {
-    title: 'Arxswap',
-    body: 'Connect to see your address and request payments. Not your phrase.',
-    primary: ['Connect', 'dapp'],
-    secondary: ['Back', 'dapps'],
+  s('arxswap', '23.03 Explore', '23 · Explore', 'list', {
+    title: 'Explore',
+    body: 'In-app browser',
+    primary: ['Back', 'explore'],
   }),
 ];
 

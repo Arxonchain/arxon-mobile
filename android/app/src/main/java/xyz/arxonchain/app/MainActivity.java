@@ -1,21 +1,31 @@
 package xyz.arxonchain.app;
 
 import android.app.Activity;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
+import androidx.annotation.NonNull;
+import androidx.biometric.BiometricManager;
+import androidx.biometric.BiometricPrompt;
+import androidx.core.content.ContextCompat;
 import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
+
+import java.util.concurrent.Executor;
 
 /**
  * Capacitor loads the bundled app via BridgeWebViewClient#shouldInterceptRequest (virtual
@@ -31,18 +41,28 @@ public class MainActivity extends BridgeActivity {
   private static final String TAG = "ArxonCapacitor";
   /** Matches the wallet page background — avoids white flash before OTA paints. */
   private static final int WEBVIEW_BG = Color.parseColor("#050505");
+  private InAppBrowserOverlay inAppBrowser;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
-    SplashScreen.installSplashScreen(this);
+    registerPlugin(ArxonBiometricPlugin.class);
+    SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
+    splashScreen.setKeepOnScreenCondition(() -> false);
     WebView.setWebContentsDebuggingEnabled(true);
     super.onCreate(savedInstanceState);
     getWindow().getDecorView().setBackgroundColor(WEBVIEW_BG);
+    inAppBrowser = new InAppBrowserOverlay(this);
 
     Bridge bridge = getBridge();
     if (bridge != null) {
-      disableWebViewOverscroll(bridge.getWebView());
-      configureWebViewForTurnstile(bridge.getWebView());
+      WebView webView = bridge.getWebView();
+      disableWebViewOverscroll(webView);
+      configureWebViewForTurnstile(webView);
+      if (webView != null) {
+        webView.addJavascriptInterface(new ClipboardBridge(this), "ArxonClipboard");
+        webView.addJavascriptInterface(new BiometricBridge(this), "ArxonBiometric");
+        webView.addJavascriptInterface(new BrowserBridge(this), "ArxonInAppBrowser");
+      }
       bridge.setWebViewClient(new DiagnosticBridgeWebViewClient(bridge, this));
     } else {
       Log.w(TAG, "Bridge was null after onCreate; skipping WebViewClient wrapper");
@@ -55,6 +75,155 @@ public class MainActivity extends BridgeActivity {
     Bridge bridge = getBridge();
     if (bridge != null) {
       disableWebViewOverscroll(bridge.getWebView());
+    }
+  }
+
+  public static final class BrowserBridge {
+    private final MainActivity activity;
+
+    BrowserBridge(MainActivity activity) {
+      this.activity = activity;
+    }
+
+    @JavascriptInterface
+    public void open(String url) {
+      activity.runOnUiThread(() -> {
+        if (activity.inAppBrowser != null) {
+          activity.inAppBrowser.open(url);
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void close() {
+      activity.runOnUiThread(() -> {
+        if (activity.inAppBrowser != null) {
+          activity.inAppBrowser.close();
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void back() {
+      activity.runOnUiThread(() -> {
+        if (activity.inAppBrowser != null) {
+          activity.inAppBrowser.goBack();
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void forward() {
+      activity.runOnUiThread(() -> {
+        if (activity.inAppBrowser != null) {
+          activity.inAppBrowser.goForward();
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void reload() {
+      activity.runOnUiThread(() -> {
+        if (activity.inAppBrowser != null) {
+          activity.inAppBrowser.reload();
+        }
+      });
+    }
+  }
+
+  public static final class BiometricBridge {
+    private final MainActivity activity;
+
+    BiometricBridge(MainActivity activity) {
+      this.activity = activity;
+    }
+
+    @JavascriptInterface
+    public void verify(String requestId, String title, String subtitle) {
+      activity.runOnUiThread(() -> activity.showBiometricPrompt(requestId, title, subtitle));
+    }
+  }
+
+  void showBiometricPrompt(String requestId, String title, String subtitle) {
+    Executor executor = ContextCompat.getMainExecutor(this);
+    BiometricPrompt prompt = new BiometricPrompt(
+        this,
+        executor,
+        new BiometricPrompt.AuthenticationCallback() {
+          @Override
+          public void onAuthenticationError(int errorCode, @NonNull CharSequence errString) {
+            deliverBioResult(requestId, false, errString == null ? "Canceled." : errString.toString());
+          }
+
+          @Override
+          public void onAuthenticationSucceeded(@NonNull BiometricPrompt.AuthenticationResult result) {
+            deliverBioResult(requestId, true, "");
+          }
+        });
+    String promptTitle = title == null || title.trim().isEmpty() ? "Arxon" : title.trim();
+    BiometricPrompt.PromptInfo.Builder builder = new BiometricPrompt.PromptInfo.Builder()
+        .setTitle(promptTitle)
+        .setNegativeButtonText("Cancel")
+        .setAllowedAuthenticators(
+            BiometricManager.Authenticators.BIOMETRIC_STRONG | BiometricManager.Authenticators.BIOMETRIC_WEAK);
+    if (subtitle != null && !subtitle.trim().isEmpty()) {
+      builder.setSubtitle(subtitle.trim());
+    }
+    try {
+      prompt.authenticate(builder.build());
+    } catch (Exception e) {
+      Log.w(TAG, "Biometric prompt failed to start", e);
+      deliverBioResult(requestId, false, e.getMessage() == null ? "Could not open fingerprint." : e.getMessage());
+    }
+  }
+
+  void deliverBioResult(String requestId, boolean ok, String error) {
+    Bridge bridge = getBridge();
+    WebView webView = bridge != null ? bridge.getWebView() : null;
+    if (webView == null) {
+      return;
+    }
+    String js = "window.__arxonBioResult&&window.__arxonBioResult("
+        + jsString(requestId)
+        + ","
+        + (ok ? "true" : "false")
+        + ","
+        + jsString(error)
+        + ")";
+    webView.post(() -> webView.evaluateJavascript(js, null));
+  }
+
+  private static String jsString(String raw) {
+    if (raw == null) {
+      return "''";
+    }
+    return "'" + raw.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ").replace("\r", "") + "'";
+  }
+
+  public static final class ClipboardBridge {
+    private final Context context;
+
+    ClipboardBridge(Context context) {
+      this.context = context.getApplicationContext();
+    }
+
+    @JavascriptInterface
+    public String read() {
+      try {
+        ClipboardManager manager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (manager == null || !manager.hasPrimaryClip()) {
+          return "";
+        }
+        ClipData clip = manager.getPrimaryClip();
+        if (clip == null || clip.getItemCount() < 1) {
+          return "";
+        }
+        CharSequence text = clip.getItemAt(0).coerceToText(context);
+        return text == null ? "" : text.toString();
+      } catch (Exception e) {
+        Log.w(TAG, "Clipboard read failed", e);
+        return "";
+      }
     }
   }
 

@@ -2,24 +2,21 @@ import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { tabTarget, vaultEntry } from './VaultScreens';
-import { pickWalletTab, useWalletNetwork, WalletTabs } from './WalletTabs';
+import { pickWalletTab, useWalletNetwork, WALLET_TAB_CLEAR, WalletTabs } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { selectedNetwork } from './homeNetworks';
 import { appVersion, HELP_URL, openExternal, PRIVACY_URL, SUPPORT_EMAIL, TERMS_URL, WEB_VERSION } from './openExternal';
+import { DISPLAY_CURRENCIES, readDisplayCurrency, writeDisplayCurrency, type DisplayCode } from './displayCurrency';
+import { ProfileAvatar } from './ProfileAvatar';
+import { useProfilePhoto } from './profilePhoto';
+import { usePullRefresh } from './pullRefresh';
 
 const art = (name: string) => `/wallet-figma/account/${name}`;
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
 const SHORT = 'arx1q8x4…t7c2n4p';
 type Go = (id: string, remember?: boolean) => void;
 
-const CURRENCIES: [string, string][] = [
-  ['USD', 'US Dollar'],
-  ['EUR', 'Euro'],
-  ['GBP', 'British Pound'],
-  ['NGN', 'Nigerian Naira'],
-  ['ZAR', 'South African Rand'],
-];
 const KINDS = ['Bug', 'Transaction', 'Suggestion', 'Other'];
 const SCREENS = new Set(['account', 'currency', 'help', 'report']);
 
@@ -27,19 +24,8 @@ export function isAccountScreen(id: string) {
   return SCREENS.has(id);
 }
 
-const CURRENCY_KEY = 'arxon.currency';
-
-function readCurrency() {
-  try {
-    const saved = localStorage.getItem(CURRENCY_KEY);
-    return CURRENCIES.some(([id]) => id === saved) ? saved! : 'USD';
-  } catch {
-    return 'USD';
-  }
-}
-
 export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
-  const [code, setCode] = useState(readCurrency);
+  const [code, setCode] = useState(readDisplayCurrency);
   const [copied, setCopied] = useState(false);
   const [kind, setKind] = useState('Bug');
   const [note, setNote] = useState('');
@@ -66,7 +52,7 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
       {id === 'currency' && (
         <Currency code={code} onPick={(next) => {
           setCode(next);
-          try { localStorage.setItem(CURRENCY_KEY, next); } catch { /* the choice still applies this session */ }
+          writeDisplayCurrency(next);
           leave('account');
         }} onBack={() => leave('account')} />
       )}
@@ -99,14 +85,17 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
 
 function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { code: string; copied: boolean; onCopy: () => void; go: Go; label: string; shortAddr: string; onLogout: () => void | Promise<void> }) {
   const net = useWalletNetwork();
+  const live = useLiveFrame();
+  const photo = useProfilePhoto(live?.accountIndex ?? 0);
+  const pull = usePullRefresh(() => live?.refresh?.());
   return (
     <>
       <PhoneStatus />
-      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 103, overflowY: 'auto', overflowX: 'hidden' }}>
-        <div style={{ padding: '64px 18px 24px' }}>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', overflowX: 'hidden' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
+        <div style={{ padding: '64px 18px 88px' }}>
           <p style={{ margin: 0, fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>Account</p>
           <div style={{ marginTop: 18, minHeight: 84, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
-            <FigmaImg src={art('avatar.svg')} width={52} height={52} />
+            <ProfileAvatar size={52} photo={photo} accountIndex={live?.accountIndex ?? 0} />
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: 'block', fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{label}</span>
               <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{copied ? 'Copied' : shortAddr}</span>
@@ -118,17 +107,18 @@ function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { cod
           <p style={accountKicker}>SECURITY & PRIVACY</p>
           <div style={accountCard}>
             <Row icon={art('key.svg')} label="Recovery phrase" onClick={() => go('view-verify')} />
-            <Row icon={art('face.svg')} label="Face ID & password" onClick={() => go('face-settings')} />
+            <Row icon={art('face.svg')} label={live?.app ? 'Fingerprint, Face ID & password' : 'Face ID & password'} onClick={() => go('face-settings')} />
             {net === 'testnet' && <Row icon={art('shield.svg')} label="Private mode" value="On" onClick={() => go('privacy')} />}
           </div>
           <p style={accountKicker}>EXTENSIONS</p>
           <div style={accountCard}>
-            <Row letter label="Arxon Mining" value="Not set up" onClick={() => go('mine-entry')} />
+            <Row letter label="Arxon Mining" value={live?.app ? 'Open' : 'Not set up'} onClick={() => go('mine-entry')} />
           </div>
           <p style={accountKicker}>PREFERENCES</p>
           <div style={accountCard}>
             <Row icon={art('dollar.svg')} label="Currency" value={code} onClick={() => go('currency')} />
             <Row icon={art('globe.svg')} label="Network" value={selectedNetwork(net).name} onClick={() => go('network')} />
+            <Row icon="/wallet-figma/explore/apps.svg" label="Connected apps" value={live?.app ? String(live.wcSessions.length) : undefined} onClick={() => go('connected')} />
             <Row icon={art('help.svg')} label="Help & support" onClick={() => go('help')} />
           </div>
           <div style={{ ...accountCard, marginTop: 22 }}>
@@ -165,7 +155,7 @@ function Row({ icon, letter, label, value, onClick }: { icon?: string; letter?: 
   );
 }
 
-function Currency({ code, onPick, onBack }: { code: string; onPick: (code: string) => void; onBack: () => void }) {
+function Currency({ code, onPick, onBack }: { code: string; onPick: (code: DisplayCode) => void; onBack: () => void }) {
   return (
     <>
       <NoteStatus />
@@ -173,7 +163,7 @@ function Currency({ code, onPick, onBack }: { code: string; onPick: (code: strin
       <p style={{ position: 'absolute', left: 24, top: 106, margin: 0, fontSize: 30, fontWeight: 700 }}>Currency</p>
       <p style={{ position: 'absolute', left: 24, top: 152, width: 336, margin: 0, fontSize: 15, color: '#8b9097' }}>Choose how values are shown in Arxon.</p>
       <div style={listCard}>
-        {CURRENCIES.map(([id, name], index) => (
+        {DISPLAY_CURRENCIES.map(([id, name], index) => (
           <button key={id} type="button" onClick={() => onPick(id)} style={{ ...listRow, borderTop: index ? '1px solid #2a3447' : 'none' }}>
             <span>
               <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{id}</span>
@@ -343,7 +333,7 @@ function HomeBar() {
   return <div style={{ position: 'absolute', left: 128, top: 831, width: 134, height: 5, borderRadius: 100, background: '#fff', opacity: 0.25 }} />;
 }
 
-const iconBtn: CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex' };
+const iconBtn: CSSProperties = { width: 40, height: 40, border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const iconBg: CSSProperties = { width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const accountKicker: CSSProperties = { margin: '22px 4px 8px', fontSize: 12, fontWeight: 600, color: '#5c5f64' };
 const accountCard: CSSProperties = { background: '#1c2025', borderRadius: 16, overflow: 'hidden' };

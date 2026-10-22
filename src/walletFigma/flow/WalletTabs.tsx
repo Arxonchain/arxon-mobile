@@ -5,6 +5,9 @@ import { font } from '@/walletFigma/tokens';
 export type WalletTabName = 'Home' | 'Explore' | 'History' | 'Account' | 'Testnet';
 export type WalletNet = 'mainnet' | 'testnet';
 
+/** Keep tabbed lists above the 64px bar at y=728 in the 844 frame. */
+export const WALLET_TAB_CLEAR = 'calc(116px + env(safe-area-inset-bottom, 0px))';
+
 export const WalletNetworkContext = createContext<WalletNet>('mainnet');
 
 export function useWalletNetwork() {
@@ -54,7 +57,8 @@ const ACTIVE_GLOW = 'rgba(172, 202, 254, 0.14)';
 export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSelect: (tab: WalletTabName) => void }) {
   const live = useLiveFrame();
   return (
-    <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 8 }}>
+    <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 8, overflow: 'visible', paddingBottom: live?.app ? 'env(safe-area-inset-bottom, 0px)' : 0 }}>
+      <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: -28, height: 28, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(5,5,5,0) 0%, #050505 100%)' }} />
       <div style={{ display: 'flex', padding: '0 2px' }}>
         {TABS.map((tab) => {
           const on = tab.name === active;

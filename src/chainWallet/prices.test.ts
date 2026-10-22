@@ -33,5 +33,9 @@ describe('token USD quotes', () => {
     expect(quoteFor('ARX', prices)).toEqual(noMarketQuote());
     expect(quoteFor('ETH', prices).usd).toBe(3000);
     expect(quoteFor('USDC', prices).noMarket).toBe(false);
+    prices.BTC.usd = 64000;
+    prices.SOL.usd = 140;
+    expect(quoteFor('BTC', prices).usd).toBe(64000);
+    expect(quoteFor('SOL', prices).usd).toBe(140);
   });
 });

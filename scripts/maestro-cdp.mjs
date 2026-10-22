@@ -178,59 +178,336 @@ function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
 }
 
+const LAYOUT_JS = `(() => {
+  const issues = [];
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const visible = (el) => {
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden' || Number(s.opacity) === 0) return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 1 && r.height > 1;
+  };
+  const label = (el) => (el.getAttribute('aria-label') || el.innerText || el.textContent || '').replace(/\\s+/g, ' ').trim();
+  const nodes = [...document.querySelectorAll('button, [role="tab"], [role="button"], a')].filter(visible);
+  for (const el of nodes) {
+    const r = el.getBoundingClientRect();
+    const text = label(el).slice(0, 80);
+    if (r.width < 24 || r.height < 24) issues.push({ type: 'tiny-hit', text, w: Math.round(r.width), h: Math.round(r.height) });
+    if (!text) issues.push({ type: 'unlabeled', tag: el.tagName, w: Math.round(r.width), h: Math.round(r.height), x: Math.round(r.x), y: Math.round(r.y) });
+    if (r.bottom > vh + 8 && r.top < vh) issues.push({ type: 'clipped-bottom', text, y: Math.round(r.bottom), vh });
+    if (r.top < -8 && r.bottom > 0) issues.push({ type: 'clipped-top', text, y: Math.round(r.top) });
+    if (r.right > vw + 8 && r.left < vw) issues.push({ type: 'clipped-right', text });
+  }
+  const chrome = [...document.querySelectorAll('span, p')].filter(visible).map(label);
+  if (chrome.some((t) => t === '9:41')) issues.push({ type: 'os-chrome', text: '9:41 still visible' });
+  const nav = document.querySelector('nav');
+  if (nav && visible(nav)) {
+    const r = nav.getBoundingClientRect();
+    if (r.bottom > vh + 4) issues.push({ type: 'nav-cropped', bottom: Math.round(r.bottom), vh });
+  }
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[i].getBoundingClientRect();
+    for (let j = i + 1; j < nodes.length; j++) {
+      const b = nodes[j].getBoundingClientRect();
+      const overlap = Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+      const minArea = Math.min(a.width * a.height, b.width * b.height);
+      if (minArea > 0 && overlap / minArea > 0.55) {
+        const ta = label(nodes[i]).slice(0, 40);
+        const tb = label(nodes[j]).slice(0, 40);
+        if (ta && tb && ta !== tb) issues.push({ type: 'overlap', a: ta, b: tb });
+      }
+    }
+  }
+  const cards = [...document.querySelectorAll('button')].filter(visible);
+  for (const el of cards) {
+    const r = el.getBoundingClientRect();
+    const text = label(el).slice(0, 60);
+    if (r.width > 240 && r.height > 88 && r.height < 700) {
+      issues.push({ type: 'stretched-card', text, w: Math.round(r.width), h: Math.round(r.height) });
+    }
+    if (r.width > vw + 12) issues.push({ type: 'wide-card', text, w: Math.round(r.width), vw });
+  }
+  return issues.slice(0, 40);
+})()`;
+
+const SKIP = new Set([
+  'log out', 'logout', 'forgot password?', 'forgot password',
+  'use fingerprint', 'use face id', 'enable fingerprint', 'enable face id',
+  'waiting for fingerprint…', 'waiting for face id…',
+  'show password', 'hide password',
+  'mining', 'wallet',
+]);
+
+const TAB_LABELS = ['Home', 'Explore', 'History', 'Account', 'Testnet'];
+
+function skipLabel(text) {
+  const t = String(text || '').toLowerCase().trim();
+  if (!t) return true;
+  if (SKIP.has(t)) return true;
+  if (t.includes('waiting for')) return true;
+  if (t.includes('mine arx') || t.includes('arxon mining')) return true;
+  if (t === 'complete security check' || t.includes('retry verification')) return true;
+  return false;
+}
+
+function isChromeTab(text) {
+  return TAB_LABELS.includes(text) || text === 'Wallet' || text === 'Mining';
+}
+
+function screenKey(ui) {
+  const head = (ui.headings || []).slice(0, 3).join('|');
+  const btns = (ui.buttons || []).map((b) => b.text).slice(0, 12).join('|');
+  return `${ui.path || ''}::${head}::${btns}`;
+}
+
 async function walk() {
   const dir = resolve('maestro/out');
   mkdirSync(dir, { recursive: true });
   const report = [];
+  const bugs = [];
+  const seen = new Set();
 
   adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
   adb('shell', 'cmd', 'statusbar', 'collapse');
-  adb('shell', 'am', 'start', '-n', 'xyz.arxonchain.app/.MainActivity');
-  await sleep(2000);
+  await sleep(800);
+
+  return withSession(async (session) => {
+    const step = async (name) => {
+      await sleep(800);
+      const ui = await dump(session);
+      let layout = [];
+      try {
+        layout = await evalJson(session, LAYOUT_JS) || [];
+      } catch {
+        layout = [];
+      }
+      const png = resolve(dir, `${String(report.length).padStart(2, '0')}-${name.replace(/[^a-z0-9-]+/gi, '-').slice(0, 40)}.png`);
+      if (layout.length || ui.toast || report.length === 0) {
+        try { adbShot(png); } catch { /* shot optional */ }
+      }
+      const labels = labelsOf(ui);
+      const entry = { name, toast: ui.toast, path: ui.path, mode: ui.mode, buttons: labels, headings: ui.headings, body: ui.body, layout, shot: png };
+      report.push(entry);
+      for (const issue of layout) bugs.push({ screen: name, ...issue });
+      if (ui.toast) bugs.push({ screen: name, type: 'toast', text: ui.toast });
+      return { ...ui, labels, layout };
+    };
+
+    const ensureWallet = async () => {
+      const now = await dump(session);
+      if (now.mode === 'mining' || (String(now.body || '').includes('Welcome Back') && (now.buttons || []).some((b) => b.text === 'Wallet'))) {
+        const hasWallet = (now.buttons || []).some((b) => b.text === 'Wallet');
+        if (hasWallet) await click('Wallet', session);
+        await sleep(500);
+      }
+    };
+
+    const goHome = async () => {
+      await ensureWallet();
+      const now = await dump(session);
+      if ((now.headings || []).some((h) => /account 01|tokens/i.test(h)) && now.mode !== 'mining') return;
+      const backBtn = findBack(now);
+      if (backBtn) {
+        await click(backBtn.aria || backBtn.text, session);
+        await sleep(400);
+      }
+      const later = await dump(session);
+      if (later.mode === 'mining') {
+        await click('Wallet', session);
+        await sleep(400);
+      }
+      const after = await dump(session);
+      if (!(after.buttons || []).some((b) => b.text === 'Home')) return;
+      await click('Home', session);
+    };
+
+    await step('start');
+
+    const openInner = async (labels) => {
+      for (const label of labels) {
+        const now = await dump(session);
+        const has = (now.buttons || []).some((b) => (b.text || '').toLowerCase().includes(String(label).toLowerCase()));
+        if (!has) continue;
+        const res = await click(label, session);
+        const ui = await step(`tap-${String(label).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28)}`);
+        report[report.length - 1].click = res;
+        if (!res?.ok) bugs.push({ screen: ui.headings?.[0] || 'unknown', type: 'click-miss', text: label, available: res?.available?.slice?.(0, 12) });
+        const key = screenKey(ui);
+        if (!seen.has(key)) {
+          seen.add(key);
+          const inner = (ui.buttons || []).map((b) => b.text).filter((t) => !skipLabel(t) && !isChromeTab(t));
+          for (const t of inner.slice(0, 10)) {
+            if (seen.has(`btn:${t}`)) continue;
+            const hit = await click(t, session);
+            if (!hit?.ok) continue;
+            seen.add(`btn:${t}`);
+            await step(`inner-${String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`);
+            const backBtn = findBack(await dump(session));
+            if (backBtn) await click(backBtn.aria || backBtn.text, session);
+          }
+        }
+        seen.add(`btn:${label}`);
+        await goHome();
+      }
+    };
+
+    await ensureWallet();
+    const seed = await dump(session);
+    const homeTaps = (seed.buttons || []).map((b) => b.text).filter((t) => !skipLabel(t) && !isChromeTab(t));
+    await openInner(homeTaps);
+
+    for (const tab of TAB_LABELS) {
+      await goHome();
+      const res = await click(tab, session);
+      const ui = await step(`tab-${tab.toLowerCase()}`);
+      report[report.length - 1].click = res;
+      if (tab === 'Account') {
+        for (const row of ['Fingerprint, Face ID & password', 'Face ID & password', 'Help & support', 'Currency', 'Privacy', 'WalletConnect', 'Address book', 'Backup']) {
+          const latest = await dump(session);
+          const hit = (latest.buttons || []).find((b) => b.text.toLowerCase().includes(row.toLowerCase()));
+          if (!hit) continue;
+          await click(hit.text, session);
+          await step(`account-${row.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`);
+          await goHome();
+          await click('Account', session);
+        }
+      } else if (tab !== 'Home') {
+        const inner = (ui.buttons || []).map((b) => b.text).filter((t) => !skipLabel(t) && !isChromeTab(t));
+        for (const t of inner.slice(0, 8)) {
+          if (seen.has(`tabbtn:${t}`)) continue;
+          const hit = await click(t, session);
+          if (!hit?.ok) continue;
+          seen.add(`tabbtn:${t}`);
+          await step(`tabinner-${String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 24)}`);
+          const backBtn = findBack(await dump(session));
+          if (backBtn) await click(backBtn.aria || backBtn.text, session);
+          await sleep(300);
+          await click(tab, session);
+        }
+      }
+    }
+
+    await goHome();
+    await step('wallet-home-end');
+
+    writeFileSync(resolve(dir, 'report.json'), JSON.stringify({ bugs, report }, null, 2));
+    return { steps: report.length, bugs: bugs.length, out: dir, bugTypes: [...new Set(bugs.map((b) => b.type))] };
+  });
+}
+
+async function walkExplore() {
+  const dir = resolve('maestro/out/explore');
+  mkdirSync(dir, { recursive: true });
+  const report = [];
+  const bugs = [];
+
+  adb('shell', 'input', 'keyevent', 'KEYCODE_WAKEUP');
+  adb('shell', 'cmd', 'statusbar', 'collapse');
+  await sleep(600);
 
   return withSession(async (session) => {
     const step = async (name) => {
       await sleep(700);
       const ui = await dump(session);
-      const png = resolve(dir, `${String(report.length).padStart(2, '0')}-${name}.png`);
-      adbShot(png);
+      let layout = [];
+      try {
+        layout = await evalJson(session, LAYOUT_JS) || [];
+      } catch {
+        layout = [];
+      }
+      const png = resolve(dir, `${String(report.length).padStart(2, '0')}-${name.replace(/[^a-z0-9-]+/gi, '-').slice(0, 40)}.png`);
+      try { adbShot(png); } catch { /* shot optional */ }
       const labels = labelsOf(ui);
-      report.push({ name, toast: ui.toast, path: ui.path, mode: ui.mode, buttons: labels, body: ui.body, shot: png });
-      return { ...ui, labels };
+      report.push({ name, toast: ui.toast, path: ui.path, mode: ui.mode, buttons: labels, headings: ui.headings, body: ui.body, layout, shot: png });
+      for (const issue of layout) bugs.push({ screen: name, ...issue });
+      if (ui.toast) bugs.push({ screen: name, type: 'toast', text: ui.toast });
+      return { ...ui, labels, layout };
     };
 
-    const home = await step('home');
-
-    for (const [name, label] of [['send', 'Send'], ['receive', 'Receive'], ['swap', 'Swap'], ['more', 'More']]) {
+    const tap = async (label) => {
       const res = await click(label, session);
-      const ui = await step(name);
-      report[report.length - 1].click = res;
-      if (name === 'more' && ui.labels.includes('Buy')) {
-        await click('Buy', session);
-        await step('buy');
-      }
+      if (!res?.ok) bugs.push({ screen: report.at(-1)?.name || 'unknown', type: 'click-miss', text: label, available: res?.available?.slice?.(0, 16) });
+      return res;
+    };
+
+    const backHere = async () => {
       const now = await dump(session);
       const backBtn = findBack(now);
-      if (backBtn) await click(backBtn.aria || backBtn.text, session);
-      else await click('Home', session);
-      await step(`after-${name}`);
+      if (backBtn) {
+        await click(backBtn.aria || backBtn.text, session);
+        await sleep(400);
+        return;
+      }
+      await tap('Explore');
+    };
+
+    const now = await dump(session);
+    if (now.mode === 'mining') {
+      await tap('Wallet');
+      await sleep(400);
+    }
+    if ((now.body || '').toLowerCase().includes('enter your password') || (now.buttons || []).some((b) => b.text === 'Unlock')) {
+      writeFileSync(resolve(dir, 'report.json'), JSON.stringify({ bugs: [{ screen: 'unlock', type: 'locked', text: 'Wallet is locked; unlock to audit Explore.' }], report: [{ name: 'locked', ...now }] }, null, 2));
+      return { steps: 1, bugs: 1, out: dir, bugTypes: ['locked'] };
+    }
+    await tap('Explore');
+    await step('explore-start');
+
+    for (const chip of ['All', 'Browser', 'dApps', 'Tools']) {
+      await tap(chip);
+      await step(`explore-chip-${chip.toLowerCase()}`);
+      try {
+        const cards = await evalJson(session, `(() => {
+          const issues = [];
+          const vw = window.innerWidth;
+          for (const el of document.querySelectorAll('button')) {
+            const r = el.getBoundingClientRect();
+            const text = (el.innerText || '').replace(/\\s+/g, ' ').trim().slice(0, 48);
+            if (r.width > 240 && r.height > 88 && r.height < 700) issues.push({ type: 'stretched-card', text, h: Math.round(r.height), w: Math.round(r.width) });
+            if (r.width > vw + 12) issues.push({ type: 'wide-card', text, w: Math.round(r.width), vw });
+          }
+          const native = !!window.ArxonInAppBrowser;
+          return { native, issues };
+        })()`);
+        report[report.length - 1].cards = cards;
+        for (const issue of cards?.issues || []) bugs.push({ screen: `explore-chip-${chip.toLowerCase()}`, ...issue });
+      } catch { /* ignore */ }
     }
 
-    for (const tab of ['Explore', 'History', 'Account', 'Testnet', 'Home']) {
-      const res = await click(tab, session);
-      await step(`tab-${tab.toLowerCase()}`);
-      report[report.length - 1].click = res;
+    await tap('All');
+    await sleep(300);
+    await tap('See all');
+    await step('explore-dapps-list');
+    await backHere();
+    await tap('Explore');
+    await sleep(300);
+
+    await tap('Tools');
+    await sleep(300);
+    await tap('Buy crypto');
+    await step('explore-buy');
+    await backHere();
+    await tap('Explore');
+    await tap('Tools');
+    await tap('Connected apps');
+    await step('explore-connected');
+    await backHere();
+
+    await tap('Explore');
+    await tap('Refresh');
+    await step('explore-refresh');
+
+    for (const tab of TAB_LABELS) {
+      await tap(tab);
+      await step(`wallet-tab-${tab.toLowerCase()}`);
     }
 
-    if (home.labels.includes('Mining')) {
-      await click('Mining', session);
-      await step('mining');
-      await click('Wallet', session);
-      await step('wallet-again');
-    }
+    await tap('Explore');
+    await step('explore-end');
 
-    writeFileSync(resolve(dir, 'report.json'), JSON.stringify(report, null, 2));
-    return { steps: report.length, out: dir };
+    writeFileSync(resolve(dir, 'report.json'), JSON.stringify({ bugs, report }, null, 2));
+    return { steps: report.length, bugs: bugs.length, out: dir, bugTypes: [...new Set(bugs.map((b) => b.type))] };
   });
 }
 
@@ -246,8 +523,9 @@ try {
   else if (cmd === 'eval') result = await withSession((s) => evalJson(s, arg));
   else if (cmd === 'shot') result = await shot(arg || 'maestro/out/shot.png');
   else if (cmd === 'walk') result = await walk();
+  else if (cmd === 'explore') result = await walkExplore();
   else {
-    console.error('dump | buttons | click <text> | back | eval <js> | shot <file> | walk');
+    console.error('dump | buttons | click <text> | back | eval <js> | shot <file> | walk | explore');
     process.exit(2);
   }
   console.log(JSON.stringify(result, null, 2));

@@ -9,6 +9,11 @@ import { useAppHidesFigmaChrome } from './appChrome';
 import { NetworkSheet } from './ReceiveScreens';
 import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { font } from '@/walletFigma/tokens';
+import { ProfileAvatar } from './ProfileAvatar';
+import { useProfilePhoto } from './profilePhoto';
+import { usePullRefresh } from './pullRefresh';
+import { openExternal } from './openExternal';
+import { HomeMarket } from './HomeMarket';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
 
@@ -48,7 +53,7 @@ const AFTER_VAULT: Tok[] = [
 ];
 
 const CARDS: { title: string; body: string; kind: 'fund' | 'mine'; to: string }[] = [
-  { title: 'Fund your wallet', body: 'Add ARX to get started', kind: 'fund', to: 'receive' },
+  { title: 'Fund your wallet', body: 'Receive crypto to get started', kind: 'fund', to: 'receive' },
   { title: 'Mine ARX-P', body: 'Earn ARX-P in the mining app', kind: 'mine', to: 'mine-entry' },
 ];
 
@@ -90,11 +95,11 @@ function useNetworkSheet(scope: WalletNet, go: Go) {
 function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () => void; behind?: string }) {
   const live = useLiveFrame();
   const hideChrome = useAppHidesFigmaChrome();
+  const photo = useProfilePhoto(live?.accountIndex ?? 0);
   const network = useNetworkSheet('mainnet', go);
   const [localHide, setLocalHide] = useState(false);
   const cards = useRef<HTMLDivElement>(null);
-  const sheet = id === 'more';
-  const view = sheet && behind && behind !== 'more' ? behind : id === 'more' ? 'home-funded' : id;
+  const view = id === 'more' ? 'home-funded' : id;
   const liveRows = live?.app ? live.tokens : null;
   const liveFunded = !!liveRows?.some((token) => {
     const n = Number(token.amount.replace(/[^0-9.]/g, ''));
@@ -103,7 +108,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
   const empty = liveRows ? !liveFunded : view === 'home' || view === 'home-hidden';
   const hidden = live?.app
     ? live.hidden || view === 'home-hidden'
-    : view === 'home-hidden' || (!empty && !sheet && localHide);
+    : view === 'home-hidden' || (!empty && localHide);
   const vaulted = view === 'home-vaulted' || view === 'home-unvaulted';
   rememberTabs(empty ? 'empty' : vaulted ? 'vaulted' : 'funded');
 
@@ -147,6 +152,12 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
     return vaultEntry('vault-empty');
   }
 
+  const compact = !!live?.app;
+  const y = compact
+    ? { header: 86, bal: 148, act: 228, cards: 324, cardH: 136, tok: 476, list: 504 }
+    : { header: 58, bal: 126, act: 236, cards: 340, cardH: 172, tok: 528, list: 567 };
+  const pull = usePullRefresh(() => live?.refresh?.());
+
   return (
     <div style={{ position: 'relative', width: 390, height: live?.app || !(liveRows && empty) ? 844 : 1040, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.home-cards,.arxon-token-scroll{scrollbar-width:none;-ms-overflow-style:none}.home-cards::-webkit-scrollbar,.arxon-token-scroll::-webkit-scrollbar{display:none;width:0;height:0}`}</style>
@@ -157,56 +168,59 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       </div>
       )}
 
-      <header style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <button type="button" aria-label="Select network" onClick={network.show} style={plain}>
-          <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />
-          <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
-          <FigmaImg src={art('chev.svg')} width={16} height={16} />
-        </button>
-        <div style={{ display: 'flex', gap: 10 }}>
+      <header style={{ position: 'absolute', left: 18, top: y.header, width: 354, height: compact ? 40 : 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          {live?.app ? (
+            <ProfileAvatar size={36} photo={photo} accountIndex={live.accountIndex} onOpen={() => go('account')} />
+          ) : (
+            <span style={{ width: 36, height: 36, borderRadius: 18, background: '#1c2025' }} />
+          )}
+          <button type="button" aria-label="Select network" onClick={network.show} style={{ ...plain, minHeight: 40 }}>
+            <span style={{ fontSize: compact ? 15 : 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
+            <FigmaImg src={art('chev.svg')} width={16} height={16} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', gap: compact ? 8 : 10 }}>
           <CircleBtn label="Search" onClick={() => go('search')}><FigmaImg src={art('search.svg')} width={20} height={20} /></CircleBtn>
           <CircleBtn label="Notifications" onClick={() => go('notifications')}><FigmaImg src={art('bell.svg')} width={20} height={20} /></CircleBtn>
         </div>
       </header>
 
-      <div style={{ position: 'absolute', left: 22, top: 126, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+      <div style={{ position: 'absolute', left: 22, top: y.bal, display: 'flex', flexDirection: 'column', gap: compact ? 8 : 6 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           {hidden ? (
-            <span style={{ fontSize: 44, fontWeight: 500, letterSpacing: 1, lineHeight: 1 }}>••••••</span>
+            <span style={{ fontSize: compact ? 34 : 44, fontWeight: 500, letterSpacing: 1, lineHeight: 1 }}>••••••</span>
           ) : (
-            <span style={{ fontSize: 48, fontWeight: 700, lineHeight: 1 }}>{total}</span>
+            <span style={{ fontSize: compact ? 36 : 48, fontWeight: 700, lineHeight: 1 }}>{total}</span>
           )}
           <button type="button" aria-label={hidden ? 'Show balance' : 'Hide balance'} onClick={eye} style={iconBtn}>
             <FigmaImg src={art(hidden ? 'eye-off.svg' : 'eye.svg')} width={22} height={22} />
           </button>
         </div>
-        <span style={{ fontSize: 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
+        <span style={{ fontSize: compact ? 13 : 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: 236, width: 354, display: 'flex', gap: 14 }}>
-        <Action label="Send" onClick={() => go(sendTo())}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-        <Action label="Receive" onClick={() => { live?.setReceiveAsset(network.picked.asset); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
-        <Action label="Swap" onClick={() => go(vaulted ? 'swap-vault' : 'swap')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
-        <button type="button" onClick={() => go('more')} style={actionBtn}>
-          <FigmaImg src={art('more.svg')} width={58} height={58} />
-          <span style={actionLabel}>More</span>
-        </button>
+      <div style={{ position: 'absolute', left: 18, top: y.act, width: 354, display: 'flex', justifyContent: 'space-between' }}>
+        <Action label="Send" onClick={() => go(sendTo())}><FigmaImg src={art('send.svg')} width={compact ? 22 : 24} height={compact ? 22 : 24} /></Action>
+        <Action label="Receive" onClick={() => { live?.setReceiveAsset(network.picked.asset); go('receive'); }}><FigmaImg src={art('receive.svg')} width={compact ? 22 : 24} height={compact ? 22 : 24} /></Action>
+        <Action label="Swap" onClick={() => go(vaulted ? 'swap-vault' : 'swap')}><FigmaImg src={art('swap.svg')} width={compact ? 22 : 24} height={compact ? 22 : 24} /></Action>
+        <Action label="Buy crypto" onClick={() => go('buy')}><FigmaImg src={art('buy.svg')} width={compact ? 22 : 24} height={compact ? 22 : 24} /></Action>
       </div>
 
-      <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: 340, width: 390, display: 'flex', gap: 12, overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
+      <div ref={cards} className="home-cards" style={{ position: 'absolute', left: 0, top: y.cards, width: 390, height: y.cardH, display: 'flex', gap: 10, alignItems: 'stretch', overflowX: 'auto', overflowY: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x', padding: '0 18px', boxSizing: 'border-box' }}>
         {CARDS.map((card) => (
           <StartCard key={card.title} kind={card.kind} title={card.title} body={card.body} onClick={() => go(card.to)} />
         ))}
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: 492, width: 354, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontSize: 18, fontWeight: 700 }}>Tokens</span>
-        <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
+      <div style={{ position: 'absolute', left: 18, top: y.tok, width: 354, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: compact ? 16 : 18, fontWeight: 700 }}>Tokens</span>
+        <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: compact ? 13 : 14, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>Manage</button>
       </div>
 
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: 531, width: 354, bottom: 80, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: y.list, width: 354, bottom: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', paddingBottom: compact ? 'calc(72px + env(safe-area-inset-bottom, 0px))' : 80 }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
         {tokens.map((token) => (
-          <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={tokenRow}>
+          <button key={token.name} type="button" onClick={() => { if (live?.app && token.symbol) live.setReceiveAsset(token.symbol); go(token.to); }} style={compact ? compactTokenRow : tokenRow}>
             <TokenIcon kind={token.icon} />
             <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4, textAlign: 'left' }}>
               <span style={{ fontSize: 16, fontWeight: 600 }}>{token.name}</span>
@@ -218,16 +232,12 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
             </span>
           </button>
         ))}
+        <HomeMarket go={go} />
       </div>
 
       <WalletTabs
         active="Home"
         onSelect={(tab: WalletTabName) => {
-          if (tab === 'Home' && sheet) {
-            if (back) back();
-            else go('home-funded', false);
-            return;
-          }
           pickWalletTab('mainnet', tab, go, {
             home: empty ? 'home' : 'home-funded',
             vault: vaultTo(),
@@ -235,35 +245,18 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
           });
         }}
       />
-
-      {sheet && (
-        <div style={live?.app ? appSheetLayer : { position: 'absolute', inset: 0, zIndex: 6 }}>
-          <button type="button" aria-label="Close" onClick={() => (back ? back() : go('home-funded', false))} style={scrim} />
-          <div style={live?.app ? appSheetBox : sheetBox}>
-            <div style={{ position: 'absolute', left: 174, top: 9, width: 40, height: 4, borderRadius: 4, background: '#293347' }} />
-            <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 18, fontWeight: 700 }}>More</p>
-            <button type="button" onClick={() => go('buy')} style={{ ...actionBtn, position: 'absolute', left: 17, top: 79 }}>
-              <span style={circle}><FigmaImg src={art('buy.svg')} width={24} height={24} /></span>
-              <span style={actionLabel}>Buy</span>
-            </button>
-            <button type="button" onClick={() => go('mine-entry')} style={{ ...actionBtn, position: 'absolute', left: 109, top: 79 }}>
-              <span style={circle}><span style={{ color: '#abc9ff', fontSize: 20, fontWeight: 700 }}>M</span></span>
-              <span style={actionLabel}>Mine</span>
-            </button>
-          </div>
-        </div>
-      )}
       {network.sheet}
     </div>
   );
 }
 
-function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () => void; behind?: string }) {
+function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: string }) {
   const live = useLiveFrame();
+  const pull = usePullRefresh(() => live?.refresh?.());
   const hideChrome = useAppHidesFigmaChrome();
+  const photo = useProfilePhoto(live?.accountIndex ?? 0);
   const network = useNetworkSheet('testnet', go);
   const [added, setAdded] = useState(() => sessionStore.testnetAdded());
-  const sheet = id === 'more';
   const on = live?.app ? live.testnetAdded : added;
   const hidden = live?.app ? live.hidden : false;
   const tokens = on ? (live?.app ? live.testnetTokens : DEMO_TESTNET) : [];
@@ -289,7 +282,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       live.openFaucet();
       return;
     }
-    window.open(START_URL, '_blank', 'noopener,noreferrer');
+    void openExternal(START_URL);
   }
 
   return (
@@ -301,13 +294,19 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         </div>
       )}
 
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: hideChrome ? 12 : 44, width: 390, bottom: 80, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '16px 16px 24px' }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: live?.app ? 72 : hideChrome ? 12 : 44, width: 390, bottom: 0, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: live?.app ? '8px 16px 0' : '16px 16px 0', paddingBottom: 'calc(72px + env(safe-area-inset-bottom, 0px))' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
         <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 40, marginBottom: 16 }}>
-          <button type="button" aria-label="Select network" onClick={network.show} style={plain}>
-            <img src={art('avatar.png')} alt="" width={36} height={36} style={{ borderRadius: 18 }} />
-            <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
-            <FigmaImg src={art('chev.svg')} width={16} height={16} />
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+            {live?.app ? (
+              <ProfileAvatar size={36} photo={photo} accountIndex={live.accountIndex} onOpen={() => go('account')} />
+            ) : (
+              <span style={{ width: 36, height: 36, borderRadius: 18, background: '#1c2025' }} />
+            )}
+            <button type="button" aria-label="Select network" onClick={network.show} style={{ ...plain, minHeight: 40 }}>
+              <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
+              <FigmaImg src={art('chev.svg')} width={16} height={16} />
+            </button>
+          </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <CircleBtn label="Search" onClick={() => go('search')}><FigmaImg src={art('search.svg')} width={20} height={20} /></CircleBtn>
             <CircleBtn label="Notifications" onClick={() => go('notifications')}><FigmaImg src={art('bell.svg')} width={20} height={20} /></CircleBtn>
@@ -334,13 +333,14 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: on ? 16 : 24 }}>
-          <Action label="Send" onClick={() => go('send-token')}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
-          <Action label="Receive" onClick={() => { live?.setReceiveAsset('ARXt'); go('receive'); }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
-          <Action label="Swap" onClick={() => go('swap')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
-          <button type="button" onClick={() => go('more')} style={actionBtn}>
-            <FigmaImg src={art('more.svg')} width={58} height={58} />
-            <span style={actionLabel}>More</span>
-          </button>
+          <Action label="Send" onClick={() => go(on ? 'send-token' : 'add-network')}><FigmaImg src={art('send.svg')} width={24} height={24} /></Action>
+          <Action label="Receive" onClick={() => {
+            if (!on) { go('add-network'); return; }
+            live?.setReceiveAsset('ARXt');
+            go('receive');
+          }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
+          <Action label="Swap" onClick={() => go(on ? 'swap' : 'add-network')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
+          <Action label="Buy crypto" onClick={() => go('buy')}><FigmaImg src={art('buy.svg')} width={24} height={24} /></Action>
         </div>
 
         {!on ? (
@@ -358,7 +358,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
             <button type="button" onClick={openFaucet} style={ghostBtn}>Faucet · tARX</button>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 18, fontWeight: 700 }}>Tokens</span>
-              <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500 }}>Manage</button>
+              <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>Manage</button>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               {tokens.map((token) => (
@@ -375,6 +375,7 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
                 </button>
               ))}
             </div>
+            <HomeMarket go={go} />
           </div>
         )}
       </div>
@@ -382,11 +383,6 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
       <WalletTabs
         active="Testnet"
         onSelect={(tab: WalletTabName) => {
-          if (tab === 'Testnet' && sheet) {
-            if (back) back();
-            else go('testnet', false);
-            return;
-          }
           pickWalletTab('testnet', tab, go, {
             home: 'home-funded',
             vault: vaultTo(),
@@ -394,24 +390,6 @@ function TestnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
           });
         }}
       />
-
-      {sheet && (
-        <div style={live?.app ? appSheetLayer : { position: 'absolute', inset: 0, zIndex: 6 }}>
-          <button type="button" aria-label="Close" onClick={() => (back ? back() : go('testnet', false))} style={scrim} />
-          <div style={live?.app ? appSheetBox : sheetBox}>
-            <div style={{ position: 'absolute', left: 174, top: 9, width: 40, height: 4, borderRadius: 4, background: '#293347' }} />
-            <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 18, fontWeight: 700 }}>More</p>
-            <button type="button" onClick={() => go('buy')} style={{ ...actionBtn, position: 'absolute', left: 17, top: 79 }}>
-              <span style={circle}><FigmaImg src={art('buy.svg')} width={24} height={24} /></span>
-              <span style={actionLabel}>Buy</span>
-            </button>
-            <button type="button" onClick={() => go('mine-entry')} style={{ ...actionBtn, position: 'absolute', left: 109, top: 79 }}>
-              <span style={circle}><span style={{ color: '#abc9ff', fontSize: 20, fontWeight: 700 }}>M</span></span>
-              <span style={actionLabel}>Mine</span>
-            </button>
-          </div>
-        </div>
-      )}
       {network.sheet}
     </div>
   );
@@ -430,18 +408,20 @@ function toneColor(tone: Tok['tone']) {
 }
 
 function CircleBtn({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  const size = 40;
   return (
-    <button type="button" aria-label={label} onClick={onClick} style={{ width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
+    <button type="button" aria-label={label} onClick={onClick} style={{ width: size, height: size, borderRadius: size / 2, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
       {children}
     </button>
   );
 }
 
 function Action({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+  const compact = !!useLiveFrame()?.app;
   return (
-    <button type="button" onClick={onClick} style={actionBtn}>
-      <span style={circle}>{children}</span>
-      <span style={actionLabel}>{label}</span>
+    <button type="button" onClick={onClick} style={{ ...actionBtn, gap: compact ? 6 : 8 }}>
+      <span style={{ ...circle, width: compact ? 50 : 58, height: compact ? 50 : 58, borderRadius: compact ? 25 : 29 }}>{children}</span>
+      <span style={{ ...actionLabel, fontSize: compact ? 11 : 12 }}>{label}</span>
     </button>
   );
 }
@@ -456,27 +436,23 @@ function Tab({ label, active, onClick, children }: { label: string; active?: boo
 }
 
 function StartCard({ kind, title, body, onClick }: { kind: 'fund' | 'mine'; title: string; body: string; onClick: () => void }) {
-  if (kind === 'mine') {
-    return (
-      <button type="button" onClick={onClick} style={mineCardBtn}>
-        <img
-          src={art('mine-dashboard.png')}
-          alt=""
-          style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 22%' }}
-        />
-        <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,5,5,0.05) 18%, rgba(5,5,5,0.88) 72%)' }} />
-        <span style={{ position: 'relative', zIndex: 1, padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 4, width: '100%', boxSizing: 'border-box' }}>
-          <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'left' }}>{title}</span>
-          <span style={{ fontSize: 12, fontWeight: 400, color: '#d0d3d8', textAlign: 'left', lineHeight: 1.35 }}>{body}</span>
-        </span>
-      </button>
-    );
-  }
+  const compact = !!useLiveFrame()?.app;
+  const size = compact ? 136 : 172;
+  const cardStyle: CSSProperties = { ...mineCardBtn, width: size, height: size };
+  const artSrc = kind === 'mine' ? art('mine-arxp.jpg') : art('fund-wallet.png');
+  const position = kind === 'mine' ? 'center' : 'center 32%';
   return (
-    <button type="button" onClick={onClick} style={cardBtn}>
-      <FigmaImg src={art('plus.svg')} width={18} height={18} />
-      <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'left' }}>{title}</span>
-      <span style={{ fontSize: 12, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.35 }}>{body}</span>
+    <button type="button" onClick={onClick} style={cardStyle}>
+      <img
+        src={artSrc}
+        alt=""
+        style={{ position: 'absolute', left: 0, top: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: position }}
+      />
+      <span style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(5,5,5,0.08) 35%, rgba(5,5,5,0.82) 100%)' }} />
+      <span style={{ position: 'relative', zIndex: 1, padding: compact ? 10 : 12, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 3, width: '100%', boxSizing: 'border-box' }}>
+        <span style={{ fontSize: compact ? 13 : 14, fontWeight: 600, textAlign: 'left' }}>{title}</span>
+        <span style={{ fontSize: compact ? 11 : 12, fontWeight: 400, color: '#d0d3d8', textAlign: 'left', lineHeight: 1.3 }}>{body}</span>
+      </span>
     </button>
   );
 }
@@ -498,11 +474,7 @@ function TokenIcon({ kind }: { kind: Tok['icon'] }) {
     );
   }
   if (kind === 'sol') {
-    return (
-      <span style={{ width: 40, height: 40, borderRadius: 20, background: '#9945ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#fff', fontSize: 13, fontWeight: 700 }}>
-        S
-      </span>
-    );
+    return <img src="/wallet-figma/welcome/sol.png" alt="" width={40} height={40} style={{ borderRadius: 20, objectFit: 'cover', flexShrink: 0 }} />;
   }
   if (kind === 'usdt') return <img src={art('usdt.png')} alt="" width={40} height={40} style={{ borderRadius: 20, objectFit: 'cover' }} />;
   return (
@@ -513,10 +485,10 @@ function TokenIcon({ kind }: { kind: Tok['icon'] }) {
 }
 
 const plain: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
-const iconBtn: CSSProperties = { width: 22, height: 22, padding: 0, border: 'none', background: 'none', cursor: 'pointer' };
+const iconBtn: CSSProperties = { width: 40, height: 40, margin: -9, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 function subTab(on: boolean): CSSProperties {
   return {
-    height: 26,
+    height: 32,
     minWidth: 64,
     padding: '0 12px',
     border: 'none',
@@ -554,13 +526,9 @@ const ghostBtn: CSSProperties = {
   fontWeight: 600,
   cursor: 'pointer',
 };
-const actionBtn: CSSProperties = { width: 78, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
-const actionLabel: CSSProperties = { fontSize: 14, fontWeight: 400, lineHeight: 1 };
+const actionBtn: CSSProperties = { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
+const actionLabel: CSSProperties = { fontSize: 12, fontWeight: 400, lineHeight: 1.15, textAlign: 'center', width: '100%' };
 const circle: CSSProperties = { width: 58, height: 58, borderRadius: 29, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const cardBtn: CSSProperties = { width: 172, height: 132, flexShrink: 0, borderRadius: 16, background: '#1c2025', border: 'none', color: '#fff', padding: 16, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontFamily: font.sans, boxSizing: 'border-box' };
-const mineCardBtn: CSSProperties = { width: 220, height: 132, flexShrink: 0, borderRadius: 16, background: '#0b1118', border: 'none', color: '#fff', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', cursor: 'pointer', fontFamily: font.sans, boxSizing: 'border-box', position: 'relative', overflow: 'hidden' };
+const mineCardBtn: CSSProperties = { width: 172, height: 172, flexShrink: 0, borderRadius: 16, background: '#0b1118', border: 'none', color: '#fff', padding: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', justifyContent: 'flex-end', cursor: 'pointer', fontFamily: font.sans, boxSizing: 'border-box', position: 'relative', overflow: 'hidden' };
 const tokenRow: CSSProperties = { width: '100%', height: 64, display: 'flex', alignItems: 'center', gap: 12, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
-const scrim: CSSProperties = { position: 'absolute', inset: 0, border: 'none', padding: 0, background: 'rgba(0,0,0,0.6)', cursor: 'pointer' };
-const sheetBox: CSSProperties = { position: 'absolute', left: 0, top: 608, width: 390, height: 236, background: '#12171f', border: '1px solid #293347', borderBottom: 'none', borderRadius: '24px 24px 0 0', boxSizing: 'border-box', textAlign: 'left', zIndex: 1 };
-const appSheetLayer: CSSProperties = { position: 'fixed', inset: 0, zIndex: 9 };
-const appSheetBox: CSSProperties = { ...sheetBox, top: 'auto', bottom: 0 };
+const compactTokenRow: CSSProperties = { ...tokenRow, height: 52, minHeight: 52 };
