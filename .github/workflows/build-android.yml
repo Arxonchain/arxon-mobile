@@ -76,6 +76,34 @@ jobs:
       - name: Rename APK
         run: mv android/app/build/outputs/apk/debug/app-debug.apk android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk
 
+      - name: Verify APK is a real zip with arm64-only native libs
+        run: |
+          python3 - <<'PY'
+          import sys, zipfile, pathlib
+          apk = pathlib.Path("android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk")
+          data = apk.read_bytes()
+          if data[:4] != b"PK\x03\x04":
+              sys.exit(f"not a zip/apk: {data[:16]!r}")
+          with zipfile.ZipFile(apk) as z:
+              if z.testzip() is not None:
+                  sys.exit("corrupt zip")
+              names = z.namelist()
+              if "AndroidManifest.xml" not in names:
+                  sys.exit("missing AndroidManifest.xml")
+              if not any(n.endswith(".RSA") or n.endswith(".EC") or n.endswith(".DSA") or n.startswith("META-INF/") for n in names):
+                  sys.exit("missing META-INF")
+              maps = [n for n in names if n.endswith(".map")]
+              if maps:
+                  sys.exit(f"source maps in apk: {maps[:5]}")
+              sos = [n for n in names if n.endswith(".so")]
+              bad_abi = [n for n in sos if n.startswith("lib/x86") or n.startswith("lib/armeabi")]
+              if bad_abi:
+                  sys.exit(f"forbidden abi libs: {bad_abi}")
+              if not any(n.startswith("lib/arm64-v8a/") for n in sos):
+                  sys.exit("missing arm64-v8a native libs")
+              print("ok", apk, "bytes", apk.stat().st_size, "so", sos)
+          PY
+
       # Direct .apk download — GitHub Actions zips often fail to extract on phones.
       # Publish before Actions artifacts so a full storage quota cannot skip this step.
       - name: Publish APK on Releases
@@ -85,6 +113,7 @@ jobs:
           name: Private wallet APK
           body: |
             Sideload only. Uninstall Play Store Arxon and any older private APK first, then install the `.apk` on this release (not the Actions zip).
+            Debug-signed; same package as Play (`xyz.arxonchain.app`) so the store build must be removed first.
           prerelease: true
           make_latest: false
           files: android/app/build/outputs/apk/debug/Arxon-Wallet-Private-${{ github.run_number }}.apk

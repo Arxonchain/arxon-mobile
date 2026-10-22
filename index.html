@@ -326,7 +326,8 @@
     </script>
     <script type="module">
       const path = (location.pathname || '/').replace(/\/$/, '') || '/';
-      if (path === '/flow' || path.indexOf('/flow/') === 0) {
+      // /flow is the design catalog (laptop preview only). Product wallet is App.
+      if (import.meta.env.DEV && (path === '/flow' || path.indexOf('/flow/') === 0)) {
         import('/src/flow-entry.tsx');
       } else {
         import('/src/main.tsx');

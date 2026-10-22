@@ -106,13 +106,13 @@ void (async () => {
     if (!rootEl) throw new Error("Missing #root element");
 
     const path = resolveAppPath();
-    if (path === '/flow' || path.startsWith('/flow/')) {
+    if (import.meta.env.DEV && (path === '/flow' || path.startsWith('/flow/'))) {
       const { default: FlowStudio } = await import("./walletFigma/flow/FlowStudio");
       createRoot(rootEl).render(<FlowStudio />);
       markBootOk();
       return;
     }
-    if (isDevPublicPath(path)) {
+    if (import.meta.env.DEV && isDevPublicPath(path)) {
       const { default: FailureUiPreview } = await import("./pages/dev/FailureUiPreview");
       createRoot(rootEl).render(<FailureUiPreview />);
       markBootOk();

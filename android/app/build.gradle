@@ -13,7 +13,21 @@ android {
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
-            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~:!*.map'
+        }
+        // ML Kit's 32-bit barhopper is 4KB-aligned. Android 15 / Samsung
+        // rejects the whole APK ("package appears to be invalid") if any packed
+        // .so fails 16KB page-size checks. arm64-v8a barhopper is 16KB-aligned.
+        ndk {
+            abiFilters "arm64-v8a"
+        }
+    }
+    packaging {
+        jniLibs {
+            excludes += ["**/armeabi-v7a/**", "**/x86/**", "**/x86_64/**"]
+        }
+        resources {
+            excludes += ["**/*.map"]
         }
     }
     buildTypes {
@@ -23,6 +37,11 @@ android {
         }
     }
 }
+
+// Mutate the default debug keystore config (do not replace storeFile).
+android.signingConfigs.debug.enableV1Signing = true
+android.signingConfigs.debug.enableV2Signing = true
+android.signingConfigs.debug.enableV3Signing = true
 
 repositories {
     flatDir{
