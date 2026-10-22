@@ -1,0 +1,6 @@
+appId: xyz.arxonchain.app
+name: Arxon wallet
+flows:
+  - '*'
+excludeTags:
+  - destructive

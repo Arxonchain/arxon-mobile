@@ -158,7 +158,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return to === 'phrase-done' ? { replace: 'create' } : {};
   }
 
-  if (to === 'swap-success') {
+  if (to === 'swap' || to === 'swap-vault' || to === 'swap-token' || to === 'swap-review' || to === 'swap-success') {
     return { block: true, note: 'Coming soon' };
   }
 
@@ -166,7 +166,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return { block: true, note: 'Privacy is available on Arxon Testnet only.' };
   }
 
-  if (to === 'buy-status') {
+  if (to === 'buy' || to === 'buy-review' || to === 'buy-status') {
     return { block: true, note: 'Coming soon' };
   }
 
@@ -174,7 +174,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return { block: true, note: 'Confirm from the Vault review uses the live send path. Nothing was broadcast from this shortcut.' };
   }
 
-  if (to === 'claim-done') {
+  if (to === 'claim' || to === 'claim-done') {
     return { block: true, note: 'Coming soon' };
   }
 

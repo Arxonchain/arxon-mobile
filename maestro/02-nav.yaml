@@ -1,0 +1,37 @@
+appId: xyz.arxonchain.app
+name: Five wallet tabs
+tags:
+  - smoke
+  - wallet
+---
+- launchApp:
+    appId: xyz.arxonchain.app
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: nav-home
+- tapOn:
+    point: '30%,94%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: nav-explore
+- tapOn:
+    point: '50%,94%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: nav-history
+- tapOn:
+    point: '70%,94%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: nav-account
+- tapOn:
+    point: '90%,94%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: nav-testnet
+- tapOn:
+    point: '10%,94%'
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: nav-home-return

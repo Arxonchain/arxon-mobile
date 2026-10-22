@@ -34,3 +34,4 @@ dist-ssr
 .deploy/
 .tools/
 depth-watch-staging/
+maestro/out/

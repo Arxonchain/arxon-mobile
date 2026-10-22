@@ -80,6 +80,10 @@ export default function ModeShell({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   useEffect(() => {
+    document.title = mode === 'mining' ? 'Arxon Mining' : 'Arxon';
+  }, [mode]);
+
+  useEffect(() => {
     if (mode === 'mining' && isMiningPath(location.pathname)) {
       lastMiningPath.current = `${location.pathname}${location.search}`;
     }

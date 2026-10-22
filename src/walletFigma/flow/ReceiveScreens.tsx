@@ -80,7 +80,7 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   function share() {
     if (!address) return;
     if (navigator.share) {
-      navigator.share({ title: 'Arxon address', text: address }).catch(() => undefined);
+      navigator.share({ title: `${current.name} address`, text: address }).catch(() => undefined);
       return;
     }
     void copy();
@@ -102,9 +102,22 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
+function receiveCopy(current: Net, liveApp: boolean) {
+  const arxon = !liveApp || current.scope === 'testnet' || current.asset === 'ARX' || current.asset === 'ARXt';
+  const letter = arxon ? 'A' : (current.asset.replace(/t$/i, '').slice(0, 1) || 'A');
+  const caption = arxon ? 'Your Arxon address' : `Your ${current.name} address`;
+  const warn = arxon
+    ? 'Only send ARX and Arxon-network assets to this address. Other assets may be lost.'
+    : `Only send ${current.asset} on ${current.name} to this address. Other assets may be lost.`;
+  return { letter, caption, warn, privacy: arxon };
+}
+
 function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, address, qrSrc }: {
   current: Net; pub: boolean; setPub: (v: boolean) => void; copied: boolean; onCopy: () => void; onShare: () => void; go: Go; leave: () => void; address: string; qrSrc: string;
 }) {
+  const live = useLiveFrame();
+  const copy = receiveCopy(current, !!live?.app);
+  const warnTop = copy.privacy ? 620 : 534;
   return (
     <>
       <PhoneStatus />
@@ -117,10 +130,11 @@ function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, add
       </button>
       <div style={{ position: 'absolute', left: 63, top: 180, width: 264, height: 264, borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
         <img src={qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32 }} />
-        <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>A</div>
+        <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>{copy.letter}</div>
       </div>
-      <p style={{ position: 'absolute', left: 18, top: 466, width: 354, margin: 0, textAlign: 'center', fontSize: 13, color: '#8b9097' }}>Your Arxon address</p>
+      <p style={{ position: 'absolute', left: 18, top: 466, width: 354, margin: 0, textAlign: 'center', fontSize: 13, color: '#8b9097' }}>{copy.caption}</p>
       <p style={{ position: 'absolute', left: 45, top: 488, width: 300, margin: 0, textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{address}</p>
+      {copy.privacy ? (
       <div style={{ position: 'absolute', left: 18, top: 534, width: 354, height: 72, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
         <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <FigmaImg src="/wallet-figma/send/shield.svg" width={18} height={18} />
@@ -133,15 +147,16 @@ function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, add
           <FigmaImg src={pub ? '/wallet-figma/send/toggle-on.svg' : '/wallet-figma/send/toggle-off.svg'} width={pub ? 46 : 48} height={28} />
         </button>
       </div>
-      <div style={{ position: 'absolute', left: 22, top: 620, width: 346, display: 'flex', gap: 8 }}>
+      ) : null}
+      <div style={{ position: 'absolute', left: 22, top: warnTop, width: 346, display: 'flex', gap: 8 }}>
         <FigmaImg src={art('info.svg')} width={16} height={16} />
-        <p style={{ margin: 0, width: 322, fontSize: 12, color: '#5c5f64', lineHeight: 1.35 }}>Only send ARX and Arxon-network assets to this address. Other assets may be lost.</p>
+        <p style={{ margin: 0, width: 322, fontSize: 12, color: '#5c5f64', lineHeight: 1.35 }}>{copy.warn}</p>
       </div>
-      <button type="button" onClick={onCopy} style={{ ...solid, top: 664 }}>
+      <button type="button" onClick={onCopy} style={{ ...solid, top: warnTop + 44 }}>
         <FigmaImg src={art('copy.svg')} width={18} height={18} />
         {copied ? 'Copied' : 'Copy address'}
       </button>
-      <button type="button" onClick={onShare} style={{ ...outline, top: 729 }}>
+      <button type="button" onClick={onShare} style={{ ...outline, top: warnTop + 109 }}>
         <FigmaImg src={art('share.svg')} width={18} height={18} />
         Share
       </button>

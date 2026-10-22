@@ -30,7 +30,9 @@
     "cap:sync": "npx cap sync android",
     "lint": "eslint .",
     "test": "vitest run",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "maestro:dump": "node scripts/maestro-cdp.mjs dump",
+    "maestro:walk": "node scripts/maestro-cdp.mjs walk"
   },
   "dependencies": {
     "@capacitor-mlkit/barcode-scanning": "^8.2.1",

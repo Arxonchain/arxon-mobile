@@ -48,6 +48,7 @@ export function ExploreScreens({ id, go, back }: { id: string; go: Go; back?: ()
 }
 
 function Explore({ go, open, soon }: { go: Go; open: (app: App) => void; soon: string | null }) {
+  const live = useLiveFrame();
   const tools: [string, string, string, string][] = [
     ['claim.svg', 'Claim ARX', 'Claim your ARX-P allocation', 'claim'],
     ['buy.svg', 'Buy', 'Buy crypto with a card', 'buy'],
@@ -66,7 +67,7 @@ function Explore({ go, open, soon }: { go: Go; open: (app: App) => void; soon: s
           <FigmaImg src={art('bolt.svg')} width={20} height={20} />
         </span>
         <span style={{ position: 'absolute', left: 70, top: 21, fontSize: 15, fontWeight: 600 }}>Arxon Mining</span>
-        <span style={{ position: 'absolute', left: 70, top: 43, fontSize: 12.5, color: '#8c8f99' }}>Mine ARX in your wallet</span>
+        <span style={{ position: 'absolute', left: 70, top: 43, fontSize: 12.5, color: '#8c8f99' }}>{live?.app ? 'Earn ARX-P in the mining app' : 'Mine ARX in your wallet'}</span>
         <span style={{ position: 'absolute', left: 255, top: 29, width: 81, height: 26, borderRadius: 13, background: 'rgba(172,202,254,0.16)', color: '#accafe', fontSize: 12, fontWeight: 500, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Extension</span>
       </button>
       <p style={section}>DAPPS</p>

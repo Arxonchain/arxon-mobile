@@ -1,0 +1,28 @@
+appId: xyz.arxonchain.app
+name: Home is the live wallet
+tags:
+  - smoke
+  - wallet
+---
+- launchApp:
+    appId: xyz.arxonchain.app
+    clearState: false
+- extendedWaitUntil:
+    visible:
+      id: 'xyz.arxonchain.app:id/webview'
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 4000
+- takeScreenshot: home
+# WebView text is not in the Android a11y tree on this phone.
+# Taps below are percent of the 1080×2400 WebView, mapped from the 390-wide home.
+- tapOn:
+    point: '14%,34%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: after-send
+- tapOn:
+    point: '10%,94%'
+- waitForAnimationToEnd:
+    timeout: 2000
+- takeScreenshot: home-after-send

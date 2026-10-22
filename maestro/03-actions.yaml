@@ -1,0 +1,33 @@
+appId: xyz.arxonchain.app
+name: Send Receive Swap More
+tags:
+  - wallet
+---
+- launchApp:
+    appId: xyz.arxonchain.app
+    clearState: false
+- waitForAnimationToEnd:
+    timeout: 4000
+- tapOn:
+    point: '38%,34%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: receive
+- tapOn:
+    point: '10%,8%'
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    point: '58%,34%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: swap
+- tapOn:
+    point: '10%,8%'
+- waitForAnimationToEnd:
+    timeout: 2000
+- tapOn:
+    point: '82%,34%'
+- waitForAnimationToEnd:
+    timeout: 2500
+- takeScreenshot: more
