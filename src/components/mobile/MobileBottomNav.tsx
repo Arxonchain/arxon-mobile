@@ -65,8 +65,8 @@ const ProfileIcon = (a: boolean) => (
 
 /**
  * Classic bottom nav (VITE_ARXON_UI_V2 unset).
- * Mining stays here for Play Store OTA users. New-main redesign uses MobileBottomNavV2
- * (no mining tab) when built with .env.word-forge / build:internal.
+ * Mining stays here for Play Store OTA users. Wallet-shell builds use MobileBottomNavV2
+ * with the mining-only tabs (Home, Mining, Arena, Play/Ranks, Profile).
  */
 const BASE_TABS = [
   { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },

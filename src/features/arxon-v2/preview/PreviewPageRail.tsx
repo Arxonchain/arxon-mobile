@@ -10,7 +10,6 @@ const sections: { title: string; pages: { path: string; label: string }[] }[] = 
       { path: APP_PREVIEW_BASE, label: 'Dashboard' },
       { path: `${APP_PREVIEW_BASE}/arena`, label: 'Game Arena' },
       { path: `${APP_PREVIEW_BASE}/arena/prediction-market`, label: 'Prediction Market' },
-      { path: `${APP_PREVIEW_BASE}/wallet`, label: 'Wallet' },
       { path: `${APP_PREVIEW_BASE}/profile`, label: 'Profile' },
     ],
   },

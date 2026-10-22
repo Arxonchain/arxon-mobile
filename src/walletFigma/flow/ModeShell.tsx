@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { font } from '@/walletFigma/tokens';
 import FlowStudio from './FlowStudio';
@@ -65,7 +65,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     const prev = modeRef.current;
     const loc = locRef.current;
     if (prev === 'mining') {
-      lastMiningPath.current = `${loc.pathname}${loc.search}` || '/mine';
+      lastMiningPath.current = isMiningPath(loc.pathname) ? `${loc.pathname}${loc.search}` : '/mine';
     }
     setMode(next);
     try {
@@ -74,10 +74,23 @@ export default function ModeShell({ children }: { children: ReactNode }) {
       /* ignore */
     }
     if (next === 'mining') {
-      const dest = lastMiningPath.current || '/mine';
+      const dest = isMiningPath(lastMiningPath.current.split('?')[0]) ? lastMiningPath.current : '/mine';
       if (`${loc.pathname}${loc.search}` !== dest) navigate(dest);
     }
   }, [navigate]);
+
+  useEffect(() => {
+    if (mode === 'mining' && isMiningPath(location.pathname)) {
+      lastMiningPath.current = `${location.pathname}${location.search}`;
+    }
+  }, [mode, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (mode !== 'mining') return;
+    if (isMiningPath(location.pathname)) return;
+    const dest = isMiningPath(lastMiningPath.current.split('?')[0]) ? lastMiningPath.current : '/mine';
+    if (`${location.pathname}${location.search}` !== dest) navigate(dest, { replace: true });
+  }, [mode, location.pathname, location.search, navigate]);
 
   const actions = useMemo<WalletModeActions>(
     () => ({ openMining: () => choose('mining'), openWallet: () => choose('wallet') }),

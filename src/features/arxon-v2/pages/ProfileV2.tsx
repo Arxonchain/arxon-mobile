@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useState, useRef, useEffect } from 'react';
 import {
-  Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks, Users, Wallet, Camera,
+  Copy, Check, Shield, Bell, BookOpen, Settings, LogOut, ListChecks, Users, Camera,
   LayoutDashboard, Trophy, History, Scale, User2, CalendarDays, FileDown, Globe, Zap, Receipt,
   Upload, Link2, BarChart3, Megaphone, RotateCcw, Coins, Send, Flame, type LucideIcon,
 } from 'lucide-react';
@@ -59,7 +59,6 @@ const QUICK: { Icon: LucideIcon; label: string; path: string; accent: string }[]
 const MENU: { Icon: LucideIcon; label: string; sub: string; path: string; accent: string }[] = [
   { Icon: Receipt, label: 'Points History', sub: 'Credits & deductions', path: '/points-history', accent: neon.gold },
   { Icon: Users, label: 'Referrals', sub: '100 ARX-P per friend', path: '/referrals', accent: neon.teal },
-  { Icon: Wallet, label: 'Wallet', sub: 'Connect Web3 wallet', path: '/wallet', accent: neon.cyan },
   { Icon: Shield, label: 'Security', sub: 'Password & account', path: '/settings?tab=security', accent: neon.purple },
   { Icon: BookOpen, label: 'Litepaper', sub: 'Guides & docs', path: '/litepaper', accent: 'rgba(184,239,248,0.6)' },
   { Icon: Settings, label: 'App Settings', sub: 'Notifications & display', path: '/settings', accent: 'rgba(184,239,248,0.45)' },

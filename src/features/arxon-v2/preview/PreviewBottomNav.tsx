@@ -5,6 +5,7 @@ import NeonBottomNav from '@/features/arxon-v2/layout/NeonBottomNav';
 import { buildV2NavTabs } from '@/features/arxon-v2/layout/navTabs';
 
 const tabs = buildV2NavTabs(APP_PREVIEW_BASE);
+const base = APP_PREVIEW_BASE;
 
 export default function PreviewBottomNav() {
   const location = useLocation();
@@ -14,16 +15,12 @@ export default function PreviewBottomNav() {
 
   const activeId = (() => {
     const p = location.pathname;
-    if (p.startsWith(`${APP_PREVIEW_BASE}/testnet`)) return 'testnet';
-    if (
-      p.startsWith(`${APP_PREVIEW_BASE}/balances`) ||
-      p.startsWith(`${APP_PREVIEW_BASE}/portfolio`) ||
-      p.startsWith(`${APP_PREVIEW_BASE}/activity`) ||
-      p.startsWith(`${APP_PREVIEW_BASE}/tx`)
-    ) {
-      return 'balances';
-    }
-    return 'mine';
+    if (p === `${base}/mining` || p.startsWith(`${base}/mining/`)) return 'mining';
+    if (p === `${base}/arena` || p.startsWith(`${base}/arena/`)) return 'arena';
+    if (p === `${base}/games` || p.startsWith(`${base}/games/`)) return 'games';
+    if (p === `${base}/leaderboard` || p.startsWith(`${base}/leaderboard/`)) return 'leaderboard';
+    if (p === `${base}/profile` || p.startsWith(`${base}/profile/`)) return 'profile';
+    return 'home';
   })();
 
   return <NeonBottomNav tabs={tabs} activeId={activeId} layoutId="preview-nav-pill" position="absolute" />;

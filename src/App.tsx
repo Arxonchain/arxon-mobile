@@ -130,8 +130,8 @@ const ProfileV2 = lazy(() => import("@/features/arxon-v2/pages/ProfileV2"));
 const TasksV2 = lazy(() => import("@/features/arxon-v2/pages/TasksV2"));
 const ReferralsV2 = lazy(() => import("@/features/arxon-v2/pages/ReferralsV2"));
 const NexusV2 = lazy(() => import("@/features/arxon-v2/pages/NexusV2"));
-const WalletV2 = lazy(() => import("@/features/arxon-v2/pages/WalletV2"));
 const SettingsV2 = lazy(() => import("@/features/arxon-v2/pages/SettingsV2"));
+const MiningV2 = lazy(() => import("@/features/arxon-v2/pages/MiningV2"));
 const NotificationsV2 = lazy(() => import("@/features/arxon-v2/pages/NotificationsV2"));
 const PointsHistoryV2 = lazy(() => import("@/features/arxon-v2/pages/PointsHistoryV2"));
 const DiceHubV2 = lazy(() => import("@/features/arxon-v2/pages/DiceHubV2"));
@@ -330,10 +330,10 @@ function AppRoutes() {
           <Route path="mine" element={<DashboardNeon preview />} />
           <Route path="activity" element={<DashboardNeon preview />} />
           <Route path="explore" element={<DashboardNeon preview />} />
-          <Route path="balances" element={<DashboardNeon preview />} />
-          <Route path="testnet" element={<DashboardNeon preview />} />
-          <Route path="portfolio" element={<Navigate to="/ui-preview/balances" replace />} />
-          <Route path="mining" element={<Navigate to="/ui-preview/mine" replace />} />
+          <Route path="balances" element={<Navigate to="/ui-preview/mine" replace />} />
+          <Route path="testnet" element={<Navigate to="/ui-preview/mine" replace />} />
+          <Route path="portfolio" element={<Navigate to="/ui-preview/mine" replace />} />
+          <Route path="mining" element={<MiningV2 preview />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
           <Route path="arena/dice" element={g(<DiceHubV2 />)} />
           <Route path="arena/dice/house" element={g(<DiceMatchV2 />)} />
@@ -347,7 +347,7 @@ function AppRoutes() {
           <Route path="tasks" element={<TasksV2 />} />
           <Route path="referrals" element={<ReferralsV2 />} />
           <Route path="nexus" element={<NexusV2 />} />
-          <Route path="wallet" element={<WalletV2 />} />
+          <Route path="wallet" element={<Navigate to="/ui-preview/mine" replace />} />
           <Route path="settings" element={<SettingsV2 />} />
           <Route path="notifications" element={<NotificationsV2 />} />
           <Route path="points-history" element={<PointsHistoryV2 />} />
