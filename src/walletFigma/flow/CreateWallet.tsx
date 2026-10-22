@@ -1,5 +1,6 @@
 import { useState, type CSSProperties, type ReactNode } from 'react';
 import { font } from '@/walletFigma/tokens';
+import { sessionStore } from '@/chainWallet/session';
 import { useLiveFrame } from './liveFrame';
 
 const icon = (name: string) => `/wallet-figma/create/${name}`;
@@ -40,8 +41,8 @@ export function CreateWalletScreens({
         setConfirm={setConfirm}
         agree={agree}
         setAgree={setAgree}
-        onBack={() => (back ? back() : go('slide16', false))}
-        onContinue={() => go('backup')}
+        onBack={() => (back ? back() : go(sessionStore.setupPath() === 'import' ? 'import' : 'phrase-confirm', false))}
+        onContinue={() => go(sessionStore.setupPath() === 'import' ? 'ready-skip' : 'backup')}
       />
     );
   }
@@ -64,7 +65,7 @@ export function CreateWalletScreens({
         go(next === 'drive' ? 'backup' : 'backup-manual', false);
       }}
       onBack={() => (back ? back() : go('create', false))}
-      onContinue={() => go(choice === 'drive' ? 'drive-connect' : 'caution1')}
+      onContinue={() => go(choice === 'drive' ? 'drive-connect' : sessionStore.phraseVerified() ? 'ready-skip' : 'caution1')}
       onLater={() => go('ready-skip')}
     />
   );

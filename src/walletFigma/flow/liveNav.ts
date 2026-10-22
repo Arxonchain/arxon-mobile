@@ -44,12 +44,53 @@ type LiveNavInput = {
   } | null;
 };
 
+function phraseWordCount(mnemonic: string | null) {
+  return mnemonic ? mnemonic.trim().split(/\s+/).filter(Boolean).length : 0;
+}
+
 export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
   const { from, to, password, wallet, openMining, wc } = input;
 
-  if (from === 'create' && (to === 'backup' || to === 'backup-manual')) {
-    if (password.length >= 8) await setUnlockPassword(password);
+  if (from === 'slide16' && (to === 'create' || to === 'caution1')) {
+    sessionStore.setSetupPath('create');
     if (!wallet.mnemonic) await wallet.createWallet();
+    return to === 'create' ? { replace: 'caution1' } : {};
+  }
+
+  if (from === 'slide16' && to === 'import') {
+    sessionStore.setSetupPath('import');
+    return {};
+  }
+
+  if (from === 'import' && (to === 'phrase-confirm' || to === 'create')) {
+    sessionStore.setSetupPath('import');
+    return {};
+  }
+
+  if (from === 'import' && (to === 'ready-skip' || to === 'home' || to.startsWith('home-'))) {
+    sessionStore.setSetupPath('import');
+    return { replace: phraseWordCount(wallet.mnemonic) >= 12 ? 'phrase-confirm' : 'create' };
+  }
+
+  if ((from === 'phrase-confirm' || from === 'phrase-shown') && (to === 'phrase-done' || to === 'create')) {
+    const resolved = resolvePhraseWords({
+      app: true,
+      words: wallet.mnemonic ? wallet.mnemonic.trim().split(/\s+/) : null,
+    });
+    if (!resolved.usable && sessionStore.setupPath() !== 'import') {
+      return { block: true, note: 'Recovery phrase is not ready to confirm.' };
+    }
+    sessionStore.setPhraseVerified(true);
+    return to === 'create' ? {} : { replace: 'create' };
+  }
+
+  if (from === 'create' && (to === 'backup' || to === 'backup-manual' || to === 'ready-skip')) {
+    if (password.length < 8) {
+      return { block: true, note: 'Create a password of at least 8 characters.' };
+    }
+    await setUnlockPassword(password);
+    if (!wallet.mnemonic) await wallet.createWallet();
+    if (to === 'ready-skip') sessionStore.setSetupPath(null);
     return {};
   }
 
@@ -105,25 +146,16 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
       };
     }
     if (!wallet.mnemonic) await wallet.createWallet();
-    return {};
-  }
-
-  if (from === 'phrase-confirm' && to === 'phrase-done') {
-    const resolved = resolvePhraseWords({
-      app: true,
-      words: wallet.mnemonic ? wallet.mnemonic.trim().split(/\s+/) : null,
-    });
-    if (!resolved.usable) {
-      return { block: true, note: 'Recovery phrase is not ready to confirm.' };
-    }
-    sessionStore.setPhraseVerified(true);
+    if (!sessionStore.hasPassword()) return { replace: 'create' };
     return {};
   }
 
   if (to === 'ready-skip' || to === 'phrase-done') {
     if (to === 'phrase-done') sessionStore.setPhraseVerified(true);
     if (!wallet.mnemonic) await wallet.createWallet();
-    return {};
+    if (!sessionStore.hasPassword()) return { replace: 'create' };
+    sessionStore.setSetupPath(null);
+    return to === 'phrase-done' ? { replace: 'create' } : {};
   }
 
   if (to === 'swap-success') {
@@ -200,6 +232,8 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     return {};
   }
   if (to === 'home' || to.startsWith('home-') || (to === 'more' && from !== 'testnet')) {
+    if (!sessionStore.hasPassword()) return { replace: 'create' };
+    sessionStore.setSetupPath(null);
     await wallet.setNetwork('ethereum');
     return {};
   }

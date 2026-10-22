@@ -346,6 +346,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     sessionStore.clearPass();
     sessionStore.clearBox();
     sessionStore.clearSkBox();
+    sessionStore.setPhraseVerified(false);
+    sessionStore.setSetupPath(null);
     setLocked(false);
   }, []);
 

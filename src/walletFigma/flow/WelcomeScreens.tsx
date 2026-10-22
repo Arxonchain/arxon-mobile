@@ -16,7 +16,7 @@ export function WelcomeScreens({ id, go }: { id: string; go: Go }) {
   if (id === 'splash') return <Splash onNext={() => go('gateway', false)} />;
   if (id === 'gateway') return <Gateway onNext={() => go('slide15')} />;
   if (id === 'slide15') return <Slide15 onNext={() => go('slide16')} />;
-  return <Slide16 onCreate={() => go('create')} onRestore={() => go('import')} />;
+  return <Slide16 onCreate={() => go('caution1')} onRestore={() => go('import')} />;
 }
 
 function Phone({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
@@ -27,7 +27,8 @@ function Phone({ children, onClick }: { children: ReactNode; onClick?: () => voi
       style={{
         position: 'relative',
         width: 390,
-        height: 844,
+        minHeight: 844,
+        height: live?.app ? '100%' : 844,
         background: '#050505',
         overflow: 'hidden',
         color: '#e7e7e8',
@@ -80,7 +81,7 @@ export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; on
 
   useEffect(() => {
     if (!ready) return;
-    const t = window.setTimeout(() => finishRef.current(), 1200);
+    const t = window.setTimeout(() => finishRef.current(), 2800);
     return () => window.clearTimeout(t);
   }, [ready]);
 
@@ -89,9 +90,9 @@ export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; on
       type="button"
       onClick={() => ready && onFinish()}
       style={{
-        minHeight: '100vh',
+        minHeight: '100dvh',
         width: '100%',
-        background: '#050505',
+        background: 'radial-gradient(ellipse 120% 70% at 50% -10%, #3d6dff 0%, #1a3d9e 28%, #0a1630 58%, #050505 78%)',
         border: 'none',
         display: 'flex',
         alignItems: 'center',
@@ -248,7 +249,7 @@ function Slide16({ onCreate, onRestore }: { onCreate: () => void; onRestore: () 
 
 function Glow() {
   return (
-    <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 572, overflow: 'hidden', pointerEvents: 'none' }}>
+    <div style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'hidden', pointerEvents: 'none' }}>
       <img src={asset('blob.svg')} alt="" width={1147} height={1094} style={{ position: 'absolute', left: -378, top: -500, width: 1147, height: 1094, maxWidth: 'none' }} />
       <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: -281, top: -330, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />
       <img src={asset('arc-white.svg')} alt="" width={1028} height={598} style={{ position: 'absolute', left: 189, top: -408, width: 1028, height: 598, maxWidth: 'none', mixBlendMode: 'overlay' }} />

@@ -319,14 +319,27 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     };
   }, [receiveAddress]);
 
+  useEffect(() => {
+    if (!wallet.mnemonic) return;
+    const next = wallet.mnemonic.trim().split(/\s+/).filter(Boolean);
+    if (next.length >= 12) setWords(next);
+  }, [wallet.mnemonic]);
+
   const ensureWords = useCallback(async () => {
     if (words && words.length >= 12) return words;
-    if (wallet.mnemonic && wallet.mnemonic.trim().split(/\s+/).length >= 12) {
-      const next = wallet.mnemonic.trim().split(/\s+/);
-      setWords(next);
-      return next;
+    if (wallet.mnemonic) {
+      const next = wallet.mnemonic.trim().split(/\s+/).filter(Boolean);
+      if (next.length >= 12) {
+        setWords(next);
+        return next;
+      }
+      throw new Error('Recovery phrase is not available on this device.');
     }
-    throw new Error('Recovery phrase is not available on this device.');
+    const phrase = await wallet.createWallet();
+    const next = phrase.trim().split(/\s+/).filter(Boolean);
+    if (next.length < 12) throw new Error('Recovery phrase is not available on this device.');
+    setWords(next);
+    return next;
   }, [wallet, words]);
 
   const eth = wallet.ethBalances;
@@ -443,9 +456,13 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     ? 'splash'
     : needsUnlock
       ? 'unlock'
-      : wallet.address
+      : wallet.address && sessionStore.hasPassword()
         ? 'home'
-        : 'splash';
+        : wallet.address && sessionStore.phraseVerified()
+          ? 'create'
+          : wallet.address
+            ? 'caution1'
+            : 'splash';
 
   const send = useCallback(
     async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home', paymentFlags?: PrivacyFlags) => {

@@ -26,6 +26,7 @@ import { WalletNetworkContext, type WalletNet } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
 import { isHomeRoot, isOnboardingScreen, isSetupScreen, isWelcomeScreen, useModeChrome } from './modeChrome';
 import { markBootOk } from '@/lib/bootState';
+import { sessionStore } from '@/chainWallet/session';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
 
@@ -61,6 +62,10 @@ const HIDE_SCROLLBARS_CSS = `
 
 const APP_SCROLL_CSS = `
 .arxon-app-frame { transform: translateZ(0); }
+.arxon-app-scroll > div {
+  min-height: 100%;
+  box-sizing: border-box;
+}
 .arxon-app-scroll {
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
@@ -90,6 +95,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const { setShowToggle } = useModeChrome();
   const [id, setId] = useState('splash');
   const [appScale, setAppScale] = useState(1);
+  const [appFrameH, setAppFrameH] = useState(844);
   const [stack, setStack] = useState<string[]>([]);
   const [hidden, setHidden] = useState(false);
   const [backup, setBackup] = useState<'drive' | 'manual'>('drive');
@@ -167,7 +173,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (id !== 'splash') return;
     if (jumpRef.current) return;
     if (app && live?.startId && live.startId !== 'splash') return;
-    const t = window.setTimeout(() => go('gateway', false), 1600);
+    const t = window.setTimeout(() => go('gateway', false), 2800);
     return () => window.clearTimeout(t);
   }, [id, app, live?.startId]);
 
@@ -206,7 +212,10 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!stage) return;
     const measure = () => {
       const w = Math.max(stage.clientWidth, 1);
-      setAppScale(Math.min(1, w / 390));
+      const h = Math.max(stage.clientHeight, 1);
+      const scale = w / 390;
+      setAppScale(scale);
+      setAppFrameH(Math.max(844, h / scale));
     };
     measure();
     const watcher = new ResizeObserver(measure);
@@ -312,7 +321,11 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       setId('home');
       return;
     }
-    if (id === 'create' || id === 'import' || id === 'backup' || id === 'backup-manual' || id === 'drive-connect') {
+    if (id === 'create') {
+      setId(sessionStore.setupPath() === 'import' ? 'import' : 'phrase-confirm');
+      return;
+    }
+    if (id === 'import' || id === 'backup' || id === 'backup-manual' || id === 'drive-connect' || id === 'caution1') {
       setId('slide16');
     }
   }
@@ -401,8 +414,8 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           style={app
           ? {
             width: 390,
-            height: appScale > 0 && appScale < 1 ? `${100 / appScale}%` : '100%',
-            transform: appScale > 0 && appScale < 1 ? `scale(${appScale})` : 'translateZ(0)',
+            height: appFrameH,
+            transform: appScale > 0 && appScale !== 1 ? `scale(${appScale})` : 'translateZ(0)',
             transformOrigin: 'top center',
             background: ink.page,
             position: 'relative',

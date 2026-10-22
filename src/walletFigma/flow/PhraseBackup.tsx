@@ -60,7 +60,7 @@ export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back
   }
 
   useEffect(() => {
-    if (live?.app && (id === 'phrase-hidden' || id === 'phrase-shown' || id === 'phrase-confirm' || id === 'phrase-done')) {
+    if (live?.app && (id === 'caution1' || id === 'caution2' || id === 'caution3' || id === 'phrase-hidden' || id === 'phrase-shown' || id === 'phrase-confirm' || id === 'phrase-done')) {
       void loadPhrase();
     }
     // load from the live wallet whenever this backup step is shown
@@ -75,9 +75,9 @@ export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back
         title={caution.title}
         body={caution.body}
         action={caution.action}
-        onBack={() => (back ? back() : go(caution.step === 1 ? 'backup-manual' : CAUTIONS[caution.step - 2].id, false))}
+        onBack={() => (back ? back() : go(caution.step === 1 ? 'slide16' : CAUTIONS[caution.step - 2].id, false))}
         onNext={() => go(caution.next)}
-        onLater={() => go('ready-skip')}
+        onLater={() => go('create')}
       />
     );
   }
@@ -106,7 +106,7 @@ export function PhraseBackupScreens({ id, go, back }: { id: string; go: Go; back
         error={loadError}
         onRetry={() => void loadPhrase()}
         onBack={() => (back ? back() : go('phrase-shown', false))}
-        onVerify={() => { if (usable) go('phrase-done'); }}
+        onVerify={() => { if (usable) go('create'); }}
       />
     );
   }

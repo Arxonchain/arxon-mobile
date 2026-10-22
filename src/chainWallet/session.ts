@@ -43,6 +43,15 @@ export const sessionStore = {
   phraseVerified: () => localStorage.getItem('arxon.phraseVerified') === '1',
   setPhraseVerified: (on: boolean) => localStorage.setItem('arxon.phraseVerified', on ? '1' : '0'),
 
+  setupPath: (): 'create' | 'import' | null => {
+    const raw = localStorage.getItem('arxon.setupPath');
+    return raw === 'create' || raw === 'import' ? raw : null;
+  },
+  setSetupPath: (value: 'create' | 'import' | null) => {
+    if (!value) localStorage.removeItem('arxon.setupPath');
+    else localStorage.setItem('arxon.setupPath', value);
+  },
+
   biometrics: () => localStorage.getItem('arxon.biometrics') === '1',
   setBiometrics: (on: boolean) => localStorage.setItem('arxon.biometrics', on ? '1' : '0'),
 
