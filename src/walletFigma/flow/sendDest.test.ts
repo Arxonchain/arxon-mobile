@@ -16,6 +16,14 @@ describe('isLiveSendDest', () => {
     expect(isLiveSendDest(pk, true)).toBe(true);
     expect(isLiveSendDest(pk, false)).toBe(false);
   });
+
+  it('accepts Bitcoin and Solana addresses only for those sends', () => {
+    expect(isLiveSendDest('bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu', false, { symbol: 'BTC' })).toBe(true);
+    expect(isLiveSendDest('0x1111111111111111111111111111111111111111', false, { symbol: 'BTC' })).toBe(false);
+    expect(isLiveSendDest('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', false, { symbol: 'SOL' })).toBe(true);
+    expect(isLiveSendDest('HAgk14JpMQLgt6rVgv7cBQFJWFto5Dqxi472uT3DKpqk', false, { symbol: 'USDT', chain: 'solana' })).toBe(true);
+    expect(isLiveSendDest('0x1111111111111111111111111111111111111111', false, { symbol: 'USDT', chain: 'ethereum' })).toBe(true);
+  });
 });
 
 describe('parseTokenQty', () => {

@@ -6,14 +6,14 @@ import { storage } from './storage';
 export type ActivityKind = 'shield' | 'transfer' | 'private' | 'unshield' | 'onchain';
 
 export type ActivityItem = {
-  hash: Hex;
+  hash: string;
   kind: ActivityKind;
   to: string;
   amount: string;
   maskBits: number;
   at: number;
   token?: string;
-  network?: 'arxon' | 'ethereum';
+  network?: 'arxon' | 'ethereum' | 'bitcoin' | 'solana';
   clocks?: TxClocks;
 };
 

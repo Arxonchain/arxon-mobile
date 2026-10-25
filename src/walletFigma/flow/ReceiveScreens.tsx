@@ -67,14 +67,21 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
     else go('network', false);
   }
 
-  const address = live?.app ? live.receiveAddress || live.address || '' : ADDRESS;
-  const qrSrc = live?.app && live.receiveQr ? live.receiveQr : art('qr.svg');
+  const stable = (live?.receiveAsset || '').toUpperCase();
+  const stablecoin = stable === 'USDT' || stable === 'USDC';
+  const [stableChain, setStableChain] = useState<'ethereum' | 'solana'>('ethereum');
+  const address = !live?.app
+    ? ADDRESS
+    : stablecoin && stableChain === 'solana'
+      ? live.solAddress || ''
+      : live.receiveAddress || live.address || '';
+  const qrSrc = live?.app && !(stablecoin && stableChain === 'solana') && live.receiveQr ? live.receiveQr : art('qr.svg');
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.recv-field::placeholder{color:#8b9097}`}</style>
       {id === 'receive' && (
-        <Receive current={current} shielded={shielded} setShielded={setShielded} go={go} leave={leave} address={address} qrSrc={qrSrc} />
+        <Receive current={current} shielded={shielded} setShielded={setShielded} go={go} leave={leave} address={address} qrSrc={qrSrc} stablecoin={stablecoin ? stable : null} stableChain={stableChain} setStableChain={setStableChain} />
       )}
       {id === 'network' && (
         <Networks nets={nets} selected={selected} onPick={pick} onAdd={() => go('add-network')} onClose={leave} />
@@ -96,12 +103,14 @@ function receiveCopy(current: Net, liveApp: boolean) {
   return { letter, caption, warn, privacy: arxon };
 }
 
-function Receive({ current, shielded, setShielded, go, leave, address, qrSrc }: {
+function Receive({ current, shielded, setShielded, go, leave, address, qrSrc, stablecoin, stableChain, setStableChain }: {
   current: Net; shielded: boolean; setShielded: (v: boolean) => void; go: Go; leave: () => void; address: string; qrSrc: string;
+  stablecoin: 'USDT' | 'USDC' | null; stableChain: 'ethereum' | 'solana'; setStableChain: (chain: 'ethereum' | 'solana') => void;
 }) {
   const live = useLiveFrame();
   const copy = receiveCopy(current, !!live?.app);
-  const testnet = copy.privacy;
+  const chainName = stableChain === 'solana' ? 'Solana' : 'Ethereum';
+  const testnet = stablecoin ? false : copy.privacy;
   const shieldedKey = live?.app ? live.shieldedPk || '' : `0x${'11'.repeat(32)}`;
   const showingKey = testnet && shielded;
   const shown = showingKey ? shieldedKey : address;
@@ -114,7 +123,10 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc }: 
       : 'Public address. Anyone can send ARX here, and that payment is visible.';
   const warn = showingKey
     ? 'Only send a private payment to this shielded key. A normal transfer will not arrive here.'
-    : copy.warn;
+    : stablecoin
+      ? `Only send ${stablecoin} on ${chainName} to this address. ${stablecoin} on another chain will not arrive.`
+      : copy.warn;
+  const [chainQr, setChainQr] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showingKey || !shieldedKey) {
@@ -131,6 +143,22 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc }: 
       cancel = true;
     };
   }, [showingKey, shieldedKey]);
+
+  useEffect(() => {
+    if (!stablecoin || stableChain !== 'solana' || !address) {
+      setChainQr(null);
+      return;
+    }
+    let cancel = false;
+    void qrDataUrl(address).then((url) => {
+      if (!cancel) setChainQr(url);
+    }).catch(() => {
+      if (!cancel) setChainQr(null);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [stablecoin, stableChain, address]);
 
   async function copyShown() {
     if (!shown) return;
@@ -155,17 +183,24 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc }: 
       <Back top={56} onClick={leave} />
       <p style={{ position: 'absolute', left: 70, top: 65.5, width: 250, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>Receive</p>
       <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 112, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '0 18px 28px' }}>
-        <button type="button" onClick={() => go('network')} style={pillFlow}>
-          <FigmaImg src={art('dot.svg')} width={18} height={18} />
-          <span>{current.pill}</span>
-          <FigmaImg src={art('chev-down.svg')} width={16} height={16} />
-        </button>
+        {stablecoin ? (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
+            <button type="button" onClick={() => setStableChain('ethereum')} style={chainChip(stableChain === 'ethereum')}>Ethereum</button>
+            <button type="button" onClick={() => setStableChain('solana')} style={chainChip(stableChain === 'solana')}>Solana</button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => go('network')} style={pillFlow}>
+            <FigmaImg src={art('dot.svg')} width={18} height={18} />
+            <span>{current.pill}</span>
+            <FigmaImg src={art('chev-down.svg')} width={16} height={16} />
+          </button>
+        )}
         <div style={{ position: 'relative', width: 264, height: 264, margin: '22px auto 0', borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
-          <img src={showingKey && shieldQr ? shieldQr : qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32, width: 200, height: 200, objectFit: 'contain' }} />
+          <img src={showingKey && shieldQr ? shieldQr : chainQr || qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32, width: 200, height: 200, objectFit: 'contain' }} />
           <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>{copy.letter}</div>
         </div>
-        <p style={{ margin: '18px 0 0', textAlign: 'center', fontSize: 13, color: '#8b9097' }}>{showingKey ? 'Shielded key' : copy.caption}</p>
-        <p style={{ margin: '8px 12px 0', textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{shown || (showingKey ? 'Your shielded key is not ready yet.' : '')}</p>
+        <p style={{ margin: '18px 0 0', textAlign: 'center', fontSize: 13, color: '#8b9097' }}>{showingKey ? 'Shielded key' : stablecoin ? `Your ${chainName} address` : copy.caption}</p>
+        <p style={{ margin: '8px 12px 0', textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{shown || (showingKey ? 'Your shielded key is not ready yet.' : stablecoin && stableChain === 'solana' ? 'Your Solana address is not ready yet.' : '')}</p>
         {about ? <p style={{ margin: '8px 8px 0', textAlign: 'left', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>{about}</p> : null}
         {testnet ? (
           <div style={{ marginTop: 14, background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
@@ -335,6 +370,9 @@ function HomeBar() {
 }
 
 const pillFlow: CSSProperties = { height: 40, margin: '8px auto 0', border: 'none', borderRadius: 22, background: '#1c2025', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px 9px 14px', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer' };
+function chainChip(on: boolean): CSSProperties {
+  return { height: 40, minWidth: 108, border: 'none', borderRadius: 20, background: on ? '#accafe' : '#1c2025', color: on ? '#0c1018' : '#fff', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' };
+}
 const solidFlow: CSSProperties = { width: '100%', height: 55, marginTop: 16, borderRadius: 8, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
 const outlineFlow: CSSProperties = { width: '100%', height: 55, marginTop: 10, borderRadius: 8, border: '1.5px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
 const iconBtn: CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0 };

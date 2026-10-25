@@ -32,15 +32,21 @@ function seedFromMnemonic(mnemonic: string) {
   return pbkdf2(sha512, mnemonic.normalize('NFKD'), 'mnemonic'.normalize('NFKD'), { c: 2048, dkLen: 64 });
 }
 
-async function bitcoinAddress(mnemonic: string, index: number) {
+/** Same BIP84 key the Bitcoin receive address is derived from. */
+export async function bitcoinSigner(mnemonic: string, index = 0) {
   const [{ HDKey }, { bech32 }] = await Promise.all([import('@scure/bip32'), import('@scure/base')]);
   const child = HDKey.fromMasterSeed(seedFromMnemonic(mnemonic)).derive(`m/84'/0'/0'/0/${index}`);
-  if (!child.publicKey) throw new Error('No BTC key');
+  if (!child.privateKey || !child.publicKey) throw new Error('No BTC key');
   const hash = ripemd160(sha256(child.publicKey));
-  return bech32.encode('bc', [0, ...bech32.toWords(hash)]);
+  return {
+    address: bech32.encode('bc', [0, ...bech32.toWords(hash)]),
+    privateKey: child.privateKey,
+    publicKey: child.publicKey,
+  };
 }
 
-async function solanaAddress(mnemonic: string, index: number) {
+/** Same SLIP-0010 key the Solana receive address is derived from. */
+export async function solanaSigner(mnemonic: string, index = 0) {
   const [{ ed25519 }, { base58 }] = await Promise.all([import('@noble/curves/ed25519.js'), import('@scure/base')]);
   const seed = seedFromMnemonic(mnemonic);
   const master = hmac(sha512, new TextEncoder().encode('ed25519 seed'), seed);
@@ -59,5 +65,13 @@ async function solanaAddress(mnemonic: string, index: number) {
     key = next.slice(0, 32);
     chain = next.slice(32);
   }
-  return base58.encode(ed25519.getPublicKey(key));
+  return { address: base58.encode(ed25519.getPublicKey(key)), secret: key };
+}
+
+async function bitcoinAddress(mnemonic: string, index: number) {
+  return (await bitcoinSigner(mnemonic, index)).address;
+}
+
+async function solanaAddress(mnemonic: string, index: number) {
+  return (await solanaSigner(mnemonic, index)).address;
 }

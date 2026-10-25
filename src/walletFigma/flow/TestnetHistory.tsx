@@ -17,7 +17,7 @@ const MODELS: [Model, string][] = [
 ];
 
 export function isMainnetActivity(row: { network?: string }) {
-  return row.network === 'ethereum';
+  return row.network === 'ethereum' || row.network === 'bitcoin' || row.network === 'solana';
 }
 
 export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limit?: number; place?: Place }) {

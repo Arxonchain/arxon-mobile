@@ -7,6 +7,8 @@ import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 import { isLiveSendDest, parseTokenQty } from './sendDest';
+
+type StableChain = 'ethereum' | 'solana';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
 import { briefAddr } from './briefAddr';
 import { LiveHead, availableBox, liveGhost, livePrimary } from './LiveScroll';
@@ -40,6 +42,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const net = useWalletNetwork();
   const [tokenId, setTokenId] = useState(() => (live?.app && net !== 'testnet' ? 'eth' : 'arx'));
   const [unavailable, setUnavailable] = useState<string | null>(null);
+  const [stableChain, setStableChain] = useState<StableChain>('ethereum');
   const [query, setQuery] = useState('');
   const [who, setWho] = useState('');
   const [picked, setPicked] = useState('');
@@ -55,18 +58,41 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const leave = () => (back ? back() : go('home-funded', false));
   const vaulted = id === 'send-amount-vault';
   const liveQty = live?.app ? liveTokenQty(live, net, token.id) : null;
-  const available = liveQty != null
-    ? liveQty
-    : vaulted && token.id === 'arx' ? 1400 : id === 'send-amount' && token.id === 'arx' ? 0 : token.home;
+  const stableMainnet = !!live?.app && net !== 'testnet' && (token.id === 'usdt' || token.id === 'usdc');
+  const available = live?.app && token.id === 'btc'
+    ? live.btcBalance
+    : live?.app && token.id === 'sol'
+      ? live.solBalance
+      : stableMainnet && stableChain === 'solana'
+        ? (token.id === 'usdt' ? live.solUsdt : live.solUsdc)
+        : liveQty != null
+          ? liveQty
+          : vaulted && token.id === 'arx' ? 1400 : id === 'send-amount' && token.id === 'arx' ? 0 : token.home;
   const paymentFlags: PrivacyFlags = {
     hideSender: flags[0],
     hideReceiver: flags[1],
     hideAmount: flags[2],
     hideBalance: flags[3],
   };
-  const networkLabel = live?.app ? (net === 'testnet' ? 'Arxon Testnet' : 'Ethereum') : 'Arxon';
+  const networkLabel = !live?.app
+    ? 'Arxon'
+    : net === 'testnet'
+      ? 'Arxon Testnet'
+      : token.id === 'btc'
+        ? 'Bitcoin'
+        : token.id === 'sol' || (stableMainnet && stableChain === 'solana')
+          ? 'Solana'
+          : 'Ethereum';
   const feeLabel = live?.app ? 'Set by the network' : token.id === 'arx' ? `0.0004 ${token.symbol}` : `0 ${token.symbol}`;
   const privSend = token.id === 'arx' && (!live?.app || net === 'testnet') && (flags[0] || flags[1] || flags[2]);
+  function chooseChain(next: StableChain) {
+    setStableChain(next);
+    const dest = (picked || who).trim();
+    if (dest && !isLiveSendDest(dest, net === 'testnet', { symbol: token.symbol, chain: next })) {
+      setWho('');
+      setPicked('');
+    }
+  }
   const dest = (picked || who).trim();
   const shownTo = live?.app ? dest : picked || 'arx1q8x4…t7c2n4p';
   const numeric = Number(amount);
@@ -86,12 +112,9 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
           tokenId={tokenId}
           note={unavailable}
           onPick={(next) => {
-            if (live?.app && (next === 'btc' || next === 'sol')) {
-              setUnavailable(`${next.toUpperCase()} send is not available yet. You can still receive ${next.toUpperCase()}.`);
-              return;
-            }
             setUnavailable(null);
             setTokenId(next);
+            setStableChain('ethereum');
             setAmount('0');
             go('send-who');
           }}
@@ -100,7 +123,18 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
         />
       )}
       {id === 'send-who' && (
-        <PickWho query={who} setQuery={setWho} picked={picked} onPick={(address) => { setPicked(address); setWho(address); }} go={go} leave={leave} />
+        <PickWho
+          query={who}
+          setQuery={setWho}
+          picked={picked}
+          symbol={token.symbol}
+          chain={stableChain}
+          showChain={stableMainnet}
+          onChain={chooseChain}
+          onPick={(address) => { setPicked(address); setWho(address); }}
+          go={go}
+          leave={leave}
+        />
       )}
       {(id === 'send-amount' || id === 'send-amount-vault') && (
         <Amount
@@ -116,12 +150,15 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
           onPaste={(text) => setWho(text)}
           ready={readyAmount}
           fiat={readyAmount ? numeric * unitUsd : 0}
+          showChain={stableMainnet}
+          chain={stableChain}
+          onChain={chooseChain}
           go={go}
           leave={leave}
         />
       )}
       {id === 'send-review' && (
-        <Review token={token} to={shownTo} amount={shownAmount} fiat={fiat} priv={privSend} flags={paymentFlags} networkLabel={networkLabel} feeLabel={feeLabel} go={go} leave={leave} />
+        <Review token={token} to={shownTo} amount={shownAmount} fiat={fiat} priv={privSend} flags={paymentFlags} networkLabel={networkLabel} feeLabel={feeLabel} chain={stableChain} go={go} leave={leave} />
       )}
       {id === 'send-success' && <Success amount={shownAmount} symbol={token.symbol} privateSend={privSend} to={shownTo} feeLabel={feeLabel} go={go} />}
       {id === 'send-privacy' && <Privacy flags={flags} setFlags={setFlags} go={go} leave={leave} />}
@@ -198,7 +235,9 @@ function PickToken({ query, setQuery, tokenId, note, onPick, leave, go }: { quer
   );
 }
 
-function PickWho({ query, setQuery, picked, onPick, go, leave }: { query: string; setQuery: (v: string) => void; picked: string; onPick: (address: string) => void; go: Go; leave: () => void }) {
+function PickWho({ query, setQuery, picked, symbol, chain, showChain, onChain, onPick, go, leave }: {
+  query: string; setQuery: (v: string) => void; picked: string; symbol: string; chain: StableChain; showChain: boolean; onChain: (chain: StableChain) => void; onPick: (address: string) => void; go: Go; leave: () => void;
+}) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
   const q = query.trim().toLowerCase();
@@ -206,7 +245,12 @@ function PickWho({ query, setQuery, picked, onPick, go, leave }: { query: string
   const accounts = sample ? PEOPLE.filter((person) => person.group === 'account' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q))) : [];
   const recent = sample ? PEOPLE.filter((person) => person.group === 'recent' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q))) : [];
   const dest = (picked || query).trim();
-  const ready = live?.app ? isLiveSendDest(dest, net === 'testnet') : dest.length > 0;
+  const ready = live?.app ? isLiveSendDest(dest, net === 'testnet', { symbol, chain }) : dest.length > 0;
+  const hint = symbol.toUpperCase() === 'BTC'
+    ? 'Paste a Bitcoin address. It usually starts with bc1.'
+    : symbol.toUpperCase() === 'SOL' || (showChain && chain === 'solana')
+      ? 'Paste a Solana address.'
+      : `Paste a 0x address${net === 'testnet' ? ' or shielded key' : ''}.`;
   return (
     <>
       <Back top={52} left={16} icon="back" onClick={leave} />
@@ -242,15 +286,17 @@ function PickWho({ query, setQuery, picked, onPick, go, leave }: { query: string
           ))}
         </div>
       )}
-      {live?.app ? <p style={{ position: 'absolute', left: 24, top: 700, width: 342, margin: 0, fontSize: 12, color: '#8b9097' }}>Paste a 0x address{net === 'testnet' ? ' or shielded key' : ''}.</p> : null}
+      {showChain ? <ChainPick chain={chain} onChain={onChain} top={228} /> : null}
+      {live?.app ? <p style={{ position: 'absolute', left: 24, top: 700, width: 342, margin: 0, fontSize: 12, color: '#8b9097' }}>{hint}</p> : null}
       <button type="button" disabled={!ready} onClick={() => go('send-amount')} style={{ ...primary, top: 744, opacity: ready ? 1 : 0.4 }}>Continue</button>
     </>
   );
 }
 
-function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, onMax, onPaste, ready, fiat, go, leave }: {
+function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, onMax, onPaste, ready, fiat, showChain, chain, onChain, go, leave }: {
   token: (typeof TOKENS)[number]; who: string; amount: string; available: number; vaulted: boolean; flags: boolean[]; onFlag: (index: number) => void;
-  onKey: (key: string) => void; onMax: () => void; onPaste: (text: string) => void; ready: boolean; fiat: number; go: Go; leave: () => void;
+  onKey: (key: string) => void; onMax: () => void; onPaste: (text: string) => void; ready: boolean; fiat: number;
+  showChain: boolean; chain: StableChain; onChain: (chain: StableChain) => void; go: Go; leave: () => void;
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
@@ -275,8 +321,9 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
               <span style={{ fontSize: 13, fontWeight: 500, color: '#8b9097' }}>To</span>
               <span style={{ flex: 1, fontSize: 14, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
               <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
-              <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
+              <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} />              </button>
             </div>
+            {showChain ? <ChainPick chain={chain} onChain={onChain} /> : null}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 148 }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
                 <span style={{ fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
@@ -376,8 +423,8 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
   );
 }
 
-function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, go, leave }: {
-  token: (typeof TOKENS)[number]; to: string; amount: string; fiat: number; priv: boolean; flags: PrivacyFlags; networkLabel: string; feeLabel: string; go: Go; leave: () => void;
+function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, chain, go, leave }: {
+  token: (typeof TOKENS)[number]; to: string; amount: string; fiat: number; priv: boolean; flags: PrivacyFlags; networkLabel: string; feeLabel: string; chain: StableChain; go: Go; leave: () => void;
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
@@ -412,15 +459,16 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
       return;
     }
     if (submitted) return;
-    if (live.app && !isLiveSendDest(to, net === 'testnet')) {
-      setErr(net === 'testnet' ? 'Enter a 0x address or shielded destination.' : 'Enter a 0x address.');
+    if (live.app && !isLiveSendDest(to, net === 'testnet', { symbol: token.symbol, chain })) {
+      const symbol = token.symbol.toUpperCase();
+      setErr(symbol === 'BTC' ? 'Enter a Bitcoin address.' : symbol === 'SOL' || chain === 'solana' ? 'Enter a Solana address.' : net === 'testnet' ? 'Enter a 0x address or shielded destination.' : 'Enter a 0x address.');
       return;
     }
     setBusy(true);
     setErr(null);
     try {
       const testnet = net === 'testnet';
-      await live.send(token.symbol, to, amount.replace(/,/g, ''), testnet, testnet && priv && token.id === 'arx' ? 'private' : 'home', testnet ? flags : undefined);
+      await live.send(token.symbol, to, amount.replace(/,/g, ''), testnet, testnet && priv && token.id === 'arx' ? 'private' : 'home', testnet ? flags : undefined, chain);
     } catch (e) {
       if (e instanceof PendingTxError) {
         setSubmitted(e.hash);
@@ -713,6 +761,29 @@ function formatAmount(value: number) {
 function rate(token: (typeof TOKENS)[number]) {
   if (!token.home) return 0;
   return Number(token.fiat.replace(/[$,]/g, '')) / token.home;
+}
+
+function ChainPick({ chain, onChain, top }: { chain: StableChain; onChain: (chain: StableChain) => void; top?: number }) {
+  const placed = top != null;
+  return (
+    <div style={{ position: placed ? 'absolute' : 'relative', left: placed ? 16 : undefined, top, width: placed ? 358 : '100%', marginTop: placed ? 0 : 12 }}>
+      <div style={{ display: 'flex', gap: 8 }}>
+        {(['ethereum', 'solana'] as const).map((id) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChain(id)}
+            style={{ height: 40, minWidth: 108, padding: '0 14px', border: 'none', borderRadius: 10, background: chain === id ? '#accafe' : '#1c2025', color: chain === id ? '#0c1018' : '#fff', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {id === 'ethereum' ? 'Ethereum' : 'Solana'}
+          </button>
+        ))}
+      </div>
+      <p style={{ margin: '8px 0 0', fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>
+        {chain === 'ethereum' ? 'This send uses Ethereum. A Solana address will not receive it.' : 'This send uses Solana. An Ethereum address will not receive it.'}
+      </p>
+    </div>
+  );
 }
 
 const round: CSSProperties = { position: 'absolute', width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' };

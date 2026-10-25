@@ -1,7 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getAddress, type Address } from 'viem';
-import { loadActivity, mergeHashes, type ActivityItem } from '@/chainWallet/activity';
+import { loadActivity, mergeHashes, pushActivity, type ActivityItem } from '@/chainWallet/activity';
+import { bitcoinBalance, sendBitcoin } from '@/chainWallet/bitcoinSend';
+import { SOL_USDC, SOL_USDT, sendSolana, sendSolanaStable, solanaBalance, solanaTokenBalance } from '@/chainWallet/solanaSend';
 import { START_URL, DEFAULT_RPC, PendingTxError } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
@@ -34,6 +36,7 @@ import { useWc } from '@/chainWallet/wcProvider';
 import { beforeGo, type NavDecision } from './liveNav';
 import { useWalletModeActions } from './ModeShell';
 import { addressesFromMnemonic, type AltAddresses } from '@/chainWallet/altChains';
+import { isBtcAddress, isSolAddress } from './sendDest';
 import { qrDataUrl, scanAddressQr } from '@/chainWallet/receiveQr';
 import { useDisplayCurrency } from './displayCurrency';
 
@@ -67,7 +70,7 @@ export type LiveActivity = {
     model?: 'public' | 'private' | 'shield' | 'unshield' | 'onchain';
     place?: 'home' | 'vault';
     party?: string;
-    network?: 'arxon' | 'ethereum';
+    network?: 'arxon' | 'ethereum' | 'bitcoin' | 'solana';
   }[];
 };
 
@@ -141,7 +144,11 @@ type LiveFrame = {
   testnetAdded: boolean;
   enableTestnet: (rpc?: string) => Promise<void>;
   openFaucet: () => void;
-  send: (symbol: string, to: string, amount: string, testnet: boolean, mode?: LiveSendMode, flags?: PrivacyFlags) => Promise<void>;
+  btcBalance: number;
+  solBalance: number;
+  solUsdt: number;
+  solUsdc: number;
+  send: (symbol: string, to: string, amount: string, testnet: boolean, mode?: LiveSendMode, flags?: PrivacyFlags, chain?: 'ethereum' | 'solana') => Promise<void>;
   chainNetwork: WalletNetworkId;
   unlock: (password: string) => Promise<boolean>;
   unlockBiometric: () => Promise<boolean>;
@@ -166,6 +173,7 @@ type LiveFrame = {
   pairWc: (uri: string) => Promise<void>;
   receiveAsset: string;
   receiveAddress: string;
+  solAddress: string;
   receiveQr: string | null;
   setReceiveAsset: (symbol: string) => void;
   scanQr: () => Promise<string>;
@@ -184,6 +192,11 @@ export function useLiveFrame() {
 function num(v: string | null) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+function coinQty(value: number, digits: number) {
+  if (!Number.isFinite(value) || value === 0) return '0.00';
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits });
 }
 
 function qty(v: string | null, digits: number) {
@@ -299,6 +312,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [receiveAsset, setReceiveAsset] = useState('ETH');
   const [receiveQr, setReceiveQr] = useState<string | null>(null);
   const [alt, setAlt] = useState<AltAddresses | null>(null);
+  const [altBal, setAltBal] = useState({ btc: 0, sol: 0, usdt: 0, usdc: 0 });
+  const [balTick, setBalTick] = useState(0);
   const [testnetAdded, setTestnetAdded] = useState(() => sessionStore.testnetAdded());
   const [vaultTokens, setVaultTokens] = useState<VaultHolding[]>([]);
   const [flight, setFlight] = useState<TxFlight | null>(null);
@@ -397,6 +412,32 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     };
   }, [wallet.mnemonic, wallet.accountIndex, wallet.address]);
 
+  useEffect(() => {
+    let cancel = false;
+    if (!alt?.btc && !alt?.sol) {
+      setAltBal({ btc: 0, sol: 0, usdt: 0, usdc: 0 });
+      return;
+    }
+    void (async () => {
+      const next = { btc: 0, sol: 0, usdt: 0, usdc: 0 };
+      if (alt.btc) next.btc = await bitcoinBalance(alt.btc).catch(() => 0);
+      if (alt.sol) {
+        const [sol, usdt, usdc] = await Promise.all([
+          solanaBalance(alt.sol).catch(() => 0),
+          solanaTokenBalance(alt.sol, SOL_USDT).catch(() => 0),
+          solanaTokenBalance(alt.sol, SOL_USDC).catch(() => 0),
+        ]);
+        next.sol = sol;
+        next.usdt = usdt;
+        next.usdc = usdc;
+      }
+      if (!cancel) setAltBal(next);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [alt?.btc, alt?.sol, balTick]);
+
   const receiveAddress = (() => {
     const s = receiveAsset.toUpperCase();
     if (s === 'BTC') return alt?.btc || '';
@@ -453,7 +494,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const ethUsd = mainnetUsdN(eth.ETH, ethQ.usd);
   const usdcUsd = mainnetUsdN(eth.USDC, usdcQ.usd);
   const usdtUsd = mainnetUsdN(eth.USDT, usdtQ.usd);
-  const totalN = ethUsd + usdcUsd + usdtUsd;
+  const totalN = ethUsd + usdcUsd + usdtUsd + altBal.btc * (btcQ.usd || 0) + altBal.sol * (solQ.usd || 0);
 
   const weighted = (() => {
     const rows: [number, number][] = [];
@@ -478,8 +519,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     {
       name: 'Solana',
-      amount: '0.00 SOL',
-      value: format(0),
+      amount: `${coinQty(altBal.sol, 6)} SOL`,
+      value: format(altBal.sol * (solQ.usd || 0)),
       change: pct(solQ.change24h),
       tone: toneOf(solQ.change24h),
       icon: 'sol',
@@ -488,8 +529,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     {
       name: 'Bitcoin',
-      amount: '0.00 BTC',
-      value: format(0),
+      amount: `${coinQty(altBal.btc, 8)} BTC`,
+      value: format(altBal.btc * (btcQ.usd || 0)),
       change: pct(btcQ.change24h),
       tone: toneOf(btcQ.change24h),
       icon: 'btc',
@@ -565,11 +606,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         : 'splash';
 
   const send = useCallback(
-    async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home', paymentFlags?: PrivacyFlags) => {
+    async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home', paymentFlags?: PrivacyFlags, chain?: 'ethereum' | 'solana') => {
       const flags = (testnet ? paymentFlags : undefined) ?? readDefaultPrivacy();
-      if (symbol === 'SOL' || symbol === 'BTC') {
-        throw new Error(`${symbol} send is not available yet.`);
-      }
       if (!testnet && (mode !== 'home' || isArxonSymbol(symbol))) {
         throw new Error('Arxon, Vault and private sends are on Arxon Testnet only.');
       }
@@ -649,8 +687,29 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           setFlight({ ...meta, phase: 'done' });
           return;
         }
+        if (symbol === 'BTC' || symbol === 'SOL' || ((symbol === 'USDT' || symbol === 'USDC') && chain === 'solana')) {
+          if (!wallet.mnemonic) throw new Error('Unlock the wallet to send.');
+          if (symbol === 'BTC') {
+            if (!isBtcAddress(dest)) throw new Error('Enter a Bitcoin address. It usually starts with bc1.');
+            const hash = await sendBitcoin(wallet.mnemonic, wallet.accountIndex, dest, amount);
+            await pushActivity({ hash, kind: 'transfer', to: dest, amount, maskBits: 0, at: Date.now(), token: 'BTC', network: 'bitcoin' });
+            setActivity(groupActivity(await loadActivity()));
+            setBalTick((n) => n + 1);
+            setFlight({ ...meta, phase: 'done' });
+            return;
+          }
+          if (!isSolAddress(dest)) throw new Error('Enter a Solana address.');
+          const hash = symbol === 'SOL'
+            ? await sendSolana(wallet.mnemonic, wallet.accountIndex, dest, amount)
+            : await sendSolanaStable(wallet.mnemonic, wallet.accountIndex, symbol === 'USDC' ? 'USDC' : 'USDT', dest, amount);
+          await pushActivity({ hash, kind: 'transfer', to: dest, amount, maskBits: 0, at: Date.now(), token: symbol, network: 'solana' });
+          setActivity(groupActivity(await loadActivity()));
+          setBalTick((n) => n + 1);
+          setFlight({ ...meta, phase: 'done' });
+          return;
+        }
         if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) {
-          throw new Error('Enter a 0x address. This wallet sends on Ethereum and Arxon Testnet.');
+          throw new Error('Enter a 0x address. This wallet sends ETH, USDT, and USDC on Ethereum.');
         }
         if (!isEthSymbol(symbol)) {
           throw new Error(`${symbol} sends are not available on this wallet.`);
@@ -692,6 +751,10 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     privacyPill: pillText(defaults),
     hidden: hide.hidden,
     toggleHide: hide.toggle,
+    btcBalance: altBal.btc,
+    solBalance: altBal.sol,
+    solUsdt: altBal.usdt,
+    solUsdc: altBal.usdc,
     tokens,
     testnetTotal: testnetAdded ? qty(wallet.network === 'arxon' ? wallet.balance : arx, 4) : '0.00',
     testnetTokens,
@@ -710,6 +773,28 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         if (fullFrom && !rows.some(([label]) => label === 'From')) rows.splice(Math.min(1, rows.length), 0, ['From', briefAddr(fullFrom)]);
         return { ...base, fullTo, fullFrom, accountLabel, rows };
       };
+      if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
+        const netName = saved?.network === 'bitcoin' ? 'Bitcoin' : 'Solana';
+        const fromAddr = saved?.network === 'bitcoin' ? alt?.btc || '' : alt?.sol || '';
+        setInspect({
+          hash,
+          title: saved?.title || 'Sent',
+          amount: saved?.amount || `${hash.slice(0, 10)}…`,
+          fiat: netName,
+          status: 'Submitted',
+          vault: false,
+          fullTo: saved?.party,
+          fullFrom: fromAddr || undefined,
+          accountLabel,
+          rows: [
+            ['From', fromAddr ? `${accountLabel} · ${fromAddr}` : accountLabel],
+            ...(saved?.party ? [['To', saved.party] as [string, string]] : []),
+            ['Network', netName],
+            ['Hash', hash],
+          ],
+        });
+        return;
+      }
       try {
         const row = await inspectTx(wallet.rpcUrl, hash as `0x${string}`);
         setInspect(stamp(toLiveInspect(row)));
@@ -926,6 +1011,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     receiveAsset,
     receiveAddress,
+    solAddress: alt?.sol || '',
     receiveQr,
     setReceiveAsset,
     scanQr,
@@ -987,6 +1073,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     receiveAsset,
     receiveAddress,
     receiveQr,
+    alt,
+    altBal,
     scanQr,
     alt,
     format,
@@ -1030,7 +1118,7 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
       title: model === 'shield' ? 'Shield in' : model === 'unshield' ? 'Unshield' : model === 'private' ? 'Private pay' : model === 'public' ? 'Sent' : 'On-chain',
       sub: `${where}${who ? ` · ${who}` : ''} · ${when}`,
       amount: item.amount ? shownAmount(`${item.amount} ${item.token ?? ''}`) : item.hash.slice(0, 10),
-      fiat: item.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet',
+      fiat: item.network === 'ethereum' ? 'Ethereum' : item.network === 'bitcoin' ? 'Bitcoin' : item.network === 'solana' ? 'Solana' : 'Arxon Testnet',
       kind,
       token: item.token ?? 'ARX',
       to: item.kind === 'private' ? 'receipt' : 'tx',
@@ -1038,7 +1126,7 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
       model,
       place,
       party: item.to,
-      network: item.network === 'ethereum' ? 'ethereum' : 'arxon',
+      network: item.network === 'ethereum' || item.network === 'bitcoin' || item.network === 'solana' ? item.network : 'arxon',
     });
     groups.set(day, current);
   }
