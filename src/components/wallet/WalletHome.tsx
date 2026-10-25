@@ -109,7 +109,7 @@ export default function WalletHome() {
         </button>
       </div>
       <p style={{ margin: '6px 0 0', color: ink.secondary, fontSize: 14 }}>
-        {show(`${publicAmt} tARX`)} · Vault {show(vaultAmt)} tARX · no USD price
+        {show(`${publicAmt} tARX`)} · Vault {show(vaultAmt)} tARX · $0.00
       </p>
 
       {rpcError ? (

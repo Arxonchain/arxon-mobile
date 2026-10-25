@@ -97,7 +97,7 @@ export default function WalletMarket() {
             >
               <TokenName id="ARX" name="tARX" size={32} />
               <span style={{ float: 'right', fontSize: 15, lineHeight: '32px' }}>{show(native)}</span>
-              <span style={{ display: 'block', fontSize: 11, color: 'hsl(215 14% 48%)', marginTop: 6 }}>testnet · no USD</span>
+              <span style={{ display: 'block', fontSize: 11, color: 'hsl(215 14% 48%)', marginTop: 6 }}>$0.00</span>
               <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'hsl(215 14% 48%)', marginTop: 8 }}>
                 <TokenMark id="ARX" size={14} />
                 Vault {show(vault)}

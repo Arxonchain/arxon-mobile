@@ -230,6 +230,7 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
     to.startsWith('vault') ||
     to.startsWith('priv-') ||
     to.startsWith('unshield-') ||
+    to.startsWith('shield-') ||
     to === 'send-amount-vault'
   ) {
     if (!sessionStore.testnetAdded()) return { replace: 'testnet' };

@@ -63,7 +63,11 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
         <FigmaImg src={art('back.svg')} width={20} height={20} />
       </button>
       <HomeBar />
-      {id === 'receipt' && <Receipt go={go} onShare={() => share(shareText)} inspect={liveInspect} loading={!!live?.app && !liveInspect} />}
+      {id === 'receipt' && live?.app ? (
+        <LiveReceipt go={go} onShare={() => share(shareText)} inspect={liveInspect} loading={!liveInspect} />
+      ) : id === 'receipt' ? (
+        <Receipt go={go} onShare={() => share(shareText)} inspect={liveInspect} loading={false} />
+      ) : null}
       {id === 'code-create' && (
         <Create who={who} setWho={setWho} note={note} setNote={setNote} onGenerate={() => {
           if (live?.app) live.makeCode(who, note);
@@ -73,6 +77,38 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
       )}
       {id === 'code-ready' && <Ready label={label} copied={copied} onCopy={copyCode} onShare={() => share(liveCode)} code={liveCode} created={live?.codes[0]?.at} />}
       {id === 'code-log' && <Log go={go} codes={live?.app ? live.codes : null} />}
+    </div>
+  );
+}
+
+function LiveReceipt({ go, onShare, inspect, loading }: { go: Go; onShare: () => void; inspect: { hash: string; amount: string; rows: [string, string][]; status: string; fullTo?: string } | null; loading: boolean }) {
+  const rows: [string, string][] = [];
+  const seen = new Set<string>();
+  for (const [label, value] of inspect?.rows ?? []) {
+    if (seen.has(label)) continue;
+    seen.add(label);
+    rows.push([label, label === 'To' && inspect?.fullTo ? inspect.fullTo : value]);
+  }
+  if (inspect?.fullTo && !seen.has('To')) rows.push(['To', inspect.fullTo]);
+  return (
+    <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 108, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 18px 28px' }}>
+      <h1 style={{ margin: 0, fontSize: 30, fontWeight: 700 }}>Private receipt</h1>
+      <p style={{ margin: '10px 0 0', color: '#8b9097', fontSize: 15, lineHeight: 1.35 }}>Proof of this payment, stored permanently on the Arxon chain.</p>
+      <div style={{ marginTop: 16, background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, padding: '8px 0' }}>
+        {(loading ? [['Status', 'Loading…']] : rows).map(([label, value]) => (
+          <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '8px 16px', fontSize: 14 }}>
+            <span style={{ flex: '0 0 108px', color: '#8b9097' }}>{label}</span>
+            <span style={{ flex: 1, textAlign: 'right', fontWeight: 500, wordBreak: 'break-all' }}>{value}</span>
+          </div>
+        ))}
+      </div>
+      <p style={{ margin: '12px 0 0', fontSize: 12, color: '#8b9097', lineHeight: 1.4 }}>Only you can see your balance. The other person sees theirs on their own receipt.</p>
+      <button type="button" onClick={() => go('code-create')} style={{ ...fillBtn, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 16 }}>Generate disclosure code</button>
+      <button type="button" onClick={onShare} style={{ ...lineBtn, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Share receipt</button>
+      <button type="button" onClick={() => go('code-log')} style={{ ...linkBtn, position: 'relative', left: 0, top: 0, margin: '12px auto 0' }}>
+        View disclosure codes
+        <FigmaImg src={art('chev.svg')} width={5.8} height={9.8} />
+      </button>
     </div>
   );
 }

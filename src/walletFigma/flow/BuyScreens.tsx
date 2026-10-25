@@ -6,6 +6,7 @@ import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { CoinLogo } from './HomeMarket';
+import { CenterLine, SwipeConfirm } from './SwipeConfirm';
 
 const art = (name: string) => `/wallet-figma/buy/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -177,7 +178,7 @@ function Amount({
           </button>
         ))}
       </div>
-      <button type="button" disabled={!ready || !usd} onClick={() => go('buy-review')} style={{ ...primary, top: 716, background: ready && usd ? '#accafe' : '#1c2025', color: ready && usd ? '#0c1018' : '#5c5f64' }}>Review order</button>
+      <button type="button" disabled={!ready || !usd} onClick={() => go('buy-review')} style={{ ...primary, top: 720, height: 48, borderRadius: 12, background: ready && usd ? '#accafe' : '#1c2025', color: ready && usd ? '#0c1018' : '#5c5f64' }}>Review order</button>
     </>
   );
 }
@@ -217,16 +218,13 @@ function Review({
           <p style={kicker}>You receive</p>
           <p style={{ margin: '4px 0 0', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {asset.symbol}</p>
         </div>
-        <div style={{ background: '#1c2025', borderRadius: 16, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14, fontSize: 14 }}>
-          <Line label="Token" value={`${asset.name} · ${asset.symbol}`} />
-          <Line label="Rate" value={usd ? `1 ${asset.symbol} = ${formatUsd(usd)}` : '—'} />
-          <Line label="Provider fee" value={`$${money(PROVIDER)}`} />
-          <Line label="Network fee" value="$0.00" />
-          <Line label="Deliver to" value={live?.app ? `${live.accountLabel}${live.address ? ` · ${live.address.slice(0, 6)}…${live.address.slice(-4)}` : ''}` : 'Account 01 · arx1q7…m2d9'} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700 }}>
-            <span>Total</span>
-            <span>${money(total)}</span>
-          </div>
+        <div style={{ background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
+          <CenterLine label="Token" value={`${asset.name} · ${asset.symbol}`} />
+          <CenterLine label="Rate" value={usd ? `1 ${asset.symbol} = ${formatUsd(usd)}` : '—'} />
+          <CenterLine label="Provider fee" value={`$${money(PROVIDER)}`} />
+          <CenterLine label="Network fee" value="$0.00" />
+          <CenterLine label="Deliver to" value={live?.app ? `${live.accountLabel}${live.address ? ` · ${live.address.slice(0, 6)}…${live.address.slice(-4)}` : ''}` : 'Account 01 · arx1q7…m2d9'} />
+          <CenterLine label="Total" value={`$${money(total)}`} />
         </div>
         <div style={{ height: 72, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px' }}>
           <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
@@ -241,15 +239,17 @@ function Review({
           </button>
         </div>
       </div>
-      <p style={{ position: 'absolute', left: 16, top: 714, width: 358, margin: 0, textAlign: 'center', fontSize: 12, color: '#8b9097' }}>By continuing you agree to the provider’s terms.</p>
-      {err ? <p style={{ position: 'absolute', left: 24, top: 690, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
-      <button type="button" onClick={() => {
-        if (live?.app) {
-          setErr('Coming soon');
-          return;
-        }
-        go('buy-status');
-      }} style={{ ...primary, top: 744 }}>Pay ${money(total)}</button>
+      <div style={{ position: 'absolute', left: 18, top: 700, width: 354 }}>
+        {err ? <p style={{ margin: '0 0 8px', color: '#f25252', fontSize: 12, textAlign: 'center' }}>{err}</p> : null}
+        <SwipeConfirm label={`Pay $${money(total)}`} onConfirm={() => {
+          if (live?.app) {
+            setErr('Coming soon');
+            return;
+          }
+          go('buy-status');
+        }} />
+        <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>By continuing you agree to the provider’s terms.</p>
+      </div>
     </>
   );
 }

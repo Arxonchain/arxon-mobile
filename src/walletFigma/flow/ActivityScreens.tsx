@@ -7,6 +7,9 @@ import { useLiveFrame, type LiveActivity } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { explorerTxUrl, openExternal } from './openExternal';
 import { usePullRefresh } from './pullRefresh';
+import { TestnetHistory } from './TestnetHistory';
+import { briefAddr } from './briefAddr';
+import { LiveHead, LiveScroll, liveGhost, livePrimary } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -102,6 +105,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
     go('activity', false);
   }
 
+  const testnetLive = !!live?.app && net === 'testnet' && id !== 'tx' && id !== 'tx-vault';
   const showSheet = id === 'activity-filter';
   const vaultList = id === 'activity-filtered' || id === 'activity-vault';
   const none = id === 'activity-none';
@@ -119,8 +123,12 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
       ) : (
         <>
           <PhoneStatus />
-          <Header onFilter={openFilter} onRefresh={() => void live?.refresh?.()} />
-          {vaultList || none ? (
+          <Header onFilter={testnetLive ? undefined : openFilter} onRefresh={() => void live?.refresh?.()} title={testnetLive ? 'Testnet history' : 'Activity'} />
+          {testnetLive ? (
+            <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: 118, width: 354, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+              <TestnetHistory go={go} />
+            </div>
+          ) : vaultList || none ? (
             <button type="button" onClick={clear} style={{ ...chip, position: 'absolute', left: 18, top: 122, background: '#accafe', color: '#0c1018', fontWeight: 600 }}>Vault moves  ✕</button>
           ) : (
             <div style={{ position: 'absolute', left: 18, top: 122, display: 'flex', gap: 10 }}>
@@ -129,10 +137,10 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
               ))}
             </div>
           )}
-          {empty && <Empty title="No activity yet" body="Your sent, received and swapped transactions will show up here." action="Fund your wallet" onAction={() => go('receive')} />}
-          {none && <Empty title="No Vault moves" body="Moves between Home and your Vault will show up here." action="Clear filter" onAction={clear} />}
-          {filteredBlank && <Empty title="No activity yet" body="Nothing in this range. Try another date or token." action="Clear filter" onAction={clear} />}
-          {!empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash); }} onRefresh={() => live?.refresh?.()} />}
+          {!testnetLive && empty && <Empty title="No activity yet" body="Your sent, received and swapped transactions will show up here." action="Fund your wallet" onAction={() => go('receive')} />}
+          {!testnetLive && none && <Empty title="No Vault moves" body="Moves between Home and your Vault will show up here." action="Clear filter" onAction={clear} />}
+          {!testnetLive && filteredBlank && <Empty title="No activity yet" body="Nothing in this range. Try another date or token." action="Clear filter" onAction={clear} />}
+          {!testnetLive && !empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash); }} onRefresh={() => live?.refresh?.()} />}
           <Tabs go={go} here={empty ? 'activity-empty' : vaultList ? 'activity-filtered' : none ? 'activity-none' : 'activity'} />
           {showSheet && (
             <Filter draft={draft} setDraft={setDraft} onClose={leave} onReset={() => { setDraft({ type: 'All', token: 'All tokens', date: 'Any time' }); clear(); }} onApply={apply} />
@@ -172,10 +180,10 @@ function filterRows(type: string, token: string, date = 'Any time') {
   })).filter((group) => group.items.length);
 }
 
-function Header({ onFilter, onRefresh }: { onFilter: () => void; onRefresh?: () => void }) {
+function Header({ onFilter, onRefresh, title = 'Activity' }: { onFilter?: () => void; onRefresh?: () => void; title?: string }) {
   return (
     <div style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>Activity</p>
+      <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>{title}</p>
       <div style={{ display: 'flex', gap: 8 }}>
         {onRefresh ? (
           <button type="button" aria-label="Refresh" onClick={onRefresh} style={round}>
@@ -185,7 +193,7 @@ function Header({ onFilter, onRefresh }: { onFilter: () => void; onRefresh?: () 
             </svg>
           </button>
         ) : null}
-        <button type="button" aria-label="Filter" onClick={onFilter} style={round}><FigmaImg src={art('filter.svg')} width={20} height={20} /></button>
+        {onFilter ? <button type="button" aria-label="Filter" onClick={onFilter} style={round}><FigmaImg src={art('filter.svg')} width={20} height={20} /></button> : null}
       </div>
     </div>
   );
@@ -248,7 +256,7 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
   const loading = !!live?.app && !inspect;
   const vault = inspect ? inspect.vault : id === 'tx-vault';
   const rows = inspect
-    ? inspect.rows
+    ? inspect.rows.map(([label, value]): [string, string] => [label, label === 'To' && inspect.fullTo ? briefAddr(inspect.fullTo) : value])
     : loading
     ? [['Status', 'Loading…']]
     : vault
@@ -271,10 +279,40 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
     const onEthereum = row ? row.fiat === 'Ethereum' : net === 'mainnet';
     void openExternal(explorerTxUrl(hash, onEthereum ? 'ethereum' : 'arxon'));
   }
+  if (live?.app) {
+    return (
+      <LiveScroll>
+        <LiveHead title="Transaction" onBack={leave} />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ width: 72, height: 72, borderRadius: 36, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FigmaImg src={art('out.svg')} width={20} height={20} />
+          </div>
+          <p style={{ margin: '16px 0 0', textAlign: 'center', fontSize: 20, fontWeight: 700 }}>{title}</p>
+          <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 32, fontWeight: 700 }}>{amount}</p>
+          {fiat ? <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>{fiat}</p> : null}
+          <span style={{ marginTop: 12, minHeight: 28, borderRadius: 14, background: '#12301f', color: '#3ddc97', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', padding: '0 14px' }}>{status}</span>
+        </div>
+        <div style={{ marginTop: 16, background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, padding: '4px 16px' }}>
+          {rows.map(([label, value], index) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', fontSize: 14, borderTop: index ? '1px solid #2a3447' : 'none' }}>
+              <span style={{ flex: '0 0 108px', color: '#8b9097' }}>{label}</span>
+              <span style={{ flex: 1, textAlign: 'right', fontWeight: 500, wordBreak: 'break-word', color: label === 'Privacy' ? '#accafe' : '#fff' }}>{value}</span>
+            </div>
+          ))}
+        </div>
+        <button type="button" onClick={() => navigator.clipboard?.writeText(hash).catch(() => undefined)} style={{ marginTop: 12, width: '100%', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '12px 15px', cursor: 'pointer', minHeight: 56 }}>
+          <span style={{ display: 'block', fontSize: 12, color: '#8b9097' }}>Transaction hash</span>
+          <span style={{ display: 'block', marginTop: 2, fontSize: 14, fontWeight: 500, wordBreak: 'break-all' }}>{hashLabel}</span>
+        </button>
+        <button type="button" onClick={() => go(vault ? 'activity' : 'receipt')} style={{ ...livePrimary, marginTop: 16 }}>{vault ? 'Back to Activity' : 'View private receipt'}</button>
+        {!vault ? <button type="button" onClick={explorer} style={{ ...liveGhost, marginTop: 10 }}>View on explorer</button> : null}
+      </LiveScroll>
+    );
+  }
   return (
     <>
       <NoteStatus />
-      <button type="button" aria-label="Back" onClick={leave} style={{ ...round, left: 16, top: 52 }}>
+      <button type="button" aria-label="Back" onClick={leave} style={{ ...round, position: 'absolute', left: 16, top: 52 }}>
         <FigmaImg src="/wallet-figma/find/back.svg" width={20} height={20} />
       </button>
       <p style={{ position: 'absolute', left: 70, top: 61.5, width: 250, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 600 }}>Transaction</p>
@@ -354,7 +392,7 @@ function Tabs({ go, here }: { go: Go; here: string }) {
         if (tab === 'History') return;
         pickWalletTab(net, tab, go, {
           home: tabTarget('home'),
-          vault: net === 'testnet' ? vaultEntry('vault-empty') : tabTarget('vault'),
+          vault: net === 'testnet' ? vaultEntry('vault') : tabTarget('vault'),
           history: here,
         });
       }}

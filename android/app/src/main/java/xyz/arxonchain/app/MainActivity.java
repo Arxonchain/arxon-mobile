@@ -19,7 +19,6 @@ import androidx.annotation.NonNull;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
-import androidx.core.splashscreen.SplashScreen;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
@@ -46,8 +45,7 @@ public class MainActivity extends BridgeActivity {
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     registerPlugin(ArxonBiometricPlugin.class);
-    SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
-    splashScreen.setKeepOnScreenCondition(() -> false);
+    setTheme(R.style.AppTheme_NoActionBar);
     WebView.setWebContentsDebuggingEnabled(true);
     super.onCreate(savedInstanceState);
     getWindow().getDecorView().setBackgroundColor(WEBVIEW_BG);

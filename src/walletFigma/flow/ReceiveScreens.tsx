@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { ARXON, DEFAULT_RPC, SCAN_URL } from '@/chainWallet/chain';
@@ -7,6 +7,7 @@ import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 import { applyNetwork, listNetworks, saveNetwork, selectedNetwork, type HomeNetwork } from './homeNetworks';
+import { qrDataUrl } from '@/chainWallet/receiveQr';
 
 const art = (name: string) => `/wallet-figma/receive/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -26,8 +27,7 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const net = useWalletNetwork();
   const [nets, setNets] = useState<Net[]>(() => listNetworks(net));
   const [selected, setSelected] = useState(() => selectedNetwork(net).id);
-  const [pub, setPub] = useState(true);
-  const [copied, setCopied] = useState(false);
+  const [shielded, setShielded] = useState(false);
   const [focus, setFocus] = useState('name');
   const [form, setForm] = useState(() =>
     net === 'testnet' && !(live?.app ? live.testnetAdded : sessionStore.testnetAdded())
@@ -70,27 +70,11 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const address = live?.app ? live.receiveAddress || live.address || '' : ADDRESS;
   const qrSrc = live?.app && live.receiveQr ? live.receiveQr : art('qr.svg');
 
-  async function copy() {
-    if (!address) return;
-    try { await navigator.clipboard?.writeText(address); } catch { /* preview still confirms */ }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
-  }
-
-  function share() {
-    if (!address) return;
-    if (navigator.share) {
-      navigator.share({ title: `${current.name} address`, text: address }).catch(() => undefined);
-      return;
-    }
-    void copy();
-  }
-
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`.recv-field::placeholder{color:#8b9097}`}</style>
       {id === 'receive' && (
-        <Receive current={current} pub={pub} setPub={setPub} copied={copied} onCopy={copy} onShare={share} go={go} leave={leave} address={address} qrSrc={qrSrc} />
+        <Receive current={current} shielded={shielded} setShielded={setShielded} go={go} leave={leave} address={address} qrSrc={qrSrc} />
       )}
       {id === 'network' && (
         <Networks nets={nets} selected={selected} onPick={pick} onAdd={() => go('add-network')} onClose={leave} />
@@ -112,55 +96,101 @@ function receiveCopy(current: Net, liveApp: boolean) {
   return { letter, caption, warn, privacy: arxon };
 }
 
-function Receive({ current, pub, setPub, copied, onCopy, onShare, go, leave, address, qrSrc }: {
-  current: Net; pub: boolean; setPub: (v: boolean) => void; copied: boolean; onCopy: () => void; onShare: () => void; go: Go; leave: () => void; address: string; qrSrc: string;
+function Receive({ current, shielded, setShielded, go, leave, address, qrSrc }: {
+  current: Net; shielded: boolean; setShielded: (v: boolean) => void; go: Go; leave: () => void; address: string; qrSrc: string;
 }) {
   const live = useLiveFrame();
   const copy = receiveCopy(current, !!live?.app);
-  const warnTop = copy.privacy ? 620 : 534;
+  const testnet = copy.privacy;
+  const shieldedKey = live?.app ? live.shieldedPk || '' : `0x${'11'.repeat(32)}`;
+  const showingKey = testnet && shielded;
+  const shown = showingKey ? shieldedKey : address;
+  const [copied, setCopied] = useState(false);
+  const [shieldQr, setShieldQr] = useState<string | null>(null);
+  const about = !testnet
+    ? null
+    : showingKey
+      ? 'Shielded key. Private pay into this vault uses it, and the amount stays hidden.'
+      : 'Public address. Anyone can send ARX here, and that payment is visible.';
+  const warn = showingKey
+    ? 'Only send a private payment to this shielded key. A normal transfer will not arrive here.'
+    : copy.warn;
+
+  useEffect(() => {
+    if (!showingKey || !shieldedKey) {
+      setShieldQr(null);
+      return;
+    }
+    let cancel = false;
+    void qrDataUrl(shieldedKey).then((url) => {
+      if (!cancel) setShieldQr(url);
+    }).catch(() => {
+      if (!cancel) setShieldQr(null);
+    });
+    return () => {
+      cancel = true;
+    };
+  }, [showingKey, shieldedKey]);
+
+  async function copyShown() {
+    if (!shown) return;
+    try { await navigator.clipboard?.writeText(shown); } catch { /* preview still confirms */ }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  }
+
+  function share() {
+    if (!shown) return;
+    const title = showingKey ? 'Shielded key' : `${current.name} address`;
+    if (navigator.share) {
+      navigator.share({ title, text: shown }).catch(() => undefined);
+      return;
+    }
+    void copyShown();
+  }
+
   return (
     <>
       <PhoneStatus />
       <Back top={56} onClick={leave} />
       <p style={{ position: 'absolute', left: 70, top: 65.5, width: 250, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>Receive</p>
-      <button type="button" onClick={() => go('network')} style={pill}>
-        <FigmaImg src={art('dot.svg')} width={18} height={18} />
-        <span>{current.pill}</span>
-        <FigmaImg src={art('chev-down.svg')} width={16} height={16} />
-      </button>
-      <div style={{ position: 'absolute', left: 63, top: 180, width: 264, height: 264, borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
-        <img src={qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32 }} />
-        <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>{copy.letter}</div>
-      </div>
-      <p style={{ position: 'absolute', left: 18, top: 466, width: 354, margin: 0, textAlign: 'center', fontSize: 13, color: '#8b9097' }}>{copy.caption}</p>
-      <p style={{ position: 'absolute', left: 45, top: 488, width: 300, margin: 0, textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{address}</p>
-      {copy.privacy ? (
-      <div style={{ position: 'absolute', left: 18, top: 534, width: 354, height: 72, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
-        <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <FigmaImg src="/wallet-figma/send/shield.svg" width={18} height={18} />
-        </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Your public address</span>
-          <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Every payment you receive gets a private receipt</span>
-        </span>
-        <button type="button" aria-label="Your public address" aria-pressed={pub} onClick={() => setPub(!pub)} style={iconBtn}>
-          <FigmaImg src={pub ? '/wallet-figma/send/toggle-on.svg' : '/wallet-figma/send/toggle-off.svg'} width={pub ? 46 : 48} height={28} />
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 112, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '0 18px 28px' }}>
+        <button type="button" onClick={() => go('network')} style={pillFlow}>
+          <FigmaImg src={art('dot.svg')} width={18} height={18} />
+          <span>{current.pill}</span>
+          <FigmaImg src={art('chev-down.svg')} width={16} height={16} />
+        </button>
+        <div style={{ position: 'relative', width: 264, height: 264, margin: '22px auto 0', borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
+          <img src={showingKey && shieldQr ? shieldQr : qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32, width: 200, height: 200, objectFit: 'contain' }} />
+          <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>{copy.letter}</div>
+        </div>
+        <p style={{ margin: '18px 0 0', textAlign: 'center', fontSize: 13, color: '#8b9097' }}>{showingKey ? 'Shielded key' : copy.caption}</p>
+        <p style={{ margin: '8px 12px 0', textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{shown || (showingKey ? 'Your shielded key is not ready yet.' : '')}</p>
+        {about ? <p style={{ margin: '8px 8px 0', textAlign: 'left', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>{about}</p> : null}
+        {testnet ? (
+          <div style={{ marginTop: 14, background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
+            <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+              <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Shielded key</span>
+              <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Off is your public address. On is the vault key.</span>
+            </span>
+            <button type="button" aria-label="Shielded key" aria-pressed={shielded} onClick={() => setShielded(!shielded)} style={iconBtn}>
+              <img src={shielded ? '/wallet-figma/send/toggle-on.svg' : '/wallet-figma/send/toggle-off.svg'} alt="" width={48} height={28} style={{ width: 48, height: 28, objectFit: 'contain', display: 'block' }} />
+            </button>
+          </div>
+        ) : null}
+        <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <img src={art('info.svg')} alt="" width={16} height={16} style={{ width: 16, height: 16, flex: '0 0 16px', objectFit: 'contain', display: 'block' }} />
+          <p style={{ margin: 0, flex: 1, fontSize: 12, color: '#5c5f64', lineHeight: 1.35, textAlign: 'left' }}>{warn}</p>
+        </div>
+        <button type="button" onClick={() => void copyShown()} style={solidFlow}>
+          <FigmaImg src={art('copy.svg')} width={18} height={18} />
+          {copied ? 'Copied' : showingKey ? 'Copy key' : 'Copy address'}
+        </button>
+        <button type="button" onClick={share} style={outlineFlow}>
+          <FigmaImg src={art('share.svg')} width={18} height={18} />
+          Share
         </button>
       </div>
-      ) : null}
-      <div style={{ position: 'absolute', left: 22, top: warnTop, width: 346, display: 'flex', gap: 8 }}>
-        <FigmaImg src={art('info.svg')} width={16} height={16} />
-        <p style={{ margin: 0, width: 322, fontSize: 12, color: '#5c5f64', lineHeight: 1.35 }}>{copy.warn}</p>
-      </div>
-      <button type="button" onClick={onCopy} style={{ ...solid, top: warnTop + 44 }}>
-        <FigmaImg src={art('copy.svg')} width={18} height={18} />
-        {copied ? 'Copied' : 'Copy address'}
-      </button>
-      <button type="button" onClick={onShare} style={{ ...outline, top: warnTop + 109 }}>
-        <FigmaImg src={art('share.svg')} width={18} height={18} />
-        Share
-      </button>
-      <HomeBar />
     </>
   );
 }
@@ -253,9 +283,9 @@ function AddNetwork({ form, setForm, focus, setFocus, onSave, leave }: {
             />
           </label>
         ))}
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center', background: '#11161f', border: '1px solid #2a3447', borderRadius: 16, padding: '12px 16px' }}>
-          <FigmaImg src={art('info-card.svg')} width={16} height={16} />
-          <p style={{ margin: 0, width: 290, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>Only add networks you trust. A malicious network can see your activity.</p>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', background: '#11161f', border: '1px solid #2a3447', borderRadius: 16, padding: '12px 16px' }}>
+          <img src={art('info-card.svg')} alt="" width={16} height={16} style={{ width: 16, height: 16, flex: '0 0 16px', objectFit: 'contain', display: 'block' }} />
+          <p style={{ margin: 0, flex: 1, fontSize: 13, color: '#8b9097', lineHeight: 1.35, textAlign: 'left' }}>Only add networks you trust. A malicious network can see your activity.</p>
         </div>
       </div>
       <button type="button" onClick={onSave} style={{ position: hideChrome ? 'fixed' : 'absolute', left: 16, ...(hideChrome ? { bottom: 16, zIndex: 9 } : { top: 744 }), width: 358, height: 52, borderRadius: 14, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Save network</button>
@@ -304,9 +334,9 @@ function HomeBar() {
   );
 }
 
-const pill: CSSProperties = { position: 'absolute', left: '50%', top: 124, transform: 'translateX(-50%)', height: 40, border: 'none', borderRadius: 22, background: '#1c2025', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px 9px 14px', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer' };
+const pillFlow: CSSProperties = { height: 40, margin: '8px auto 0', border: 'none', borderRadius: 22, background: '#1c2025', color: '#fff', display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px 9px 14px', fontFamily: font.sans, fontSize: 14, fontWeight: 500, cursor: 'pointer' };
+const solidFlow: CSSProperties = { width: '100%', height: 55, marginTop: 16, borderRadius: 8, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
+const outlineFlow: CSSProperties = { width: '100%', height: 55, marginTop: 10, borderRadius: 8, border: '1.5px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
 const iconBtn: CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', flexShrink: 0 };
-const solid: CSSProperties = { position: 'absolute', left: 19, width: 353, height: 55, borderRadius: 8, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
-const outline: CSSProperties = { position: 'absolute', left: 19, width: 353, height: 55, borderRadius: 8, border: '1.5px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 };
 const netBtn: CSSProperties = { position: 'absolute', left: 15, width: 358, height: 72, boxSizing: 'border-box', borderRadius: 14, border: '1px solid #2a3447', color: '#fff', fontFamily: font.sans, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12, padding: '0 13px' };
 const fieldBox: CSSProperties = { width: '100%', height: 52, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, padding: '0 16px', color: '#fff', fontFamily: font.sans, fontSize: 15, outline: 'none' };

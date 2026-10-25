@@ -289,7 +289,7 @@ function Tabs({ go }: { go: Go }) {
         if (tab === 'Account') return;
         pickWalletTab(net, tab, go, {
           home: tabTarget('home'),
-          vault: net === 'testnet' ? vaultEntry('vault-empty') : tabTarget('vault'),
+          vault: net === 'testnet' ? vaultEntry('vault') : tabTarget('vault'),
           history: tabTarget('history'),
         });
       }}

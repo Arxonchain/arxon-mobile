@@ -329,7 +329,7 @@ export default function WalletToken() {
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '8px 0 4px' }}>{meta?.symbol ?? 'Token'}</h1>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', marginBottom: 6 }}>{meta?.name ?? token}</p>
       <p style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.5px', margin: '8px 0 0' }}>{show(publicBal)}</p>
-      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', margin: '4px 0 0' }}>testnet · no USD</p>
+      <p style={{ fontSize: 12, color: 'hsl(215 14% 48%)', margin: '4px 0 0' }}>$0.00</p>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 42%)', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}>
         {arx20 ? (
           <>

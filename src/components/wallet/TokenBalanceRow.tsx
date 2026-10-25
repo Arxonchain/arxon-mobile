@@ -62,7 +62,7 @@ export function TokenBalanceRow({
         )}
         {testnet ? (
           <span style={{ display: 'block', fontSize: 11, color: 'hsl(215 14% 48%)', marginTop: 4 }}>
-            testnet · no USD
+            $0.00
           </span>
         ) : null}
       </div>

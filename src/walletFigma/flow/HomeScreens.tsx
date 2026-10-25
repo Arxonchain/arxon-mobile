@@ -14,6 +14,8 @@ import { useProfilePhoto } from './profilePhoto';
 import { usePullRefresh } from './pullRefresh';
 import { openExternal } from './openExternal';
 import { HomeMarket } from './HomeMarket';
+import { SwipeVault } from './SwipeConfirm';
+import { TestnetHistory } from './TestnetHistory';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
 
@@ -257,6 +259,7 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
   const photo = useProfilePhoto(live?.accountIndex ?? 0);
   const network = useNetworkSheet('testnet', go);
   const [added, setAdded] = useState(() => sessionStore.testnetAdded());
+  const [intro, setIntro] = useState(() => typeof localStorage === 'undefined' || localStorage.getItem(TESTNET_INTRO_KEY) !== '1');
   const on = live?.app ? live.testnetAdded : added;
   const hidden = live?.app ? live.hidden : false;
   const tokens = on ? (live?.app ? live.testnetTokens : DEMO_TESTNET) : [];
@@ -264,8 +267,10 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
 
   function vaultTo() {
     if (!on) return 'add-network';
-    if (!tokens.some((row) => Number(row.amount.replace(/[^0-9.]/g, '')) > 0)) return vaultEntry('vault-nofunds');
-    return vaultEntry('vault-empty');
+    const holding = tokens.some((row) => Number(row.amount.replace(/[^0-9.]/g, '')) > 0);
+    const shielded = live?.app ? Number(live.shielded) > 0 : false;
+    if (!holding && !shielded) return vaultEntry('vault-nofunds');
+    return vaultEntry('vault');
   }
 
   async function addNetwork() {
@@ -283,6 +288,19 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
       return;
     }
     void openExternal(START_URL);
+  }
+
+  function dismissIntro() {
+    localStorage.setItem(TESTNET_INTRO_KEY, '1');
+    setIntro(false);
+  }
+
+  function openVaultFlow(body: string) {
+    if (!on) {
+      go('add-network');
+      return;
+    }
+    go(vaultEntry(body));
   }
 
   return (
@@ -340,7 +358,11 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
             go('receive');
           }}><FigmaImg src={art('receive.svg')} width={24} height={24} /></Action>
           <Action label="Swap" onClick={() => go(on ? 'swap' : 'add-network')}><FigmaImg src={art('swap.svg')} width={24} height={24} /></Action>
-          <Action label="Buy crypto" onClick={() => go('buy')}><FigmaImg src={art('buy.svg')} width={24} height={24} /></Action>
+          <Action label="Shield in" onClick={() => openVaultFlow('shield-explain')}><FigmaImg src={art('shield.svg')} width={24} height={24} /></Action>
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginBottom: on ? 16 : 24 }}>
+          <SwipeVault label="Private pay" onOpen={() => openVaultFlow('vault')} />
+          <SwipeVault label="Unshield" onOpen={() => openVaultFlow('vault')} />
         </div>
 
         {!on ? (
@@ -375,7 +397,10 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
                 </button>
               ))}
             </div>
-            <HomeMarket go={go} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: 18, fontWeight: 700 }}>History</span>
+            </div>
+            <TestnetHistory go={go} />
           </div>
         )}
       </div>
@@ -391,14 +416,35 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
         }}
       />
       {network.sheet}
+      {intro ? <TestnetIntro onDone={dismissIntro} /> : null}
+    </div>
+  );
+}
+
+const TESTNET_INTRO_KEY = 'arxon.testnet.introSeen';
+
+function TestnetIntro({ onDone }: { onDone: () => void }) {
+  return (
+    <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: '#050505', overflow: 'hidden', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <div style={{ marginTop: 120, width: 96, height: 96, borderRadius: 48, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <FigmaImg src={art('shield.svg')} width={40} height={40} />
+      </div>
+      <h1 style={{ margin: '28px 28px 0', textAlign: 'center', fontSize: 28, fontWeight: 700, lineHeight: 1.15 }}>Private payments on Testnet</h1>
+      <p style={{ margin: '14px 32px 0', textAlign: 'center', color: '#8b9097', fontSize: 15, lineHeight: 1.45 }}>
+        Shield tokens into your Vault. Pay someone from that Vault without showing the balance. Unshield when you want a public balance again.
+      </p>
+      <div style={{ marginTop: 'auto', width: 354, paddingBottom: 36, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <button type="button" onClick={onDone} style={{ height: 55, border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>I understand</button>
+        <button type="button" onClick={onDone} style={{ height: 48, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Skip all</button>
+      </div>
     </div>
   );
 }
 
 const DEMO_TESTNET: Tok[] = [
-  { name: 'Arxon', amount: '0.00 ARXt', value: 'No USD price', change: 'Arxon Testnet', tone: 'flat', icon: 'arx', to: 'token-arx', symbol: 'ARXt' },
-  { name: 'Tether', amount: '0.00 USDTarx', value: 'No USD price', change: 'Arxon Testnet', tone: 'flat', icon: 'usdt', to: 'token-usdt', symbol: 'USDTarx' },
-  { name: 'USD Coin', amount: '0.00 USDCarx', value: 'No USD price', change: 'Arxon Testnet', tone: 'flat', icon: 'usdc', to: 'token-usdc', symbol: 'USDCarx' },
+  { name: 'Arxon', amount: '0.00 ARXt', value: '$0.00', change: 'Arxon Testnet', tone: 'flat', icon: 'arx', to: 'token-arx', symbol: 'ARXt' },
+  { name: 'Tether', amount: '0.00 USDTarx', value: '$0.00', change: 'Arxon Testnet', tone: 'flat', icon: 'usdt', to: 'token-usdt', symbol: 'USDTarx' },
+  { name: 'USD Coin', amount: '0.00 USDCarx', value: '$0.00', change: 'Arxon Testnet', tone: 'flat', icon: 'usdc', to: 'token-usdc', symbol: 'USDCarx' },
 ];
 
 function toneColor(tone: Tok['tone']) {

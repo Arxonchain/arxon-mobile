@@ -615,6 +615,27 @@ export const SCREENS: Scr[] = [
     primary: ['Private transfer', 'priv-amount'],
     secondary: ['Unshield to public address', 'unshield-amount'],
   }),
+  s('shield-explain', '18.28 Shield in – Hidden balance', '18 · Vault & accounts', 'caution', {
+    title: 'Shield in',
+    body: 'Every token you shield, and the total shielded balance, can never be public. Nobody else can see it.',
+    primary: ['Choose a token', 'vault-pick-in'],
+  }),
+  s('priv-addr', '18.29 Private pay – Wallet', '18 · Vault & accounts', 'form', {
+    title: 'Private pay',
+    body: 'Paste the shielded key of the wallet you are paying.',
+    primary: ['Continue', 'priv-amount'],
+  }),
+  s('unshield-who', '18.30 Unshield – Who receives it', '18 · Vault & accounts', 'list', {
+    title: 'Unshield',
+    rows: ['To myself', 'To someone else'],
+    primary: ['To myself', 'vault-send-token'],
+    secondary: ['To someone else', 'unshield-addr'],
+  }),
+  s('unshield-addr', '18.31 Unshield – Address', '18 · Vault & accounts', 'form', {
+    title: 'Unshield',
+    body: 'Enter the 0x address that should receive the public balance.',
+    primary: ['Continue', 'vault-send-token'],
+  }),
   s('priv-amount', '18.21 Private transfer – Amount', '18 · Vault & accounts', 'amount', {
     title: 'Private transfer',
     body: 'Sender, recipient, and amount stay hidden.',

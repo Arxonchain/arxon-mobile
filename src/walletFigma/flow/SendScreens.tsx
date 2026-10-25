@@ -7,6 +7,9 @@ import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 import { isLiveSendDest, parseTokenQty } from './sendDest';
+import { CenterLine, SwipeConfirm } from './SwipeConfirm';
+import { briefAddr } from './briefAddr';
+import { LiveHead, LiveScroll, liveGhost, livePrimary } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/send/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -41,8 +44,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const [who, setWho] = useState('');
   const [picked, setPicked] = useState('');
   const [amount, setAmount] = useState('0');
-  const [priv, setPriv] = useState(true);
-  const [flags, setFlags] = useState([false, false, true, true]);
+  const [flags, setFlags] = useState([true, true, true, false]);
   const tokenBase = TOKENS.find((item) => item.id === tokenId)
     ?? (tokenId === 'sol'
       ? { id: 'sol', name: 'Solana', amount: '0.00 SOL', fiat: '$0.00', symbol: 'SOL', hidden: false, home: 0, vault: '' }
@@ -64,7 +66,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   };
   const networkLabel = live?.app ? (net === 'testnet' ? 'Arxon Testnet' : 'Ethereum') : 'Arxon';
   const feeLabel = live?.app ? 'Set by the network' : token.id === 'arx' ? `0.0004 ${token.symbol}` : `0 ${token.symbol}`;
-  const privSend = priv && token.id === 'arx' && (!live?.app || net === 'testnet');
+  const privSend = token.id === 'arx' && (!live?.app || net === 'testnet') && (flags[0] || flags[1] || flags[2]);
   const dest = (picked || who).trim();
   const shownTo = live?.app ? dest : picked || 'arx1q8x4…t7c2n4p';
   const numeric = Number(amount);
@@ -107,8 +109,8 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
           amount={amount}
           available={available}
           vaulted={vaulted}
-          priv={priv}
-          setPriv={setPriv}
+          flags={flags}
+          onFlag={(index) => setFlags((prev) => prev.map((on, i) => (i === index ? !on : on)))}
           onKey={(key) => setAmount((prev) => punch(prev, key))}
           onMax={() => setAmount(rawNum(Math.max(0, live?.app ? available : available - (token.id === 'arx' ? 0.0004 : 0))))}
           onPaste={(text) => setWho(text)}
@@ -246,20 +248,79 @@ function PickWho({ query, setQuery, picked, onPick, go, leave }: { query: string
   );
 }
 
-function Amount({ token, who, amount, available, vaulted, priv, setPriv, onKey, onMax, onPaste, ready, fiat, go, leave }: {
-  token: (typeof TOKENS)[number]; who: string; amount: string; available: number; vaulted: boolean; priv: boolean; setPriv: (v: boolean) => void;
+function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, onMax, onPaste, ready, fiat, go, leave }: {
+  token: (typeof TOKENS)[number]; who: string; amount: string; available: number; vaulted: boolean; flags: boolean[]; onFlag: (index: number) => void;
   onKey: (key: string) => void; onMax: () => void; onPaste: (text: string) => void; ready: boolean; fiat: number; go: Go; leave: () => void;
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
+  const privacy = token.id === 'arx' && (!live?.app || net === 'testnet');
+  const privacyTop = vaulted ? 412 : 364;
+  const keysTop = privacy ? privacyTop + 150 : vaulted ? 486 : 452;
+  const choices = [
+    ['Sender', 'Hide who pays'],
+    ['Receiver', 'Hide who receives'],
+    ['Amount', 'Hide how much'],
+  ];
+  if (live?.app) {
+    return (
+      <LiveScroll>
+        <LiveHead title={`Send ${token.symbol}`} onBack={leave} />
+        <div style={{ height: 56, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 16px' }}>
+          <span style={{ fontSize: 14, fontWeight: 500, color: '#8b9097' }}>To</span>
+          <span style={{ flex: 1, fontSize: 15, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
+          <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
+          <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginTop: 28 }}>
+          <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
+          <span style={{ fontSize: 20, fontWeight: 500, color: '#accafe', marginBottom: 6 }}>{token.symbol}</span>
+        </div>
+        <p style={{ margin: '10px 0 0', textAlign: 'center', fontSize: 15, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
+          <span style={chip}>Available {showAvail(available)} {token.symbol}</span>
+          <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44 }}>Max</button>
+        </div>
+        {vaulted && token.vault ? (
+          <p style={{ margin: '14px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>
+            {token.vault} in your Vault is sent from the Vault.{' '}
+            <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
+          </p>
+        ) : null}
+        {privacy ? (
+          <div style={{ marginTop: 16, background: '#1c2025', borderRadius: 14, overflow: 'hidden' }}>
+            {choices.map(([title, body], index) => (
+              <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
+                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{title}</span>
+                  <span style={{ display: 'block', marginTop: 1, fontSize: 12, color: '#8b9097' }}>{body}</span>
+                </span>
+                <button type="button" aria-label={title} aria-pressed={flags[index]} onClick={() => onFlag(index)} style={{ ...iconBtn, width: 44, height: 44 }}>
+                  <img src={art(flags[index] ? 'toggle-on.svg' : 'toggle-off.svg')} alt="" width={46} height={28} style={{ width: 46, height: 28, objectFit: 'contain', display: 'block' }} />
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 8 }}>
+          {keys.map((key) => (
+            <button key={key} type="button" onClick={() => onKey(key)} style={{ ...keyBtn, width: '33.33%', height: 48 }}>
+              {key === '⌫' ? <FigmaImg src={art('backspace.svg')} width={24} height={24} /> : key}
+            </button>
+          ))}
+        </div>
+        <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...livePrimary, marginTop: 8, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
+      </LiveScroll>
+    );
+  }
   return (
     <>
       <Back top={56} left={18} icon="chev" onClick={leave} />
       <Title top={65.5} size={17} weight={700}>Send {token.symbol}</Title>
       <div style={{ position: 'absolute', left: 18, top: 118, width: 354, height: 56, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 0 16px' }}>
         <span style={{ fontSize: 14, fontWeight: 500, color: '#8b9097' }}>To</span>
-        <span style={{ flex: 1, fontSize: 15, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who || 'Address or Arxon name'}</span>
+        <span style={{ flex: 1, fontSize: 15, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
         <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
         <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
       </div>
@@ -278,26 +339,29 @@ function Amount({ token, who, amount, available, vaulted, priv, setPriv, onKey, 
           <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
         </p>
       )}
-      {token.id === 'arx' && (!live?.app || net === 'testnet') && (
-        <div style={{ position: 'absolute', left: 18, top: vaulted ? 412 : 372, width: 354, height: 64, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 12 }}>
-          <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FigmaImg src={art('shield.svg')} width={18} height={18} /></span>
-          <span style={{ flex: 1 }}>
-            <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Private transaction</span>
-            <span style={{ display: 'block', fontSize: 12, color: '#8b9097' }}>Hides amount and sender</span>
-          </span>
-          <button type="button" aria-label="Private transaction" onClick={() => setPriv(!priv)} style={iconBtn}>
-            <FigmaImg src={art(priv ? 'toggle-on.svg' : 'toggle-off.svg')} width={priv ? 46 : 48} height={28} />
-          </button>
+      {privacy && (
+        <div style={{ position: 'absolute', left: 18, top: privacyTop, width: 354, background: '#1c2025', borderRadius: 14, overflow: 'hidden' }}>
+          {choices.map(([title, body], index) => (
+            <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
+              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{title}</span>
+                <span style={{ display: 'block', marginTop: 1, fontSize: 12, color: '#8b9097' }}>{body}</span>
+              </span>
+              <button type="button" aria-label={title} aria-pressed={flags[index]} onClick={() => onFlag(index)} style={iconBtn}>
+                <img src={art(flags[index] ? 'toggle-on.svg' : 'toggle-off.svg')} alt="" width={46} height={28} style={{ width: 46, height: 28, objectFit: 'contain', display: 'block' }} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
-      <div style={{ position: 'absolute', left: 18, top: vaulted ? 486 : 452, width: 354, display: 'flex', flexWrap: 'wrap' }}>
+      <div style={{ position: 'absolute', left: 18, top: keysTop, width: 354, display: 'flex', flexWrap: 'wrap' }}>
         {keys.map((key) => (
-          <button key={key} type="button" onClick={() => onKey(key)} style={keyBtn}>
+          <button key={key} type="button" onClick={() => onKey(key)} style={{ ...keyBtn, height: privacy ? 44 : 52 }}>
             {key === '⌫' ? <FigmaImg src={art('backspace.svg')} width={24} height={24} /> : key}
           </button>
         ))}
       </div>
-      <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...reviewBtn, top: 712, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
+      <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...reviewBtn, top: 720, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
     </>
   );
 }
@@ -313,6 +377,13 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
   const total = live?.app
     ? `${amount} ${token.symbol} + fee`
     : `${(Number(amount.replace(/,/g, '')) + (token.id === 'arx' ? 0.0004 : 0)).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
+  const showPrivacy = !live?.app || net === 'testnet';
+  const privacyRows: [string, string, string?][] = [
+    ['Sender', flags.hideSender ? 'Hidden' : 'Visible', flags.hideSender ? '#accafe' : '#fff'],
+    ['Receiver', flags.hideReceiver ? 'Hidden' : 'Visible', flags.hideReceiver ? '#accafe' : '#fff'],
+    ['Amount', flags.hideAmount ? 'Hidden' : 'Visible', flags.hideAmount ? '#accafe' : '#fff'],
+  ];
+  const fromLabel = live?.accountLabel || 'Account 01';
   async function confirm() {
     if (!live?.app) {
       go('send-success');
@@ -349,37 +420,56 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
     <>
       <Back top={56} left={18} icon="chev" onClick={leave} />
       <Title top={65.5} size={17} weight={700}>Review</Title>
-      <div style={{ position: 'absolute', left: 18, top: 118, width: 354, textAlign: 'center' }}>
-        <p style={{ margin: 0, fontSize: 14, color: '#8b9097' }}>You are sending</p>
-        <p style={{ margin: '6px 0 0', fontSize: 40, fontWeight: 700 }}>{amount} {token.symbol}</p>
-        <p style={{ margin: '6px 0 0', fontSize: 15, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 108, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 18px 28px' }}>
+        <div style={{ textAlign: 'left' }}>
+          <p style={{ margin: 0, fontSize: 14, color: '#8b9097' }}>You are sending</p>
+          <p style={{ margin: '6px 0 0', fontSize: 40, fontWeight: 700 }}>{amount} {token.symbol}</p>
+          <p style={{ margin: '6px 0 0', fontSize: 15, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+        </div>
+        <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, border: busy ? '1px solid #accafe' : '1px solid #2a3447', padding: '8px 16px', animation: busy ? 'arxon-card 1.1s ease-in-out infinite' : undefined }}>
+          <style>{`@keyframes arxon-card{0%,100%{box-shadow:0 0 0 rgba(172,202,254,0)}50%{box-shadow:0 0 18px rgba(172,202,254,0.35)}}`}</style>
+          <CenterLine label="To" value={briefAddr(to)} />
+          <CenterLine label="From" value={fromLabel} />
+          <CenterLine label="Network" value={networkLabel} />
+          {showPrivacy && privacyRows.map(([label, value, color]) => (
+            <CenterLine key={label} label={label} value={value} color={color} />
+          ))}
+          <CenterLine label="Network fee" value={feeLabel} />
+          <CenterLine label="Total" value={total} />
+        </div>
+        {priv && token.id === 'arx' ? <p style={{ margin: '12px 0 0', fontSize: 12, color: '#8b9097', lineHeight: 1.4, textAlign: 'left' }}>Hidden fields stay off the public record. This can’t be undone once confirmed.</p> : null}
+        {err ? <p style={{ margin: '12px 0 0', fontSize: 12, color: submitted ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{err}</p> : null}
+        <div style={{ marginTop: 16 }}>
+          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} processing={busy} disabled={busy || !!submitted} onConfirm={() => void confirm()} />
+        </div>
+        <button type="button" onClick={leave} disabled={busy} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
       </div>
-      <div style={{ position: 'absolute', left: 18, top: 262, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
-        <Line label="To" value={to} />
-        <Line label="From" value="Account 01" />
-        <Line label="Network" value={networkLabel} />
-        {(!live?.app || net === 'testnet') && (
-        <button type="button" onClick={() => go('send-privacy')} style={{ ...lineBtn }}>
-          <span style={{ color: '#8b9097' }}>Privacy</span>
-          <span style={{ display: 'flex', alignItems: 'center', gap: 6, color: '#accafe', fontWeight: 500 }}>
-            {priv && token.id === 'arx' && <FigmaImg src={art('shield-sm.svg')} width={16} height={16} />}
-            {priv && token.id === 'arx' ? 'Private' : 'Public'}
-          </span>
-        </button>
-        )}
-        <Line label="Network fee" value={feeLabel} />
-        <div style={{ height: 1, background: '#2a3447' }} />
-        <Line label="Total" value={total} />
-      </div>
-      {priv && token.id === 'arx' && <p style={{ position: 'absolute', left: 30, top: 527, width: 330, margin: 0, fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Private transactions hide the amount and sender on-chain. This can’t be undone once confirmed.</p>}
-      {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, fontSize: 12, color: submitted ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{err}</p> : null}
-      <button type="button" disabled={busy || !!submitted} onClick={() => void confirm()} style={{ ...primary, top: 649, borderRadius: 8, height: 55, opacity: busy || submitted ? 0.6 : 1 }}>{submitted ? 'Submitted' : busy ? 'Sending' : 'Confirm and send'}</button>
-      <button type="button" onClick={leave} style={{ ...ghost, top: 714 }}>Cancel</button>
     </>
   );
 }
 
 function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: string; symbol: string; privateSend: boolean; to: string; feeLabel: string; go: Go }) {
+  const live = useLiveFrame();
+  if (live?.app) {
+    return (
+      <LiveScroll>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 48 }}>
+          <div style={{ width: 96, height: 96, borderRadius: 48, background: '#accafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <FigmaImg src={art('check-lg.svg')} width={44} height={44} />
+          </div>
+          <p style={{ margin: '28px 0 0', textAlign: 'center', fontSize: 26, fontWeight: 700 }}>{privateSend ? 'Sent privately' : 'Sent'}</p>
+          <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{amount} {symbol}</p>
+        </div>
+        <div style={{ marginTop: 24, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
+          <Line label="To" value={briefAddr(to)} />
+          <Line label="Network fee" value={feeLabel} />
+          <Line label="Status" value="Confirmed" valueColor="#3ddc84" />
+        </div>
+        <button type="button" onClick={() => go('home-funded')} style={{ ...livePrimary, marginTop: 24 }}>Done</button>
+        <button type="button" onClick={() => go('receipt')} style={{ ...liveGhost, marginTop: 10 }}>View private receipt</button>
+      </LiveScroll>
+    );
+  }
   return (
     <>
       <img src={art('glow.svg')} alt="" width={168} height={168} style={{ position: 'absolute', left: 111, top: 130 }} />
@@ -390,7 +480,7 @@ function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: st
       <p style={{ position: 'absolute', left: 35, top: 334, width: 320, margin: 0, textAlign: 'center', fontSize: 26, fontWeight: 700 }}>{privateSend ? 'Sent privately' : 'Sent'}</p>
       <p style={{ position: 'absolute', left: 35, top: 376, width: 320, margin: 0, textAlign: 'center', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{amount} {symbol}</p>
       <div style={{ position: 'absolute', left: 18, top: 440, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
-        <Line label="To" value={to} />
+        <Line label="To" value={briefAddr(to)} />
         <Line label="Network fee" value={feeLabel} />
         <Line label="Status" value="Confirmed" valueColor="#3ddc84" />
       </div>
@@ -453,7 +543,7 @@ function Failed({ to, amount, symbol, go }: { to: string; amount: string; symbol
       <p style={{ position: 'absolute', left: 35, top: 334, width: 320, margin: 0, textAlign: 'center', fontSize: 26, fontWeight: 700 }}>Payment failed</p>
       <p style={{ position: 'absolute', left: 35, top: 376, width: 320, margin: 0, textAlign: 'center', fontSize: 32, fontWeight: 700 }}>{amount} {symbol}</p>
       <div style={{ position: 'absolute', left: 18, top: 440, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
-        <Line label="To" value={to} />
+        <Line label="To" value={briefAddr(to)} />
         <Line label="Network fee" value="No fee charged" />
         <Line label="Status" value="Not sent" valueColor="#f55c5c" />
       </div>
@@ -615,7 +705,7 @@ const checkBubble: CSSProperties = { display: 'inline-flex', width: 24, height: 
 const pasteBtn: CSSProperties = { position: 'absolute', left: 16, top: 172, width: 358, height: 44, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' };
 const primary: CSSProperties = { position: 'absolute', left: 16, width: 358, height: 52, borderRadius: 14, border: 'none', background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' };
 const ghost: CSSProperties = { position: 'absolute', left: 19, width: 353, height: 55, borderRadius: 8, border: '1.5px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' };
-const reviewBtn: CSSProperties = { position: 'absolute', left: 19, width: 353, height: 55, borderRadius: 8, border: 'none', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' };
+const reviewBtn: CSSProperties = { position: 'absolute', left: 18, width: 354, height: 48, borderRadius: 12, border: 'none', fontFamily: font.sans, fontSize: 15, fontWeight: 600, cursor: 'pointer', padding: 0 };
 const chip: CSSProperties = { background: '#1c2025', color: '#8b9097', borderRadius: 18, padding: '8px 14px', fontSize: 13 };
 const keyBtn: CSSProperties = { width: 118, height: 52, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, fontSize: 26, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const lineBtn: CSSProperties = { width: '100%', height: 36, border: 'none', background: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 0, fontFamily: font.sans, fontSize: 14, cursor: 'pointer' };

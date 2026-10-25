@@ -283,11 +283,15 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       const w = Math.max(stage.clientWidth, 1);
       const h = Math.max(stage.clientHeight, 1);
       const cover = Math.max(w / 390, h / 844);
-      const scale = 844 * cover - h > 16 ? h / 844 : cover;
+      const welcome = isWelcomeScreen(id);
+      const scale = welcome ? cover : (844 * cover - h > 16 ? h / 844 : cover);
+      const frameW = 390 * scale;
+      const frameH = 844 * scale;
       setAppScale(scale);
       setAppFrameH(844);
-      setAppOffsetX((w - 390 * scale) / 2);
-      setAppOffsetY((h - 844 * scale) / 2);
+      setAppOffsetX((w - frameW) / 2);
+      // Welcome covers the width on every phone. Extra height is cropped from the top so the actions stay on screen.
+      setAppOffsetY(welcome && frameH > h + 1 ? h - frameH : (h - frameH) / 2);
     };
     measure();
     const watcher = new ResizeObserver(measure);
@@ -300,7 +304,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       window.removeEventListener('resize', measure);
       view?.removeEventListener('resize', measure);
     };
-  }, [app]);
+  }, [app, id]);
 
   useEffect(() => {
     if (!app) return;
@@ -339,6 +343,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           dest.startsWith('vault') ||
           dest.startsWith('priv-') ||
           dest.startsWith('unshield-') ||
+          dest.startsWith('shield-') ||
           dest === 'send-amount-vault'
         ) {
           if (dest === 'testnet' || live.testnetAdded) void live.setNetwork('arxon');
@@ -356,6 +361,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         dest.startsWith('vault') ||
         dest.startsWith('priv-') ||
         dest.startsWith('unshield-') ||
+        dest.startsWith('shield-') ||
         dest === 'send-amount-vault'
       ) {
         setNet('testnet');
@@ -486,7 +492,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           <span style={{ color: ink.secondary, fontSize: 12 }}>{screen.name}</span>
         </div>
         )}
-        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: app ? undefined : 'center', alignItems: 'flex-start', overflow: 'hidden', position: app ? 'relative' : undefined }}>
+        <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: app ? undefined : 'center', alignItems: 'flex-start', overflow: 'hidden', position: app ? 'relative' : undefined, background: app ? '#050505' : undefined }}>
         <WalletNetworkContext.Provider value={net}>
         <div
           className={app ? 'arxon-app-frame' : 'arxon-flow-frame'}

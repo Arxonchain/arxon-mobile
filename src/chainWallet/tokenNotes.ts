@@ -2,8 +2,9 @@ import { formatUnits, type Hex } from 'viem';
 
 import { fetchArx20NoteLeaves } from './chain';
 import { storage } from './storage';
-import type { StoredNote } from './notes';
-import { notesOnChain, pickNote, shieldedTotal } from './notes';
+import { hydrateLeaves, loadLeaves, loadNotes, notesOnChain, pickNote, shieldedTotal, type StoredNote } from './notes';
+
+export type { StoredNote };
 
 export type { StoredNote };
 
@@ -103,6 +104,65 @@ export function pickTokenNote(notes: StoredNote[], amountWei: bigint, symbol: st
     const msg = e instanceof Error ? e.message : 'No note';
     throw new Error(msg.replaceAll(' tARX', ` ${symbol}`).replaceAll(' ARX', ` ${symbol}`));
   }
+}
+
+export type VaultHolding = {
+  name: string;
+  symbol: string;
+  amount: string;
+  icon: 'arx' | 'usdt' | 'usdc';
+};
+
+function holdingIcon(symbol: string): VaultHolding['icon'] {
+  if (/usdt/i.test(symbol)) return 'usdt';
+  if (/usdc/i.test(symbol)) return 'usdc';
+  return 'arx';
+}
+
+function prettyAmount(wei: bigint, decimals: number) {
+  const n = Number(formatUnits(wei, decimals));
+  if (!Number.isFinite(n)) return formatUnits(wei, decimals);
+  return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
+}
+
+/** Shielded totals this account can spend: native ARX notes, then each ARX-20 vault. */
+export async function loadVaultHoldings(
+  rpcUrl: string,
+  listed: { address: Hex; name: string; symbol: string; decimals: number; standard: string }[],
+): Promise<VaultHolding[]> {
+  const rows: VaultHolding[] = [];
+  try {
+    await hydrateLeaves(rpcUrl);
+  } catch {
+    /* Saved notes still count when the tree read fails. */
+  }
+  const leaves = await loadLeaves();
+  const nativeRaw = await loadNotes();
+  const native = leaves.length ? notesOnChain(nativeRaw, leaves) : nativeRaw;
+  const arx = shieldedTotal(native);
+  if (arx > 0n) {
+    rows.push({ name: 'Arxon', symbol: 'ARX', amount: prettyAmount(arx, 18), icon: 'arx' });
+  }
+  for (const token of listed) {
+    if (token.standard !== 'arx20') continue;
+    try {
+      await hydrateTokenLeaves(rpcUrl, token.address);
+    } catch {
+      /* Keep the notes already saved for this token. */
+    }
+    const tokenLeaves = await loadTokenLeaves(token.address);
+    const raw = await loadTokenNotes(token.address);
+    const notes = tokenLeaves.length ? notesOnChain(raw, tokenLeaves) : raw;
+    const total = shieldedTotal(notes);
+    if (total <= 0n) continue;
+    rows.push({
+      name: token.name || token.symbol,
+      symbol: token.symbol,
+      amount: prettyAmount(total, token.decimals),
+      icon: holdingIcon(token.symbol),
+    });
+  }
+  return rows;
 }
 
 export { formatUnits, shieldedTotal };

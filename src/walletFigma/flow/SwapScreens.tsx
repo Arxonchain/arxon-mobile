@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { CenterLine, SwipeConfirm } from './SwipeConfirm';
 
 const art = (name: string) => `/wallet-figma/swap/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -130,7 +131,7 @@ function SwapForm({ pay, recv, amount, quote, vaultMode, ready, onAmount, onPick
           <button type="button" onClick={() => go('move-home')} style={{ marginTop: 4, border: 'none', background: 'none', padding: 0, color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>Move to Home</button>
         </div>
       )}
-      <button type="button" disabled={!canReview} onClick={onReview} style={{ ...action, top: 712, background: canReview ? '#accafe' : '#1c2025', color: canReview ? '#0c1018' : '#5c5f64' }}>{canReview ? 'Review' : 'Enter an amount'}</button>
+      <button type="button" disabled={!canReview} onClick={onReview} style={{ ...action, top: 720, height: 48, borderRadius: 12, background: canReview ? '#accafe' : '#1c2025', color: canReview ? '#0c1018' : '#5c5f64' }}>{canReview ? 'Review' : 'Enter an amount'}</button>
       <HomeBar />
     </>
   );
@@ -233,28 +234,25 @@ function Review({ pay, recv, amount, quote, go, leave }: { pay: Tok; recv: Tok; 
         <p style={{ margin: 0, fontSize: 40, fontWeight: 700 }}>{amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {pay.symbol}</p>
         <p style={{ margin: 0, fontSize: 15, color: '#8b9097' }}>≈ ${(amount * usd(pay)).toFixed(2)}</p>
       </div>
-      <div style={{ position: 'absolute', left: 18, top: 262, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
-        <Row label="You receive" value={`${showQuote(quote)} ${recv.symbol}`} />
-        <Row label="Rate" value={`1 ${pay.symbol} ≈ ${showRate(rate)} ${recv.symbol}`} />
-        <Row label="Slippage" value="0.5%" />
-        <div style={{ height: 36, display: 'flex', alignItems: 'center', gap: 6, fontSize: 14 }}>
-          <span style={{ flex: 1, color: '#8b9097' }}>Privacy</span>
-          <FigmaImg src="/wallet-figma/send/shield-sm.svg" width={16} height={16} />
-          <span style={{ fontWeight: 500, color: '#accafe' }}>Private</span>
-        </div>
-        <Row label="Network fee" value={`${FEE} ${pay.symbol}`} />
-        <div style={{ height: 1, background: '#2a3447' }} />
-        <Row label="Total" value={`${total.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${pay.symbol}`} />
+      <div style={{ position: 'absolute', left: 18, top: 250, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
+        <CenterLine label="You receive" value={`${showQuote(quote)} ${recv.symbol}`} />
+        <CenterLine label="Rate" value={`1 ${pay.symbol} ≈ ${showRate(rate)} ${recv.symbol}`} />
+        <CenterLine label="Slippage" value="0.5%" />
+        <CenterLine label="Privacy" value="Private" color="#accafe" />
+        <CenterLine label="Network fee" value={`${FEE} ${pay.symbol}`} />
+        <CenterLine label="Total" value={`${total.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${pay.symbol}`} />
       </div>
       <p style={{ position: 'absolute', left: 30, top: 527, width: 330, margin: 0, fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Swap amounts stay hidden on-chain. The final amount can vary by up to the slippage.</p>
       {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
-      <button type="button" onClick={() => {
-        if (live?.app) {
-          setErr('Coming soon');
-          return;
-        }
-        go('swap-success');
-      }} style={{ ...action, top: 649, background: '#accafe', color: '#0c1018' }}>Confirm swap</button>
+      <div style={{ position: 'absolute', left: 18, top: 640, width: 354 }}>
+        <SwipeConfirm label="Confirm swap" onConfirm={() => {
+          if (live?.app) {
+            setErr('Coming soon');
+            return;
+          }
+          go('swap-success');
+        }} />
+      </div>
       <button type="button" onClick={leave} style={{ ...ghost, top: 714 }}>Cancel</button>
       <HomeBar />
     </>

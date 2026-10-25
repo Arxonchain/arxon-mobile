@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getAddress, type Address } from 'viem';
-import { activityLabel, loadActivity, type ActivityItem } from '@/chainWallet/activity';
+import { loadActivity, type ActivityItem } from '@/chainWallet/activity';
 import { START_URL, DEFAULT_RPC } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
@@ -11,6 +11,8 @@ import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/pr
 import { routeSend } from '@/chainWallet/routeSend';
 import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
 import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
+import { loadVaultHoldings, type VaultHolding } from '@/chainWallet/tokenNotes';
+import { briefAddr } from './briefAddr';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { hiddenCount, privacyPill as pillText, readDefaultPrivacy, writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 import { verifyBiometrics } from '@/chainWallet/biometrics';
@@ -61,6 +63,10 @@ export type LiveActivity = {
     tint?: string;
     to?: string;
     hash?: string;
+    model?: 'public' | 'private' | 'shield' | 'unshield' | 'onchain';
+    place?: 'home' | 'vault';
+    party?: string;
+    network?: 'arxon' | 'ethereum';
   }[];
 };
 
@@ -74,6 +80,8 @@ export type LiveInspect = {
   status: string;
   vault: boolean;
   rows: [string, string][];
+  /** Full counterparty address. Shown only on the private receipt. */
+  fullTo?: string;
 };
 
 type LiveFrame = {
@@ -99,6 +107,9 @@ type LiveFrame = {
   openTx: (hash: string) => Promise<void>;
   words: string[] | null;
   shielded: string;
+  shieldedPk: string | null;
+  vaultTokens: VaultHolding[];
+  refreshVault: () => Promise<void>;
   publicArx: string;
   sessionPassword: string | null;
   startId: string;
@@ -201,7 +212,7 @@ function pct(change: number | null) {
 }
 
 function short(addr: string) {
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  return briefAddr(addr);
 }
 
 function isEthSymbol(value: string): value is EthereumToken {
@@ -250,6 +261,18 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [receiveQr, setReceiveQr] = useState<string | null>(null);
   const [alt, setAlt] = useState<AltAddresses | null>(null);
   const [testnetAdded, setTestnetAdded] = useState(() => sessionStore.testnetAdded());
+  const [vaultTokens, setVaultTokens] = useState<VaultHolding[]>([]);
+
+  const refreshVault = useCallback(async () => {
+    try {
+      if (wallet.network === 'arxon') await wallet.refreshNotes();
+    } catch {
+      /* Saved notes still count when the tree read fails. */
+    }
+    const listedNow = await loadListedTokens();
+    setListed(listedNow);
+    setVaultTokens(await loadVaultHoldings(wallet.rpcUrl, listedNow));
+  }, [wallet.network, wallet.rpcUrl, wallet.refreshNotes]);
 
   useEffect(() => {
     if (wallet.network === 'arxon') setArx(wallet.balance);
@@ -266,7 +289,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     return () => {
       cancel = true;
     };
-  }, [wallet.address, wallet.balance, wallet.network, wallet.rpcUrl]);
+  }, [wallet.address, wallet.balance, wallet.shieldedBalance, wallet.notes.length, wallet.network, wallet.rpcUrl]);
 
   useEffect(() => {
     const onVis = () => {
@@ -443,7 +466,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         {
           name: 'Arxon',
           amount: `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} ARXt`,
-          value: 'No USD price',
+          value: '$0.00',
           change: 'Arxon Testnet',
           tone: 'flat',
           icon: 'arx',
@@ -453,7 +476,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         {
           name: 'Tether',
           amount: listedStable(listed, 'USDT'),
-          value: 'No USD price',
+          value: '$0.00',
           change: 'Arxon Testnet',
           tone: 'flat',
           icon: 'usdt',
@@ -463,7 +486,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         {
           name: 'USD Coin',
           amount: listedStable(listed, 'USDC'),
-          value: 'No USD price',
+          value: '$0.00',
           change: 'Arxon Testnet',
           tone: 'flat',
           icon: 'usdc',
@@ -503,19 +526,24 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
       }
       if (mode === 'vault') {
-        await wallet.sendShielded(amount, VAULT_FLAGS);
+        await wallet.sendShielded(amount, paymentFlags ?? VAULT_FLAGS);
         return;
       }
       if (mode === 'unshield') {
         const dest = to.trim();
         if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) throw new Error('Unshield needs a 0x address.');
-        await wallet.sendUnshield(getAddress(dest) as Address, amount, UNSHIELD_FLAGS);
+        await wallet.sendUnshield(getAddress(dest) as Address, amount, paymentFlags ?? UNSHIELD_FLAGS);
         return;
       }
       if (mode === 'private') {
         const dest = to.trim() || wallet.shieldedPk || '';
         if (!dest) throw new Error('Private send needs a shielded destination on Arxon Testnet.');
-        await wallet.sendPrivate(dest, amount, flags.hideSender || flags.hideReceiver || flags.hideAmount ? flags : VAULT_FLAGS);
+        const privateFlags = paymentFlags
+          ? flags
+          : flags.hideSender || flags.hideReceiver || flags.hideAmount
+            ? flags
+            : VAULT_FLAGS;
+        await wallet.sendPrivate(dest, amount, privateFlags);
         return;
       }
       const dest = to.trim();
@@ -588,9 +616,11 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     activity,
     inspect,
     openTx: async (hash: string) => {
+      const saved = activity.flatMap((group) => group.items).find((item) => item.hash?.toLowerCase() === hash.toLowerCase());
+      const fullTo = saved?.party && /^0x[0-9a-fA-F]{16,}$/.test(saved.party) ? saved.party : undefined;
       try {
         const row = await inspectTx(wallet.rpcUrl, hash as `0x${string}`);
-        setInspect(toLiveInspect(row));
+        setInspect({ ...toLiveInspect(row), fullTo });
       } catch (e) {
         setInspect({
           hash,
@@ -599,6 +629,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           fiat: e instanceof Error ? e.message : 'Could not load this transaction',
           status: 'Unknown',
           vault: false,
+          fullTo,
           rows: [
             ['Hash', `${hash.slice(0, 10)}…${hash.slice(-6)}`],
             ['Network', wallet.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet'],
@@ -608,6 +639,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
     words,
     shielded: wallet.shieldedBalance,
+    shieldedPk: wallet.shieldedPk,
+    vaultTokens,
+    refreshVault,
     publicArx: qty(wallet.network === 'arxon' ? wallet.balance : arx, 4),
     sessionPassword: currentPassword(),
     startId,
@@ -808,6 +842,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     tokens,
     testnetTokens,
     testnetAdded,
+    vaultTokens,
+    refreshVault,
     totalN,
     weighted,
     current,
@@ -836,21 +872,30 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
     const day = ageDays <= 0 ? 'Today' : ageDays === 1 ? 'Yesterday' : 'Earlier';
     const age = ageDays <= 0 ? 0 : ageDays === 1 ? 1 : 14;
     const current = groups.get(day) ?? { day, age, items: [] };
-    const kind =
-      item.kind === 'shield' || item.kind === 'unshield'
-        ? 'vault'
-        : item.kind === 'private'
-          ? 'private'
-          : 'sent';
+    const model =
+      item.kind === 'shield' || item.kind === 'unshield' || item.kind === 'private'
+        ? item.kind
+        : item.kind === 'transfer'
+          ? 'public'
+          : 'onchain';
+    const place = model === 'public' || model === 'onchain' ? 'home' : 'vault';
+    const kind = place === 'vault' && model !== 'private' ? 'vault' : model === 'private' ? 'private' : 'sent';
+    const who = item.kind === 'shield' ? '' : briefAddr(item.to);
+    const when = new Date(item.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const where = place === 'home' ? 'Home' : 'Vault';
     current.items.push({
-      title: activityLabel(item.kind),
-      sub: `${item.hash.slice(0, 8)}…${item.hash.slice(-4)}${item.network === 'ethereum' ? ' · Ethereum' : ' · Arxon Testnet'}`,
+      title: model === 'shield' ? 'Shield in' : model === 'unshield' ? 'Unshield' : model === 'private' ? 'Private pay' : model === 'public' ? 'Sent' : 'On-chain',
+      sub: `${where}${who ? ` · ${who}` : ''} · ${when}`,
       amount: item.amount ? `${item.amount} ${item.token ?? ''}`.trim() : item.hash.slice(0, 10),
       fiat: item.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet',
       kind,
       token: item.token ?? 'ARX',
       to: item.kind === 'private' ? 'receipt' : 'tx',
       hash: item.hash,
+      model,
+      place,
+      party: item.to,
+      network: item.network === 'ethereum' ? 'ethereum' : 'arxon',
     });
     groups.set(day, current);
   }
