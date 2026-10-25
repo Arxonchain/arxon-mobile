@@ -16,16 +16,16 @@ const MODELS: [Model, string][] = [
   ['unshield', 'Unshield'],
 ];
 
-export function TestnetHistory({ go, limit }: { go: Go; limit?: number }) {
+export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limit?: number; place?: Place }) {
   const live = useLiveFrame();
-  const [place, setPlace] = useState<Place>('all');
+  const [place, setPlace] = useState<Place>(lockedPlace ?? 'all');
   const [model, setModel] = useState<Model>('all');
   const testnet = (live?.app ? flatten(live.activity) : []).filter((row) => row.network !== 'ethereum');
+  const where = lockedPlace ?? (limit ? 'all' : place);
   const matched = testnet.filter((row) => {
-    if (limit) return true;
-    if (place !== 'all' && row.place !== place) return false;
-    if (model !== 'all' && row.model !== model) return false;
-    return true;
+    if (where !== 'all' && row.place !== where) return false;
+    if (limit || model === 'all') return true;
+    return row.model === model;
   });
   const rows = limit ? matched.slice(0, limit) : matched;
 
@@ -47,7 +47,7 @@ export function TestnetHistory({ go, limit }: { go: Go; limit?: number }) {
       )}
       {rows.length === 0 ? (
         <p style={{ margin: '8px 0 0', fontSize: 14, color: '#8b9097', lineHeight: 1.4 }}>
-          {!live?.app ? 'Testnet payments show up here.' : testnet.length === 0 ? 'No testnet transactions yet.' : 'Nothing matches this filter.'}
+          {!live?.app ? 'Testnet payments show up here.' : testnet.length === 0 ? 'No testnet transactions yet.' : matched.length === 0 && where === 'vault' ? 'No vault transactions yet.' : 'Nothing matches this filter.'}
         </p>
       ) : rows.map((row) => (
         <button
@@ -66,7 +66,7 @@ export function TestnetHistory({ go, limit }: { go: Go; limit?: number }) {
           <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'right' }}>{row.amount}</span>
         </button>
       ))}
-      {limit && testnet.length > limit ? (
+      {limit && matched.length > limit ? (
         <button type="button" onClick={() => go('activity')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, textAlign: 'left', padding: '4px 0', cursor: 'pointer' }}>See all</button>
       ) : null}
     </div>

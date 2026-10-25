@@ -15,6 +15,7 @@ import { usePullRefresh } from './pullRefresh';
 import { NetworkSheet } from './ReceiveScreens';
 import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { briefAddr } from './briefAddr';
+import { TestnetHistory } from './TestnetHistory';
 
 const IDS = new Set([
   'vault-empty', 'vault', 'vault-amount', 'vault-review', 'vault-done', 'move-home', 'move-home-done',
@@ -559,6 +560,17 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
             </div>
           ))}
         </div>
+        {live?.app ? (
+          <>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+              <span style={{ fontSize: 18, fontWeight: 700 }}>History</span>
+              <button type="button" onClick={() => go('activity')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>See all</button>
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <TestnetHistory go={go} limit={3} place="vault" />
+            </div>
+          </>
+        ) : null}
       </div>
       {network.sheet}
       {sheet && (

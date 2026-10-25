@@ -892,6 +892,14 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   return <LiveFrameContext.Provider value={value}>{children}</LiveFrameContext.Provider>;
 }
 
+/** Keypad amounts can be stored as ".01". History should show the leading zero. */
+function shownAmount(amount: string) {
+  const text = amount.trim();
+  if (text.startsWith('.')) return `0${text}`;
+  if (text.startsWith('-.')) return `-0${text.slice(1)}`;
+  return text;
+}
+
 function groupActivity(items: ActivityItem[]): LiveActivity[] {
   if (!items.length) return [];
   const now = Date.now();
@@ -915,7 +923,7 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
     current.items.push({
       title: model === 'shield' ? 'Shield in' : model === 'unshield' ? 'Unshield' : model === 'private' ? 'Private pay' : model === 'public' ? 'Sent' : 'On-chain',
       sub: `${where}${who ? ` · ${who}` : ''} · ${when}`,
-      amount: item.amount ? `${item.amount} ${item.token ?? ''}`.trim() : item.hash.slice(0, 10),
+      amount: item.amount ? shownAmount(`${item.amount} ${item.token ?? ''}`) : item.hash.slice(0, 10),
       fiat: item.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet',
       kind,
       token: item.token ?? 'ARX',
