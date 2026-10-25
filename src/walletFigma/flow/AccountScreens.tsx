@@ -31,6 +31,8 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const [note, setNote] = useState('');
   const [diagnostics, setDiagnostics] = useState(true);
   const [sent, setSent] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [draftName, setDraftName] = useState('');
   const live = useLiveFrame();
   const full = live?.app ? live.address ?? '' : ADDRESS;
   const shortAddr = live?.address ? `${live.address.slice(0, 6)}…${live.address.slice(-4)}` : live?.app ? '' : SHORT;
@@ -39,12 +41,32 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       {id === 'account' && (
-        <Account code={code} copied={copied} label={live?.accountLabel ?? 'Account 01'} shortAddr={shortAddr} onCopy={() => {
-          if (!full) return;
-          navigator.clipboard?.writeText(full).catch(() => undefined);
-          setCopied(true);
-          window.setTimeout(() => setCopied(false), 1200);
-        }} go={go} onLogout={async () => {
+        <Account
+          code={code}
+          copied={copied}
+          label={live?.accountLabel ?? 'Account 01'}
+          shortAddr={shortAddr}
+          editing={live?.app ? editing : false}
+          draftName={draftName}
+          onDraft={setDraftName}
+          onCopy={live?.app ? undefined : () => {
+            if (!full) return;
+            navigator.clipboard?.writeText(full).catch(() => undefined);
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 1200);
+          }}
+          onRename={live?.app ? () => {
+            setDraftName(live.accountLabel);
+            setEditing(true);
+          } : undefined}
+          onSaveName={() => {
+            const name = draftName.trim();
+            if (!name) return;
+            live?.renameAccount(name);
+            setEditing(false);
+          }}
+          go={go}
+          onLogout={async () => {
           if (live?.logout) await live.logout();
           go('slide16', false);
         }} />
@@ -83,7 +105,20 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { code: string; copied: boolean; onCopy: () => void; go: Go; label: string; shortAddr: string; onLogout: () => void | Promise<void> }) {
+function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, onSaveName, go, label, shortAddr, onLogout }: {
+  code: string;
+  copied: boolean;
+  onCopy?: () => void;
+  onRename?: () => void;
+  editing?: boolean;
+  draftName?: string;
+  onDraft?: (value: string) => void;
+  onSaveName?: () => void;
+  go: Go;
+  label: string;
+  shortAddr: string;
+  onLogout: () => void | Promise<void>;
+}) {
   const net = useWalletNetwork();
   const live = useLiveFrame();
   const photo = useProfilePhoto(live?.accountIndex ?? 0);
@@ -92,29 +127,50 @@ function Account({ code, copied, onCopy, go, label, shortAddr, onLogout }: { cod
     <>
       <PhoneStatus />
       <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', overflowX: 'hidden' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
-        <div style={{ padding: '64px 18px 88px' }}>
-          <p style={{ margin: 0, fontSize: 26, fontWeight: 700, lineHeight: 1.2 }}>Account</p>
-          <div style={{ marginTop: 18, minHeight: 84, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
+        <div style={{ padding: live?.app ? '56px 16px 24px' : '64px 18px 88px' }}>
+          <p style={{ margin: 0, fontSize: live?.app ? 24 : 26, fontWeight: 700, lineHeight: 1.2 }}>Account</p>
+          <div style={{ marginTop: live?.app ? 14 : 18, minHeight: 84, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
             <ProfileAvatar size={52} photo={photo} accountIndex={live?.accountIndex ?? 0} />
             <span style={{ flex: 1, minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{label}</span>
+              {editing ? (
+                <input
+                  value={draftName}
+                  onChange={(event) => onDraft?.(event.target.value)}
+                  aria-label="Account name"
+                  style={{ width: '100%', boxSizing: 'border-box', height: 36, borderRadius: 8, border: '1px solid #accafe', background: '#11161f', color: '#fff', fontFamily: font.sans, fontSize: 15, fontWeight: 600, padding: '0 10px' }}
+                />
+              ) : (
+                <span style={{ display: 'block', fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{label}</span>
+              )}
               <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{copied ? 'Copied' : shortAddr}</span>
             </span>
-            <button type="button" aria-label="Copy address" onClick={onCopy} style={iconBtn}>
-              <FigmaImg src={art('copy.svg')} width={20} height={20} />
-            </button>
+            {editing ? (
+              <button type="button" onClick={onSaveName} style={{ ...iconBtn, width: 64, borderRadius: 8, background: '#accafe', color: '#0c1018', fontSize: 13, fontWeight: 700 }}>Save</button>
+            ) : onRename ? (
+              <button type="button" aria-label="Rename account" onClick={onRename} style={iconBtn}>
+                <EditMark />
+              </button>
+            ) : (
+              <button type="button" aria-label="Copy address" onClick={onCopy} style={iconBtn}>
+                <FigmaImg src={art('copy.svg')} width={20} height={20} />
+              </button>
+            )}
           </div>
-          <p style={accountKicker}>SECURITY & PRIVACY</p>
+          <p style={live?.app ? liveKicker : accountKicker}>SECURITY & PRIVACY</p>
           <div style={accountCard}>
             <Row icon={art('key.svg')} label="Recovery phrase" onClick={() => go('view-verify')} />
             <Row icon={art('face.svg')} label={live?.app ? 'Fingerprint, Face ID & password' : 'Face ID & password'} onClick={() => go('face-settings')} />
             {net === 'testnet' && <Row icon={art('shield.svg')} label="Private mode" value="On" onClick={() => go('privacy')} />}
           </div>
-          <p style={accountKicker}>EXTENSIONS</p>
-          <div style={accountCard}>
-            <Row letter label="Arxon Mining" value={live?.app ? 'Open' : 'Not set up'} onClick={() => go('mine-entry')} />
-          </div>
-          <p style={accountKicker}>PREFERENCES</p>
+          {live?.app ? null : (
+            <>
+              <p style={accountKicker}>EXTENSIONS</p>
+              <div style={accountCard}>
+                <Row letter label="Arxon Mining" value="Not set up" onClick={() => go('mine-entry')} />
+              </div>
+            </>
+          )}
+          <p style={live?.app ? liveKicker : accountKicker}>PREFERENCES</p>
           <div style={accountCard}>
             <Row icon={art('dollar.svg')} label="Currency" value={code} onClick={() => go('currency')} />
             <Row icon={art('globe.svg')} label="Network" value={selectedNetwork(net).name} onClick={() => go('network')} />
@@ -334,6 +390,16 @@ function HomeBar() {
 }
 
 const iconBtn: CSSProperties = { width: 40, height: 40, border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
+const liveKicker: CSSProperties = { margin: '14px 4px 6px', fontSize: 12, fontWeight: 600, color: '#5c5f64' };
+
+function EditMark() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M4 13.5V16h2.5L15.2 7.3 12.7 4.8 4 13.5Z" fill="none" stroke="#accafe" strokeWidth="1.6" strokeLinejoin="round" />
+      <path d="M11.6 6 14 8.4" fill="none" stroke="#accafe" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
 const iconBg: CSSProperties = { width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const accountKicker: CSSProperties = { margin: '22px 4px 8px', fontSize: 12, fontWeight: 600, color: '#5c5f64' };
 const accountCard: CSSProperties = { background: '#1c2025', borderRadius: 16, overflow: 'hidden' };

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 
 import { createPortal } from 'react-dom';
 import { Capacitor } from '@capacitor/core';
 import { font } from '@/walletFigma/tokens';
-import { closeInAppBrowse, hostOfBrowse, subscribeInAppBrowse, usingNativeInAppBrowse } from './inAppBrowse';
+import { closeInAppBrowse, hostOfBrowse, safeBrowseUrl, subscribeInAppBrowse, usingNativeInAppBrowse } from './inAppBrowse';
 
 /**
  * Fallback in-app browser chrome (USB live / web). Native Android uses
@@ -46,7 +46,9 @@ export function InAppBrowserHost() {
     e?.preventDefault();
     const next = typed.trim();
     if (!next) return;
-    const href = /^https?:\/\//i.test(next) ? next : `https://${next}`;
+    const withScheme = /^https?:\/\//i.test(next) ? next : `https://${next}`;
+    const href = safeBrowseUrl(withScheme);
+    if (!href) return;
     setUrl(href);
     setTyped(href);
     setLoading(true);
@@ -94,9 +96,22 @@ export function InAppBrowserHost() {
         title="Arxon browser"
         src={url}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-        referrerPolicy="no-referrer-when-downgrade"
+        referrerPolicy="no-referrer"
         style={frame}
-        onLoad={() => setLoading(false)}
+        onLoad={() => {
+          setLoading(false);
+          const frame = frameRef.current;
+          if (!frame) return;
+          try {
+            const href = frame.contentWindow?.location.href || '';
+            if (href && href !== 'about:blank' && !safeBrowseUrl(href)) {
+              frame.src = 'about:blank';
+              closeInAppBrowse();
+            }
+          } catch {
+            /* A cross-origin site cannot read wallet storage. */
+          }
+        }}
       />
       <div style={dock}>
         <p style={hint}>{hostOfBrowse(url)}</p>

@@ -16,10 +16,10 @@ export function useWalletNetwork() {
 
 const TABS: { name: WalletTabName; src: string; w: number; h: number }[] = [
   { name: 'Home', src: '/wallet-figma/activity/tab-home.svg', w: 22, h: 22 },
-  { name: 'Explore', src: '/wallet-figma/activity/tab-explore.svg', w: 24, h: 24 },
   { name: 'History', src: '/wallet-figma/activity/tab-history.svg', w: 20, h: 20 },
-  { name: 'Account', src: '/wallet-figma/activity/tab-account.svg', w: 22, h: 22 },
+  { name: 'Explore', src: '/wallet-figma/activity/tab-explore.svg', w: 24, h: 24 },
   { name: 'Testnet', src: '/wallet-figma/receive/globe-test.svg', w: 20, h: 20 },
+  { name: 'Account', src: '/wallet-figma/activity/tab-account.svg', w: 22, h: 22 },
 ];
 
 type Go = (id: string, remember?: boolean) => void;

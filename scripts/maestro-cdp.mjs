@@ -104,7 +104,7 @@ async function evalJson(session, expression) {
 async function withSession(fn) {
   forward();
   const list = await pages();
-  const page = list.find((p) => p.type === 'page') || list[0];
+  const page = list.find((p) => p.type === 'page' && p.url && !p.url.startsWith('about:')) || list.find((p) => p.type === 'page') || list[0];
   if (!page) throw new Error('No WebView page');
   const session = await connect(page.webSocketDebuggerUrl);
   try {
@@ -239,7 +239,7 @@ const SKIP = new Set([
   'mining', 'wallet',
 ]);
 
-const TAB_LABELS = ['Home', 'Explore', 'History', 'Account', 'Testnet'];
+const TAB_LABELS = ['Home', 'History', 'Explore', 'Testnet', 'Account'];
 
 function skipLabel(text) {
   const t = String(text || '').toLowerCase().trim();

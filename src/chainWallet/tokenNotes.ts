@@ -125,6 +125,41 @@ function prettyAmount(wei: bigint, decimals: number) {
   return n.toLocaleString(undefined, { maximumFractionDigits: 6 });
 }
 
+function pushHolding(
+  rows: VaultHolding[],
+  name: string,
+  symbol: string,
+  wei: bigint,
+  decimals: number,
+) {
+  if (wei <= 0n) return;
+  rows.push({
+    name,
+    symbol,
+    amount: prettyAmount(wei, decimals),
+    icon: holdingIcon(symbol),
+  });
+}
+
+/** Last saved notes only. No chain scan, so the vault number can paint immediately. */
+export async function loadCachedVaultHoldings(
+  listed: { address: Hex; name: string; symbol: string; decimals: number; standard: string }[],
+): Promise<VaultHolding[]> {
+  const rows: VaultHolding[] = [];
+  pushHolding(rows, 'Arxon', 'ARX', shieldedTotal(await loadNotes()), 18);
+  for (const token of listed) {
+    if (token.standard !== 'arx20') continue;
+    pushHolding(
+      rows,
+      token.name || token.symbol,
+      token.symbol,
+      shieldedTotal(await loadTokenNotes(token.address)),
+      token.decimals,
+    );
+  }
+  return rows;
+}
+
 /** Shielded totals this account can spend: native ARX notes, then each ARX-20 vault. */
 export async function loadVaultHoldings(
   rpcUrl: string,

@@ -67,6 +67,7 @@ export async function mergeHashes(hashes: Hex[], from: Address): Promise<Activit
       amount: '',
       maskBits: 0,
       at: Date.now(),
+      network: 'arxon',
     }));
   const next = [...extra, ...prev].slice(0, MAX);
   await storage.setActivity(JSON.stringify(next));

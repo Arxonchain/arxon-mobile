@@ -73,6 +73,8 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   const [token, setToken] = useState('All tokens');
   const [date, setDate] = useState('Any time');
   const [draft, setDraft] = useState({ type: 'All', token: 'All tokens', date: 'Any time' });
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshed, setRefreshed] = useState(false);
   const live = useLiveFrame();
   const empty = live?.app
     ? live.activity.length === 0 && id !== 'activity-vault' && id !== 'activity-filtered' && id !== 'tx' && id !== 'tx-vault'
@@ -105,6 +107,17 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
     go('activity', false);
   }
 
+  async function refreshHistory() {
+    setRefreshing(true);
+    setRefreshed(false);
+    try {
+      await live?.refresh?.();
+      setRefreshed(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
   const testnetLive = !!live?.app && net === 'testnet' && id !== 'tx' && id !== 'tx-vault';
   const showSheet = id === 'activity-filter';
   const vaultList = id === 'activity-filtered' || id === 'activity-vault';
@@ -115,6 +128,36 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
       ? filterLive(live.activity, type, token, date)
       : filterRows(type, token, date);
   const filteredBlank = !empty && !none && !vaultList && groups.length === 0;
+  const frame = { position: 'relative' as const, width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' };
+
+  if (live?.app && id !== 'tx' && id !== 'tx-vault') {
+    const mainnet = filterLive(
+      live.activity
+        .map((group) => ({ ...group, items: group.items.filter((row) => row.network === 'ethereum') }))
+        .filter((group) => group.items.length),
+      type,
+      token,
+      date,
+    );
+    return (
+      <div style={frame}>
+        <LiveHistory
+          go={go}
+          mainnet={mainnet}
+          refreshing={refreshing}
+          refreshed={refreshed}
+          onRefresh={() => void refreshHistory()}
+          onFilter={openFilter}
+          showSheet={showSheet}
+          draft={draft}
+          setDraft={setDraft}
+          onClose={() => go('activity', false)}
+          onReset={() => { setDraft({ type: 'All', token: 'All tokens', date: 'Any time' }); clear(); }}
+          onApply={apply}
+        />
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
@@ -151,6 +194,77 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   );
 }
 
+function LiveHistory({ go, mainnet, refreshing, refreshed, onRefresh, onFilter, showSheet, draft, setDraft, onClose, onReset, onApply }: {
+  go: Go;
+  mainnet: { day: string; items: (Row & { hash?: string })[] }[];
+  refreshing: boolean;
+  refreshed: boolean;
+  onRefresh: () => void;
+  onFilter: () => void;
+  showSheet: boolean;
+  draft: { type: string; token: string; date: string };
+  setDraft: (v: { type: string; token: string; date: string }) => void;
+  onClose: () => void;
+  onReset: () => void;
+  onApply: () => void;
+}) {
+  const live = useLiveFrame();
+  const flat = mainnet.flatMap((group) => group.items.map((item) => ({ ...item, day: group.day })));
+  return (
+    <>
+      <PhoneStatus />
+      <Header onFilter={onFilter} onRefresh={onRefresh} title="History" spinning={refreshing} />
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 16, top: 108, width: 358, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 12 }}>
+        <section>
+          <p style={sectionTitle}>Mainnet</p>
+          {flat.length === 0 ? (
+            <p style={emptyCopy}>No mainnet activity yet. Ethereum sends and receives show up here.</p>
+          ) : flat.map((row) => (
+            <button
+              key={`${row.hash ?? row.title}-${row.sub}`}
+              type="button"
+              onClick={() => {
+                if (row.hash) void live?.openTx(row.hash);
+                go(row.to || 'tx');
+              }}
+              style={histRow}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{row.title}</span>
+                <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097' }}>{row.day} · {row.sub}</span>
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600 }}>{row.amount}</span>
+            </button>
+          ))}
+        </section>
+        <section>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+            <p style={{ ...sectionTitle, margin: 0 }}>Testnet</p>
+            <button type="button" aria-label="Refresh testnet activity" onClick={onRefresh} style={{ ...round, width: 44, height: 44 }}>
+              <RefreshGlyph spinning={refreshing} />
+            </button>
+          </div>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: refreshing ? '#accafe' : '#8b9097', minHeight: 16 }}>
+            {refreshing ? 'Refreshing testnet activity…' : refreshed ? 'Testnet activity updated' : 'Private pay stays under Vault.'}
+          </p>
+          <TestnetHistory go={go} />
+        </section>
+      </div>
+      <Tabs go={go} here="activity" />
+      {showSheet ? <Filter draft={draft} setDraft={setDraft} onClose={onClose} onReset={onReset} onApply={onApply} /> : null}
+    </>
+  );
+}
+
+function RefreshGlyph({ spinning }: { spinning?: boolean }) {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style={{ transform: spinning ? 'rotate(180deg)' : undefined, transition: 'transform 0.3s linear' }}>
+      <path d="M14.5 9A5.5 5.5 0 1 1 9 3.5" fill="none" stroke={spinning ? '#accafe' : '#8c8f99'} strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M9 1.5v4h3.4" fill="none" stroke={spinning ? '#accafe' : '#8c8f99'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function filterLive(groups: LiveActivity[], type: string, token: string, date = 'Any time') {
   const kind = type === 'Sent' ? 'sent' : type === 'Received' ? 'received' : type === 'Swaps' ? 'swap' : type === 'Private' ? 'private' : type === 'Vault moves' ? 'vault' : '';
   const maxAge = date === 'Last 7 days' ? 7 : date === 'Last 30 days' ? 30 : 10000;
@@ -180,17 +294,14 @@ function filterRows(type: string, token: string, date = 'Any time') {
   })).filter((group) => group.items.length);
 }
 
-function Header({ onFilter, onRefresh, title = 'Activity' }: { onFilter?: () => void; onRefresh?: () => void; title?: string }) {
+function Header({ onFilter, onRefresh, title = 'Activity', spinning = false }: { onFilter?: () => void; onRefresh?: () => void; title?: string; spinning?: boolean }) {
   return (
     <div style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
       <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>{title}</p>
       <div style={{ display: 'flex', gap: 8 }}>
         {onRefresh ? (
           <button type="button" aria-label="Refresh" onClick={onRefresh} style={round}>
-            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
-              <path d="M14.5 9A5.5 5.5 0 1 1 9 3.5" fill="none" stroke="#8c8f99" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M9 1.5v4h3.4" fill="none" stroke="#8c8f99" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <RefreshGlyph spinning={spinning} />
           </button>
         ) : null}
         {onFilter ? <button type="button" aria-label="Filter" onClick={onFilter} style={round}><FigmaImg src={art('filter.svg')} width={20} height={20} /></button> : null}
@@ -354,11 +465,15 @@ function Filter({ draft, setDraft, onClose, onReset, onApply }: {
   onReset: () => void;
   onApply: () => void;
 }) {
+  const live = useLiveFrame();
   const groups: [string, string, string[]][] = [['Type', 'type', TYPES], ['Token', 'token', TOKENS], ['Date', 'date', DATES]];
+  const sheet: CSSProperties = live?.app
+    ? { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: 'calc(100% - 48px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px calc(28px + env(safe-area-inset-bottom, 0px))', zIndex: 4 }
+    : { position: 'absolute', left: 0, top: 383, width: 390, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px 28px', zIndex: 4 };
   return (
     <>
       <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.6)', padding: 0, cursor: 'pointer', zIndex: 3 }} />
-      <div style={{ position: 'absolute', left: 0, top: 383, width: 390, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px 28px', zIndex: 4 }}>
+      <div style={sheet}>
         <div style={{ width: 36, height: 4, borderRadius: 2, background: '#5c5f64', margin: '0 auto' }} />
         <p style={{ margin: '14px 0 0', fontSize: 20, fontWeight: 700 }}>Filter activity</p>
         {groups.map(([label, key, options]) => (
@@ -427,3 +542,6 @@ const chip: CSSProperties = { border: 'none', borderRadius: 30, minHeight: 40, p
 const rowBtn: CSSProperties = { width: '100%', height: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: 0, cursor: 'pointer' };
 const iconWrap: CSSProperties = { width: 40, height: 40, borderRadius: 20, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const barBtn: CSSProperties = { position: 'absolute', left: 16, width: 358, height: 52, borderRadius: 14, fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' };
+const sectionTitle: CSSProperties = { margin: '0 0 8px', fontSize: 13, fontWeight: 700, letterSpacing: 0.4, color: '#accafe' };
+const emptyCopy: CSSProperties = { margin: 0, fontSize: 13, color: '#8b9097', lineHeight: 1.4 };
+const histRow: CSSProperties = { width: '100%', border: 'none', background: '#1c2025', color: '#fff', borderRadius: 12, padding: '10px 12px', marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' };

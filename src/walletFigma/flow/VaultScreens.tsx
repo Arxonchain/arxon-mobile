@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import type { VaultHolding } from '@/chainWallet/tokenNotes';
@@ -16,6 +16,7 @@ import { NetworkSheet } from './ReceiveScreens';
 import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { briefAddr } from './briefAddr';
 import { TestnetHistory } from './TestnetHistory';
+import { availableBox } from './LiveScroll';
 
 const IDS = new Set([
   'vault-empty', 'vault', 'vault-amount', 'vault-review', 'vault-done', 'move-home', 'move-home-done',
@@ -272,8 +273,20 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
   const max = Math.max(0, available - (token === 'ARX' ? FEE : 0));
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
   const title = movingIn ? 'Shield in' : id === 'move-home' ? 'Move to Home' : id === 'priv-amount' ? 'Private pay' : 'Unshield';
+  const alive = useRef(true);
+  const moved = useRef(false);
+  useEffect(() => () => { alive.current = false; }, []);
+  const flightHere = live?.flight?.screen === id ? live.flight : null;
+  useEffect(() => {
+    if (id !== 'move-home' || moved.current) return;
+    if (flightHere?.phase === 'done' && !flightHere.detail) {
+      moved.current = true;
+      go('move-home-done');
+    }
+  }, [id, flightHere?.phase, flightHere?.detail, go]);
   return (
-    <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <div data-amount-entry={live?.app ? '1' : undefined} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: live?.app ? 'hidden' : undefined }}>
+      <div style={{ flex: 1, minHeight: 0, overflowY: live?.app ? 'auto' : undefined }}>
       <PhoneStatus />
       <Head title={title} onBack={leave} />
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: 8, color: '#8b9097', fontSize: 13 }}>
@@ -283,16 +296,17 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
       </div>
       <div style={{ textAlign: 'center', marginTop: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
-          <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1, color: over ? '#f25252' : '#fff' }}>{amount ? qty(value, amount.includes('.') ? 2 : 0) : '0'}</span>
+          <span style={{ fontSize: live?.app ? 44 : 56, fontWeight: 700, lineHeight: 1, color: over ? '#f25252' : '#fff' }}>{amount ? qty(value, amount.includes('.') ? 2 : 0) : '0'}</span>
           <span style={{ fontSize: 18, fontWeight: 600, color: '#accafe', marginBottom: 6 }}>{token}</span>
         </div>
         <p style={{ margin: '8px 0 0', color: '#8b9097', fontSize: 15 }}>{live?.app && token === 'ARX' ? '$0.00' : `≈ ${money(fiat)}`}</p>
       </div>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 14 }}>
-        <span style={{ ...pill, color: over ? '#f25252' : '#8b9097' }}>Available {qty(available)} {token}</span>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 14 }}>
+        <span style={live?.app ? { ...availableBox, color: over ? '#f25252' : '#c9cdd4' } : { ...pill, color: over ? '#f25252' : '#8b9097' }}>Available {qty(available)} {token}</span>
         <Max onClick={() => fill(onKey, amount, max)} />
       </div>
       {over && <p style={{ margin: '10px 0 0', textAlign: 'center', color: '#f25252', fontSize: 13 }}>Not enough on {movingIn ? 'Home' : 'Vault'}</p>}
+      {flightHere?.detail ? <p style={{ margin: '8px 18px 0', textAlign: 'center', color: flightHere.phase === 'error' ? '#f25252' : '#accafe', fontSize: 12 }}>{flightHere.detail}</p> : null}
       {!sending && !over && !live?.app && (
         <div style={{ margin: '14px 18px 0', height: 48, borderRadius: 14, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', fontSize: 14 }}>
           <span style={{ color: '#8b9097' }}>Home balance after</span>
@@ -302,22 +316,29 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
       {movingIn && <Note title="Shielded balance" body="This amount leaves your public balance. The Vault total stays hidden." />}
       {id === 'priv-amount' && <Note title="Private pay" body="Paid from your Vault. You choose what the public can see on the next screen." />}
       {id === 'unshield-amount' && <Note title="Unshield" body="This returns a public balance. You choose what stays hidden on the next screen." />}
+      </div>
       <div style={{ flex: '0 0 auto', marginTop: 8, padding: '0 18px 18px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap' }}>
           {keys.map((key) => (
-            <button key={key} type="button" onClick={() => onKey(key)} style={keyBtn}>
+            <button key={key} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onKey(key)} style={live?.app ? { ...keyBtn, height: 44 } : keyBtn}>
               {key === '⌫' ? <FigmaImg src="/wallet-figma/send/backspace.svg" width={24} height={24} /> : key}
             </button>
           ))}
         </div>
-        <button type="button" disabled={!ready} onClick={() => {
+        <button type="button" disabled={!ready || flightHere?.phase === 'processing'} onClick={() => {
           if (id === 'move-home' && live?.app) {
-            void live.vaultMoveOut(amount).then(() => go('move-home-done')).catch(() => go('vault-failed'));
+            void live.vaultMoveOut(amount).then(() => {
+              if (!alive.current || moved.current) return;
+              moved.current = true;
+              go('move-home-done');
+            }).catch(() => {
+              if (alive.current) go('vault-failed');
+            });
             return;
           }
           go(id === 'move-home' ? 'move-home-done' : id === 'priv-amount' ? 'priv-review' : id === 'unshield-amount' ? 'unshield-review' : 'vault-review');
-        }} style={reviewBtn(ready)}>
-          {id === 'move-home' ? 'Move to Home' : 'Review'}
+        }} style={reviewBtn(ready && flightHere?.phase !== 'processing')}>
+          {flightHere?.phase === 'processing' ? 'Processing' : id === 'move-home' ? 'Move to Home' : 'Review'}
         </button>
       </div>
     </div>
@@ -334,6 +355,19 @@ function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: strin
   const live = useLiveFrame();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const screenId = id === 'vault-review' ? 'vault-review' : id === 'priv-review' ? 'priv-review' : 'unshield-review';
+  const doneId = id === 'vault-review' ? 'vault-done' : id === 'priv-review' ? 'priv-done' : 'unshield-done';
+  const flightHere = live?.flight?.screen === screenId ? live.flight : null;
+  const advanced = useRef(false);
+  useEffect(() => {
+    if (advanced.current) return;
+    if (flightHere?.phase === 'done' && !flightHere.detail) {
+      advanced.current = true;
+      go(doneId);
+    }
+  }, [flightHere?.phase, flightHere?.detail, doneId, go]);
   const value = num(amount || '0');
   const fiat = value * price(token);
   const total = live?.app ? `${qty(value)} ${token} + fee` : token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`;
@@ -366,8 +400,8 @@ function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: strin
         {shielding ? 'The amount you shield is no longer a public balance. Nobody can see the total held in your Vault.' : paying ? 'This pays from the Vault. Hidden fields stay off the public record.' : 'Unshielding creates a public balance at the address you chose.'}
       </p>
       <div style={{ marginTop: 16, padding: '0 18px 28px', display: 'flex', flexDirection: 'column', gap: 10, flex: '0 0 auto' }}>
-        {err ? <p style={{ margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
-        <SwipeConfirm label={confirm} processing={busy} disabled={busy} onConfirm={() => {
+        {err || (flightHere && flightHere.phase !== 'processing' ? flightHere.detail : null) ? <p style={{ margin: 0, color: flightHere?.phase === 'done' ? '#accafe' : '#f25252', fontSize: 12 }}>{err || flightHere?.detail}</p> : null}
+        <SwipeConfirm label={confirm} processing={busy || flightHere?.phase === 'processing'} disabled={busy || flightHere?.phase === 'processing'} onConfirm={() => {
           if (!live?.app) {
             go(shielding ? 'vault-pending' : paying ? 'priv-pending' : 'unshield-pending');
             return;
@@ -388,9 +422,9 @@ function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: strin
           setErr(null);
           const mode = shielding ? 'vault' : paying ? 'private' : 'unshield';
           void live.send(token, to, amount, true, mode, mask)
-            .then(() => go(shielding ? 'vault-done' : paying ? 'priv-done' : 'unshield-done', false))
-            .catch((e: unknown) => setErr(e instanceof Error ? e.message : 'Vault send failed'))
-            .finally(() => setBusy(false));
+            .then(() => { if (alive.current && !advanced.current) { advanced.current = true; go(shielding ? 'vault-done' : paying ? 'priv-done' : 'unshield-done', false); } })
+            .catch((e: unknown) => { if (alive.current) setErr(e instanceof Error ? e.message : 'Vault send failed'); })
+            .finally(() => { if (alive.current) setBusy(false); });
         }} />
         <button type="button" onClick={leave} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
       </div>
@@ -458,9 +492,15 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
   const pull = usePullRefresh(() => live?.refreshVault?.());
   const [keyOpen, setKeyOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [ready, setReady] = useState(!live?.app);
   const balanceHidden = live?.app ? live.hidden : hidden;
-  const rows: VaultHolding[] = live?.app ? live.vaultTokens : demoHoldings(many, !!broke);
+  const cachedShielded = Number(String(live?.shielded || '0').replace(/,/g, '')) || 0;
+  const rows: VaultHolding[] = live?.app
+    ? (live.vaultTokens.length
+      ? live.vaultTokens
+      : cachedShielded > 0
+        ? [{ name: 'Arxon', symbol: 'ARX', amount: live?.shielded || '0', icon: 'arx' }]
+        : [])
+    : demoHoldings(many, !!broke);
   const total = vaultHeadline(rows);
   const key = live?.app ? live.shieldedPk || '' : `0x${'11'.repeat(32)}`;
 
@@ -470,7 +510,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
     if (!liveApp || !refreshVault) return;
     let cancel = false;
     void refreshVault().finally(() => {
-      if (!cancel) setReady(true);
+      cancel = true;
     });
     return () => {
       cancel = true;
@@ -535,10 +575,10 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
           <SwipeVault label="Unshield" onOpen={onUnshield} />
         </div>
 
-        <button type="button" onClick={() => { setCopied(false); setKeyOpen(true); }} style={receiveCard}>
+        <button type="button" onClick={() => { setCopied(false); setKeyOpen(true); }} style={live?.app ? liveReceive : receiveCard}>
           <FigmaImg src="/wallet-figma/home/receive.svg" width={18} height={18} />
           <span style={{ fontSize: 16, fontWeight: 700 }}>Receive</span>
-          <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8f99', lineHeight: 1.4 }}>Shielded key for tokens in this vault.</span>
+          <span style={{ fontSize: 13, fontWeight: 500, color: live?.app ? '#fff' : '#8c8f99', lineHeight: 1.4 }}>Shielded key for tokens in this vault.</span>
         </button>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
@@ -547,7 +587,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8 }}>
           {rows.length === 0 ? (
             <p style={{ margin: '4px 0 0', color: '#8b9097', fontSize: 14, lineHeight: 1.4 }}>
-              {live?.app && !ready ? 'Reading the vault from Testnet…' : 'Nothing shielded yet. Shield in from the Testnet home and it shows here.'}
+              Nothing shielded yet. Shield in from the Testnet home and it shows here.
             </p>
           ) : rows.map((row) => (
             <div key={`${row.symbol}-${row.name}`} style={{ height: 64, display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -999,6 +1039,7 @@ const pill: CSSProperties = { height: 32, borderRadius: 16, background: '#1c2025
 const iconBtn: CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' };
 const plain: CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, border: 'none', background: 'none', color: '#fff', padding: 0, cursor: 'pointer', fontFamily: font.sans };
 const receiveCard: CSSProperties = { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 8, padding: 16, border: 'none', borderRadius: 16, background: '#1c2025', color: '#fff', fontFamily: font.sans, cursor: 'pointer', textAlign: 'left' };
+const liveReceive: CSSProperties = { ...receiveCard, background: '#243044', border: '1px solid #accafe', borderRadius: 12, minHeight: 76 };
 const rowBtn: CSSProperties = { width: '100%', height: 68, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: '0 18px', cursor: 'pointer', boxSizing: 'border-box' };
 const card: CSSProperties = { width: 170, height: 92, border: 'none', borderRadius: 16, background: '#1c2025', color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: 14, display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer' };
 const sheet: CSSProperties = { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 18px 28px' };

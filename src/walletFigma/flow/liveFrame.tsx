@@ -1,18 +1,18 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getAddress, type Address } from 'viem';
-import { loadActivity, type ActivityItem } from '@/chainWallet/activity';
-import { START_URL, DEFAULT_RPC } from '@/chainWallet/chain';
+import { loadActivity, mergeHashes, type ActivityItem } from '@/chainWallet/activity';
+import { START_URL, DEFAULT_RPC, PendingTxError } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import type { EthereumToken, WalletNetworkId } from '@/chainWallet/networks';
 import { quoteFor } from '@/chainWallet/prices';
 import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
-import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
+import { inspectTx, scanRecentFrom, type InspectedTx } from '@/chainWallet/inspect';
 import { RELAYER_PAYER } from '@/chainWallet/relay';
 import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
-import { loadVaultHoldings, type VaultHolding } from '@/chainWallet/tokenNotes';
+import { loadCachedVaultHoldings, loadVaultHoldings, type VaultHolding } from '@/chainWallet/tokenNotes';
 import { briefAddr } from './briefAddr';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { hiddenCount, privacyPill as pillText, readDefaultPrivacy, writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
@@ -72,6 +72,21 @@ export type LiveActivity = {
 };
 
 export type LiveSendMode = 'home' | 'vault' | 'private' | 'unshield';
+
+export type TxFlight = {
+  screen: string;
+  done: string;
+  title: string;
+  phase: 'processing' | 'done' | 'error';
+  detail?: string;
+};
+
+function flightFor(mode: LiveSendMode, symbol: string): Pick<TxFlight, 'screen' | 'done' | 'title'> {
+  if (mode === 'vault') return { screen: 'vault-review', done: 'vault-done', title: 'Shield in' };
+  if (mode === 'private') return { screen: 'priv-review', done: 'priv-done', title: 'Private pay' };
+  if (mode === 'unshield') return { screen: 'unshield-review', done: 'unshield-done', title: 'Unshield' };
+  return { screen: 'send-review', done: 'send-success', title: `Send ${symbol}` };
+}
 
 export type LiveInspect = {
   hash: string;
@@ -154,6 +169,9 @@ type LiveFrame = {
   setReceiveAsset: (symbol: string) => void;
   scanQr: () => Promise<string>;
   refresh: () => Promise<void>;
+  flight: TxFlight | null;
+  clearFlight: () => void;
+  renameAccount: (label: string) => void;
 };
 
 const LiveFrameContext = createContext<LiveFrame | null>(null);
@@ -282,17 +300,35 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [alt, setAlt] = useState<AltAddresses | null>(null);
   const [testnetAdded, setTestnetAdded] = useState(() => sessionStore.testnetAdded());
   const [vaultTokens, setVaultTokens] = useState<VaultHolding[]>([]);
+  const [flight, setFlight] = useState<TxFlight | null>(null);
+  const [labelRev, setLabelRev] = useState(0);
 
   const refreshVault = useCallback(async () => {
-    try {
-      if (wallet.network === 'arxon') await wallet.refreshNotes();
-    } catch {
-      /* Saved notes still count when the tree read fails. */
-    }
     const listedNow = await loadListedTokens();
     setListed(listedNow);
-    setVaultTokens(await loadVaultHoldings(wallet.rpcUrl, listedNow));
+    const cached = await loadCachedVaultHoldings(listedNow);
+    setVaultTokens(cached);
+    try {
+      if (wallet.network === 'arxon') await wallet.refreshNotes();
+      setVaultTokens(await loadVaultHoldings(wallet.rpcUrl, listedNow));
+    } catch {
+      setVaultTokens(await loadCachedVaultHoldings(listedNow));
+    }
   }, [wallet.network, wallet.rpcUrl, wallet.refreshNotes]);
+
+  useEffect(() => {
+    let cancel = false;
+    void (async () => {
+      const listedNow = await loadListedTokens();
+      if (cancel) return;
+      setListed(listedNow);
+      const cached = await loadCachedVaultHoldings(listedNow);
+      if (!cancel) setVaultTokens(cached);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [wallet.address, wallet.notes.length]);
 
   useEffect(() => {
     if (wallet.network === 'arxon') setArx(wallet.balance);
@@ -543,72 +579,91 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         if (isArxonStable(symbol) || (testnet && (symbol === 'USDT' || symbol === 'USDC'))) {
           throw new Error('USDT/USDC ARX-20 vault notes are not wired yet.');
         }
-        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
       }
-      if (mode === 'vault') {
-        await wallet.sendShielded(amount, paymentFlags ?? VAULT_FLAGS);
-        return;
-      }
-      if (mode === 'unshield') {
-        const dest = to.trim();
-        if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) throw new Error('Unshield needs a 0x address.');
-        await wallet.sendUnshield(getAddress(dest) as Address, amount, paymentFlags ?? UNSHIELD_FLAGS);
-        return;
-      }
-      if (mode === 'private') {
-        const dest = to.trim() || wallet.shieldedPk || '';
-        if (!dest) throw new Error('Private send needs a shielded destination on Arxon Testnet.');
-        const privateFlags = paymentFlags
-          ? flags
-          : flags.hideSender || flags.hideReceiver || flags.hideAmount
+      const meta = flightFor(mode, symbol);
+      setFlight({ ...meta, phase: 'processing' });
+      try {
+        if (mode === 'vault' || mode === 'private' || mode === 'unshield') {
+          if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
+        }
+        if (mode === 'vault') {
+          await wallet.sendShielded(amount, paymentFlags ?? VAULT_FLAGS);
+          setFlight({ ...meta, phase: 'done' });
+          return;
+        }
+        if (mode === 'unshield') {
+          const dest = to.trim();
+          if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) throw new Error('Unshield needs a 0x address.');
+          await wallet.sendUnshield(getAddress(dest) as Address, amount, paymentFlags ?? UNSHIELD_FLAGS);
+          setFlight({ ...meta, phase: 'done' });
+          return;
+        }
+        if (mode === 'private') {
+          const dest = to.trim() || wallet.shieldedPk || '';
+          if (!dest) throw new Error('Private send needs a shielded destination on Arxon Testnet.');
+          const privateFlags = paymentFlags
             ? flags
-            : VAULT_FLAGS;
-        await wallet.sendPrivate(dest, amount, privateFlags);
-        return;
-      }
-      const dest = to.trim();
-      if (isArxonStable(symbol)) {
-        throw new Error('USDT/USDC ARX-20 transfers are not wired yet.');
-      }
-      if (testnet || isArxonSymbol(symbol)) {
-        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-        const routed = routeSend({
-          to: dest,
-          amount,
-          flags,
-          notes: wallet.notes,
-          publicArx: wallet.balance,
-          shieldedPk: wallet.shieldedPk,
-        });
-        if (routed.kind === 'need-amount' || routed.kind === 'bad-to' || routed.kind === 'need-funds') {
-          throw new Error(routed.label);
-        }
-        if (routed.kind === 'shield') {
-          await wallet.sendShielded(amount, flags);
+            : flags.hideSender || flags.hideReceiver || flags.hideAmount
+              ? flags
+              : VAULT_FLAGS;
+          await wallet.sendPrivate(dest, amount, privateFlags);
+          setFlight({ ...meta, phase: 'done' });
           return;
         }
-        if (routed.kind === 'private') {
-          if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
-          await wallet.sendPrivate(routed.pk, amount, flags);
+        const dest = to.trim();
+        if (isArxonStable(symbol)) {
+          throw new Error('USDT/USDC ARX-20 transfers are not wired yet.');
+        }
+        if (testnet || isArxonSymbol(symbol)) {
+          if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
+          const routed = routeSend({
+            to: dest,
+            amount,
+            flags,
+            notes: wallet.notes,
+            publicArx: wallet.balance,
+            shieldedPk: wallet.shieldedPk,
+          });
+          if (routed.kind === 'need-amount' || routed.kind === 'bad-to' || routed.kind === 'need-funds') {
+            throw new Error(routed.label);
+          }
+          if (routed.kind === 'shield') {
+            await wallet.sendShielded(amount, flags);
+            setFlight({ ...meta, phase: 'done' });
+            return;
+          }
+          if (routed.kind === 'private') {
+            if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
+            await wallet.sendPrivate(routed.pk, amount, flags);
+            setFlight({ ...meta, phase: 'done' });
+            return;
+          }
+          if (routed.kind === 'unshield') {
+            if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
+            await wallet.sendUnshield(routed.to, amount, flags);
+            setFlight({ ...meta, phase: 'done' });
+            return;
+          }
+          await wallet.sendArx(routed.to, amount);
+          setFlight({ ...meta, phase: 'done' });
           return;
         }
-        if (routed.kind === 'unshield') {
-          if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
-          await wallet.sendUnshield(routed.to, amount, flags);
-          return;
+        if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) {
+          throw new Error('Enter a 0x address. This wallet sends on Ethereum and Arxon Testnet.');
         }
-        await wallet.sendArx(routed.to, amount);
-        return;
+        if (!isEthSymbol(symbol)) {
+          throw new Error(`${symbol} sends are not available on this wallet.`);
+        }
+        const addr = getAddress(dest) as Address;
+        if (wallet.network !== 'ethereum') await wallet.setNetwork('ethereum');
+        await wallet.sendEthereum(symbol, addr, amount);
+        setFlight({ ...meta, phase: 'done' });
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : 'Transaction failed';
+        const pending = e instanceof PendingTxError;
+        setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
+        throw e;
       }
-      if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) {
-        throw new Error('Enter a 0x address. This wallet sends on Ethereum and Arxon Testnet.');
-      }
-      if (!isEthSymbol(symbol)) {
-        throw new Error(`${symbol} sends are not available on this wallet.`);
-      }
-      const addr = getAddress(dest) as Address;
-      if (wallet.network !== 'ethereum') await wallet.setNetwork('ethereum');
-      await wallet.sendEthereum(symbol, addr, amount);
     },
     [wallet],
   );
@@ -802,13 +857,31 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           : null,
       }),
     vaultMoveIn: async (amount: string) => {
-      if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-      await wallet.sendShielded(amount, VAULT_FLAGS);
+      const meta = { screen: 'vault-review', done: 'vault-done', title: 'Shield in' };
+      setFlight({ ...meta, phase: 'processing' });
+      try {
+        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
+        await wallet.sendShielded(amount, VAULT_FLAGS);
+        setFlight({ ...meta, phase: 'done' });
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : 'Transaction failed';
+        setFlight({ ...meta, phase: e instanceof PendingTxError ? 'done' : 'error', detail, done: e instanceof PendingTxError ? meta.screen : meta.done });
+        throw e;
+      }
     },
     vaultMoveOut: async (amount: string) => {
       if (!wallet.address) throw new Error('No account');
-      if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-      await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
+      const meta = { screen: 'move-home', done: 'move-home-done', title: 'Move to Home' };
+      setFlight({ ...meta, phase: 'processing' });
+      try {
+        if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
+        await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
+        setFlight({ ...meta, phase: 'done' });
+      } catch (e) {
+        const detail = e instanceof Error ? e.message : 'Transaction failed';
+        setFlight({ ...meta, phase: e instanceof PendingTxError ? 'done' : 'error', detail, done: e instanceof PendingTxError ? meta.screen : meta.done });
+        throw e;
+      }
     },
     wcSessions: (wc?.sessions ?? []).map((row) => ({ name: row.name, url: row.url, topic: row.topic })),
     wcPeer: wc?.request
@@ -850,11 +923,35 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     setReceiveAsset,
     scanQr,
     refresh: async () => {
-      await Promise.all([
+      await Promise.allSettled([
         wallet.refreshBalance(),
         refreshPrices(),
         loadActivity().then((items) => setActivity(groupActivity(items))),
       ]);
+      if (!wallet.address) return;
+      const address = wallet.address as Address;
+      void scanRecentFrom(DEFAULT_RPC, address, 32)
+        .then(async (hashes) => {
+          if (!hashes.length) return;
+          await mergeHashes(hashes, address);
+          setActivity(groupActivity(await loadActivity()));
+        })
+        .catch(() => {
+          /* The saved list is already on screen. */
+        });
+    },
+    flight,
+    clearFlight: () => setFlight(null),
+    renameAccount: (label: string) => {
+      const name = label.trim().replace(/\s+/g, ' ').slice(0, 32);
+      if (!name) return;
+      const index = wallet.accountIndex;
+      const rows = sessionStore.accounts();
+      const next = rows.some((row) => row.index === index)
+        ? rows.map((row) => (row.index === index ? { ...row, label: name } : row))
+        : [...rows, { index, label: name }];
+      sessionStore.setAccounts(next);
+      setLabelRev((n) => n + 1);
     },
   }), [
     wallet,
@@ -887,6 +984,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     alt,
     format,
     refreshPrices,
+    flight,
+    labelRev,
   ]);
 
   return <LiveFrameContext.Provider value={value}>{children}</LiveFrameContext.Provider>;

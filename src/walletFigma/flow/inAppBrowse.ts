@@ -126,13 +126,40 @@ export function usingNativeInAppBrowse() {
   return nativeOpen;
 }
 
+const WALLET_HOSTS = new Set([
+  '127.0.0.1',
+  'localhost',
+  '0.0.0.0',
+  '::1',
+  'arxon-mobile.pages.dev',
+]);
+
+/** https/http sites only. Never the wallet origin, javascript:, or file:. */
+export function safeBrowseUrl(raw: string): string | null {
+  const href = raw.trim();
+  if (!href) return null;
+  if (/^(javascript|file|data|blob|content|intent):/i.test(href)) return null;
+  let url: URL;
+  try {
+    url = new URL(href);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+  const host = url.hostname.replace(/^\[|\]$/g, '').toLowerCase();
+  if (WALLET_HOSTS.has(host) || host.endsWith('.localhost')) return null;
+  return url.toString();
+}
+
 export function openInAppBrowse(url: string) {
-  const href = url.trim();
-  if (!href) return;
-  if (href.startsWith('mailto:')) {
-    window.location.href = href;
+  const trimmed = url.trim();
+  if (!trimmed) return;
+  if (trimmed.startsWith('mailto:')) {
+    window.location.href = trimmed;
     return;
   }
+  const href = safeBrowseUrl(trimmed);
+  if (!href) return;
   attachNativeHooks();
   const native = nativeBrowser();
   if (native) {

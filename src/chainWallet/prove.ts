@@ -72,6 +72,62 @@ type WasmBindgen = ((url: string) => Promise<unknown>) & {
 let wasm: WasmBindgen | null = null;
 let wasmLoad: Promise<WasmBindgen | null> | null = null;
 
+type WorkerJob = { id: number; ok: boolean; result?: unknown; error?: string; boot?: boolean };
+
+let proveWorker: Worker | null = null;
+let workerBroken = false;
+let workerSeq = 0;
+const workerWaiters = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+
+function proveAsset(name: string) {
+  return new URL(localProve(name), window.location.href).toString();
+}
+
+function workerHandle() {
+  if (workerBroken || typeof Worker === 'undefined' || !onWeb()) return null;
+  if (proveWorker) return proveWorker;
+  try {
+    const worker = new Worker(proveAsset('prove-worker.js'));
+    worker.onmessage = (event: MessageEvent<WorkerJob>) => {
+      const job = workerWaiters.get(event.data.id);
+      if (!job) return;
+      workerWaiters.delete(event.data.id);
+      if (event.data.boot) workerBroken = true;
+      if (event.data.ok) job.resolve(event.data.result);
+      else job.reject(new Error(event.data.error || 'Proof failed'));
+    };
+    worker.onerror = () => {
+      workerBroken = true;
+      const error = new Error('Prover worker failed');
+      for (const job of workerWaiters.values()) job.reject(error);
+      workerWaiters.clear();
+      worker.terminate();
+      proveWorker = null;
+    };
+    proveWorker = worker;
+    return worker;
+  } catch {
+    workerBroken = true;
+    return null;
+  }
+}
+
+function callWorker<T>(method: 'keys' | 'shield' | 'transfer' | 'unshield', body: unknown): Promise<T> | null {
+  const worker = workerHandle();
+  if (!worker) return null;
+  const id = ++workerSeq;
+  return new Promise((resolve, reject) => {
+    workerWaiters.set(id, { resolve: (value) => resolve(value as T), reject });
+    worker.postMessage({
+      id,
+      method,
+      body,
+      jsUrl: proveAsset('arxon_prove.js'),
+      wasmUrl: proveAsset('arxon_prove_bg.wasm'),
+    });
+  });
+}
+
 function onWeb(): boolean {
   return typeof window !== 'undefined' && typeof document !== 'undefined';
 }
@@ -166,6 +222,16 @@ async function call<T>(
   method: 'keys' | 'shield' | 'transfer' | 'unshield',
   body: unknown
 ): Promise<T> {
+  if (onWeb() && !workerBroken) {
+    const pending = callWorker<T>(method, body);
+    if (pending) {
+      try {
+        return await pending;
+      } catch (e) {
+        if (!workerBroken) throw e;
+      }
+    }
+  }
   if (onWeb()) {
     try {
       const api = await loadWasm();

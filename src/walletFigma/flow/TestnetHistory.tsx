@@ -28,6 +28,7 @@ export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limi
     return row.model === model;
   });
   const rows = limit ? matched.slice(0, limit) : matched;
+  const grouped = !limit && where === 'all';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -46,29 +47,63 @@ export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limi
         </>
       )}
       {rows.length === 0 ? (
-        <p style={{ margin: '8px 0 0', fontSize: 14, color: '#8b9097', lineHeight: 1.4 }}>
-          {!live?.app ? 'Testnet payments show up here.' : testnet.length === 0 ? 'No testnet transactions yet.' : matched.length === 0 && where === 'vault' ? 'No vault transactions yet.' : 'Nothing matches this filter.'}
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>
+          {!live?.app ? 'Testnet payments show up here.' : testnet.length === 0 ? 'No testnet transactions yet.' : matched.length === 0 && where === 'vault' ? 'No vault transactions yet. Private pay is filed here.' : 'Nothing matches this filter.'}
         </p>
+      ) : grouped ? (
+        <Grouped rows={rows} go={go} />
       ) : rows.map((row) => (
-        <button
-          key={`${row.hash ?? row.title}-${row.sub}`}
-          type="button"
-          onClick={() => {
-            if (row.hash) void live?.openTx(row.hash);
-            go(row.to || 'tx');
-          }}
-          style={{ width: '100%', border: 'none', background: '#1c2025', color: '#fff', borderRadius: 14, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' }}
-        >
-          <span style={{ flex: 1, minWidth: 0 }}>
-            <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{row.title}</span>
-            <span style={{ display: 'block', marginTop: 3, fontSize: 12, color: '#8b9097' }}>{row.day} · {row.sub}</span>
-          </span>
-          <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'right' }}>{row.amount}</span>
-        </button>
+        <HistoryLine key={`${row.hash ?? row.title}-${row.sub}`} row={row} go={go} />
       ))}
       {limit && matched.length > limit ? (
         <button type="button" onClick={() => go('activity')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, textAlign: 'left', padding: '4px 0', cursor: 'pointer' }}>See all</button>
       ) : null}
+    </div>
+  );
+}
+
+function HistoryLine({ row, go }: { row: Item; go: Go }) {
+  const live = useLiveFrame();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        if (row.hash) void live?.openTx(row.hash);
+        go(row.to || 'tx');
+      }}
+      style={{ width: '100%', border: 'none', background: '#1c2025', color: '#fff', borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' }}
+    >
+      <span style={{ flex: 1, minWidth: 0 }}>
+        <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{row.title}</span>
+        <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097' }}>{row.day} · {row.sub}</span>
+      </span>
+      <span style={{ fontSize: 13, fontWeight: 600, textAlign: 'right' }}>{row.amount}</span>
+    </button>
+  );
+}
+
+function Grouped({ rows, go }: { rows: Item[]; go: Go }) {
+  const home = rows.filter((row) => row.place !== 'vault');
+  const vault = rows.filter((row) => row.place === 'vault');
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <Group label="Home" rows={home} empty="No home transactions yet." go={go} />
+      <Group label="Vault" rows={vault} empty="No vault transactions yet. Private pay is filed here." go={go} />
+    </div>
+  );
+}
+
+function Group({ label, rows, empty, go }: { label: string; rows: Item[]; empty: string; go: Go }) {
+  return (
+    <div>
+      <p style={{ margin: '4px 0 6px', fontSize: 12, fontWeight: 700, letterSpacing: 0.4, color: '#8c8f99' }}>{label}</p>
+      {rows.length === 0 ? (
+        <p style={{ margin: 0, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{empty}</p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.map((row) => <HistoryLine key={`${row.hash ?? row.title}-${row.sub}`} row={row} go={go} />)}
+        </div>
+      )}
     </div>
   );
 }

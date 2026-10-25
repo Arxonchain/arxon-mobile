@@ -61,6 +61,9 @@ final class InAppBrowserOverlay {
       return;
     }
     String href = url.trim();
+    if (!allowedBrowseUrl(href)) {
+      return;
+    }
     if (root == null) {
       build();
     }
@@ -203,7 +206,7 @@ final class InAppBrowserOverlay {
         }
         String scheme = uri.getScheme() == null ? "" : uri.getScheme();
         if ("http".equals(scheme) || "https".equals(scheme)) {
-          return false;
+          return walletOrigin(uri.getHost());
         }
         return true;
       }
@@ -291,7 +294,44 @@ final class InAppBrowserOverlay {
         next = "https://duckduckgo.com/?q=" + Uri.encode(next);
       }
     }
+    if (!allowedBrowseUrl(next)) {
+      return;
+    }
     web.loadUrl(next);
+  }
+
+  private boolean allowedBrowseUrl(String raw) {
+    if (raw == null) {
+      return false;
+    }
+    String href = raw.trim();
+    String lower = href.toLowerCase();
+    if (href.isEmpty()
+        || lower.startsWith("javascript:")
+        || lower.startsWith("file:")
+        || lower.startsWith("data:")
+        || lower.startsWith("blob:")
+        || lower.startsWith("content:")
+        || lower.startsWith("intent:")) {
+      return false;
+    }
+    Uri uri = Uri.parse(href);
+    String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase();
+    if (!"https".equals(scheme) && !"http".equals(scheme)) {
+      return false;
+    }
+    return !walletOrigin(uri.getHost());
+  }
+
+  private boolean walletOrigin(String host) {
+    if (host == null) {
+      return true;
+    }
+    String name = host.toLowerCase();
+    return "127.0.0.1".equals(name)
+        || "localhost".equals(name)
+        || "0.0.0.0".equals(name)
+        || "arxon-mobile.pages.dev".equals(name);
   }
 
   private TextView roundBtn(String mark, Runnable action) {

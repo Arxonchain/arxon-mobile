@@ -155,8 +155,8 @@ function Explore({ go }: { go: Go }) {
             {visits.length > 0 ? (
               <div style={card}>
                 {visits.slice(0, 8).map((visit, index) => (
-                  <button key={visit.url + visit.at} type="button" onClick={() => void openSite(visit.title, visit.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
-                    <span style={{ ...mark, background: '#293347' }}>{(hostOf(visit.url)[0] || 'A').toUpperCase()}</span>
+                  <button key={visit.url + visit.at} type="button" onClick={() => void openSite(visit.title, visit.url)} style={{ ...(live?.app ? liveRow : row), borderTop: index ? '1px solid #29333d' : 'none' }}>
+                    <SiteLogo name={visit.title} url={visit.url} letter={(hostOf(visit.url)[0] || 'A').toUpperCase()} />
                     <span style={copy}>
                       <span style={title}>{visit.title}</span>
                       <span style={sub}>{hostOf(visit.url)}</span>
@@ -173,8 +173,8 @@ function Explore({ go }: { go: Go }) {
             <p style={kicker}>EXPLORERS</p>
             <div style={card}>
               {EXPLORERS.map((rowItem, index) => (
-                <button key={rowItem.url} type="button" onClick={() => void openSite(rowItem.name, rowItem.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
-                  <span style={{ ...mark, background: '#2a3447' }}>{rowItem.name.slice(0, 1)}</span>
+                <button key={rowItem.url} type="button" onClick={() => void openSite(rowItem.name, rowItem.url)} style={{ ...(live?.app ? liveRow : row), borderTop: index ? '1px solid #29333d' : 'none' }}>
+                  <SiteLogo name={rowItem.name} url={rowItem.url} letter={rowItem.name.slice(0, 1)} />
                   <span style={copy}>
                     <span style={title}>{rowItem.name}</span>
                     <span style={sub}>{rowItem.chain} · {hostOf(rowItem.url)}</span>
@@ -194,8 +194,8 @@ function Explore({ go }: { go: Go }) {
           >
             <div style={card}>
               {(section === 'dapps' ? DAPPS : DAPPS.slice(0, 6)).map((app, index) => (
-                <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
-                  <span style={{ ...mark, background: app.color }}>{app.letter}</span>
+                <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...(live?.app ? liveRow : row), borderTop: index ? '1px solid #29333d' : 'none' }}>
+                  <SiteLogo name={app.name} url={app.url} letter={app.letter} color={app.color} />
                   <span style={copy}>
                     <span style={title}>{app.name}</span>
                     <span style={sub}>{app.chain} · {app.blurb}</span>
@@ -266,7 +266,7 @@ function DappList({ onBack }: { onBack: () => void }) {
         <div style={card}>
           {DAPPS.map((app, index) => (
             <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
-              <span style={{ ...mark, background: app.color }}>{app.letter}</span>
+              <SiteLogo name={app.name} url={app.url} letter={app.letter} color={app.color} />
               <span style={copy}>
                 <span style={title}>{app.name}</span>
                 <span style={sub}>{hostOf(app.url)} · {app.chain}</span>
@@ -305,6 +305,25 @@ function Back({ onClick }: { onClick: () => void }) {
   );
 }
 
+function SiteLogo({ name, url, letter, color = '#2a3447' }: { name: string; url: string; letter: string; color?: string }) {
+  const [failed, setFailed] = useState(false);
+  const host = hostOf(url);
+  const initial = (letter || name[0] || 'A').slice(0, 1).toUpperCase();
+  if (failed) return <span style={{ ...mark, background: '#2a3447', color: '#fff' }}>{initial}</span>;
+  return (
+    <span style={{ ...mark, background: color, overflow: 'hidden' }}>
+      <img
+        src={`https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64`}
+        alt=""
+        width={28}
+        height={28}
+        onError={() => setFailed(true)}
+        style={{ width: 28, height: 28, objectFit: 'contain', display: 'block', background: '#fff', borderRadius: 8 }}
+      />
+    </span>
+  );
+}
+
 function RefreshMark({ spinning }: { spinning: boolean }) {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style={{ transform: spinning ? 'rotate(180deg)' : undefined, transition: 'transform 0.3s linear' }}>
@@ -339,6 +358,7 @@ function PhoneStatus() {
 const kicker: CSSProperties = { margin: '12px 4px 8px', fontSize: 12, fontWeight: 600, color: '#5c5f64', letterSpacing: 0.6 };
 const card: CSSProperties = { width: '100%', maxWidth: '100%', background: '#1c2126', borderRadius: 16, overflow: 'hidden', height: 'auto' };
 const row: CSSProperties = { width: '100%', height: 64, minHeight: 64, maxHeight: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' };
+const liveRow: CSSProperties = { ...row, height: 56, minHeight: 56, maxHeight: 56, gap: 10, padding: '0 12px' };
 const mark: CSSProperties = { width: 40, height: 40, borderRadius: 20, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, flexShrink: 0 };
 const copy: CSSProperties = { flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden' };
 const title: CSSProperties = { display: 'block', fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };

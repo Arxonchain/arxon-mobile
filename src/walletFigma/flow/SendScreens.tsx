@@ -1,4 +1,4 @@
-import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { PendingTxError } from '@/chainWallet/chain';
@@ -9,7 +9,7 @@ import { useWalletNetwork } from './WalletTabs';
 import { isLiveSendDest, parseTokenQty } from './sendDest';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
 import { briefAddr } from './briefAddr';
-import { LiveHead, LiveScroll, liveGhost, livePrimary } from './LiveScroll';
+import { LiveHead, availableBox, liveGhost, livePrimary } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/send/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -265,53 +265,57 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
   ];
   if (live?.app) {
     return (
-      <LiveScroll>
-        <LiveHead title={`Send ${token.symbol}`} onBack={leave} />
-        <div style={{ height: 56, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 16px' }}>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#8b9097' }}>To</span>
-          <span style={{ flex: 1, fontSize: 15, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
-          <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
-          <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginTop: 28 }}>
-          <span style={{ fontSize: 56, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
-          <span style={{ fontSize: 20, fontWeight: 500, color: '#accafe', marginBottom: 6 }}>{token.symbol}</span>
-        </div>
-        <p style={{ margin: '10px 0 0', textAlign: 'center', fontSize: 15, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 14 }}>
-          <span style={chip}>Available {showAvail(available)} {token.symbol}</span>
-          <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44 }}>Max</button>
-        </div>
-        {vaulted && token.vault ? (
-          <p style={{ margin: '14px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>
-            {token.vault} in your Vault is sent from the Vault.{' '}
-            <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
-          </p>
-        ) : null}
-        {privacy ? (
-          <div style={{ marginTop: 16, background: '#1c2025', borderRadius: 14, overflow: 'hidden' }}>
-            {choices.map(([title, body], index) => (
-              <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
-                <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                  <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{title}</span>
-                  <span style={{ display: 'block', marginTop: 1, fontSize: 12, color: '#8b9097' }}>{body}</span>
-                </span>
-                <button type="button" aria-label={title} aria-pressed={flags[index]} onClick={() => onFlag(index)} style={{ ...iconBtn, width: 44, height: 44 }}>
-                  <img src={art(flags[index] ? 'toggle-on.svg' : 'toggle-off.svg')} alt="" width={46} height={28} style={{ width: 46, height: 28, objectFit: 'contain', display: 'block' }} />
-                </button>
-              </div>
+      <div data-amount-entry style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 18px 8px' }}>
+          <LiveHead title={`Send ${token.symbol}`} onBack={leave} />
+          <div style={{ height: 52, boxSizing: 'border-box', background: '#1c2025', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px' }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: '#8b9097' }}>To</span>
+            <span style={{ flex: 1, fontSize: 14, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
+            <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
+            <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginTop: 16 }}>
+            <span style={{ fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
+            <span style={{ fontSize: 18, fontWeight: 500, color: '#accafe', marginBottom: 4 }}>{token.symbol}</span>
+          </div>
+          <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            <span style={availableBox}>Available {showAvail(available)} {token.symbol}</span>
+            <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44, borderRadius: 0 }}>Max</button>
+          </div>
+          {vaulted && token.vault ? (
+            <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>
+              {token.vault} in your Vault is sent from the Vault.{' '}
+              <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
+            </p>
+          ) : null}
+          {privacy ? (
+            <div style={{ marginTop: 12, background: '#1c2025', borderRadius: 14, overflow: 'hidden' }}>
+              {choices.map(([title, body], index) => (
+                <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
+                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{title}</span>
+                    <span style={{ display: 'block', marginTop: 1, fontSize: 12, color: '#8b9097' }}>{body}</span>
+                  </span>
+                  <button type="button" aria-label={title} aria-pressed={flags[index]} onClick={() => onFlag(index)} style={{ ...iconBtn, width: 44, height: 44 }}>
+                    <img src={art(flags[index] ? 'toggle-on.svg' : 'toggle-off.svg')} alt="" width={46} height={28} style={{ width: 46, height: 28, objectFit: 'contain', display: 'block' }} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 4 }}>
+            {keys.map((key) => (
+              <button key={key} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onKey(key)} style={{ ...keyBtn, width: '33.33%', height: 44 }}>
+                {key === '⌫' ? <FigmaImg src={art('backspace.svg')} width={24} height={24} /> : key}
+              </button>
             ))}
           </div>
-        ) : null}
-        <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 8 }}>
-          {keys.map((key) => (
-            <button key={key} type="button" onClick={() => onKey(key)} style={{ ...keyBtn, width: '33.33%', height: 48 }}>
-              {key === '⌫' ? <FigmaImg src={art('backspace.svg')} width={24} height={24} /> : key}
-            </button>
-          ))}
         </div>
-        <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...livePrimary, marginTop: 8, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
-      </LiveScroll>
+        <div style={{ flex: '0 0 auto', padding: '8px 18px 16px' }}>
+          <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...livePrimary, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
+        </div>
+      </div>
     );
   }
   return (
@@ -374,6 +378,18 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<string | null>(null);
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
+  const flightHere = live?.flight?.screen === 'send-review' ? live.flight : null;
+  const remoteBusy = flightHere?.phase === 'processing';
+  const advanced = useRef(false);
+  useEffect(() => {
+    if (advanced.current) return;
+    if (flightHere?.phase === 'done' && !flightHere.detail) {
+      advanced.current = true;
+      go('send-success');
+    }
+  }, [flightHere?.phase, flightHere?.detail, go]);
   const total = live?.app
     ? `${amount} ${token.symbol} + fee`
     : `${(Number(amount.replace(/,/g, '')) + (token.id === 'arx' ? 0.0004 : 0)).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
@@ -399,7 +415,6 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
     try {
       const testnet = net === 'testnet';
       await live.send(token.symbol, to, amount.replace(/,/g, ''), testnet, testnet && priv && token.id === 'arx' ? 'private' : 'home', testnet ? flags : undefined);
-      go('send-success');
     } catch (e) {
       if (e instanceof PendingTxError) {
         setSubmitted(e.hash);
@@ -408,7 +423,7 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
       }
       const msg = e instanceof Error ? e.message : 'Send failed';
       if (/reverted/i.test(msg)) {
-        go('send-failed');
+        if (alive.current) go('send-failed');
         return;
       }
       setErr(msg);
@@ -416,6 +431,7 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
       setBusy(false);
     }
   }
+  const shownErr = err || (flightHere && flightHere.phase !== 'processing' ? flightHere.detail ?? null : null);
   return (
     <>
       <Back top={56} left={18} icon="chev" onClick={leave} />
@@ -438,9 +454,9 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
           <CenterLine label="Total" value={total} />
         </div>
         {priv && token.id === 'arx' ? <p style={{ margin: '12px 0 0', fontSize: 12, color: '#8b9097', lineHeight: 1.4, textAlign: 'left' }}>Hidden fields stay off the public record. This can’t be undone once confirmed.</p> : null}
-        {err ? <p style={{ margin: '12px 0 0', fontSize: 12, color: submitted ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{err}</p> : null}
+        {shownErr ? <p style={{ margin: '12px 0 0', fontSize: 12, color: submitted || flightHere?.phase === 'done' ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{shownErr}</p> : null}
         <div style={{ marginTop: 16 }}>
-          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} processing={busy} disabled={busy || !!submitted} onConfirm={() => void confirm()} />
+          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} processing={busy || remoteBusy} disabled={busy || remoteBusy || !!submitted} onConfirm={() => void confirm()} />
         </div>
         <button type="button" onClick={leave} disabled={busy} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
       </div>

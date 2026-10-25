@@ -260,6 +260,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }, [app, live?.app, live?.ready, live?.address, live?.locked, id]);
 
   useEffect(() => {
+    if (!app || !live?.app || !live.flight) return;
+    if (live.flight.phase === 'processing' || live.flight.detail) return;
+    if (id === live.flight.done) live.clearFlight();
+  }, [app, id, live]);
+
+  useEffect(() => {
     if (app) return;
     const stage = stageRef.current;
     if (!stage) return;
@@ -279,9 +285,16 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!app) return;
     const stage = stageRef.current;
     if (!stage) return;
+    let fullW = 0;
+    let fullH = 0;
     const measure = () => {
-      const w = Math.max(stage.clientWidth, 1);
-      const h = Math.max(stage.clientHeight, 1);
+      const rawW = Math.max(stage.clientWidth, 1);
+      const rawH = Math.max(stage.clientHeight, 1);
+      if (rawW > fullW) fullW = rawW;
+      if (rawH > fullH) fullH = rawH;
+      // Keyboard shrinks the WebView. Keep the 390 frame where it is.
+      const w = fullW - rawW > 72 ? fullW : rawW;
+      const h = fullH - rawH > 72 ? fullH : rawH;
       const cover = Math.max(w / 390, h / 844);
       const welcome = isWelcomeScreen(id);
       const scale = welcome ? cover : (844 * cover - h > 16 ? h / 844 : cover);
@@ -297,12 +310,19 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     const watcher = new ResizeObserver(measure);
     watcher.observe(stage);
     window.addEventListener('resize', measure);
-    const view = window.visualViewport;
-    view?.addEventListener('resize', measure);
+    const pin = () => {
+      if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    };
+    const onFocus = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest('[data-amount-entry]') || target.matches('input, textarea')) requestAnimationFrame(pin);
+    };
+    document.addEventListener('focusin', onFocus);
     return () => {
       watcher.disconnect();
       window.removeEventListener('resize', measure);
-      view?.removeEventListener('resize', measure);
+      document.removeEventListener('focusin', onFocus);
     };
   }, [app, id]);
 
@@ -569,6 +589,20 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           {shown.tab && !homeDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
           </div>
           <InAppBrowserHost />
+          {live?.app && live.flight && id !== live.flight.screen && !(live.flight.phase === 'done' && !live.flight.detail && id === live.flight.done) ? (
+            <button
+              type="button"
+              onClick={() => {
+                const flight = live.flight;
+                if (!flight) return;
+                const dest = flight.phase === 'done' && !flight.detail ? flight.done : flight.screen;
+                go(dest, false);
+              }}
+              style={{ position: 'absolute', left: 18, right: 18, bottom: 120, zIndex: 40, minHeight: 44, borderRadius: 12, border: '1px solid #accafe', background: '#1c2433', color: '#fff', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+            >
+              {live.flight.title} · {live.flight.phase === 'processing' ? 'Still processing' : live.flight.phase === 'error' ? 'Needs attention' : 'Finished'}
+            </button>
+          ) : null}
           {overlay && (
             <button type="button" onClick={() => go(overlay.parent || 'home', false)} style={{ position: 'absolute', inset: 0, zIndex: 6, background: 'rgba(0,0,0,0.55)', border: 'none', padding: 0 }}>
               <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: ink.card, borderRadius: '16px 16px 0 0', padding: 18, textAlign: 'left' }}>
@@ -759,10 +793,10 @@ function HomeMock({ id, hidden, go, onToggleHide }: { id: string; hidden: boolea
 function PhoneTabs({ active, go }: { active: TabId; go: (id: string) => void }) {
   const tabs: [TabId, string, string][] = [
     ['home', 'Home', tabTarget('home')],
-    ['explore', 'Explore', tabTarget('explore')],
     ['history', 'History', tabTarget('history')],
-    ['account', 'Account', tabTarget('account')],
+    ['explore', 'Explore', tabTarget('explore')],
     ['home', 'Testnet', 'testnet'],
+    ['account', 'Account', tabTarget('account')],
   ];
   return (
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 2, background: ink.page, display: 'flex', height: 78 }}>
