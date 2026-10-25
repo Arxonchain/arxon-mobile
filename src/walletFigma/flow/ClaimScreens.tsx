@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { Unavailable } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/claim/${name}`;
 const SCREENS = new Set(['claim', 'claim-done']);
@@ -19,8 +20,16 @@ export function hasClaimed() {
 }
 
 export function ClaimScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const hideChrome = useAppHidesFigmaChrome();
   const leave = () => (back ? back() : go('home-funded', false));
+  if (live?.app) {
+    return (
+      <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+        <Unavailable title="Claim" body="Claiming ARX is not available on this wallet yet." onBack={leave} />
+      </div>
+    );
+  }
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       {id === 'claim-done' ? <Success go={go} /> : <Claim leave={leave} go={go} />}

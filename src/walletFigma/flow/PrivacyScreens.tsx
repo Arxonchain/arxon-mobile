@@ -421,7 +421,7 @@ function Change({ expected, onSave, persist, unlock, onBack, onDone }: { expecte
   const [show, setShow] = useState([false, false, false]);
   const [error, setError] = useState(false);
   const strength = next.length === 0 ? '' : next.length < 6 ? 'Weak' : next.length < 10 ? 'Okay' : 'Strong';
-  const bars = strength === 'Strong' ? 4 : strength === 'Okay' ? 2 : strength === 'Weak' ? 1 : 0;
+  const bars = strength === 'Strong' ? 3 : strength === 'Okay' ? 2 : strength === 'Weak' ? 1 : 0;
   const ready = current.length > 0 && next.length > 0 && next === confirm;
   return (
     <>
@@ -433,7 +433,7 @@ function Change({ expected, onSave, persist, unlock, onBack, onDone }: { expecte
           <Field label="Current password" value={current} setValue={setCurrent} show={show[0]} toggle={() => setShow([!show[0], show[1], show[2]])} error={error} />
           <Field label="New password" value={next} setValue={setNext} show={show[1]} toggle={() => setShow([show[0], !show[1], show[2]])} />
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 10 }}>
-            {[0, 1, 2, 3].map((i) => <span key={i} style={{ width: 60, height: 4, borderRadius: 2, background: i < bars ? (strength === 'Strong' ? '#3ddb85' : strength === 'Okay' ? '#accafe' : '#f25252') : '#2a3447' }} />)}
+            {[0, 1, 2].map((i) => <span key={i} style={{ width: 76, height: 4, borderRadius: 2, background: i < bars ? (strength === 'Strong' ? '#3ddb85' : strength === 'Okay' ? '#accafe' : '#f25252') : '#2a3447' }} />)}
             <span style={{ marginLeft: 'auto', fontSize: 12, color: strength === 'Strong' ? '#3ddb85' : '#8b9097' }}>{strength}</span>
           </div>
           <Field label="Confirm new password" value={confirm} setValue={setConfirm} show={show[2]} toggle={() => setShow([show[0], show[1], !show[2]])} />

@@ -7,6 +7,7 @@ import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { CoinLogo } from './HomeMarket';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
+import { Unavailable } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/buy/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -29,6 +30,7 @@ export function isBuyScreen(id: string) {
 }
 
 export function BuyScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const { prices } = useTokenPrices();
   const [asset, setAsset] = useState<Asset | null>(null);
   const [amount, setAmount] = useState('100');
@@ -41,6 +43,14 @@ export function BuyScreens({ id, go, back }: { id: string; go: Go; back?: () => 
   const total = shown + PROVIDER;
   const leave = () => (back ? back() : go('home', false));
   const coin = asset ?? ASSETS[0];
+
+  if (live?.app) {
+    return (
+      <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+        <Unavailable title="Buy" body="Buying crypto is not available on this wallet yet." onBack={leave} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>

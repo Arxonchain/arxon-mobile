@@ -16,29 +16,35 @@ const MODELS: [Model, string][] = [
   ['unshield', 'Unshield'],
 ];
 
-export function TestnetHistory({ go }: { go: Go }) {
+export function TestnetHistory({ go, limit }: { go: Go; limit?: number }) {
   const live = useLiveFrame();
   const [place, setPlace] = useState<Place>('all');
   const [model, setModel] = useState<Model>('all');
   const testnet = (live?.app ? flatten(live.activity) : []).filter((row) => row.network !== 'ethereum');
-  const rows = testnet.filter((row) => {
+  const matched = testnet.filter((row) => {
+    if (limit) return true;
     if (place !== 'all' && row.place !== place) return false;
     if (model !== 'all' && row.model !== model) return false;
     return true;
   });
+  const rows = limit ? matched.slice(0, limit) : matched;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {PLACES.map(([id, label]) => (
-          <Chip key={id} label={label} on={place === id} onClick={() => setPlace(id)} />
-        ))}
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        {MODELS.map(([id, label]) => (
-          <Chip key={id} label={label} on={model === id} onClick={() => setModel(id)} />
-        ))}
-      </div>
+      {limit ? null : (
+        <>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {PLACES.map(([id, label]) => (
+              <Chip key={id} label={label} on={place === id} onClick={() => setPlace(id)} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {MODELS.map(([id, label]) => (
+              <Chip key={id} label={label} on={model === id} onClick={() => setModel(id)} />
+            ))}
+          </div>
+        </>
+      )}
       {rows.length === 0 ? (
         <p style={{ margin: '8px 0 0', fontSize: 14, color: '#8b9097', lineHeight: 1.4 }}>
           {!live?.app ? 'Testnet payments show up here.' : testnet.length === 0 ? 'No testnet transactions yet.' : 'Nothing matches this filter.'}
@@ -60,6 +66,9 @@ export function TestnetHistory({ go }: { go: Go }) {
           <span style={{ fontSize: 14, fontWeight: 600, textAlign: 'right' }}>{row.amount}</span>
         </button>
       ))}
+      {limit && testnet.length > limit ? (
+        <button type="button" onClick={() => go('activity')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, textAlign: 'left', padding: '4px 0', cursor: 'pointer' }}>See all</button>
+      ) : null}
     </div>
   );
 }

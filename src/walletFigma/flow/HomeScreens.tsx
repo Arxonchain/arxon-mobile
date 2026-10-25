@@ -399,8 +399,9 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: 18, fontWeight: 700 }}>History</span>
+              <button type="button" onClick={() => go('activity')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>See all</button>
             </div>
-            <TestnetHistory go={go} />
+            <TestnetHistory go={go} limit={3} />
           </div>
         )}
       </div>

@@ -4,6 +4,7 @@ import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
+import { Unavailable } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/swap/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -27,6 +28,7 @@ export function isSwapScreen(id: string) {
 }
 
 export function SwapScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
+  const live = useLiveFrame();
   const [pay, setPay] = useState('arx');
   const [recv, setRecv] = useState('btc');
   const [amount, setAmount] = useState('0');
@@ -88,6 +90,14 @@ export function SwapScreens({ id, go, back }: { id: string; go: Go; back?: () =>
       leave={leave}
     />
   );
+
+  if (live?.app) {
+    return (
+      <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+        <Unavailable title="Swap" body="Swap is not available on this wallet yet." onBack={leave} />
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>

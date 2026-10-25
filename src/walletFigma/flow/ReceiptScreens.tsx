@@ -81,14 +81,17 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function LiveReceipt({ go, onShare, inspect, loading }: { go: Go; onShare: () => void; inspect: { hash: string; amount: string; rows: [string, string][]; status: string; fullTo?: string } | null; loading: boolean }) {
+function LiveReceipt({ go, onShare, inspect, loading }: { go: Go; onShare: () => void; inspect: { hash: string; amount: string; rows: [string, string][]; status: string; fullTo?: string; fullFrom?: string; accountLabel?: string } | null; loading: boolean }) {
   const rows: [string, string][] = [];
   const seen = new Set<string>();
   for (const [label, value] of inspect?.rows ?? []) {
     if (seen.has(label)) continue;
     seen.add(label);
-    rows.push([label, label === 'To' && inspect?.fullTo ? inspect.fullTo : value]);
+    if (label === 'To' && inspect?.fullTo) rows.push([label, inspect.fullTo]);
+    else if (label === 'From' && inspect?.fullFrom) rows.push([label, inspect.accountLabel ? `${inspect.accountLabel} · ${inspect.fullFrom}` : inspect.fullFrom]);
+    else rows.push([label, value]);
   }
+  if (inspect?.fullFrom && !seen.has('From')) rows.unshift(['From', inspect.accountLabel ? `${inspect.accountLabel} · ${inspect.fullFrom}` : inspect.fullFrom]);
   if (inspect?.fullTo && !seen.has('To')) rows.push(['To', inspect.fullTo]);
   return (
     <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 108, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 18px 28px' }}>

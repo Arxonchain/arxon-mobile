@@ -58,6 +58,16 @@ export const liveGhost: CSSProperties = {
   border: '1px solid #2a3447',
 };
 
+export function Unavailable({ title, body, onBack }: { title: string; body: string; onBack: () => void }) {
+  return (
+    <LiveScroll>
+      <LiveHead title={title} onBack={onBack} />
+      <p style={{ margin: '28px 0 0', fontFamily: font.sans, fontSize: 22, fontWeight: 700 }}>Not available yet</p>
+      <p style={{ margin: '10px 0 0', fontFamily: font.sans, color: '#8b9097', fontSize: 15, lineHeight: 1.45 }}>{body}</p>
+    </LiveScroll>
+  );
+}
+
 const backBtn: CSSProperties = {
   width: 44,
   height: 44,

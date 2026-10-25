@@ -10,6 +10,7 @@ import { quoteFor } from '@/chainWallet/prices';
 import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
 import { inspectTx, type InspectedTx } from '@/chainWallet/inspect';
+import { RELAYER_PAYER } from '@/chainWallet/relay';
 import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
 import { loadVaultHoldings, type VaultHolding } from '@/chainWallet/tokenNotes';
 import { briefAddr } from './briefAddr';
@@ -82,6 +83,9 @@ export type LiveInspect = {
   rows: [string, string][];
   /** Full counterparty address. Shown only on the private receipt. */
   fullTo?: string;
+  /** This wallet's address. The receipt shows it in full. Other screens use the short form. */
+  fullFrom?: string;
+  accountLabel?: string;
 };
 
 type LiveFrame = {
@@ -213,6 +217,22 @@ function pct(change: number | null) {
 
 function short(addr: string) {
   return briefAddr(addr);
+}
+
+function isRelayerText(value: string) {
+  const text = value.trim().toLowerCase();
+  return text === RELAYER_PAYER.toLowerCase() || text.startsWith(briefAddr(RELAYER_PAYER).toLowerCase());
+}
+
+function fieldText(value: string) {
+  const text = value.trim();
+  const hex = text.match(/0x[0-9a-fA-F]{16,}/);
+  if (!hex || hex.index == null) return text.length > 48 ? `${text.slice(0, 24)}…` : text;
+  const rest = text.slice(hex.index + hex[0].length).replace(/^[\s·.-]+/, '');
+  const head = briefAddr(hex[0]);
+  if (!rest) return head;
+  if (/relayer/i.test(rest)) return `${head} · relayer`;
+  return `${head} · ${rest}`;
 }
 
 function isEthSymbol(value: string): value is EthereumToken {
@@ -618,23 +638,32 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     openTx: async (hash: string) => {
       const saved = activity.flatMap((group) => group.items).find((item) => item.hash?.toLowerCase() === hash.toLowerCase());
       const fullTo = saved?.party && /^0x[0-9a-fA-F]{16,}$/.test(saved.party) ? saved.party : undefined;
+      const fullFrom = wallet.address || undefined;
+      const accountLabel = current?.label || (wallet.address ? short(wallet.address) : 'Account 01');
+      const stamp = (base: LiveInspect): LiveInspect => {
+        const rows = base.rows.flatMap(([label, value]): [string, string][] => {
+          if (label !== 'From' || !isRelayerText(value)) return [[label, value]];
+          return fullFrom ? [['From', briefAddr(fullFrom)]] : [];
+        });
+        if (fullFrom && !rows.some(([label]) => label === 'From')) rows.splice(Math.min(1, rows.length), 0, ['From', briefAddr(fullFrom)]);
+        return { ...base, fullTo, fullFrom, accountLabel, rows };
+      };
       try {
         const row = await inspectTx(wallet.rpcUrl, hash as `0x${string}`);
-        setInspect({ ...toLiveInspect(row), fullTo });
+        setInspect(stamp(toLiveInspect(row)));
       } catch (e) {
-        setInspect({
+        setInspect(stamp({
           hash,
           title: 'Transaction',
           amount: hash.slice(0, 10),
           fiat: e instanceof Error ? e.message : 'Could not load this transaction',
           status: 'Unknown',
           vault: false,
-          fullTo,
           rows: [
             ['Hash', `${hash.slice(0, 10)}…${hash.slice(-6)}`],
             ['Network', wallet.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet'],
           ],
-        });
+        }));
       }
     },
     words,
@@ -917,11 +946,11 @@ function toLiveInspect(row: InspectedTx): LiveInspect {
     vault,
     rows: [
       ['Date', row.blockNumber ? `Block ${row.blockNumber}` : 'Pending'],
-      ['From', short(row.from)],
+      ...(row.from.toLowerCase() === RELAYER_PAYER.toLowerCase() ? [] : [['From', short(row.from)] as [string, string]]),
       ['To', row.to ? short(row.to) : '—'],
       ['Amount', amount],
       ['Privacy', hidden.length ? hidden.join(', ') : row.kind === 'private' ? 'Private' : 'Public'],
-      ...row.rows.slice(0, 4).map((item): [string, string] => [item.label, item.value.length > 24 ? `${item.value.slice(0, 10)}…${item.value.slice(-4)}` : item.value]),
+      ...row.rows.slice(0, 4).map((item): [string, string] => [item.label, fieldText(item.value)]),
     ],
   };
 }
