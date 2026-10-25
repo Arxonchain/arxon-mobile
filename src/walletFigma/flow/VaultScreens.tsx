@@ -17,6 +17,7 @@ import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { briefAddr } from './briefAddr';
 import { TestnetHistory } from './TestnetHistory';
 import { availableBox } from './LiveScroll';
+import { AccountSheet, type AccountSheetMode } from './AccountSheet';
 
 const IDS = new Set([
   'vault-empty', 'vault', 'vault-amount', 'vault-review', 'vault-done', 'move-home', 'move-home-done',
@@ -195,7 +196,14 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
       <style>{`@keyframes vaultspin{to{transform:rotate(360deg)}}`}</style>
       {account ? (
-        <Accounts id={id} go={go} made={madeSecond} name={name} setName={setName} onCreate={() => { setMadeSecond(true); go('accounts', false); }} />
+        <Accounts id={id} go={go} made={madeSecond} name={name} setName={setName} onCreate={() => {
+          if (live?.app) {
+            void live.addAccount(name).then(() => go('home', false));
+            return;
+          }
+          setMadeSecond(true);
+          go('accounts', false);
+        }} />
       ) : id === 'vault-empty' || id === 'vault-nofunds' || id === 'vault' || id === 'vault-many' || sheet ? (
         <VaultHome many={id === 'vault-many'} hidden={hidden} broke={id === 'vault-nofunds' || id === 'vault-empty'} onEye={() => setHidden((v) => !v)} go={go} sheet={sheet} onPrivate={() => { setSendKind('private'); setMask({ hideSender: true, hideReceiver: true, hideAmount: true, hideBalance: false }); go('vault-send-token'); }} onUnshield={() => { setSendKind('public'); setMask({ hideSender: true, hideReceiver: false, hideAmount: false, hideBalance: false }); go('unshield-who'); }} />
       ) : id === 'shield-explain' ? (
@@ -284,12 +292,15 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
       go('move-home-done');
     }
   }, [id, flightHere?.phase, flightHere?.detail, go]);
+  const pinned = !!live?.app;
   return (
-    <div data-amount-entry={live?.app ? '1' : undefined} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: live?.app ? 'hidden' : undefined }}>
-      <div style={{ flex: 1, minHeight: 0, overflowY: live?.app ? 'auto' : undefined }}>
-      <PhoneStatus />
-      <Head title={title} onBack={leave} />
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: 8, color: '#8b9097', fontSize: 13 }}>
+    <div data-amount-entry={pinned ? '1' : undefined} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: pinned ? 'hidden' : undefined, paddingTop: pinned ? 'env(safe-area-inset-top, 0px)' : undefined }}>
+      {pinned ? <Head title={title} onBack={leave} pinned /> : null}
+      <div style={{ flex: 1, minHeight: 0, overflowY: pinned ? 'auto' : undefined, display: 'flex', flexDirection: 'column' }}>
+      <div style={{ minHeight: pinned ? '100%' : undefined, display: 'flex', flexDirection: 'column', flex: pinned ? 1 : undefined }}>
+      {pinned ? null : (<><PhoneStatus /><Head title={title} onBack={leave} /></>)}
+      <div style={{ flex: pinned ? 1 : undefined, display: 'flex', flexDirection: 'column', justifyContent: pinned ? 'center' : undefined }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: pinned ? 0 : 8, color: '#8b9097', fontSize: 13 }}>
         <span>{movingIn ? 'From  Home' : id === 'move-home' ? 'From  Vault' : 'To'}</span>
         <span style={{ color: '#accafe' }}>→</span>
         <span style={{ color: '#fff' }}>{movingIn ? 'To  Vault' : id === 'move-home' ? 'To  Home' : shortAddr(to) || 'Address'}</span>
@@ -306,6 +317,7 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
         <Max onClick={() => fill(onKey, amount, max)} />
       </div>
       {over && <p style={{ margin: '10px 0 0', textAlign: 'center', color: '#f25252', fontSize: 13 }}>Not enough on {movingIn ? 'Home' : 'Vault'}</p>}
+      </div>
       {flightHere?.detail ? <p style={{ margin: '8px 18px 0', textAlign: 'center', color: flightHere.phase === 'error' ? '#f25252' : '#accafe', fontSize: 12 }}>{flightHere.detail}</p> : null}
       {!sending && !over && !live?.app && (
         <div style={{ margin: '14px 18px 0', height: 48, borderRadius: 14, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', fontSize: 14 }}>
@@ -316,6 +328,7 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
       {movingIn && <Note title="Shielded balance" body="This amount leaves your public balance. The Vault total stays hidden." />}
       {id === 'priv-amount' && <Note title="Private pay" body="Paid from your Vault. You choose what the public can see on the next screen." />}
       {id === 'unshield-amount' && <Note title="Unshield" body="This returns a public balance. You choose what stays hidden on the next screen." />}
+      </div>
       </div>
       <div style={{ flex: '0 0 auto', marginTop: 8, padding: '0 18px 18px' }}>
         <div style={{ display: 'flex', flexWrap: 'wrap' }}>
@@ -491,6 +504,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
   const network = useVaultNetwork(go);
   const pull = usePullRefresh(() => live?.refreshVault?.());
   const [keyOpen, setKeyOpen] = useState(false);
+  const [accountsMode, setAccountsMode] = useState<AccountSheetMode>(null);
   const [copied, setCopied] = useState(false);
   const balanceHidden = live?.app ? live.hidden : hidden;
   const cachedShielded = Number(String(live?.shielded || '0').replace(/,/g, '')) || 0;
@@ -543,7 +557,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
             ) : (
               <span style={{ width: 36, height: 36, borderRadius: 18, background: '#1c2025' }} />
             )}
-            <button type="button" aria-label="Select network" onClick={network.show} style={{ ...plain, minHeight: 40 }}>
+            <button type="button" aria-label="Accounts" onClick={() => (live?.app ? setAccountsMode('list') : go('accounts'))} style={{ ...plain, minHeight: 40 }}>
               <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
               <FigmaImg src="/wallet-figma/home/chev.svg" width={16} height={16} />
             </button>
@@ -562,6 +576,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
             </button>
           </div>
           <span style={{ fontSize: 14, fontWeight: 500, color: '#accafe' }}>Total vault</span>
+          <button type="button" aria-label="Select network" onClick={network.show} style={{ border: 'none', background: 'none', padding: 0, textAlign: 'left', fontSize: 14, fontWeight: 600, color: '#accafe', fontFamily: font.sans, cursor: 'pointer' }}>{network.picked.name}</button>
           <span style={{ fontSize: 13, color: '#8b9097' }}>{balanceHidden ? '••••' : 'Only you can see this'}</span>
         </div>
 
@@ -613,6 +628,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
         ) : null}
       </div>
       {network.sheet}
+      <AccountSheet mode={accountsMode} setMode={setAccountsMode} go={go} />
       {sheet && (
         <>
           <button type="button" aria-label="Close" onClick={() => go('vault', false)} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.6)', zIndex: 12 }} />
@@ -909,24 +925,30 @@ function Accounts({ id, go, made, name, setName, onCreate }: { id: string; go: G
         <div style={sheet}>
           <div style={handle} />
           <p style={{ margin: '14px 0 6px', fontSize: 20, fontWeight: 700 }}>Add account</p>
-          <p style={{ margin: 0, color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>A new account is created from your existing recovery phrase.</p>
+          <p style={{ margin: 0, color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>A new account is the next address from this recovery phrase. No new 12-word phrase is created.</p>
           <p style={{ margin: '16px 0 8px', color: '#8b9097', fontSize: 13 }}>Account name</p>
           <input value={name} onChange={(e) => setName(e.target.value)} style={{ width: '100%', boxSizing: 'border-box', height: 52, borderRadius: 14, border: '1px solid #accafe', background: '#1c2025', color: '#fff', padding: '0 14px', fontFamily: font.sans, fontSize: 16 }} />
           <button type="button" onClick={onCreate} style={{ ...btn, marginTop: 16, background: '#accafe', color: '#0c1018', border: 'none' }}>Create account</button>
+          <p style={{ margin: '14px 0 0', color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>Importing a different recovery phrase or private key replaces this wallet. It is not a second wallet.</p>
           <button type="button" onClick={() => go('import')} style={{ marginTop: 12, width: '100%', border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 15, fontWeight: 600, cursor: 'pointer' }}>Import a wallet instead</button>
         </div>
       ) : (
         <div style={sheet}>
           <div style={handle} />
           <p style={{ margin: '14px 0 12px', fontSize: 20, fontWeight: 700 }}>Accounts</p>
-          <button type="button" onClick={() => go('accounts', false)} style={{ ...rowBtn, background: '#1c2025', borderRadius: 14, padding: '0 12px' }}>
-            <img src="/wallet-figma/home/arx-mask.png" alt="" width={28} height={28} />
-            <span style={{ flex: 1, textAlign: 'left' }}>
-              <span style={{ display: 'block', fontWeight: 600 }}>{label}</span>
-              <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>{addr} · {total}</span>
-            </span>
-            <FigmaImg src="/wallet-figma/buy/check.svg" width={20} height={20} />
-          </button>
+          {(live?.app ? live.accounts : [{ index: 0, label }]).map((row) => {
+            const on = !live?.app || row.index === live.accountIndex;
+            return (
+              <button key={row.index} type="button" onClick={() => { if (live?.app) void live.setAccountIndex(row.index); go(live?.app ? 'home' : 'accounts', false); }} style={{ ...rowBtn, background: '#1c2025', borderRadius: 14, padding: '0 12px', marginBottom: 8 }}>
+                <img src="/wallet-figma/home/arx-mask.png" alt="" width={28} height={28} />
+                <span style={{ flex: 1, textAlign: 'left' }}>
+                  <span style={{ display: 'block', fontWeight: 600 }}>{row.label}</span>
+                  <span style={{ display: 'block', color: '#8b9097', fontSize: 12 }}>{on ? `${addr} · ${total}` : 'Same recovery phrase'}</span>
+                </span>
+                {on ? <FigmaImg src="/wallet-figma/buy/check.svg" width={20} height={20} /> : null}
+              </button>
+            );
+          })}
           <button type="button" onClick={() => go('add-account')} style={{ ...btn, marginTop: 12, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Add account</button>
         </div>
       )}
@@ -950,9 +972,9 @@ function Tabs({ go, here }: { go: Go; here: string }) {
   );
 }
 
-function Head({ title, onBack }: { title: string; onBack: () => void }) {
+function Head({ title, onBack, pinned }: { title: string; onBack: () => void; pinned?: boolean }) {
   return (
-    <div style={{ height: 56, marginTop: 48, display: 'flex', alignItems: 'center', padding: '0 16px' }}>
+    <div style={{ height: 56, marginTop: pinned ? 0 : 48, display: 'flex', alignItems: 'center', padding: '0 16px', flex: '0 0 auto' }}>
       <button type="button" aria-label="Back" onClick={onBack} style={{ ...iconBtn, width: 40, height: 40, borderRadius: 20, background: '#1c2025' }}>
         <FigmaImg src="/wallet-figma/find/back.svg" width={20} height={20} />
       </button>

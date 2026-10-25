@@ -239,7 +239,7 @@ const SKIP = new Set([
   'mining', 'wallet',
 ]);
 
-const TAB_LABELS = ['Home', 'History', 'Explore', 'Testnet', 'Account'];
+const TAB_LABELS = ['Home', 'Market', 'Explore', 'Testnet', 'Account'];
 
 function skipLabel(text) {
   const t = String(text || '').toLowerCase().trim();

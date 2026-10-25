@@ -265,51 +265,57 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
   ];
   if (live?.app) {
     return (
-      <div data-amount-entry style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '8px 18px 8px' }}>
+      <div data-amount-entry style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div style={{ flex: '0 0 auto', padding: '4px 18px 0' }}>
           <LiveHead title={`Send ${token.symbol}`} onBack={leave} />
-          <div style={{ height: 52, boxSizing: 'border-box', background: '#1c2025', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px' }}>
-            <span style={{ fontSize: 13, fontWeight: 500, color: '#8b9097' }}>To</span>
-            <span style={{ flex: 1, fontSize: 14, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
-            <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
-            <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8, marginTop: 16 }}>
-            <span style={{ fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
-            <span style={{ fontSize: 18, fontWeight: 500, color: '#accafe', marginBottom: 4 }}>{token.symbol}</span>
-          </div>
-          <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
-            <span style={availableBox}>Available {showAvail(available)} {token.symbol}</span>
-            <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44, borderRadius: 0 }}>Max</button>
-          </div>
-          {vaulted && token.vault ? (
-            <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>
-              {token.vault} in your Vault is sent from the Vault.{' '}
-              <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
-            </p>
-          ) : null}
-          {privacy ? (
-            <div style={{ marginTop: 12, background: '#1c2025', borderRadius: 14, overflow: 'hidden' }}>
-              {choices.map(([title, body], index) => (
-                <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
-                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                    <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{title}</span>
-                    <span style={{ display: 'block', marginTop: 1, fontSize: 12, color: '#8b9097' }}>{body}</span>
-                  </span>
-                  <button type="button" aria-label={title} aria-pressed={flags[index]} onClick={() => onFlag(index)} style={{ ...iconBtn, width: 44, height: 44 }}>
-                    <img src={art(flags[index] ? 'toggle-on.svg' : 'toggle-off.svg')} alt="" width={46} height={28} style={{ width: 46, height: 28, objectFit: 'contain', display: 'block' }} />
-                  </button>
-                </div>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', padding: '0 18px 8px', boxSizing: 'border-box' }}>
+            <div style={{ height: 52, boxSizing: 'border-box', background: '#1c2025', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px' }}>
+              <span style={{ fontSize: 13, fontWeight: 500, color: '#8b9097' }}>To</span>
+              <span style={{ flex: 1, fontSize: 14, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
+              <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
+              <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
+            </div>
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 148 }}>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
+                <span style={{ fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
+                <span style={{ fontSize: 18, fontWeight: 500, color: '#accafe', marginBottom: 4 }}>{token.symbol}</span>
+              </div>
+              <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+              <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
+                <span style={availableBox}>Available {showAvail(available)} {token.symbol}</span>
+                <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44, borderRadius: 0 }}>Max</button>
+              </div>
+            </div>
+            {vaulted && token.vault ? (
+              <p style={{ margin: '12px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>
+                {token.vault} in your Vault is sent from the Vault.{' '}
+                <button type="button" onClick={() => go('vault-send-options')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>Send from Vault</button>
+              </p>
+            ) : null}
+            {privacy ? (
+              <div style={{ marginTop: 12, background: '#1c2025', borderRadius: 14, overflow: 'hidden' }}>
+                {choices.map(([title, body], index) => (
+                  <div key={title} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 14px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
+                    <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                      <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{title}</span>
+                      <span style={{ display: 'block', marginTop: 1, fontSize: 12, color: '#8b9097' }}>{body}</span>
+                    </span>
+                    <button type="button" aria-label={title} aria-pressed={flags[index]} onClick={() => onFlag(index)} style={{ ...iconBtn, width: 44, height: 44 }}>
+                      <img src={art(flags[index] ? 'toggle-on.svg' : 'toggle-off.svg')} alt="" width={46} height={28} style={{ width: 46, height: 28, objectFit: 'contain', display: 'block' }} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+            <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 4 }}>
+              {keys.map((key) => (
+                <button key={key} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onKey(key)} style={{ ...keyBtn, width: '33.33%', height: 44 }}>
+                  {key === '⌫' ? <FigmaImg src={art('backspace.svg')} width={24} height={24} /> : key}
+                </button>
               ))}
             </div>
-          ) : null}
-          <div style={{ display: 'flex', flexWrap: 'wrap', marginTop: 4 }}>
-            {keys.map((key) => (
-              <button key={key} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => onKey(key)} style={{ ...keyBtn, width: '33.33%', height: 44 }}>
-                {key === '⌫' ? <FigmaImg src={art('backspace.svg')} width={24} height={24} /> : key}
-              </button>
-            ))}
           </div>
         </div>
         <div style={{ flex: '0 0 auto', padding: '8px 18px 16px' }}>

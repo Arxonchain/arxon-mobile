@@ -2,7 +2,7 @@ import { createContext, useContext, type CSSProperties } from 'react';
 import { useLiveFrame } from './liveFrame';
 import { font } from '@/walletFigma/tokens';
 
-export type WalletTabName = 'Home' | 'Explore' | 'History' | 'Account' | 'Testnet';
+export type WalletTabName = 'Home' | 'Explore' | 'Market' | 'Account' | 'Testnet';
 export type WalletNet = 'mainnet' | 'testnet';
 
 /** Keep tabbed lists above the 64px bar at y=728 in the 844 frame. */
@@ -16,7 +16,7 @@ export function useWalletNetwork() {
 
 const TABS: { name: WalletTabName; src: string; w: number; h: number }[] = [
   { name: 'Home', src: '/wallet-figma/activity/tab-home.svg', w: 22, h: 22 },
-  { name: 'History', src: '/wallet-figma/activity/tab-history.svg', w: 20, h: 20 },
+  { name: 'Market', src: '/wallet-figma/activity/tab-history.svg', w: 20, h: 20 },
   { name: 'Explore', src: '/wallet-figma/activity/tab-explore.svg', w: 24, h: 24 },
   { name: 'Testnet', src: '/wallet-figma/receive/globe-test.svg', w: 20, h: 20 },
   { name: 'Account', src: '/wallet-figma/activity/tab-account.svg', w: 22, h: 22 },
@@ -43,8 +43,8 @@ export function pickWalletTab(
     go('explore', false);
     return;
   }
-  if (tab === 'History') {
-    go(net === 'testnet' ? 'activity' : main.history, false);
+  if (tab === 'Market') {
+    go('market', false);
     return;
   }
   go('account', false);
@@ -54,7 +54,7 @@ const ACCENT = '#accafe';
 const IDLE = '#8c8f99';
 const ACTIVE_GLOW = 'rgba(172, 202, 254, 0.14)';
 
-export function WalletTabs({ active, onSelect }: { active: WalletTabName; onSelect: (tab: WalletTabName) => void }) {
+export function WalletTabs({ active, onSelect }: { active: WalletTabName | null; onSelect: (tab: WalletTabName) => void }) {
   const live = useLiveFrame();
   return (
     <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 8, overflow: 'visible', paddingBottom: live?.app ? 'env(safe-area-inset-bottom, 0px)' : 0 }}>

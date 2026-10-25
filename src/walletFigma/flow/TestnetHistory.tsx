@@ -16,11 +16,15 @@ const MODELS: [Model, string][] = [
   ['unshield', 'Unshield'],
 ];
 
+export function isMainnetActivity(row: { network?: string }) {
+  return row.network === 'ethereum';
+}
+
 export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limit?: number; place?: Place }) {
   const live = useLiveFrame();
   const [place, setPlace] = useState<Place>(lockedPlace ?? 'all');
   const [model, setModel] = useState<Model>('all');
-  const testnet = (live?.app ? flatten(live.activity) : []).filter((row) => row.network !== 'ethereum');
+  const testnet = (live?.app ? flatten(live.activity) : []).filter((row) => !isMainnetActivity(row));
   const where = lockedPlace ?? (limit ? 'all' : place);
   const matched = testnet.filter((row) => {
     if (where !== 'all' && row.place !== where) return false;

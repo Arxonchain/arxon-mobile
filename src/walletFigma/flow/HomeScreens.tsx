@@ -13,9 +13,9 @@ import { ProfileAvatar } from './ProfileAvatar';
 import { useProfilePhoto } from './profilePhoto';
 import { usePullRefresh } from './pullRefresh';
 import { openExternal } from './openExternal';
-import { HomeMarket } from './HomeMarket';
+import { AccountSheet, type AccountSheetMode } from './AccountSheet';
 import { SwipeVault } from './SwipeConfirm';
-import { TestnetHistory } from './TestnetHistory';
+import { isMainnetActivity, TestnetHistory } from './TestnetHistory';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
 
@@ -154,6 +154,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
     return vaultEntry('vault-empty');
   }
 
+  const [accountsMode, setAccountsMode] = useState<AccountSheetMode>(null);
   const compact = !!live?.app;
   const y = compact
     ? { header: 86, bal: 148, act: 228, cards: 324, cardH: 136, tok: 476, list: 504 }
@@ -177,7 +178,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
           ) : (
             <span style={{ width: 36, height: 36, borderRadius: 18, background: '#1c2025' }} />
           )}
-          <button type="button" aria-label="Select network" onClick={network.show} style={{ ...plain, minHeight: 40 }}>
+          <button type="button" aria-label="Accounts" onClick={() => (live?.app ? setAccountsMode('list') : go('accounts'))} style={{ ...plain, minHeight: 40 }}>
             <span style={{ fontSize: compact ? 15 : 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
             <FigmaImg src={art('chev.svg')} width={16} height={16} />
           </button>
@@ -199,7 +200,10 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
             <FigmaImg src={art(hidden ? 'eye-off.svg' : 'eye.svg')} width={22} height={22} />
           </button>
         </div>
-        <span style={{ fontSize: compact ? 13 : 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: 346, gap: 8 }}>
+          <span style={{ fontSize: compact ? 13 : 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
+          <button type="button" aria-label="Select network" onClick={network.show} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: compact ? 13 : 14, fontWeight: 600, padding: '4px 0', cursor: 'pointer', flexShrink: 0 }}>{network.picked.name}</button>
+        </div>
       </div>
 
       <div style={{ position: 'absolute', left: 18, top: y.act, width: 354, display: 'flex', justifyContent: 'space-between' }}>
@@ -234,7 +238,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
             </span>
           </button>
         ))}
-        <HomeMarket go={go} />
+        <HomePayments go={go} />
       </div>
 
       <WalletTabs
@@ -248,6 +252,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         }}
       />
       {network.sheet}
+      <AccountSheet mode={accountsMode} setMode={setAccountsMode} go={go} />
     </div>
   );
 }
@@ -262,6 +267,7 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
   const [intro, setIntro] = useState(() => typeof localStorage === 'undefined' || localStorage.getItem(TESTNET_INTRO_KEY) !== '1');
   const on = live?.app ? live.testnetAdded : added;
   const hidden = live?.app ? live.hidden : false;
+  const [accountsMode, setAccountsMode] = useState<AccountSheetMode>(null);
   const tokens = on ? (live?.app ? live.testnetTokens : DEMO_TESTNET) : [];
   const total = on ? (live?.app ? live.testnetTotal : '0.00') : '0.00';
 
@@ -320,7 +326,7 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
             ) : (
               <span style={{ width: 36, height: 36, borderRadius: 18, background: '#1c2025' }} />
             )}
-            <button type="button" aria-label="Select network" onClick={network.show} style={{ ...plain, minHeight: 40 }}>
+            <button type="button" aria-label="Accounts" onClick={() => (live?.app ? setAccountsMode('list') : go('accounts'))} style={{ ...plain, minHeight: 40 }}>
               <span style={{ fontSize: 16, fontWeight: 500 }}>{live?.app ? live.accountLabel : 'Account 01'}</span>
               <FigmaImg src={art('chev.svg')} width={16} height={16} />
             </button>
@@ -340,7 +346,7 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
               </button>
             )}
           </div>
-          <span style={{ fontSize: 14, fontWeight: 500, color: '#accafe' }}>{on ? network.picked.name : 'Arxon Testnet'}</span>
+          <button type="button" aria-label="Select network" onClick={network.show} style={{ border: 'none', background: 'none', padding: 0, textAlign: 'left', fontSize: 14, fontWeight: 500, color: '#accafe', fontFamily: font.sans, cursor: 'pointer' }}>{on ? network.picked.name : 'Arxon Testnet'}</button>
         </div>
 
         {on && (
@@ -417,6 +423,7 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
         }}
       />
       {network.sheet}
+      <AccountSheet mode={accountsMode} setMode={setAccountsMode} go={go} />
       {intro ? <TestnetIntro onDone={dismissIntro} /> : null}
     </div>
   );
@@ -439,6 +446,50 @@ function TestnetIntro({ onDone }: { onDone: () => void }) {
         <button type="button" onClick={onDone} style={{ height: 48, border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Skip all</button>
       </div>
     </div>
+  );
+}
+
+const DEMO_PAYMENTS = [
+  { title: 'Received ETH', day: 'Today', sub: '10:42 AM', amount: '+0.0185 ETH', to: 'tx' },
+  { title: 'Sent ETH', day: 'Today', sub: '09:15 AM', amount: '-0.0040 ETH', to: 'tx' },
+  { title: 'Received BTC', day: 'Yesterday', sub: '4:20 PM', amount: '+0.0021 BTC', to: 'tx' },
+];
+
+function HomePayments({ go }: { go: Go }) {
+  const live = useLiveFrame();
+  const rows = live?.app
+    ? live.activity
+      .flatMap((group) => group.items.map((item) => ({ ...item, day: group.day })))
+      .filter((row) => isMainnetActivity(row))
+      .slice(0, 3)
+    : DEMO_PAYMENTS;
+  return (
+    <section style={{ marginTop: 8, width: '100%' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontSize: 16, fontWeight: 700 }}>History</span>
+        <button type="button" onClick={() => go('activity')} style={{ ...plain, color: '#accafe', fontSize: 14, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>See all</button>
+      </div>
+      {rows.length === 0 ? (
+        <p style={{ margin: '4px 0 0', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>No mainnet payments yet.</p>
+      ) : rows.map((row) => (
+        <button
+          key={`${row.title}-${row.sub}`}
+          type="button"
+          onClick={() => {
+            const hash = 'hash' in row ? row.hash : undefined;
+            if (hash) void live?.openTx(hash);
+            go(row.to || 'tx');
+          }}
+          style={{ width: '100%', border: 'none', background: '#1c2025', color: '#fff', borderRadius: 12, padding: '10px 12px', marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' }}
+        >
+          <span style={{ flex: 1, minWidth: 0 }}>
+            <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{row.title}</span>
+            <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097' }}>{row.day} · {row.sub}</span>
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 600 }}>{row.amount}</span>
+        </button>
+      ))}
+    </section>
   );
 }
 

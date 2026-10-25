@@ -7,7 +7,7 @@ import { useLiveFrame, type LiveActivity } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { explorerTxUrl, openExternal } from './openExternal';
 import { usePullRefresh } from './pullRefresh';
-import { TestnetHistory } from './TestnetHistory';
+import { isMainnetActivity, TestnetHistory } from './TestnetHistory';
 import { briefAddr } from './briefAddr';
 import { LiveHead, LiveScroll, liveGhost, livePrimary } from './LiveScroll';
 
@@ -133,7 +133,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   if (live?.app && id !== 'tx' && id !== 'tx-vault') {
     const mainnet = filterLive(
       live.activity
-        .map((group) => ({ ...group, items: group.items.filter((row) => row.network === 'ethereum') }))
+        .map((group) => ({ ...group, items: group.items.filter((row) => isMainnetActivity(row)) }))
         .filter((group) => group.items.length),
       type,
       token,
@@ -502,9 +502,8 @@ function Tabs({ go, here }: { go: Go; here: string }) {
   const net = useWalletNetwork();
   return (
     <WalletTabs
-      active="History"
+      active={null}
       onSelect={(tab) => {
-        if (tab === 'History') return;
         pickWalletTab(net, tab, go, {
           home: tabTarget('home'),
           vault: net === 'testnet' ? vaultEntry('vault') : tabTarget('vault'),

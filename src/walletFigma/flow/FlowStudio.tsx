@@ -9,6 +9,7 @@ import { ImportWalletScreen } from './ImportWallet';
 import { FinishScreens } from './FinishSetup';
 import { UnlockScreens } from './UnlockScreens';
 import { HomeScreens } from './HomeScreens';
+import { MarketScreen } from './HomeMarket';
 import { FindScreens } from './FindScreens';
 import { TokenScreens } from './TokenScreens';
 import { isSendScreen, SendScreens } from './SendScreens';
@@ -90,6 +91,9 @@ const APP_SCROLL_CSS = `
   width: 390px !important;
   z-index: 8;
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.arxon-app-scroll:has([data-amount-entry]) {
+  overflow: hidden !important;
 }
 `;
 const CHECKS = [3, 7, 12];
@@ -287,11 +291,19 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!stage) return;
     let fullW = 0;
     let fullH = 0;
+    let pinnedY = 0;
     const measure = () => {
       const rawW = Math.max(stage.clientWidth, 1);
       const rawH = Math.max(stage.clientHeight, 1);
       if (rawW > fullW) fullW = rawW;
       if (rawH > fullH) fullH = rawH;
+      const amount = !!stage.querySelector('[data-amount-entry]');
+      const heightDrop = fullH - rawH;
+      // Amount pages keep the top of the frame put when the WebView shrinks.
+      if (amount && heightDrop > 12) {
+        setAppOffsetY(pinnedY);
+        return;
+      }
       // Keyboard shrinks the WebView. Keep the 390 frame where it is.
       const w = fullW - rawW > 72 ? fullW : rawW;
       const h = fullH - rawH > 72 ? fullH : rawH;
@@ -304,7 +316,9 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       setAppFrameH(844);
       setAppOffsetX((w - frameW) / 2);
       // Welcome covers the width on every phone. Extra height is cropped from the top so the actions stay on screen.
-      setAppOffsetY(welcome && frameH > h + 1 ? h - frameH : (h - frameH) / 2);
+      const y = welcome && frameH > h + 1 ? h - frameH : (h - frameH) / 2;
+      pinnedY = y;
+      setAppOffsetY(y);
     };
     measure();
     const watcher = new ResizeObserver(measure);
@@ -316,7 +330,15 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     const onFocus = (event: FocusEvent) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
-      if (target.closest('[data-amount-entry]') || target.matches('input, textarea')) requestAnimationFrame(pin);
+      if (target.closest('[data-amount-entry]') || target.matches('input, textarea')) {
+        requestAnimationFrame(() => {
+          pin();
+          if (!target.closest('[data-amount-entry]')) return;
+          stage.querySelectorAll('.arxon-app-scroll').forEach((el) => {
+            if (el instanceof HTMLElement) el.scrollTop = 0;
+          });
+        });
+      }
     };
     document.addEventListener('focusin', onFocus);
     return () => {
@@ -436,6 +458,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }
 
   const homeDesigned = id === 'home' || id === 'home-hidden' || id === 'home-funded' || id === 'more' || id === 'home-vaulted' || id === 'home-unvaulted' || id === 'testnet';
+  const marketDesigned = id === 'market';
   const tokenDesigned = id.startsWith('token-');
   const sendDesigned = isSendScreen(id);
   const receiveDesigned = isReceiveScreen(id);
@@ -449,7 +472,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const privacyDesigned = isPrivacyScreen(id);
   const exploreDesigned = isExploreScreen(id);
   const unlockDesigned = id === 'unlock' || id === 'unlock-wrong' || id === 'dapp' || id === 'dapp-tx' || id === 'connected';
-  const designed = homeDesigned || tokenDesigned || sendDesigned || receiveDesigned || swapDesigned || buyDesigned || activityDesigned || receiptDesigned || claimDesigned || vaultDesigned || accountDesigned || privacyDesigned || exploreDesigned || unlockDesigned;
+  const designed = homeDesigned || marketDesigned || tokenDesigned || sendDesigned || receiveDesigned || swapDesigned || buyDesigned || activityDesigned || receiptDesigned || claimDesigned || vaultDesigned || accountDesigned || privacyDesigned || exploreDesigned || unlockDesigned;
   const parent = !designed && screen.parent ? SCREEN_MAP[screen.parent] : null;
   const shown = parent && (screen.kind === 'overlay' || screen.overlay) ? parent : screen;
   const overlay = parent && (screen.kind === 'overlay' || screen.overlay) ? screen : null;
@@ -545,6 +568,8 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           >
           {homeDesigned ? (
             <HomeScreens id={id} network={id === 'testnet' || net === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
+          ) : marketDesigned ? (
+            <MarketScreen go={go} />
           ) : tokenDesigned ? (
             <TokenScreens id={id} go={go} back={back} />
           ) : sendDesigned ? (
@@ -586,7 +611,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           ) : (
             <Body screen={shown} hidden={hidden} onToggleHide={() => { setHidden((v) => !v); go(hidden ? 'home' : 'home-hidden', false); }} go={go} back={back} backup={backup} setBackup={setBackup} password={password} setPassword={setPassword} confirm={confirm} setConfirm={setConfirm} agree={agree} setAgree={setAgree} phrasePick={phrasePick} setPhrasePick={setPhrasePick} flags={flags} setFlags={setFlags} toast={setNote} />
           )}
-          {shown.tab && !homeDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
+          {shown.tab && !homeDesigned && !marketDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
           </div>
           <InAppBrowserHost />
           {live?.app && live.flight && id !== live.flight.screen && !(live.flight.phase === 'done' && !live.flight.detail && id === live.flight.done) ? (
@@ -793,7 +818,7 @@ function HomeMock({ id, hidden, go, onToggleHide }: { id: string; hidden: boolea
 function PhoneTabs({ active, go }: { active: TabId; go: (id: string) => void }) {
   const tabs: [TabId, string, string][] = [
     ['home', 'Home', tabTarget('home')],
-    ['history', 'History', tabTarget('history')],
+    ['history', 'Market', 'market'],
     ['explore', 'Explore', tabTarget('explore')],
     ['home', 'Testnet', 'testnet'],
     ['account', 'Account', tabTarget('account')],

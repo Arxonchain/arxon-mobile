@@ -112,6 +112,7 @@ type LiveFrame = {
   accounts: { index: number; label: string }[];
   accountIndex: number;
   setAccountIndex: (index: number) => Promise<void>;
+  addAccount: (label?: string) => Promise<{ index: number; label: string }>;
   total: string;
   day: string;
   dayTone: LiveTone;
@@ -679,6 +680,12 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     accounts,
     accountIndex: wallet.accountIndex,
     setAccountIndex: wallet.setAccountIndex,
+    addAccount: async (label?: string) => {
+      const row = addHdAccount(label);
+      await wallet.setAccountIndex(row.index);
+      setLabelRev((n) => n + 1);
+      return row;
+    },
     total: format(totalN),
     day: weighted == null ? 'Ethereum' : `${weighted > 0 ? '+' : ''}${weighted.toFixed(2)}% Today`,
     dayTone: toneOf(weighted),
@@ -1064,4 +1071,3 @@ function toLiveInspect(row: InspectedTx): LiveInspect {
 
 void hiddenCount;
 void checkUnlockPassword;
-void addHdAccount;

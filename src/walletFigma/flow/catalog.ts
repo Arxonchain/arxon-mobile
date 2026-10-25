@@ -195,6 +195,10 @@ export const SCREENS: Scr[] = [
   }),
   s('home-vaulted', '08.05 Home – Funded, after moving to Vault', '08 · Home', 'home', { tab: 'home' }),
   s('home-unvaulted', '08.06 Home – Funded, after moving out of Vault', '08 · Home', 'home', { tab: 'home' }),
+  s('market', 'Market', '08 · Home', 'list', {
+    title: 'Market',
+    body: 'Live prices for Ethereum, Bitcoin, Solana, Tether, and USD Coin.',
+  }),
 
   s('search', '09.01 Search', '09 · Home – Search, tokens & alerts', 'form', {
     title: 'Search',

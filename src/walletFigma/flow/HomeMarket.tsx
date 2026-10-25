@@ -5,6 +5,10 @@ import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { useMarketChart } from '@/hooks/useMarketChart';
 import { font } from '@/walletFigma/tokens';
 import { MarketSpark } from './LivePriceChart';
+import { pickWalletTab, useWalletNetwork, WalletTabs, type WalletTabName } from './WalletTabs';
+import { useLiveFrame } from './liveFrame';
+import { useAppHidesFigmaChrome } from './appChrome';
+import { tabTarget, vaultEntry } from './VaultScreens';
 
 type Go = (id: string, remember?: boolean) => void;
 
@@ -16,11 +20,43 @@ const MARKET: { name: string; symbol: PricedSymbol; to: string; icon: 'btc' | 'e
   { name: 'USD Coin', symbol: 'USDC', to: 'token-usdc', icon: 'usdc' },
 ];
 
-export function HomeMarket({ go }: { go: Go }) {
+export function MarketScreen({ go }: { go: Go }) {
+  const live = useLiveFrame();
+  const hideChrome = useAppHidesFigmaChrome();
+  const net = useWalletNetwork();
+  const top = live?.app ? 'max(72px, env(safe-area-inset-top, 0px))' : hideChrome ? 16 : 58;
+  return (
+    <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
+      {hideChrome ? null : (
+        <div style={{ position: 'absolute', left: 0, top: 0, width: 390, height: 44 }}>
+          <span style={{ position: 'absolute', left: 21, top: 14, width: 54, textAlign: 'center', fontSize: 14, fontWeight: 600, letterSpacing: -0.28 }}>9:41</span>
+          <img src="/wallet-figma/welcome/status.svg" alt="" width={66.6} height={11.33} style={{ position: 'absolute', left: 288.67, top: 17.33 }} />
+        </div>
+      )}
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top, width: 390, bottom: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 18px calc(88px + env(safe-area-inset-bottom, 0px))' }}>
+        <p style={{ margin: '0 0 8px', fontSize: 26, fontWeight: 700 }}>Market</p>
+        <HomeMarket go={go} showTitle={false} />
+      </div>
+      <WalletTabs
+        active="Market"
+        onSelect={(tab: WalletTabName) => {
+          if (tab === 'Market') return;
+          pickWalletTab(net, tab, go, {
+            home: net === 'testnet' ? 'testnet' : tabTarget('home'),
+            vault: net === 'testnet' ? vaultEntry('vault') : tabTarget('vault'),
+            history: 'activity',
+          });
+        }}
+      />
+    </div>
+  );
+}
+
+export function HomeMarket({ go, showTitle = true }: { go: Go; showTitle?: boolean }) {
   const { prices } = useTokenPrices();
   return (
-    <section style={{ marginTop: 8, width: '100%' }}>
-      <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Market</p>
+    <section style={{ marginTop: showTitle ? 8 : 0, width: '100%' }}>
+      {showTitle ? <p style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700 }}>Market</p> : null}
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         {MARKET.map((coin) => (
           <MarketRow key={coin.symbol} coin={coin} go={go} prices={prices} />

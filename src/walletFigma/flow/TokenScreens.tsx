@@ -9,6 +9,8 @@ import { LivePriceChart } from './LivePriceChart';
 import { useDisplayCurrency } from './displayCurrency';
 import { CHART_RANGES, RANGE_SUFFIX, pricedChartSymbol, type ChartRange } from '@/chainWallet/marketChart';
 import { useMarketChart } from '@/hooks/useMarketChart';
+import { useTokenPrices } from '@/hooks/useTokenPrices';
+import { formatPct, formatUsd, quoteFor } from '@/chainWallet/prices';
 
 const art = (name: string) => `/wallet-figma/token/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -109,6 +111,10 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
       ?? (frame.title === 'Arxon' ? live.testnetTokens[0] : undefined)
     : undefined;
   const marketSym = live?.app ? pricedChartSymbol(liveTok?.symbol ?? titleSymbol(frame.title)) : null;
+  const { prices } = useTokenPrices();
+  const spot = marketSym ? quoteFor(marketSym, prices) : null;
+  const spotUp = (spot?.change24h ?? 0) > 0;
+  const spotDown = (spot?.change24h ?? 0) < 0;
   const [range, setRange] = useState<ChartRange>('1D');
   const chart = useMarketChart(live?.app ? marketSym : null, range);
   const chartMove = chart.change;
@@ -184,12 +190,20 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
         )}
       </div>
 
-      <div style={{ position: 'absolute', left: 18, top: 372, width: 354, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {CHART_RANGES.map((label) => (
-          <button key={label} type="button" onClick={() => setRange(label)} style={{ width: 52, height: 34, border: 'none', borderRadius: 17, background: range === label ? '#2a3447' : 'transparent', color: range === label ? '#accafe' : '#8b9097', fontFamily: font.sans, fontSize: 13, fontWeight: range === label ? 600 : 500, cursor: 'pointer' }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ position: 'absolute', left: 18, top: 372, width: 354, height: 36, display: 'flex', alignItems: 'center', gap: 8 }}>
+        {live?.app && marketSym ? (
+          <span style={{ flex: '0 0 auto', minWidth: 72 }}>
+            <span style={{ display: 'block', fontSize: 13, fontWeight: 700, lineHeight: 1.1 }}>{formatUsd(spot?.usd) || '—'}</span>
+            <span style={{ display: 'block', marginTop: 2, fontSize: 11, fontWeight: 600, color: spotUp ? '#3ddc84' : spotDown ? '#f25252' : '#8c8f99' }}>{formatPct(spot?.change24h) || '—'}</span>
+          </span>
+        ) : null}
+        <span style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          {CHART_RANGES.map((label) => (
+            <button key={label} type="button" onClick={() => setRange(label)} style={{ width: live?.app && marketSym ? 40 : 52, height: 34, border: 'none', borderRadius: 17, background: range === label ? '#2a3447' : 'transparent', color: range === label ? '#accafe' : '#8b9097', fontFamily: font.sans, fontSize: 13, fontWeight: range === label ? 600 : 500, cursor: 'pointer' }}>
+              {label}
+            </button>
+          ))}
+        </span>
       </div>
 
       <div style={{ position: 'absolute', left: 18, top: 432, width: 354, height: 84, display: 'flex', justifyContent: 'space-between', padding: '0 40px', boxSizing: 'border-box' }}>
