@@ -233,7 +233,7 @@ serve(async (req) => {
         email,
         password,
         email_confirm: false,
-        user_metadata: referralCode ? { referral_code: referralCode } : undefined,
+        user_metadata: referralCode ? { referred_by_code: referralCode } : undefined,
       }),
     });
     const createRaw = await createRes.text().catch(() => "");

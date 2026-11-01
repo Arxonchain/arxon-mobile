@@ -43,7 +43,7 @@ export async function signUpWithFallback(
     options: {
       emailRedirectTo: getEmailConfirmRedirectUrl(),
       ...(token ? { captchaToken: token } : {}),
-      ...(ref ? { data: { referral_code: ref } } : {}),
+      ...(ref ? { data: { referred_by_code: ref } } : {}),
     },
   });
 

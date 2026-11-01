@@ -52,8 +52,18 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   if (m.includes("signups not allowed") || m.includes("signup is disabled") || m.includes("disable_signup")) {
     return "Signups are currently disabled. Please try again later.";
   }
+  if (
+    m.includes("database error saving new user") ||
+    m.includes("database error saving") ||
+    m.includes("error saving new user")
+  ) {
+    return "We could not finish creating your account. Wait a few seconds, complete a fresh security check, then try again. If it still fails, try without a referral code first.";
+  }
+  if (m.includes("over_email_send_rate_limit") || m.includes("email rate limit")) {
+    return "A confirmation email was already requested. Wait a minute, then try again (check spam too).";
+  }
   if (m.includes("rate limit") || m.includes("too many") || m.includes("429")) {
-    return "Too many attempts. Please wait a minute and try again.";
+    return "Too many attempts from this connection. Wait a minute, complete a fresh security check, then try once more.";
   }
   if (m.includes("password") && (m.includes("weak") || m.includes("short"))) {
     return message;
