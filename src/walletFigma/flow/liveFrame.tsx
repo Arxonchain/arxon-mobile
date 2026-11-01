@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getAddress, type Address } from 'viem';
-import { loadActivity, mergeHashes, pushActivity, type ActivityItem } from '@/chainWallet/activity';
+import { loadActivity, mergeIncoming, pushActivity, type ActivityItem } from '@/chainWallet/activity';
 import { bitcoinBalance, sendBitcoin } from '@/chainWallet/bitcoinSend';
+import { plainTxError } from '@/chainWallet/txError';
 import { SOL_USDC, SOL_USDT, sendSolana, sendSolanaStable, solanaBalance, solanaTokenBalance } from '@/chainWallet/solanaSend';
 import { START_URL, DEFAULT_RPC, PendingTxError } from '@/chainWallet/chain';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
@@ -174,6 +175,9 @@ type LiveFrame = {
   receiveAsset: string;
   receiveAddress: string;
   solAddress: string;
+  btcAddress: string;
+  money: (usd: number) => string;
+  usdOf: (symbol: string) => number;
   receiveQr: string | null;
   setReceiveAsset: (symbol: string) => void;
   scanQr: () => Promise<string>;
@@ -719,10 +723,11 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         await wallet.sendEthereum(symbol, addr, amount);
         setFlight({ ...meta, phase: 'done' });
       } catch (e) {
-        const detail = e instanceof Error ? e.message : 'Transaction failed';
         const pending = e instanceof PendingTxError;
+        const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
         setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
-        throw e;
+        if (pending) throw e;
+        throw new Error(detail);
       }
     },
     [wallet],
@@ -956,8 +961,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         await wallet.sendShielded(amount, VAULT_FLAGS);
         setFlight({ ...meta, phase: 'done' });
       } catch (e) {
-        const detail = e instanceof Error ? e.message : 'Transaction failed';
-        setFlight({ ...meta, phase: e instanceof PendingTxError ? 'done' : 'error', detail, done: e instanceof PendingTxError ? meta.screen : meta.done });
+        const pending = e instanceof PendingTxError;
+        const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
+        setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
         throw e;
       }
     },
@@ -970,8 +976,9 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
         setFlight({ ...meta, phase: 'done' });
       } catch (e) {
-        const detail = e instanceof Error ? e.message : 'Transaction failed';
-        setFlight({ ...meta, phase: e instanceof PendingTxError ? 'done' : 'error', detail, done: e instanceof PendingTxError ? meta.screen : meta.done });
+        const pending = e instanceof PendingTxError;
+        const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
+        setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
         throw e;
       }
     },
@@ -1012,21 +1019,28 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     receiveAsset,
     receiveAddress,
     solAddress: alt?.sol || '',
+    btcAddress: alt?.btc || '',
+    money: format,
+    usdOf: (symbol: string) => {
+      const usd = quoteFor(symbol, prices).usd;
+      return usd != null && Number.isFinite(usd) ? usd : 0;
+    },
     receiveQr,
     setReceiveAsset,
     scanQr,
     refresh: async () => {
       await Promise.allSettled([
         wallet.refreshBalance(),
+        wallet.network === 'arxon' ? wallet.refreshNotes() : Promise.resolve(),
         refreshPrices(),
         loadActivity().then((items) => setActivity(groupActivity(items))),
       ]);
       if (!wallet.address) return;
       const address = wallet.address as Address;
-      void scanRecentFrom(DEFAULT_RPC, address, 32)
+      void scanRecentFrom(wallet.rpcUrl || DEFAULT_RPC, address, 256)
         .then(async (hashes) => {
           if (!hashes.length) return;
-          await mergeHashes(hashes, address);
+          await mergeIncoming(wallet.rpcUrl || DEFAULT_RPC, hashes, address);
           setActivity(groupActivity(await loadActivity()));
         })
         .catch(() => {
@@ -1075,6 +1089,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     receiveQr,
     alt,
     altBal,
+    prices,
+    format,
     scanQr,
     alt,
     format,
@@ -1109,17 +1125,25 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
         : item.kind === 'transfer'
           ? 'public'
           : 'onchain';
-    const place = model === 'public' || model === 'onchain' ? 'home' : 'vault';
-    const kind = place === 'vault' && model !== 'private' ? 'vault' : model === 'private' ? 'private' : 'sent';
+    const place = item.kind === 'receive' ? 'vault' : model === 'public' || model === 'onchain' ? 'home' : 'vault';
+    const kind =
+      item.kind === 'receive'
+        ? 'received'
+        : place === 'vault' && model !== 'private'
+          ? 'vault'
+          : model === 'private'
+            ? 'private'
+            : 'sent';
     const who = item.kind === 'shield' ? '' : briefAddr(item.to);
     const when = new Date(item.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-    const where = place === 'home' ? 'Home' : 'Vault';
+    const where = item.kind === 'receive' ? 'Vault' : place === 'home' ? 'Home' : 'Vault';
     current.items.push({
-      title: model === 'shield' ? 'Shield in' : model === 'unshield' ? 'Unshield' : model === 'private' ? 'Private pay' : model === 'public' ? 'Sent' : 'On-chain',
+      title: item.kind === 'receive' ? 'Received' : model === 'shield' ? 'Shield in' : model === 'unshield' ? 'Unshield' : model === 'private' ? 'Private pay' : model === 'public' ? 'Sent' : 'On-chain',
       sub: `${where}${who ? ` · ${who}` : ''} · ${when}`,
       amount: item.amount ? shownAmount(`${item.amount} ${item.token ?? ''}`) : item.hash.slice(0, 10),
       fiat: item.network === 'ethereum' ? 'Ethereum' : item.network === 'bitcoin' ? 'Bitcoin' : item.network === 'solana' ? 'Solana' : 'Arxon Testnet',
       kind,
+      tint: item.kind === 'receive' ? '#3ddc84' : undefined,
       token: item.token ?? 'ARX',
       to: item.kind === 'private' ? 'receipt' : 'tx',
       hash: item.hash,

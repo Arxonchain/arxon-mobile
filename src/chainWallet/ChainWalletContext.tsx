@@ -50,6 +50,7 @@ import {
   shieldedTotal,
   type StoredNote,
 } from './notes';
+import { scanIncomingNotes } from './scanNotes';
 import { asBits, type PrivacyFlags } from './privacy';
 import { proveKeys, proveShield, proveTransfer, proveUnshield, type NoteSecrets } from './prove';
 import { storage } from './storage';
@@ -196,7 +197,17 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     }
     const leaves = await loadLeaves();
     setNotes(notesOnChain(await loadNotes(), leaves));
-  }, [rpcUrl]);
+    if (!shieldedPk) return;
+    try {
+      const added = await scanIncomingNotes(rpcUrl, shieldedPk, (msg) => setNotesStatus(msg));
+      setNotesStatus(null);
+      if (added > 0) {
+        setNotes(notesOnChain(await loadNotes(), await loadLeaves()));
+      }
+    } catch {
+      setNotesStatus(null);
+    }
+  }, [rpcUrl, shieldedPk]);
 
   const ensureKeys = useCallback(async () => {
     const saved = await readShieldedSk();
@@ -244,6 +255,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (ready && mnemonic) void ensureKeys();
   }, [ready, mnemonic, ensureKeys]);
+
+  useEffect(() => {
+    if (ready && mnemonic && shieldedPk) void refreshNotes();
+  }, [ready, mnemonic, shieldedPk, refreshNotes]);
 
   const refreshBalance = useCallback(async (rpcOverride?: string) => {
     if (!address) {

@@ -63,7 +63,36 @@ export async function hydrateLeaves(
   }
 }
 
-/** Append every output cm (tree order). Keep secrets only for notes we own. */
+/**
+ * Store decrypted notes that already sit in the on-chain tree.
+ * Does not append leaves — hydrateLeaves owns canonical order.
+ */
+export async function adoptIncomingNotes(
+  outputs: { cm: Hex; cv: Hex; rho: Hex; amountWei: string; pk: Hex }[],
+  ourPk: string
+): Promise<StoredNote[]> {
+  const leaves = await loadLeaves();
+  const notes = await loadNotes();
+  const added: StoredNote[] = [];
+  const want = ourPk.toLowerCase();
+  for (const o of outputs) {
+    if (o.pk.toLowerCase() !== want) continue;
+    const leafIndex = leaves.findIndex((l) => l.toLowerCase() === o.cm.toLowerCase());
+    if (leafIndex < 0) continue;
+    if (notes.some((n) => n.cm.toLowerCase() === o.cm.toLowerCase())) continue;
+    const row = { ...o, leafIndex, spent: false };
+    notes.push(row);
+    added.push(row);
+  }
+  if (added.length) await saveNotes(notes);
+  return added;
+}
+
+/**
+ * Append every output cm (tree order). Keep secrets only for notes we own.
+ * Recipient secrets belong on-chain in `encrypted_note`; the other wallet
+ * recovers them with `scanIncomingNotes`.
+ */
 export async function commitOutputs(
   outputs: { cm: Hex; cv: Hex; rho: Hex; amountWei: string; pk: Hex }[],
   ourPk: string | null

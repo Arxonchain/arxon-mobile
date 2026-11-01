@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { activityLabel, loadActivity, mergeHashes, type ActivityItem } from '@/chainWallet/activity';
+import { activityLabel, loadActivity, mergeIncoming, type ActivityItem } from '@/chainWallet/activity';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { NETWORKS } from '@/chainWallet/networks';
 import { scanRecentFrom } from '@/chainWallet/scan';
@@ -13,7 +13,7 @@ export default function WalletActivity() {
   const [params] = useSearchParams();
   const wantArxon = params.get('net') === 'arxon';
   useLockNetwork(wantArxon ? 'arxon' : 'ethereum');
-  const { address, rpcUrl, refreshBalance } = useChainWallet();
+  const { address, rpcUrl, refreshBalance, refreshNotes, shieldedPk } = useChainWallet();
   const home = walletHomePath(wantArxon ? 'arxon' : 'ethereum');
   const [items, setItems] = useState<ActivityItem[]>([]);
   const [status, setStatus] = useState<string | null>(null);
@@ -36,10 +36,12 @@ export default function WalletActivity() {
     setStatus('Scanning recent blocks…');
     try {
       const hashes = await scanRecentFrom(rpcUrl, address);
-      await mergeHashes(hashes, address);
+      await mergeIncoming(rpcUrl, hashes, address);
+      await refreshNotes();
       await reload();
       await refreshBalance();
-      setStatus(hashes.length ? `Found ${hashes.length} related txs` : 'No matching txs in the last 256 blocks');
+      const extra = shieldedPk ? ' and vault notes' : '';
+      setStatus(hashes.length ? `Found ${hashes.length} related txs${extra}` : `No matching public txs in the last 256 blocks${extra}`);
     } catch (e) {
       setStatus(e instanceof Error ? e.message : 'Scan failed');
     }
