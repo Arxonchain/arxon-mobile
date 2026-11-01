@@ -114,22 +114,38 @@ function errorText(json: Record<string, unknown> | null, raw: string): string {
  * Send via Mining App Resend only (Deno.env RESEND_API_KEY on oztccmrhiawleucdluwb).
  * Never call website / arxon-web Resend keys or cross-project relays.
  */
+function deliveryErrorMessage(status: number, snippet: string): string {
+  const s = snippet.toLowerCase();
+  if (
+    s.includes("verify your domain") ||
+    s.includes("testing emails") ||
+    s.includes("domain is not verified") ||
+    s.includes("invalid `from`")
+  ) {
+    return "We could not deliver the confirmation email to that address. The sending domain is not verified for outbound mail.";
+  }
+  if (status === 429 || s.includes("rate")) {
+    return "We could not send a confirmation email just now. Wait a minute, then try Create Account again.";
+  }
+  return "We could not send a confirmation email. Please try again in a few minutes.";
+}
+
 async function sendBrandedEmail(opts: {
   to: string;
   subject: string;
   html: string;
   text: string;
   purpose: string;
-}): Promise<{ ok: boolean; status: number; snippet: string }> {
+}): Promise<{ ok: boolean; status: number; snippet: string; id: string }> {
   const resendKey = (Deno.env.get("RESEND_API_KEY") || "").trim();
   const fromEmail =
     (Deno.env.get("RESEND_FROM_EMAIL") || "").trim() ||
-    "Arxon <security@arxonchain.xyz>";
+    "Arxon <noreply@arxonchain.xyz>";
   if (!resendKey) {
-    return { ok: false, status: 500, snippet: "RESEND_API_KEY missing" };
+    return { ok: false, status: 500, snippet: "RESEND_API_KEY missing", id: "" };
   }
   if (/supabase\.co\/auth\/v1\/verify/i.test(`${opts.html}\n${opts.text}`)) {
-    return { ok: false, status: 400, snippet: "supabase_verify_link_forbidden" };
+    return { ok: false, status: 400, snippet: "supabase_verify_link_forbidden", id: "" };
   }
 
   const controller = new AbortController();
@@ -151,12 +167,25 @@ async function sendBrandedEmail(opts: {
       signal: controller.signal,
     });
     const raw = await res.text().catch(() => "");
+    let json: Record<string, unknown> | null = null;
+    try {
+      json = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+    } catch {
+      json = null;
+    }
+    const id = String(json?.id || "");
     console.log("auth-signup resend", {
       purpose: opts.purpose,
       status: res.status,
       toDomain: opts.to.split("@")[1] || "?",
+      hasId: !!id,
     });
-    return { ok: res.ok, status: res.status, snippet: raw.slice(0, 300) };
+    return {
+      ok: res.ok && !!id,
+      status: res.status,
+      snippet: String(json?.message || json?.error || raw).slice(0, 300),
+      id,
+    };
   } finally {
     clearTimeout(timeout);
   }
@@ -310,8 +339,9 @@ serve(async (req) => {
       );
     }
 
+    // Branded confirm host (App Links + inbox filters). Ignore pages.dev from the app.
     const confirmBase = allowedConfirmBase(
-      redirectTo || Deno.env.get("PUBLIC_SITE_URL") || "https://arxonchain.xyz/auth/confirm"
+      Deno.env.get("PUBLIC_SITE_URL") || "https://arxonchain.xyz/auth/confirm"
     );
     const metadata = referralCode ? { referred_by_code: referralCode } : undefined;
 
@@ -401,6 +431,9 @@ serve(async (req) => {
     const hashedToken = String(
       linkJson?.hashed_token || properties?.hashed_token || ""
     );
+    const emailOtp = String(
+      linkJson?.email_otp || properties?.email_otp || ""
+    ).replace(/\s+/g, "");
     const linkMsg = errorText(linkJson, linkParsed.raw).toLowerCase();
 
     if (!linkRes.ok || !hashedToken) {
@@ -458,14 +491,25 @@ serve(async (req) => {
       );
     }
 
+    const otpBlock = emailOtp
+      ? `<p>Your confirmation code:</p><p style="font-size:28px;letter-spacing:4px;font-weight:700">${emailOtp.replace(/</g, "")}</p>`
+      : "";
     const html = `<div style="font-family:system-ui,sans-serif;line-height:1.5;color:#111">
   <h2>Confirm your email</h2>
-  <p>Follow the link below to confirm this email address and finish signing up for Arxon.</p>
+  <p>Use this email to finish signing up for Arxon.</p>
+  ${otpBlock}
   <p><a href="${verifyUrl.replace(/"/g, "&quot;")}" style="display:inline-block;background:#111;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none">Confirm email address</a></p>
   <p style="color:#666;font-size:13px;word-break:break-all">If the button does not work, open this link:<br/>${verifyUrl.replace(/</g, "&lt;")}</p>
   <p style="color:#666;font-size:13px">If you did not create an Arxon account, you can ignore this email.</p>
 </div>`;
-    const text = `Confirm your Arxon email:\n${verifyUrl}\n\nIf you did not create an account, ignore this email.`;
+    const text = [
+      emailOtp ? `Your Arxon confirmation code: ${emailOtp}` : "",
+      `Confirm your Arxon email: ${verifyUrl}`,
+      "",
+      "If you did not create an account, ignore this email.",
+    ]
+      .filter(Boolean)
+      .join("\n");
 
     const sent = await sendBrandedEmail({
       to: email,
@@ -490,8 +534,7 @@ serve(async (req) => {
       return jsonResponse(
         {
           success: false,
-          error:
-            "We could not send a confirmation email. Please try again in a few minutes.",
+          error: deliveryErrorMessage(sent.status, sent.snippet),
         },
         503,
         rateLimitHeaders(rl)

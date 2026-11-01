@@ -42,6 +42,9 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   if (m.includes("temporarily unavailable") && context === "signup") {
     return "Signup is temporarily unavailable. Please try again in a few minutes.";
   }
+  if (m.includes("sending domain is not verified") || m.includes("could not deliver the confirmation email")) {
+    return "We could not deliver a confirmation email to that address. Try again in a minute, or use a different email.";
+  }
   if (
     m.includes("disposable email") ||
     m.includes("email provider is not allowed") ||

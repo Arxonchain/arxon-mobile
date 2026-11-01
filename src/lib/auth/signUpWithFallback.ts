@@ -15,10 +15,6 @@ function toError(e: unknown, fallback = "Sign up failed"): Error {
   return new Error(fallback);
 }
 
-function functionMissing(message: string): boolean {
-  return /not found|404|function not found|failed to send a request/i.test(message);
-}
-
 async function invokeBody(
   error: unknown,
   data: unknown
@@ -52,10 +48,9 @@ async function invokeBody(
 }
 
 /**
- * Sign up via branded auth-signup (admin create + Resend).
- * Turnstile is verified in the edge function. GoTrue SMTP is only a fallback
- * if the function is missing — it is what produced false "email already
- * requested" toasts when Auth rate-limited a mailer that never delivered.
+ * Sign up only via branded auth-signup (admin create + Resend to the address
+ * the user typed). Never fall back to GoTrue SMTP — that path returns success
+ * without delivering mail.
  */
 export async function signUpWithFallback(
   supabase: SupabaseClient,
@@ -101,57 +96,11 @@ export async function signUpWithFallback(
     }
 
     const raw = parsed.message || error?.message || "Sign up failed";
-    if (error && functionMissing(raw)) {
-      return goTrueSignUp(supabase, normalizedEmail, password, ref, token);
-    }
-
     if (parsed.code === "already_registered" || /already exists|already registered|please log in/i.test(raw)) {
       return { error: new Error(ALREADY_REGISTERED), user: null };
     }
 
     return { error: new Error(mapAuthError(raw, "signup")), user: null };
-  } catch (e) {
-    const msg = toError(e).message;
-    if (functionMissing(msg)) {
-      return goTrueSignUp(supabase, normalizedEmail, password, ref, token);
-    }
-    return { error: new Error(mapAuthError(msg, "signup")), user: null };
-  }
-}
-
-async function goTrueSignUp(
-  supabase: SupabaseClient,
-  email: string,
-  password: string,
-  ref: string,
-  token: string
-): Promise<SignUpResult> {
-  try {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: getEmailConfirmRedirectUrl(),
-        ...(token ? { captchaToken: token } : {}),
-        ...(ref ? { data: { referred_by_code: ref } } : {}),
-      },
-    });
-
-    if (error) {
-      const msg = error.message || "Sign up failed";
-      if (/already exists|already registered|user already/i.test(msg)) {
-        return { error: new Error(ALREADY_REGISTERED), user: null };
-      }
-      return { error: new Error(mapAuthError(msg, "signup")), user: null };
-    }
-
-    const identities = data.user?.identities;
-    if (Array.isArray(identities) && identities.length === 0) {
-      return { error: new Error(ALREADY_REGISTERED), user: null };
-    }
-
-    await supabase.auth.signOut({ scope: "local" }).catch(() => {});
-    return { error: null, user: data.user ?? null };
   } catch (e) {
     return { error: new Error(mapAuthError(toError(e).message, "signup")), user: null };
   }
