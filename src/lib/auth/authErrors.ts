@@ -60,7 +60,7 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
     return "We could not finish creating your account. Wait a few seconds, complete a fresh security check, then try again. If it still fails, try without a referral code first.";
   }
   if (m.includes("over_email_send_rate_limit") || m.includes("email rate limit")) {
-    return "A confirmation email was already requested. Wait a minute, then try again (check spam too).";
+    return "We could not send a confirmation email just now. Wait a minute, complete a fresh security check, then try Create Account again.";
   }
   if (m.includes("rate limit") || m.includes("too many") || m.includes("429")) {
     return "Too many attempts from this connection. Wait a minute, complete a fresh security check, then try once more.";
@@ -68,8 +68,11 @@ export function mapAuthError(message: string, context: "signin" | "signup" | "re
   if (m.includes("password") && (m.includes("weak") || m.includes("short"))) {
     return message;
   }
-  if (m.includes("network") || m.includes("failed to fetch") || m.includes("edge function")) {
+  if (m.includes("network") || m.includes("failed to fetch")) {
     return "Connection failed. Please check your internet and try again.";
+  }
+  if (m.includes("non-2xx") || m.includes("edge function")) {
+    return "Sign up failed. Complete a fresh security check, then try Create Account again.";
   }
   if (m.includes("server busy") || m.includes("503") || m.includes("502") || m.includes("gateway")) {
     return "Our servers are temporarily overloaded. Please wait a moment and try again.";

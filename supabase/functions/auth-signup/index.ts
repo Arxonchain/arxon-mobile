@@ -6,15 +6,21 @@ import {
 } from "../_shared/rateLimiter.ts";
 import { checkRateLimitDurableKey } from "../_shared/rateLimiterDb.ts";
 import { getSignupEmailRejection } from "../_shared/signupEmailPolicy.ts";
+import {
+  turnstileFailureMessage,
+  verifyTurnstile,
+} from "../_shared/verifyTurnstile.ts";
 
 /**
  * Branded signup:
- * 1) Admin createUser (no Auth mailer / no *.supabase.co verify link)
- * 2) admin/generate_link → hashed_token
- * 3) Resend HTTP with https://{site}/auth/confirm?token_hash&type=signup
+ * 1) Verify Turnstile
+ * 2) Admin createUser (no Auth mailer / no *.supabase.co verify link)
+ * 3) If the email already exists but is unconfirmed, reuse it and resend
+ * 4) admin/generate_link → hashed_token
+ * 5) Resend HTTP with https://{site}/auth/confirm?token_hash&type=signup
  *
- * Secrets: SUPABASE_SERVICE_ROLE_KEY (auto), RESEND_API_KEY
- * Optional: RESEND_FROM_EMAIL, PUBLIC_SITE_URL, TURNSTILE_SECRET_KEY
+ * Secrets: SUPABASE_SERVICE_ROLE_KEY (auto), RESEND_API_KEY, TURNSTILE_SECRET_KEY
+ * Optional: RESEND_FROM_EMAIL, PUBLIC_SITE_URL
  */
 
 const corsHeaders = {
@@ -30,6 +36,13 @@ type SignupBody = {
   referral_code?: unknown;
   captcha_token?: unknown;
   redirect_to?: unknown;
+};
+
+type AuthUser = {
+  id?: unknown;
+  email?: unknown;
+  email_confirmed_at?: unknown;
+  confirmed_at?: unknown;
 };
 
 function jsonResponse(
@@ -76,6 +89,25 @@ function brandedConfirmUrl(base: string, tokenHash: string, type: string): strin
   u.searchParams.set("token_hash", tokenHash);
   u.searchParams.set("type", type);
   return u.toString();
+}
+
+function adminHeaders(serviceRole: string): HeadersInit {
+  return {
+    apikey: serviceRole,
+    Authorization: `Bearer ${serviceRole}`,
+    "Content-Type": "application/json",
+  };
+}
+
+function isConfirmed(user: AuthUser | null): boolean {
+  if (!user) return false;
+  return Boolean(user.email_confirmed_at || user.confirmed_at);
+}
+
+function errorText(json: Record<string, unknown> | null, raw: string): string {
+  return String(
+    json?.msg || json?.error_description || json?.error || raw || ""
+  );
 }
 
 /**
@@ -128,6 +160,55 @@ async function sendBrandedEmail(opts: {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function parseJson(
+  res: Response
+): Promise<{ raw: string; json: Record<string, unknown> | null }> {
+  const raw = await res.text().catch(() => "");
+  let json: Record<string, unknown> | null = null;
+  try {
+    json = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
+  } catch {
+    json = null;
+  }
+  return { raw, json };
+}
+
+async function findUserByEmail(
+  supabaseUrl: string,
+  serviceRole: string,
+  email: string
+): Promise<AuthUser | null> {
+  const res = await fetch(
+    `${supabaseUrl}/auth/v1/admin/users?page=1&per_page=200&email=${encodeURIComponent(email)}`,
+    { headers: adminHeaders(serviceRole) }
+  );
+  const { json } = await parseJson(res);
+  const users = Array.isArray(json?.users) ? (json.users as AuthUser[]) : [];
+  const hit =
+    users.find(
+      (u) => String(u.email || "").trim().toLowerCase() === email
+    ) || null;
+  if (hit) return hit;
+
+  // Some GoTrue versions return a single user object for ?email=
+  if (json && String(json.email || "").trim().toLowerCase() === email) {
+    return json as AuthUser;
+  }
+  return null;
+}
+
+async function deleteUser(
+  supabaseUrl: string,
+  serviceRole: string,
+  userId: string
+): Promise<void> {
+  if (!userId) return;
+  await fetch(`${supabaseUrl}/auth/v1/admin/users/${userId}`, {
+    method: "DELETE",
+    headers: adminHeaders(serviceRole),
+  }).catch(() => {});
 }
 
 serve(async (req) => {
@@ -199,11 +280,23 @@ serve(async (req) => {
       );
     }
 
-    // Turnstile is enforced by GoTrue on the client signUp path (Attack Protection secret).
-    // Legacy callers may still POST captcha_token; it is ignored here to avoid a separate
-    // Edge Functions TURNSTILE_SECRET_KEY that often diverges from Auth settings.
-    if (captchaToken) {
-      console.log("auth-signup: captcha_token ignored (use GoTrue signUp captchaToken)");
+    const captcha = await verifyTurnstile(captchaToken, ip, {
+      failClosed: true,
+      logPrefix: "auth-signup",
+    });
+    if (!captcha.ok) {
+      return jsonResponse(
+        {
+          success: false,
+          error: turnstileFailureMessage(captcha.code),
+          code:
+            captcha.code === "missing_secret"
+              ? "captcha_misconfigured"
+              : "captcha_failed",
+        },
+        captcha.code === "missing_secret" ? 503 : 400,
+        rateLimitHeaders(rl)
+      );
     }
 
     const SUPABASE_URL = (Deno.env.get("SUPABASE_URL") || "").trim().replace(/\/$/, "");
@@ -220,43 +313,101 @@ serve(async (req) => {
     const confirmBase = allowedConfirmBase(
       redirectTo || Deno.env.get("PUBLIC_SITE_URL") || "https://arxonchain.xyz/auth/confirm"
     );
+    const metadata = referralCode ? { referred_by_code: referralCode } : undefined;
 
     // 1) Create user without sending Auth's default ConfirmationURL email.
     const createRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: "POST",
-      headers: {
-        apikey: SERVICE_ROLE,
-        Authorization: `Bearer ${SERVICE_ROLE}`,
-        "Content-Type": "application/json",
-      },
+      headers: adminHeaders(SERVICE_ROLE),
       body: JSON.stringify({
         email,
         password,
         email_confirm: false,
-        user_metadata: referralCode ? { referred_by_code: referralCode } : undefined,
+        user_metadata: metadata,
       }),
     });
-    const createRaw = await createRes.text().catch(() => "");
-    let createJson: Record<string, unknown> | null = null;
-    try {
-      createJson = createRaw ? JSON.parse(createRaw) : null;
-    } catch {
-      createJson = null;
+    const createParsed = await parseJson(createRes);
+    const createJson = createParsed.json;
+    const createMsg = errorText(createJson, createParsed.raw).toLowerCase();
+    const alreadyExists =
+      !createRes.ok &&
+      (createRes.status === 422 ||
+        createMsg.includes("already") ||
+        createMsg.includes("registered") ||
+        createMsg.includes("exists"));
+
+    let userId = createRes.ok ? String(createJson?.id || "") : "";
+    let createdNew = createRes.ok && !!userId;
+    let userPayload: Record<string, unknown> | null = createRes.ok ? createJson : null;
+
+    if (!createRes.ok && !alreadyExists) {
+      console.error("auth-signup createUser failed", {
+        status: createRes.status,
+        snippet: createParsed.raw.slice(0, 240),
+      });
+      return jsonResponse(
+        { success: false, error: "Sign up failed. Please try again." },
+        400,
+        rateLimitHeaders(rl)
+      );
     }
 
-    if (!createRes.ok) {
-      const msg = String(
-        createJson?.msg ||
-          createJson?.error_description ||
-          createJson?.error ||
-          createRaw ||
-          "Sign up failed"
-      ).toLowerCase();
+    if (alreadyExists) {
+      const existing = await findUserByEmail(SUPABASE_URL, SERVICE_ROLE, email);
+      if (isConfirmed(existing)) {
+        return jsonResponse(
+          {
+            success: false,
+            error: "An account already exists with this email — please log in.",
+            code: "already_registered",
+          },
+          422,
+          rateLimitHeaders(rl)
+        );
+      }
+      userId = existing?.id ? String(existing.id) : "";
+      createdNew = false;
+      userPayload = (existing as Record<string, unknown>) || null;
+
+      if (userId) {
+        await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
+          method: "PUT",
+          headers: adminHeaders(SERVICE_ROLE),
+          body: JSON.stringify({
+            password,
+            ...(metadata ? { user_metadata: metadata } : {}),
+          }),
+        }).catch(() => {});
+      }
+    }
+
+    // 2) Generate token_hash without sending mail.
+    const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
+      method: "POST",
+      headers: adminHeaders(SERVICE_ROLE),
+      body: JSON.stringify({
+        type: "signup",
+        email,
+        password,
+        redirect_to: confirmBase,
+      }),
+    });
+    const linkParsed = await parseJson(linkRes);
+    const linkJson = linkParsed.json;
+    const properties =
+      linkJson?.properties && typeof linkJson.properties === "object"
+        ? (linkJson.properties as Record<string, unknown>)
+        : null;
+    const hashedToken = String(
+      linkJson?.hashed_token || properties?.hashed_token || ""
+    );
+    const linkMsg = errorText(linkJson, linkParsed.raw).toLowerCase();
+
+    if (!linkRes.ok || !hashedToken) {
       if (
-        createRes.status === 422 ||
-        msg.includes("already") ||
-        msg.includes("registered") ||
-        msg.includes("exists")
+        linkMsg.includes("already") ||
+        linkMsg.includes("registered") ||
+        linkMsg.includes("confirmed")
       ) {
         return jsonResponse(
           {
@@ -268,60 +419,18 @@ serve(async (req) => {
           rateLimitHeaders(rl)
         );
       }
-      console.error("auth-signup createUser failed", {
-        status: createRes.status,
-        snippet: createRaw.slice(0, 240),
-      });
-      return jsonResponse(
-        { success: false, error: "Sign up failed. Please try again." },
-        400,
-        rateLimitHeaders(rl)
-      );
-    }
-
-    const userId = String(createJson?.id || "");
-
-    // 2) Generate token_hash without sending mail.
-    const linkRes = await fetch(`${SUPABASE_URL}/auth/v1/admin/generate_link`, {
-      method: "POST",
-      headers: {
-        apikey: SERVICE_ROLE,
-        Authorization: `Bearer ${SERVICE_ROLE}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        type: "signup",
-        email,
-        password,
-        redirect_to: confirmBase,
-      }),
-    });
-    const linkRaw = await linkRes.text().catch(() => "");
-    let linkJson: Record<string, unknown> | null = null;
-    try {
-      linkJson = linkRaw ? JSON.parse(linkRaw) : null;
-    } catch {
-      linkJson = null;
-    }
-    const hashedToken = String(linkJson?.hashed_token || "");
-    if (!linkRes.ok || !hashedToken) {
       console.error("auth-signup generate_link failed", {
         status: linkRes.status,
-        snippet: linkRaw.slice(0, 240),
+        snippet: linkParsed.raw.slice(0, 240),
       });
-      if (userId) {
-        await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-          method: "DELETE",
-          headers: {
-            apikey: SERVICE_ROLE,
-            Authorization: `Bearer ${SERVICE_ROLE}`,
-          },
-        }).catch(() => {});
+      if (createdNew && userId) {
+        await deleteUser(SUPABASE_URL, SERVICE_ROLE, userId);
       }
       return jsonResponse(
         {
           success: false,
-          error: "Email delivery is temporarily unavailable. Please try again in a few minutes.",
+          error:
+            "We could not send a confirmation email. Please try again in a few minutes.",
         },
         503,
         rateLimitHeaders(rl)
@@ -339,6 +448,9 @@ serve(async (req) => {
     // Never ship supabase.co verify links.
     if (linkHost.endsWith("supabase.co")) {
       console.error("auth-signup refused supabase host in confirm link", { linkHost });
+      if (createdNew && userId) {
+        await deleteUser(SUPABASE_URL, SERVICE_ROLE, userId);
+      }
       return jsonResponse(
         { success: false, error: "Server misconfigured" },
         500,
@@ -360,30 +472,26 @@ serve(async (req) => {
       subject: "Confirm your Arxon account",
       html,
       text,
-      purpose: "signup_confirm",
+      purpose: createdNew ? "signup_confirm" : "signup_confirm_resend",
     });
 
     console.log("auth-signup branded mail", {
       ok: sent.ok,
       status: sent.status,
       linkHost,
+      createdNew,
       snippet: sent.snippet.slice(0, 120),
     });
 
     if (!sent.ok) {
-      if (userId) {
-        await fetch(`${SUPABASE_URL}/auth/v1/admin/users/${userId}`, {
-          method: "DELETE",
-          headers: {
-            apikey: SERVICE_ROLE,
-            Authorization: `Bearer ${SERVICE_ROLE}`,
-          },
-        }).catch(() => {});
+      if (createdNew && userId) {
+        await deleteUser(SUPABASE_URL, SERVICE_ROLE, userId);
       }
       return jsonResponse(
         {
           success: false,
-          error: "Email delivery is temporarily unavailable. Please try again in a few minutes.",
+          error:
+            "We could not send a confirmation email. Please try again in a few minutes.",
         },
         503,
         rateLimitHeaders(rl)
@@ -395,7 +503,7 @@ serve(async (req) => {
         success: true,
         checkEmail: true,
         message: "Check your email to confirm your account.",
-        user: createJson,
+        user: userPayload,
       },
       200,
       rateLimitHeaders(rl)
