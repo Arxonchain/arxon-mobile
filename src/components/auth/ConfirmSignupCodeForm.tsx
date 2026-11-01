@@ -55,10 +55,11 @@ export default function ConfirmSignupCodeForm({
           id="confirm-code"
           inputMode="numeric"
           autoComplete="one-time-code"
-          placeholder="6-digit code from the email"
+          placeholder="8-digit code from the email"
           value={code}
           onChange={(e) => onCodeChange(e.target.value.replace(/\s/g, ""))}
           className="tracking-[0.3em] text-center text-lg bg-black/20 border-cyan-400/20"
+          maxLength={8}
           required
           disabled={loading}
         />
