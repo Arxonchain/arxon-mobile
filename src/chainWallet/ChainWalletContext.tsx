@@ -11,7 +11,7 @@ import {
 import { formatEther, parseEther, type Address } from 'viem';
 
 import { pushActivity, saveClocks } from './activity';
-import { assertKnownAnchor, DEFAULT_RPC, PRECOMPILE, publicClient, waitIncluded, walletClient } from './chain';
+import { assertKnownAnchor, DEFAULT_RPC, liveRpcUrl, PRECOMPILE, publicClient, waitIncluded, walletClient } from './chain';
 import {
   startClocks,
   stampInBlock,
@@ -238,11 +238,8 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       setLocked(needsLock);
       if (plain && !needsLock) setMnemonic(plain);
       if (isWalletNetworkId(storedNetwork)) setNetworkState(storedNetwork);
-      let rpc = storedRpc;
-      if (rpc && rpc.includes('trycloudflare.com')) {
-        rpc = DEFAULT_RPC;
-        await storage.setRpc(rpc);
-      }
+      let rpc = liveRpcUrl(storedRpc);
+      if (rpc !== storedRpc) await storage.setRpc(rpc);
       if (rpc) setRpc(rpc);
       setNotes(await loadNotes());
       setReady(true);
@@ -372,7 +369,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setRpcUrl = useCallback(async (url: string) => {
-    const next = url.trim() || DEFAULT_RPC;
+    const next = liveRpcUrl(url);
     await storage.setRpc(next);
     setRpc(next);
     return next;

@@ -41,7 +41,7 @@ const WC_METHODS = [
 const METADATA = {
   name: 'Arxon',
   description: 'Arxon wallet · chain 7171',
-  url: 'https://arxon.io',
+  url: 'https://arxonchain.xyz',
   icons: [] as string[],
 };
 

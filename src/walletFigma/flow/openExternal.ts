@@ -1,7 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 import { NETWORKS, type WalletNetworkId } from '@/chainWallet/networks';
 
-export const HELP_URL = 'https://arxon.io';
+export const HELP_URL = 'https://arxonchain.xyz';
 export const TERMS_URL = 'https://arxonchain.xyz/terms';
 export const PRIVACY_URL = 'https://arxonchain.xyz/privacy';
 export const SUPPORT_EMAIL = 'security@arxonchain.xyz';

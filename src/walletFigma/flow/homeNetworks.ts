@@ -52,10 +52,23 @@ function host(url: string) {
   }
 }
 
+function migrateHost(url?: string) {
+  return url ? url.replace(/arxon\.io/gi, 'arxonchain.xyz') : url;
+}
+
 function readCustom(): HomeNetwork[] {
   try {
     const rows = JSON.parse(localStorage.getItem(CUSTOM_KEY) || '[]');
-    return Array.isArray(rows) ? rows.filter((row) => row && typeof row.id === 'string' && (row.scope === 'mainnet' || row.scope === 'testnet')) : [];
+    if (!Array.isArray(rows)) return [];
+    let dirty = false;
+    const next = rows.filter((row) => row && typeof row.id === 'string' && (row.scope === 'mainnet' || row.scope === 'testnet')).map((row) => {
+      const rpc = migrateHost(row.rpc);
+      const explorer = migrateHost(row.explorer);
+      if (rpc !== row.rpc || explorer !== row.explorer) dirty = true;
+      return { ...row, rpc, explorer };
+    });
+    if (dirty) localStorage.setItem(CUSTOM_KEY, JSON.stringify(next));
+    return next;
   } catch {
     return [];
   }
@@ -80,7 +93,7 @@ export function pickNetwork(scope: WalletNet, id: string) {
 export function scopeFor(form: NetworkForm, from: WalletNet): WalletNet {
   const chain = form.chain.trim();
   const rpc = form.rpc.trim();
-  if (chain === String(ARXON.id) || rpc.includes('rpc-test.arxon.io') || /arxon/i.test(form.name)) return 'testnet';
+  if (chain === String(ARXON.id) || rpc.includes('rpc-test.arxon') || /arxon/i.test(form.name)) return 'testnet';
   return from;
 }
 

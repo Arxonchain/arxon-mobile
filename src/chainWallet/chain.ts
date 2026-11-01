@@ -5,14 +5,22 @@ export const ARXON = defineChain({
   id: 7171,
   name: 'Arxon Testnet',
   nativeCurrency: { name: 'tARX', symbol: 'tARX', decimals: 18 },
-  rpcUrls: { default: { http: ['https://rpc-test.arxon.io'] } },
+  rpcUrls: { default: { http: ['https://rpc-test.arxonchain.xyz'] } },
 });
 
 export const ARXON_CAIP = 'eip155:7171';
 export const ARXON_CHAIN_ID_HEX = '0x1c03';
-export const DEFAULT_RPC = 'https://rpc-test.arxon.io';
-export const START_URL = 'https://rpc-test.arxon.io/start/';
-export const SCAN_URL = 'https://scan.arxon.io';
+export const DEFAULT_RPC = 'https://rpc-test.arxonchain.xyz';
+export const START_URL = 'https://rpc-test.arxonchain.xyz/start/';
+export const SCAN_URL = 'https://scan.arxonchain.xyz';
+
+/** Old arxon.io hosts are dead; keep saved RPCs on the live domain. */
+export function liveRpcUrl(url: string | null | undefined) {
+  const next = (url || '').trim();
+  if (!next) return DEFAULT_RPC;
+  if (/trycloudflare\.com/i.test(next) || /\barxon\.io\b/i.test(next)) return DEFAULT_RPC;
+  return next;
+}
 
 export const PRECOMPILE = {
   view: '0x0000000000000000000000000000000000000800' as const,

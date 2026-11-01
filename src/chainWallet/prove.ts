@@ -1,8 +1,8 @@
 import { Capacitor } from '@capacitor/core';
 
 export const PROVE_URL = 'http://127.0.0.1:17871';
-const WASM_JS_REMOTE = 'https://rpc-test.arxon.io/prove/arxon_prove.js';
-const WASM_BIN_REMOTE = 'https://rpc-test.arxon.io/prove/arxon_prove_bg.wasm';
+const WASM_JS_REMOTE = 'https://rpc-test.arxonchain.xyz/prove/arxon_prove.js';
+const WASM_BIN_REMOTE = 'https://rpc-test.arxonchain.xyz/prove/arxon_prove_bg.wasm';
 
 function localProve(name: string) {
   const base = (import.meta.env.BASE_URL || './').replace(/\/?$/, '/');

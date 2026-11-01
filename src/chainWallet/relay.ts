@@ -9,7 +9,7 @@ export function relayUrl(rpcUrl: string): string | null {
   const base = (rpcUrl.trim() || DEFAULT_RPC).replace(/\/$/, '');
   try {
     const host = new URL(base).hostname.toLowerCase();
-    if (host === 'rpc-test.arxon.io') return `${base}/relay`;
+    if (host === 'rpc-test.arxonchain.xyz') return `${base}/relay`;
   } catch {
     return null;
   }

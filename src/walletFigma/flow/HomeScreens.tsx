@@ -376,7 +376,7 @@ function TestnetHome({ go }: { id: string; go: Go; back?: () => void; behind?: s
             <button type="button" onClick={() => void addNetwork()} style={ctaCard}>
               <FigmaImg src={art('plus.svg')} width={18} height={18} />
               <span style={{ fontSize: 16, fontWeight: 700, textAlign: 'left' }}>Add Arxon Testnet</span>
-              <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.4 }}>Chain 7171 · rpc-test.arxon.io. Tokens stay hidden until you add this network.</span>
+              <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.4 }}>Chain 7171 · rpc-test.arxonchain.xyz. Tokens stay hidden until you add this network.</span>
             </button>
             <button type="button" onClick={openFaucet} style={ghostBtn}>Faucet · tARX</button>
             <button type="button" onClick={() => go('add-network')} style={ghostBtn}>Custom RPC</button>

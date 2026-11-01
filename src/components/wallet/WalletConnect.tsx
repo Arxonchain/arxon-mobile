@@ -67,7 +67,7 @@ export default function WalletConnect() {
       </button>
       <h1 style={{ fontSize: 26, fontWeight: 700, margin: '12px 0 8px' }}>Connect</h1>
       <p style={{ fontSize: 13, color: 'hsl(215 14% 48%)', lineHeight: 1.5, marginBottom: 16 }}>
-        Paste a WalletConnect Project ID from cloud.reown.com, then paste the wc: URI from the dapp (try https://app.arxon.io). Chain 7171.
+        Paste a WalletConnect Project ID from cloud.reown.com, then paste the wc: URI from the dapp (try https://app.arxonchain.xyz). Chain 7171.
       </p>
       {error || localErr ? <p style={{ color: 'hsl(0 70% 62%)', fontSize: 13, marginBottom: 12 }}>{localErr || error}</p> : null}
 
