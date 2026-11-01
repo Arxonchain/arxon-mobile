@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Loader2, CheckCircle2, XCircle } from "lucide-react";
 import OtpEmailPrompt from "@/components/auth/OtpEmailPrompt";
+import ConfirmSignupCodeForm from "@/components/auth/ConfirmSignupCodeForm";
+import { confirmSignupWithCode } from "@/lib/auth/confirmSignupOtp";
 import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
 import { markPasswordRecovery } from "@/lib/auth/passwordRecoveryGate";
 import { takeStashedAuthCallbackHash } from "@/lib/auth/parseAuthAppLink";
@@ -24,6 +26,9 @@ const AuthConfirm = () => {
   const [otpType, setOtpType] = useState<string | null>(null);
   const [otpNext, setOtpNext] = useState<string>("/");
   const [otpError, setOtpError] = useState<string | null>(null);
+  const [manualEmail, setManualEmail] = useState("");
+  const [manualCode, setManualCode] = useState("");
+  const [manualError, setManualError] = useState<string | null>(null);
 
   // Helper: apply referral then navigate — used on every successful signup confirmation
   const applyReferralAndNavigate = async (destination: string) => {
@@ -351,6 +356,21 @@ const AuthConfirm = () => {
     await applyReferralAndNavigate(otpNext || "/");
   };
 
+  const handleManualCode = async () => {
+    setManualError(null);
+    setStatus("loading");
+    setMessage("Verifying code...");
+    const { error } = await confirmSignupWithCode(manualEmail, manualCode);
+    if (error) {
+      setManualError(error.message || "That code did not work. Check the email and try again.");
+      setStatus("error");
+      return;
+    }
+    setStatus("success");
+    setMessage("Email confirmed! Redirecting...");
+    await applyReferralAndNavigate("/");
+  };
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-card border border-border rounded-xl p-8 text-center space-y-4">
@@ -379,19 +399,20 @@ const AuthConfirm = () => {
           <>
             <XCircle className="h-12 w-12 text-destructive mx-auto" />
             <h1 className="text-xl font-semibold text-foreground">{message}</h1>
-            <button
-              onClick={() => navigate("/auth?mode=forgot")}
-              className="text-primary hover:underline"
-            >
-              Request a new link
-            </button>
-            <br />
-            <button
-              onClick={() => navigate("/auth")}
-              className="text-muted-foreground hover:underline text-sm"
-            >
-              Back to login
-            </button>
+            <p className="text-sm text-muted-foreground">
+              Or enter the confirmation code from the email.
+            </p>
+            <ConfirmSignupCodeForm
+              email={manualEmail}
+              code={manualCode}
+              errorText={manualError}
+              onEmailChange={setManualEmail}
+              onCodeChange={setManualCode}
+              onSubmit={() => {
+                void handleManualCode();
+              }}
+              onBack={() => navigate("/auth")}
+            />
           </>
         )}
       </div>

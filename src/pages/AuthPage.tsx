@@ -10,6 +10,9 @@ import arxonLogo from '@/assets/arxon-icon.svg';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
 import { captchaStaleMessage, isCaptchaTokenStale } from '@/lib/auth/captchaToken';
+import ConfirmSignupCodeForm from '@/components/auth/ConfirmSignupCodeForm';
+import { confirmSignupWithCode } from '@/lib/auth/confirmSignupOtp';
+import { Capacitor } from '@capacitor/core';
 
 // FIX BUG-23 + BUG-25 + BUG-28:
 // - This is the ONLY auth page used in routes (AuthPage.tsx). Auth.tsx is dead.
@@ -18,7 +21,7 @@ import { captchaStaleMessage, isCaptchaTokenStale } from '@/lib/auth/captchaToke
 // - Fixed: referral code saved to both localStorage AND sessionStorage on signup
 // - Fixed: applyPendingReferralCode called after email confirm (AuthConfirm handles it)
 
-type AuthMode = 'signin' | 'signup' | 'forgot';
+type AuthMode = 'signin' | 'signup' | 'forgot' | 'confirm';
 
 function isAlreadyRegisteredError(message?: string) {
   const m = (message || '').toLowerCase();
@@ -39,6 +42,8 @@ export default function AuthPage() {
   const [captchaToken,    setCaptchaToken]    = useState<string | null>(null);
   const [captchaVerifiedAt, setCaptchaVerifiedAt] = useState<number | null>(null);
   const [captchaResetKey, setCaptchaResetKey] = useState(0);
+  const [confirmCode, setConfirmCode] = useState('');
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const { signIn, signUp, resetPassword } = useAuth();
   const captchaRequired = isTurnstileConfigured();
@@ -97,6 +102,24 @@ export default function AuthPage() {
       }
     }
 
+    if (mode === 'confirm') {
+      setLoading(true);
+      setConfirmError(null);
+      try {
+        const { error } = await confirmSignupWithCode(email, confirmCode);
+        if (error) {
+          setConfirmError(error.message || 'That code did not work. Check the email and try again.');
+          return;
+        }
+        try { await applyPendingReferralCode(); } catch {}
+        toast({ title: 'Email confirmed', description: 'You are signed in.' });
+        navigate(Capacitor.isNativePlatform() ? '/mine' : '/');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     const token = captchaToken?.trim() || '';
     if (captchaRequired && !token) {
       toast({
@@ -149,18 +172,36 @@ export default function AuthPage() {
 
         try { await applyPendingReferralCode(); } catch {}
 
-        toast({
-          title: 'Check your email',
-          description: newUser?.email_confirmed_at
-            ? 'You can sign in with your email and password.'
-            : 'We sent a confirmation link. Open it to activate your account (check spam too).',
-        });
-        setMode('signin');
+        if (newUser?.email_confirmed_at) {
+          toast({
+            title: 'Account ready',
+            description: 'You can sign in with your email and password.',
+          });
+          setMode('signin');
+        } else {
+          setConfirmCode('');
+          setConfirmError(null);
+          setMode('confirm');
+          toast({
+            title: 'Check your email',
+            description: 'Enter the confirmation code we sent, or open the link in that email.',
+          });
+        }
 
       } else if (mode === 'signin') {
         const { error } = await signIn(email, password, token || undefined);
         if (error) {
           authFailed = true;
+          if (/email not confirmed/i.test(error.message || '')) {
+            setConfirmCode('');
+            setConfirmError(null);
+            setMode('confirm');
+            toast({
+              title: 'Confirm your email first',
+              description: 'Enter the code from the confirmation email.',
+            });
+            return;
+          }
           throw error;
         }
         navigate('/');
@@ -217,13 +258,29 @@ export default function AuthPage() {
             {mode === 'signin' && 'Welcome Back'}
             {mode === 'signup' && 'Create Account'}
             {mode === 'forgot' && 'Reset Password'}
+            {mode === 'confirm' && 'Confirm your email'}
           </h1>
           <p className="text-muted-foreground text-center mb-8">
             {mode === 'signin' && 'Sign in to start mining ARX-P'}
             {mode === 'signup' && 'Join Arxon and start earning'}
             {mode === 'forgot' && 'Enter your email to reset password'}
+            {mode === 'confirm' && 'Paste the code from the email (you can also open the link instead).'}
           </p>
 
+          {mode === 'confirm' ? (
+            <ConfirmSignupCodeForm
+              email={email}
+              code={confirmCode}
+              loading={loading}
+              errorText={confirmError}
+              onEmailChange={setEmail}
+              onCodeChange={setConfirmCode}
+              onSubmit={() => {
+                void handleSubmit({ preventDefault() {} } as React.FormEvent);
+              }}
+              onBack={() => setMode('signin')}
+            />
+          ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div className="space-y-2">
@@ -364,6 +421,7 @@ export default function AuthPage() {
                 : 'Send Reset Link'}
             </Button>
           </form>
+          )}
 
           {/* Mode switcher */}
           <div className="mt-6 text-center">
@@ -375,7 +433,7 @@ export default function AuthPage() {
                 <ArrowLeft className="h-4 w-4" />
                 Back to sign in
               </button>
-            ) : (
+            ) : mode === 'confirm' ? null : (
               <p className="text-sm text-muted-foreground">
                 {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
                 <button
