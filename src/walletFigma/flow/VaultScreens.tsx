@@ -15,6 +15,7 @@ import { usePullRefresh } from './pullRefresh';
 import { NetworkSheet } from './ReceiveScreens';
 import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { briefAddr } from './briefAddr';
+import { plainTxError } from '@/chainWallet/txError';
 import { TestnetHistory } from './TestnetHistory';
 import { availableBox } from './LiveScroll';
 import { AccountSheet, type AccountSheetMode } from './AccountSheet';
@@ -436,10 +437,10 @@ function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: strin
           const mode = shielding ? 'vault' : paying ? 'private' : 'unshield';
           void live.send(token, to, amount, true, mode, mask)
             .then(() => { if (alive.current && !advanced.current) { advanced.current = true; go(shielding ? 'vault-done' : paying ? 'priv-done' : 'unshield-done', false); } })
-            .catch((e: unknown) => { if (alive.current) setErr(e instanceof Error ? e.message : 'Vault send failed'); })
+            .catch((e: unknown) => { if (alive.current) setErr(plainTxError(e)); })
             .finally(() => { if (alive.current) setBusy(false); });
         }} />
-        <button type="button" onClick={leave} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
+        <button type="button" onClick={() => { live?.clearFlight(); leave(); }} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
       </div>
     </div>
   );

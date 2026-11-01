@@ -42,6 +42,20 @@ export async function solanaTokenBalance(owner: string, mint: string) {
   }
 }
 
+/** Fee in SOL. A new USDT or USDC receiver also needs the token-account rent. */
+export async function quoteSolanaFee(from: string, to: string, kind: 'SOL' | 'USDT' | 'USDC') {
+  const base = 5_000 / 1e9;
+  if (kind === 'SOL' || !from || !to) return base;
+  try {
+    const mint = new PublicKey(kind === 'USDT' ? SOL_USDT : SOL_USDC);
+    const toAta = await getAssociatedTokenAddress(mint, new PublicKey(to));
+    const existing = await connection().getAccountInfo(toAta);
+    return existing ? base : base + 0.00203928;
+  } catch {
+    return base;
+  }
+}
+
 /** Sign and broadcast native SOL from the wallet's Solana address. */
 export async function sendSolana(mnemonic: string, index: number, to: string, amount: string) {
   const signer = await solanaSigner(mnemonic, index);

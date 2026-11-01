@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { Capacitor } from '@capacitor/core';
 import { font } from '@/walletFigma/tokens';
 import { closeInAppBrowse, hostOfBrowse, safeBrowseUrl, subscribeInAppBrowse, usingNativeInAppBrowse } from './inAppBrowse';
 
@@ -21,21 +20,6 @@ export function InAppBrowserHost() {
     setTyped(next || '');
     setLoading(!!next);
   }), []);
-
-  useEffect(() => {
-    if (!url || !Capacitor.isNativePlatform()) return;
-    let handle: { remove: () => Promise<void> } | undefined;
-    void import('@capacitor/app').then(({ App }) =>
-      App.addListener('backButton', () => {
-        closeInAppBrowse();
-      }).then((h) => {
-        handle = h;
-      }),
-    );
-    return () => {
-      void handle?.remove();
-    };
-  }, [url]);
 
   if (!url) return null;
   // Native WebView (MetaMask/Phantom style) draws its own chrome on top of the app.

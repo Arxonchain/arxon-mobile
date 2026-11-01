@@ -40,14 +40,14 @@ export function pickWalletTab(
     return;
   }
   if (tab === 'Explore') {
-    go('explore', false);
+    go('explore');
     return;
   }
   if (tab === 'Market') {
-    go('market', false);
+    go('market');
     return;
   }
-  go('account', false);
+  go('account');
 }
 
 const ACCENT = '#accafe';

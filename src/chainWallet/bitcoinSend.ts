@@ -16,6 +16,20 @@ export async function bitcoinBalance(address: string) {
   return (chain + mempool) / 1e8;
 }
 
+/** Fee in BTC for this amount from the wallet address. Falls back to a one-input fee if the coins cannot cover it. */
+export async function quoteBitcoinFee(address: string, amount: string) {
+  const rate = await feeRate();
+  try {
+    const sats = toBaseUnits(amount, 8);
+    const utxos = await readUtxos(address);
+    const picked = selectUtxos(utxos, sats, rate);
+    const outputs = picked.change > 0n ? 2 : 1;
+    return Number(estimateFee(picked.inputs.length, outputs, rate)) / 1e8;
+  } catch {
+    return Number(estimateFee(1, 2, rate)) / 1e8;
+  }
+}
+
 /** Sign and broadcast a native Bitcoin payment from the wallet's bc1 address. */
 export async function sendBitcoin(mnemonic: string, index: number, to: string, amount: string) {
   const signer = await bitcoinSigner(mnemonic, index);

@@ -126,6 +126,10 @@ export function usingNativeInAppBrowse() {
   return nativeOpen;
 }
 
+export function isBrowseOpen() {
+  return nativeOpen || current != null;
+}
+
 const WALLET_HOSTS = new Set([
   '127.0.0.1',
   'localhost',

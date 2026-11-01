@@ -1,6 +1,7 @@
 import {
   createPublicClient,
   createWalletClient,
+  encodeFunctionData,
   formatEther,
   formatUnits,
   http,
@@ -9,6 +10,7 @@ import {
   type Address,
   type Hex,
 } from 'viem';
+import { plainTxError } from './txError';
 import { resolveAccount } from './keys';
 import { PendingTxError } from './chain';
 
@@ -60,19 +62,33 @@ const USDT_TRANSFER_ABI = [
 ] as const;
 
 function rpcFail(err: unknown): Error {
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/user rejected|denied|rejected the request/i.test(msg)) {
-    return new Error(msg);
+  return new Error(plainTxError(err));
+}
+
+/** Network fee in ETH for a native or USDT/USDC transfer. Uses a typical limit if the node cannot simulate it. */
+export async function quoteEthereumFee(token: EthereumToken, from: Address, to: Address, amount: string): Promise<number> {
+  const client = ethereumPublicClient();
+  const gasPrice = await client.getGasPrice();
+  let gas = token === 'ETH' ? 21_000n : 65_000n;
+  try {
+    if (token === 'ETH') {
+      gas = await client.estimateGas({ account: from, to, value: parseEther(amount || '0') });
+    } else {
+      const meta = ETHEREUM_TOKENS.find((row) => row.symbol === token);
+      if (!meta?.address) throw new Error('Unknown token');
+      const value = parseUnits((amount || '0').trim(), meta.decimals);
+      const data = encodeFunctionData({
+        abi: token === 'USDT' ? USDT_TRANSFER_ABI : ERC20_TRANSFER_ABI,
+        functionName: 'transfer',
+        args: [to, value],
+      });
+      gas = await client.estimateGas({ account: from, to: meta.address, data });
+    }
+  } catch {
+    /* keep the typical limit so the review can still show a fee */
   }
-  if (/insufficient funds|gas required exceeds/i.test(msg)) {
-    return new Error(`Ethereum send failed: ${msg}`);
-  }
-  const timed = /timeout|timed out|abort/i.test(msg);
-  return new Error(
-    timed
-      ? `Ethereum RPC timed out (${ETHEREUM_RPC}). Try again or replace ETHEREUM_RPC.`
-      : `Ethereum RPC failed (${ETHEREUM_RPC}): ${msg}`
-  );
+  const eth = Number(formatEther(gas * gasPrice));
+  return Number.isFinite(eth) ? eth : 0;
 }
 
 export function ethereumPublicClient(rpcUrl = ETHEREUM_RPC) {

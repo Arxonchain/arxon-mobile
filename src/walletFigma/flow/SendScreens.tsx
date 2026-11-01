@@ -1,8 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
+import { getAddress } from 'viem';
 import { PendingTxError } from '@/chainWallet/chain';
+import { quoteBitcoinFee } from '@/chainWallet/bitcoinSend';
+import { quoteEthereumFee } from '@/chainWallet/ethereum';
+import type { EthereumToken } from '@/chainWallet/networks';
 import type { PrivacyFlags } from '@/chainWallet/privacy';
+import { quoteSolanaFee } from '@/chainWallet/solanaSend';
+import { plainTxError } from '@/chainWallet/txError';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
@@ -96,10 +102,13 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const dest = (picked || who).trim();
   const shownTo = live?.app ? dest : picked || 'arx1q8x4…t7c2n4p';
   const numeric = Number(amount);
-  const readyAmount = Number.isFinite(numeric) && numeric > 0;
+  const overBalance = Number.isFinite(numeric) && numeric > available + 1e-9;
+  const readyAmount = Number.isFinite(numeric) && numeric > 0 && !overBalance;
   const shownAmount = readyAmount ? formatAmount(numeric) : live?.app ? '0.00' : '25.00';
-  const unitUsd = live?.app ? liveTokenUsd(live, net, token.id) : rate(token) || (token.id === 'arx' ? 0.42 : 0);
-  const fiat = (readyAmount ? numeric : live?.app ? 0 : 25) * unitUsd;
+  const stableSend = token.id === 'usdt' || token.id === 'usdc';
+  const unitUsd = live?.app ? (live.usdOf(token.symbol) || liveTokenUsd(live, net, token.id)) : rate(token) || (token.id === 'arx' ? 0.42 : 0);
+  const fiat = (readyAmount || overBalance ? numeric : live?.app ? 0 : 25) * unitUsd;
+  const priceLabel = !stableSend && unitUsd > 0 ? (live?.money(fiat) ?? `$${fiat.toFixed(2)}`) : '';
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: id === 'send-qr' ? '#0a0f17' : '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
@@ -149,7 +158,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
           onMax={() => setAmount(rawNum(Math.max(0, live?.app ? available : available - (token.id === 'arx' ? 0.0004 : 0))))}
           onPaste={(text) => setWho(text)}
           ready={readyAmount}
-          fiat={readyAmount ? numeric * unitUsd : 0}
+          priceLabel={priceLabel}
           showChain={stableMainnet}
           chain={stableChain}
           onChain={chooseChain}
@@ -158,7 +167,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
         />
       )}
       {id === 'send-review' && (
-        <Review token={token} to={shownTo} amount={shownAmount} fiat={fiat} priv={privSend} flags={paymentFlags} networkLabel={networkLabel} feeLabel={feeLabel} chain={stableChain} go={go} leave={leave} />
+        <Review token={token} to={shownTo} amount={shownAmount} priceLabel={priceLabel} available={available} priv={privSend} flags={paymentFlags} networkLabel={networkLabel} feeLabel={feeLabel} chain={stableChain} go={go} leave={leave} />
       )}
       {id === 'send-success' && <Success amount={shownAmount} symbol={token.symbol} privateSend={privSend} to={shownTo} feeLabel={feeLabel} go={go} />}
       {id === 'send-privacy' && <Privacy flags={flags} setFlags={setFlags} go={go} leave={leave} />}
@@ -293,14 +302,17 @@ function PickWho({ query, setQuery, picked, symbol, chain, showChain, onChain, o
   );
 }
 
-function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, onMax, onPaste, ready, fiat, showChain, chain, onChain, go, leave }: {
+function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, onMax, onPaste, ready, priceLabel, showChain, chain, onChain, go, leave }: {
   token: (typeof TOKENS)[number]; who: string; amount: string; available: number; vaulted: boolean; flags: boolean[]; onFlag: (index: number) => void;
-  onKey: (key: string) => void; onMax: () => void; onPaste: (text: string) => void; ready: boolean; fiat: number;
+  onKey: (key: string) => void; onMax: () => void; onPaste: (text: string) => void; ready: boolean; priceLabel: string;
   showChain: boolean; chain: StableChain; onChain: (chain: StableChain) => void; go: Go; leave: () => void;
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', '⌫'];
+  const typed = Number(String(amount).replace(/,/g, ''));
+  const over = Number.isFinite(typed) && typed > available + 1e-9;
+  const canReview = ready && !over;
   const privacy = token.id === 'arx' && (!live?.app || net === 'testnet');
   const privacyTop = vaulted ? 412 : 364;
   const keysTop = privacy ? privacyTop + 150 : vaulted ? 486 : 452;
@@ -326,10 +338,11 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
             {showChain ? <ChainPick chain={chain} onChain={onChain} /> : null}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 148 }}>
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
-                <span style={{ fontSize: 44, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
+                <span style={{ fontSize: 44, fontWeight: 700, lineHeight: 1, color: over ? '#f25252' : '#fff' }}>{showAmount(amount)}</span>
                 <span style={{ fontSize: 18, fontWeight: 500, color: '#accafe', marginBottom: 4 }}>{token.symbol}</span>
               </div>
-              <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+              {priceLabel ? <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>≈ {priceLabel}</p> : null}
+              {over ? <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 13, color: '#f25252' }}>Not enough {token.symbol}</p> : null}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
                 <span style={availableBox}>Available {showAvail(available)} {token.symbol}</span>
                 <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44, borderRadius: 0 }}>Max</button>
@@ -366,7 +379,7 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
           </div>
         </div>
         <div style={{ flex: '0 0 auto', padding: '8px 18px 16px' }}>
-          <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...livePrimary, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
+          <button type="button" disabled={!canReview} onClick={() => { if (canReview) go('send-review'); }} style={{ ...livePrimary, background: canReview ? '#accafe' : '#1c2025', color: canReview ? '#0c1018' : '#5c5f64' }}>Review</button>
         </div>
       </div>
     );
@@ -382,10 +395,11 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
         <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
       </div>
       <div style={{ position: 'absolute', left: 0, top: 196, width: 390, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
-        <span style={{ fontSize: 64, fontWeight: 700, lineHeight: 1 }}>{showAmount(amount)}</span>
+        <span style={{ fontSize: 64, fontWeight: 700, lineHeight: 1, color: over ? '#f25252' : '#fff' }}>{showAmount(amount)}</span>
         <span style={{ fontSize: 20, fontWeight: 500, color: '#accafe', marginBottom: 8 }}>{token.symbol}</span>
       </div>
-      <p style={{ position: 'absolute', left: 0, top: 282, width: 390, margin: 0, textAlign: 'center', fontSize: 15, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+      {priceLabel ? <p style={{ position: 'absolute', left: 0, top: 282, width: 390, margin: 0, textAlign: 'center', fontSize: 15, color: '#8b9097' }}>≈ {priceLabel}</p> : null}
+      {over ? <p style={{ position: 'absolute', left: 18, top: 304, width: 354, margin: 0, textAlign: 'center', fontSize: 13, color: '#f25252' }}>Not enough {token.symbol}</p> : null}
       <div style={{ position: 'absolute', top: 318, left: 0, width: 390, display: 'flex', justifyContent: 'center', gap: 10 }}>
         <span style={chip}>Available {showAvail(available)} {token.symbol}</span>
         <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans }}>Max</button>
@@ -418,13 +432,13 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
           </button>
         ))}
       </div>
-      <button type="button" disabled={!ready} onClick={() => go('send-review')} style={{ ...reviewBtn, top: 720, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Review</button>
+      <button type="button" disabled={!canReview} onClick={() => { if (canReview) go('send-review'); }} style={{ ...reviewBtn, top: 720, background: canReview ? '#accafe' : '#1c2025', color: canReview ? '#0c1018' : '#5c5f64' }}>Review</button>
     </>
   );
 }
 
-function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, chain, go, leave }: {
-  token: (typeof TOKENS)[number]; to: string; amount: string; fiat: number; priv: boolean; flags: PrivacyFlags; networkLabel: string; feeLabel: string; chain: StableChain; go: Go; leave: () => void;
+function Review({ token, to, amount, priceLabel, available, priv, flags, networkLabel, feeLabel, chain, go, leave }: {
+  token: (typeof TOKENS)[number]; to: string; amount: string; priceLabel: string; available: number; priv: boolean; flags: PrivacyFlags; networkLabel: string; feeLabel: string; chain: StableChain; go: Go; leave: () => void;
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
@@ -453,12 +467,47 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
     ['Amount', flags.hideAmount ? 'Hidden' : 'Visible', flags.hideAmount ? '#accafe' : '#fff'],
   ];
   const fromLabel = live?.accountLabel || 'Account 01';
+  const sendQty = Number(String(amount).replace(/,/g, ''));
+  const over = !!live?.app && Number.isFinite(sendQty) && sendQty > available + 1e-9;
+  const needsFee = !!live?.app && net !== 'testnet' && token.id !== 'arx';
+  const [feeText, setFeeText] = useState(live?.app ? (needsFee ? 'Checking fee…' : 'Paid in ARXt') : feeLabel);
+  const [feeWarn, setFeeWarn] = useState<string | null>(over ? `Not enough ${token.symbol}` : null);
+  const [feeWait, setFeeWait] = useState(needsFee);
+  useEffect(() => {
+    if (!live?.app || !needsFee) return;
+    let cancel = false;
+    setFeeWait(true);
+    setFeeWarn(over ? `Not enough ${token.symbol}` : null);
+    void quoteLiveFee(live, token.symbol, chain, to, String(amount).replace(/,/g, ''), net === 'testnet').then((quote) => {
+      if (cancel) return;
+      if (!quote) {
+        setFeeText('Fee unavailable');
+        setFeeWarn('Could not load the network fee.');
+        setFeeWait(false);
+        return;
+      }
+      setFeeText(feeAmount(quote.fee, quote.unit));
+      const warn = over ? `Not enough ${token.symbol}` : feeCovers(quote, sendQty, liveTokenQty(live, 'mainnet', 'eth'), live.solBalance, live.btcBalance);
+      setFeeWarn(warn);
+      setFeeWait(false);
+    }).catch(() => {
+      if (cancel) return;
+      setFeeText('Fee unavailable');
+      setFeeWarn('Could not load the network fee.');
+      setFeeWait(false);
+    });
+    return () => { cancel = true; };
+  }, [live, needsFee, token.symbol, chain, to, amount, net, over, sendQty]);
   async function confirm() {
     if (!live?.app) {
       go('send-success');
       return;
     }
-    if (submitted) return;
+    if (submitted || feeWait) return;
+    if (over || feeWarn) {
+      setErr(feeWarn || `Not enough ${token.symbol}`);
+      return;
+    }
     if (live.app && !isLiveSendDest(to, net === 'testnet', { symbol: token.symbol, chain })) {
       const symbol = token.symbol.toUpperCase();
       setErr(symbol === 'BTC' ? 'Enter a Bitcoin address.' : symbol === 'SOL' || chain === 'solana' ? 'Enter a Solana address.' : net === 'testnet' ? 'Enter a 0x address or shielded destination.' : 'Enter a 0x address.');
@@ -475,7 +524,7 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
         setErr(e.message);
         return;
       }
-      const msg = e instanceof Error ? e.message : 'Send failed';
+      const msg = plainTxError(e);
       if (/reverted/i.test(msg)) {
         if (alive.current) go('send-failed');
         return;
@@ -485,7 +534,9 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
       setBusy(false);
     }
   }
-  const shownErr = err || (flightHere && flightHere.phase !== 'processing' ? flightHere.detail ?? null : null);
+  const rawErr = err || feeWarn || (flightHere && flightHere.phase !== 'processing' ? flightHere.detail ?? null : null);
+  const shownErr = rawErr ? plainTxError(rawErr) : null;
+  const shownFee = live?.app ? feeText : feeLabel;
   return (
     <>
       <Back top={56} left={18} icon="chev" onClick={leave} />
@@ -494,7 +545,7 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
         <div style={{ textAlign: 'left' }}>
           <p style={{ margin: 0, fontSize: 14, color: '#8b9097' }}>You are sending</p>
           <p style={{ margin: '6px 0 0', fontSize: 40, fontWeight: 700 }}>{amount} {token.symbol}</p>
-          <p style={{ margin: '6px 0 0', fontSize: 15, color: '#8b9097' }}>≈ ${fiat.toFixed(2)}</p>
+          {priceLabel ? <p style={{ margin: '6px 0 0', fontSize: 15, color: '#8b9097' }}>≈ {priceLabel}</p> : null}
         </div>
         <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, border: busy ? '1px solid #accafe' : '1px solid #2a3447', padding: '8px 16px', animation: busy ? 'arxon-card 1.1s ease-in-out infinite' : undefined }}>
           <style>{`@keyframes arxon-card{0%,100%{box-shadow:0 0 0 rgba(172,202,254,0)}50%{box-shadow:0 0 18px rgba(172,202,254,0.35)}}`}</style>
@@ -504,15 +555,15 @@ function Review({ token, to, amount, fiat, priv, flags, networkLabel, feeLabel, 
           {showPrivacy && privacyRows.map(([label, value, color]) => (
             <CenterLine key={label} label={label} value={value} color={color} />
           ))}
-          <CenterLine label="Network fee" value={feeLabel} />
+          <CenterLine label="Network fee" value={shownFee} />
           <CenterLine label="Total" value={total} />
         </div>
         {priv && token.id === 'arx' ? <p style={{ margin: '12px 0 0', fontSize: 12, color: '#8b9097', lineHeight: 1.4, textAlign: 'left' }}>Hidden fields stay off the public record. This can’t be undone once confirmed.</p> : null}
         {shownErr ? <p style={{ margin: '12px 0 0', fontSize: 12, color: submitted || flightHere?.phase === 'done' ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{shownErr}</p> : null}
         <div style={{ marginTop: 16 }}>
-          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} processing={busy || remoteBusy} disabled={busy || remoteBusy || !!submitted} onConfirm={() => void confirm()} />
+          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} processing={busy || remoteBusy} disabled={busy || remoteBusy || !!submitted || feeWait || !!feeWarn || over} onConfirm={() => void confirm()} />
         </div>
-        <button type="button" onClick={leave} disabled={busy} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
+        <button type="button" onClick={() => { if (!busy && !remoteBusy) { live?.clearFlight(); leave(); } }} disabled={busy || remoteBusy} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
       </div>
     </>
   );
@@ -740,6 +791,40 @@ function showAmount(amount: string) {
 function showAvail(value: number) {
   const digits = value > 0 && value < 1 ? 4 : 2;
   return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: digits });
+}
+
+function feeAmount(value: number, symbol: string) {
+  if (!Number.isFinite(value) || value <= 0) return `0 ${symbol}`;
+  const digits = value >= 1 ? 4 : value >= 0.0001 ? 6 : 8;
+  return `${value.toLocaleString('en-US', { maximumFractionDigits: digits })} ${symbol}`;
+}
+
+function feeCovers(quote: { fee: number; pay: 'eth-value' | 'eth' | 'sol-value' | 'sol' | 'btc-value' }, amount: number, eth: number, sol: number, btc: number) {
+  if (quote.pay === 'eth-value' && amount + quote.fee > eth + 1e-12) return 'Not enough ETH for the network fee.';
+  if (quote.pay === 'eth' && quote.fee > eth + 1e-12) return 'Not enough ETH for the network fee.';
+  if (quote.pay === 'sol-value' && amount + quote.fee > sol + 1e-12) return 'Not enough SOL for the network fee.';
+  if (quote.pay === 'sol' && quote.fee > sol + 1e-12) return 'Not enough SOL for the network fee.';
+  if (quote.pay === 'btc-value' && amount + quote.fee > btc + 1e-12) return 'Not enough BTC for the network fee.';
+  return null;
+}
+
+async function quoteLiveFee(live: NonNullable<ReturnType<typeof useLiveFrame>>, symbol: string, chain: StableChain, to: string, amount: string, testnet: boolean) {
+  const sym = symbol.toUpperCase();
+  if (testnet || sym === 'ARX' || sym === 'ARXT') return null;
+  if (sym === 'BTC' && live.btcAddress) {
+    return { fee: await quoteBitcoinFee(live.btcAddress, amount), unit: 'BTC', pay: 'btc-value' as const };
+  }
+  if (sym === 'SOL' && live.solAddress) {
+    return { fee: await quoteSolanaFee(live.solAddress, to, 'SOL'), unit: 'SOL', pay: 'sol-value' as const };
+  }
+  if ((sym === 'USDT' || sym === 'USDC') && chain === 'solana' && live.solAddress) {
+    return { fee: await quoteSolanaFee(live.solAddress, to, sym), unit: 'SOL', pay: 'sol' as const };
+  }
+  if ((sym === 'ETH' || sym === 'USDT' || sym === 'USDC') && live.address && /^0x[0-9a-fA-F]{40}$/.test(to)) {
+    const fee = await quoteEthereumFee(sym as EthereumToken, getAddress(live.address), getAddress(to), amount);
+    return { fee, unit: 'ETH', pay: sym === 'ETH' ? 'eth-value' as const : 'eth' as const };
+  }
+  return null;
 }
 
 function liveTokenQty(live: NonNullable<ReturnType<typeof useLiveFrame>>, net: string, id: string) {

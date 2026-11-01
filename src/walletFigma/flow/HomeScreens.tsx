@@ -202,7 +202,7 @@ function MainnetHome({ id, go, back, behind }: { id: string; go: Go; back?: () =
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: 346, gap: 8 }}>
           <span style={{ fontSize: compact ? 13 : 14, fontWeight: 400, color: hidden ? '#5c5f64' : day.color }}>{hidden ? '•••• Today' : day.text}</span>
-          <button type="button" aria-label="Select network" onClick={network.show} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: compact ? 13 : 14, fontWeight: 600, padding: '4px 0', cursor: 'pointer', flexShrink: 0 }}>{network.picked.name}</button>
+          {live?.app ? null : <button type="button" aria-label="Select network" onClick={network.show} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: compact ? 13 : 14, fontWeight: 600, padding: '4px 0', cursor: 'pointer', flexShrink: 0 }}>{network.picked.name}</button>}
         </div>
       </div>
 
