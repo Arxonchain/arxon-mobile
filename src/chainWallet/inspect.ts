@@ -7,7 +7,7 @@ import {
 
 import { publicClient } from './chain';
 import { fromBits, type PrivacyFlags } from './privacy';
-import { RELAYER_PAYER } from './relay';
+import { isRelayerPayer } from './relay';
 import { SUBMIT_ABI } from './submit801';
 
 const ZERO = /^0x0+$/i;
@@ -28,7 +28,7 @@ function isZero(h: string): boolean {
 }
 
 function gasFromRow(from: Address): InspectedTx['rows'][number] {
-  const relayed = from.toLowerCase() === RELAYER_PAYER.toLowerCase();
+  const relayed = isRelayerPayer(from);
   return {
     label: 'Gas',
     value: relayed ? `${from} · relayer` : from,

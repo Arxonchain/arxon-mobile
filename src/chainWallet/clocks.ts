@@ -42,3 +42,53 @@ export function inBlockText(clocks?: TxClocks | null): string | null {
   if (!clocks?.inBlockAt || !clocks.sentAt) return null;
   return `In block ${formatClockMs(clocks.inBlockAt - clocks.sentAt)}`;
 }
+
+export function proveMs(clocks: TxClocks): number | null {
+  if (!clocks.provedAt) return null;
+  return clocks.provedAt - clocks.tapAt;
+}
+
+export function includeMs(clocks: TxClocks): number | null {
+  if (!clocks.inBlockAt || !clocks.sentAt) return null;
+  return clocks.inBlockAt - clocks.sentAt;
+}
+
+const LAST_INCLUDE_KEY = 'arxon.lastIncludeMs';
+const DEFAULT_INCLUDE_MS = 12_000;
+
+export function rememberIncludeMs(ms: number) {
+  if (!Number.isFinite(ms) || ms < 500 || ms > 120_000) return;
+  try {
+    localStorage.setItem(LAST_INCLUDE_KEY, String(Math.round(ms)));
+  } catch {
+    /* private mode */
+  }
+}
+
+/** Expected include wait after submit. Last measured, else two 6s slots. */
+export function etaIncludeMs(): number {
+  try {
+    const n = Number(localStorage.getItem(LAST_INCLUDE_KEY));
+    if (Number.isFinite(n) && n >= 1_000 && n <= 60_000) return n;
+  } catch {
+    /* private mode */
+  }
+  return DEFAULT_INCLUDE_MS;
+}
+
+export function etaSecondsLabel(ms = etaIncludeMs()): string {
+  return `${Math.max(1, Math.round(ms / 1000))}s`;
+}
+
+export function logTxClocks(kind: string, hash: string, clocks: TxClocks) {
+  const prove = proveMs(clocks);
+  const include = includeMs(clocks);
+  console.info('[arxon-tx]', {
+    kind,
+    hash,
+    prove_ms: prove,
+    include_ms: include,
+    prove: prove == null ? null : formatClockMs(prove),
+    include: include == null ? null : formatClockMs(include),
+  });
+}

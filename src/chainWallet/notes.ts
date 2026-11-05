@@ -1,6 +1,6 @@
 import { formatEther, type Hex } from 'viem';
 
-import { fetchNoteLeaves } from './chain';
+import { fetchNoteLeafCount, fetchNoteLeaves, fetchNoteLeavesRange } from './chain';
 import { storage } from './storage';
 
 export type StoredNote = {
@@ -57,10 +57,27 @@ export async function hydrateLeaves(
   onProgress?: (msg: string) => void
 ): Promise<void> {
   onProgress?.('Reading note tree…');
-  const chain = await fetchNoteLeaves(rpcUrl);
-  if (chain && chain.length > 0) {
-    await applyLeaves(chain);
+  const count = await fetchNoteLeafCount(rpcUrl);
+  if (count == null) {
+    const chain = await fetchNoteLeaves(rpcUrl);
+    if (chain && chain.length > 0) await applyLeaves(chain);
+    return;
   }
+  const cached = await loadLeaves();
+  if (count < cached.length) {
+    const chain = await fetchNoteLeaves(rpcUrl);
+    if (chain) await applyLeaves(chain);
+    return;
+  }
+  if (count === cached.length) return;
+  onProgress?.(`Reading ${count - cached.length} new notes…`);
+  const extra = await fetchNoteLeavesRange(rpcUrl, cached.length, count);
+  if (!extra) {
+    const chain = await fetchNoteLeaves(rpcUrl);
+    if (chain) await applyLeaves(chain);
+    return;
+  }
+  await applyLeaves([...cached, ...extra]);
 }
 
 /**

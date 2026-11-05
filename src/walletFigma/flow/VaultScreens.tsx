@@ -435,10 +435,11 @@ function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: strin
           setBusy(true);
           setErr(null);
           const mode = shielding ? 'vault' : paying ? 'private' : 'unshield';
+          const pendingId = shielding ? 'vault-pending' : paying ? 'priv-pending' : 'unshield-pending';
           void live.send(token, to, amount, true, mode, mask)
-            .then(() => { if (alive.current && !advanced.current) { advanced.current = true; go(shielding ? 'vault-done' : paying ? 'priv-done' : 'unshield-done', false); } })
             .catch((e: unknown) => { if (alive.current) setErr(plainTxError(e)); })
             .finally(() => { if (alive.current) setBusy(false); });
+          go(pendingId);
         }} />
         <button type="button" onClick={() => { live?.clearFlight(); leave(); }} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
       </div>
@@ -831,6 +832,22 @@ function feeText(live: boolean) {
 
 function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
   const live = useLiveFrame();
+  const advanced = useRef(false);
+  useEffect(() => {
+    if (advanced.current) return;
+    const flight = live?.flight;
+    if (!flight) return;
+    const doneId = id === 'vault-pending' ? 'vault-done' : id === 'priv-pending' ? 'priv-done' : 'unshield-done';
+    if (flight.phase === 'done') {
+      advanced.current = true;
+      go(doneId);
+      return;
+    }
+    if (flight.phase === 'error') {
+      advanced.current = true;
+      go('vault-failed');
+    }
+  }, [live?.flight, id, go]);
   const title = id === 'vault-pending' ? 'Shielding' : id === 'priv-pending' ? 'Private pay' : 'Unshielding';
   const to = id === 'vault-pending' ? 'Vault' : vaultDest(id === 'priv-pending', live?.app ? live.address : undefined);
   const shown = `${qty(num(amount || '0'))} ARX`;

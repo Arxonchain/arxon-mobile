@@ -2,6 +2,7 @@ import { decodeFunctionData, formatEther, type Hex, type Transaction } from 'vie
 
 import { pushActivity } from './activity';
 import { PRECOMPILE, publicClient } from './chain';
+import { notifyTx } from './txNotify';
 import { decryptNote, toHex } from './noteCipher';
 import { adoptIncomingNotes, hydrateLeaves } from './notes';
 import { storage } from './storage';
@@ -142,16 +143,18 @@ async function scanIncomingNotesInner(
   for (const note of incoming) {
     if (!addedCms.has(note.cm.toLowerCase()) || seen.has(note.hash.toLowerCase())) continue;
     seen.add(note.hash.toLowerCase());
+    const amount = formatEther(BigInt(note.amountWei));
     await pushActivity({
       hash: note.hash,
       kind: 'receive',
       to: ourPk,
-      amount: formatEther(BigInt(note.amountWei)),
+      amount,
       maskBits: 0,
       at: Date.now(),
       token: 'tARX',
       network: 'arxon',
     });
+    notifyTx('You received tARX', `${amount} tARX landed in your Vault.`, `tx-recv-${note.hash}`);
   }
   await storage.setLeafScanAt(to.toString());
   return added.length;

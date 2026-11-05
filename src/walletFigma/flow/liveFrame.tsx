@@ -13,7 +13,7 @@ import { quoteFor } from '@/chainWallet/prices';
 import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
 import { routeSend } from '@/chainWallet/routeSend';
 import { inspectTx, scanRecentFrom, type InspectedTx } from '@/chainWallet/inspect';
-import { RELAYER_PAYER } from '@/chainWallet/relay';
+import { isRelayerPayer, RELAYER_PAYER, RELAYER_PAYER_B } from '@/chainWallet/relay';
 import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
 import { loadCachedVaultHoldings, loadVaultHoldings, type VaultHolding } from '@/chainWallet/tokenNotes';
 import { briefAddr } from './briefAddr';
@@ -257,7 +257,11 @@ function short(addr: string) {
 
 function isRelayerText(value: string) {
   const text = value.trim().toLowerCase();
-  return text === RELAYER_PAYER.toLowerCase() || text.startsWith(briefAddr(RELAYER_PAYER).toLowerCase());
+  return (
+    isRelayerPayer(text) ||
+    text.startsWith(briefAddr(RELAYER_PAYER).toLowerCase()) ||
+    text.startsWith(briefAddr(RELAYER_PAYER_B).toLowerCase())
+  );
 }
 
 function fieldText(value: string) {
@@ -1172,7 +1176,7 @@ function toLiveInspect(row: InspectedTx): LiveInspect {
     vault,
     rows: [
       ['Date', row.blockNumber ? `Block ${row.blockNumber}` : 'Pending'],
-      ...(row.from.toLowerCase() === RELAYER_PAYER.toLowerCase() ? [] : [['From', short(row.from)] as [string, string]]),
+      ...(isRelayerPayer(row.from) ? [] : [['From', short(row.from)] as [string, string]]),
       ['To', row.to ? short(row.to) : '—'],
       ['Amount', amount],
       ['Privacy', hidden.length ? hidden.join(', ') : row.kind === 'private' ? 'Private' : 'Public'],

@@ -121,7 +121,11 @@ export function receiptOutcome(receipt: { status?: string } | null | undefined):
 export async function waitIncluded(rpcUrl: string, hash: Hex) {
   const client = publicClient(rpcUrl);
   try {
-    return await client.waitForTransactionReceipt({ hash, timeout: 180_000 });
+    return await client.waitForTransactionReceipt({
+      hash,
+      timeout: 90_000,
+      pollingInterval: 800,
+    });
   } catch {
     try {
       return await client.getTransactionReceipt({ hash });
@@ -140,30 +144,52 @@ export function walletClient(rpcUrl: string, mnemonic: string, addressIndex = 0)
   });
 }
 
-export async function fetchNoteLeaves(rpcUrl: string): Promise<Hex[] | null> {
-  const client = publicClient(rpcUrl);
+const LEAF_BATCH = 16;
+
+export async function fetchNoteLeafCount(rpcUrl: string): Promise<number | null> {
   try {
-    const count = await client.readContract({
+    const count = await publicClient(rpcUrl).readContract({
       address: PRECOMPILE.view,
       abi: VIEW_ABI,
       functionName: 'getNoteLeafCount',
     });
     const n = Number(count);
-    if (!Number.isSafeInteger(n) || n < 0) return null;
-    const leaves: Hex[] = [];
-    for (let i = 0; i < n; i++) {
-      const leaf = await client.readContract({
-        address: PRECOMPILE.view,
-        abi: VIEW_ABI,
-        functionName: 'getNoteLeaf',
-        args: [BigInt(i)],
-      });
-      leaves.push(leaf);
-    }
-    return leaves;
+    return Number.isSafeInteger(n) && n >= 0 ? n : null;
   } catch {
     return null;
   }
+}
+
+export async function fetchNoteLeavesRange(rpcUrl: string, from: number, to: number): Promise<Hex[] | null> {
+  if (from >= to) return [];
+  const client = publicClient(rpcUrl);
+  const out: Hex[] = [];
+  try {
+  for (let start = from; start < to; start += LEAF_BATCH) {
+    const end = Math.min(start + LEAF_BATCH, to);
+    const chunk = await Promise.all(
+      Array.from({ length: end - start }, (_, i) =>
+        client.readContract({
+          address: PRECOMPILE.view,
+          abi: VIEW_ABI,
+          functionName: 'getNoteLeaf',
+          args: [BigInt(start + i)],
+        }),
+      ),
+    );
+    out.push(...chunk);
+  }
+  return out;
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchNoteLeaves(rpcUrl: string): Promise<Hex[] | null> {
+  const n = await fetchNoteLeafCount(rpcUrl);
+  if (n == null) return null;
+  if (n === 0) return [];
+  return fetchNoteLeavesRange(rpcUrl, 0, n);
 }
 
 export async function assertKnownAnchor(rpcUrl: string, anchor: Hex) {

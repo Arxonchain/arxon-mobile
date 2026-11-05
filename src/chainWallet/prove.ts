@@ -251,6 +251,17 @@ async function call<T>(
   return postHttp(`/v1/${method}`, body);
 }
 
+/** Load wasm and run the Halo2 warm path so the first send is not a cold start. */
+export async function warmProver() {
+  if (!onWeb()) return;
+  try {
+    const api = await loadWasm();
+    api?.warm();
+  } catch {
+    /* first send still loads the prover */
+  }
+}
+
 export function proveKeys(skHex?: string | null) {
   return call<{ sk_hex: string; pk_hex: string }>('keys', { sk_hex: skHex ?? null });
 }
