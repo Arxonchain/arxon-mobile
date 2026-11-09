@@ -29,6 +29,6 @@ describe('isLiveSendDest', () => {
 describe('parseTokenQty', () => {
   it('reads the numeric amount out of live token copy', () => {
     expect(parseTokenQty('1.250000 ETH')).toBe(1.25);
-    expect(parseTokenQty('0.00 ARXt')).toBe(0);
+    expect(parseTokenQty('0.00 tARX')).toBe(0);
   });
 });

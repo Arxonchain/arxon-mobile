@@ -3,6 +3,7 @@ import type { Address, Hex } from 'viem';
 import type { TxClocks } from './clocks';
 import { inspectTx } from './inspect';
 import { storage } from './storage';
+import { TITLE_RECEIVED, creditedToYourPublicCopy, notifyTx } from './txNotify';
 
 export type ActivityKind = 'shield' | 'transfer' | 'private' | 'unshield' | 'onchain' | 'receive';
 
@@ -104,6 +105,9 @@ export async function mergeIncoming(rpcUrl: string, hashes: Hex[], address: Addr
         token: 'tARX',
         network: 'arxon',
       });
+      if (kind === 'receive' && extra[extra.length - 1].amount) {
+        notifyTx(TITLE_RECEIVED, creditedToYourPublicCopy(extra[extra.length - 1].amount), `tx-recv-${hash}`);
+      }
     } catch {
       extra.push({
         hash,

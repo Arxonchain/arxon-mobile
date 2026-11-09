@@ -8,16 +8,24 @@ import { quoteEthereumFee } from '@/chainWallet/ethereum';
 import type { EthereumToken } from '@/chainWallet/networks';
 import type { PrivacyFlags } from '@/chainWallet/privacy';
 import { quoteSolanaFee } from '@/chainWallet/solanaSend';
-import { plainTxError } from '@/chainWallet/txError';
+import { isTxCancelled, plainTxError } from '@/chainWallet/txError';
+import { etaSecondsLabel } from '@/chainWallet/clocks';
+import { recipientCreditedInCopy } from '@/chainWallet/txNotify';
+import { warmProver } from '@/chainWallet/prove';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 import { isLiveSendDest, parseTokenQty } from './sendDest';
+import { onPasteTap } from '@/lib/readClipboard';
 
 type StableChain = 'ethereum' | 'solana';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
 import { briefAddr } from './briefAddr';
-import { LiveHead, availableBox, liveGhost, livePrimary } from './LiveScroll';
+import { FailSheet } from './FailSheet';
+import { FROST_PLACEHOLDER_CSS, frostAvail, frostField, frostIcon, frostInput, frostPanel, FrostLine, HintCard, LiveHead, LiveScroll, availableBox, liveGhost, livePrimary, PullHint, sheetGlass } from './LiveScroll';
+import { useLiveFee } from './useLiveFee';
+import { usePullRefresh } from './pullRefresh';
+import { CardLoad } from './useCardLoad';
 
 const art = (name: string) => `/wallet-figma/send/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -53,15 +61,21 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const [who, setWho] = useState('');
   const [picked, setPicked] = useState('');
   const [amount, setAmount] = useState('0');
-  const [flags, setFlags] = useState([true, true, true, false]);
+  const [flags, setFlags] = useState([false, false, false, false]);
   const tokenBase = TOKENS.find((item) => item.id === tokenId)
     ?? (tokenId === 'sol'
       ? { id: 'sol', name: 'Solana', amount: '0.00 SOL', fiat: '$0.00', symbol: 'SOL', hidden: false, home: 0, vault: '' }
       : TOKENS[0]);
   const token = live?.app && tokenBase.id === 'arx' && net === 'testnet'
-    ? { ...tokenBase, symbol: 'ARXt' }
+    ? { ...tokenBase, symbol: 'tARX' }
     : tokenBase;
-  const leave = () => (back ? back() : go('home-funded', false));
+  const leave = () => {
+    if (back) {
+      back();
+      return;
+    }
+    go(live?.app && net === 'testnet' ? 'testnet' : 'home-funded', false);
+  };
   const vaulted = id === 'send-amount-vault';
   const liveQty = live?.app ? liveTokenQty(live, net, token.id) : null;
   const stableMainnet = !!live?.app && net !== 'testnet' && (token.id === 'usdt' || token.id === 'usdc');
@@ -90,7 +104,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
           ? 'Solana'
           : 'Ethereum';
   const feeLabel = live?.app ? 'Set by the network' : token.id === 'arx' ? `0.0004 ${token.symbol}` : `0 ${token.symbol}`;
-  const privSend = token.id === 'arx' && (!live?.app || net === 'testnet') && (flags[0] || flags[1] || flags[2]);
+  const privSend = false;
   function chooseChain(next: StableChain) {
     setStableChain(next);
     const dest = (picked || who).trim();
@@ -112,7 +126,7 @@ export function SendScreens({ id, go, back }: { id: string; go: Go; back?: () =>
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: id === 'send-qr' ? '#0a0f17' : '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      <style>{`.send-input::placeholder{color:#8b9097}`}</style>
+      <style>{`.send-input::placeholder{color:#8b9097}${live?.app ? FROST_PLACEHOLDER_CSS : ''}`}</style>
       <Status />
       {id === 'send-token' && (
         <PickToken
@@ -196,6 +210,75 @@ function PickToken({ query, setQuery, tokenId, note, onPick, leave, go }: { quer
       }))
     : TOKENS;
   const rows = mapped.filter((token) => !q || token.name.toLowerCase().includes(q) || token.symbol.toLowerCase().includes(q));
+  const emptyCopy = net === 'testnet' ? 'Add Arxon Testnet first. Tokens stay hidden until chain 7171 is on.' : 'Add an asset, then try send again.';
+  const tokenRows = rows.length === 0 ? (
+    <div style={{ padding: '28px 18px', textAlign: 'center' }}>
+      <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>No tokens on this network</p>
+      <p style={{ margin: '8px 0 16px', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>{emptyCopy}</p>
+      <button
+        type="button"
+        onClick={() => (net === 'testnet' ? go('add-network') : leave())}
+        style={{ minHeight: 44, padding: '0 18px', border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
+      >
+        {net === 'testnet' ? 'Add Arxon Testnet' : 'Back'}
+      </button>
+    </div>
+  ) : rows.map((token, index) => (
+    <button key={token.id} type="button" onClick={() => onPick(token.id)} style={{ ...rowBtn, height: 76, borderTop: index ? '1px solid #2a3447' : 'none' }}>
+      <TokenMark id={token.id} />
+      <span style={{ flex: 1, textAlign: 'left' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16, fontWeight: 600 }}>{token.name}</span>
+          {token.hidden && <span style={hiddenTag}><FigmaImg src={art('hidden.svg')} width={12} height={12} />Hidden</span>}
+        </span>
+        <span style={{ display: 'block', marginTop: 2, fontSize: 13, color: '#8b9097' }}>{token.amount}</span>
+      </span>
+      <span style={{ fontSize: 15, fontWeight: 600 }}>{token.fiat}</span>
+      {token.id === tokenId && <span style={checkBubble}><FigmaImg src={art('check.svg')} width={16} height={16} /></span>}
+    </button>
+  ));
+  const privacyNote = (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+      <span style={{ flexShrink: 0, width: 16, height: 16, marginTop: 1 }}>
+        <FigmaImg src={art('lock.svg')} width={16} height={16} />
+      </span>
+      <p style={{ margin: 0, flex: 1, minWidth: 0, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>
+        {net === 'testnet'
+          ? 'Private pay on Testnet uses a shielded key. A normal 0x send stays public.'
+          : 'Only Arxon supports private transfers. Other tokens are sent publicly.'}
+      </p>
+    </div>
+  );
+
+  if (live?.app) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div style={{ flex: '0 0 auto', padding: '4px 16px 0' }}>
+          <LiveHead title="Select token" onBack={leave} />
+          <label style={{ ...frostField, height: 52, padding: '0 15px' }}>
+            <FigmaImg src={art('search.svg')} width={20} height={20} style={frostIcon} />
+            <input className="send-input frost-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens" aria-label="Search tokens" style={frostInput} />
+          </label>
+          <p style={{ margin: '16px 8px 8px', fontSize: 12, fontWeight: 600, color: '#8b9097' }}>YOUR TOKENS</p>
+        </div>
+        <div className="arxon-token-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: '0 16px 24px' }}>
+          <div style={{ overflow: 'hidden', ...sheetGlass, borderRadius: 22 }}>
+            <CardLoad kind="rows" n={5} h={76}>{tokenRows}</CardLoad>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <HintCard
+              body={net === 'testnet'
+                ? 'Private pay on Testnet uses a shielded key. A normal 0x send stays public.'
+                : 'Only Arxon supports private transfers. Other tokens are sent publicly.'}
+              icon={<FigmaImg src={art('lock.svg')} width={14} height={14} />}
+            />
+          </div>
+          {note ? <p role="alert" style={{ margin: '10px 0 0', fontSize: 13, color: '#fabf33', lineHeight: 1.35 }}>{note}</p> : null}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Back top={52} left={16} icon="back" onClick={leave} />
@@ -205,39 +288,14 @@ function PickToken({ query, setQuery, tokenId, note, onPick, leave, go }: { quer
         <input className="send-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens" aria-label="Search tokens" style={input} />
       </label>
       <p style={kicker(184)}>YOUR TOKENS</p>
-      <div style={{ position: 'absolute', left: 16, top: 208, width: 358, background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, overflow: 'hidden' }}>
-        {rows.length === 0 ? (
-          <div style={{ padding: '28px 18px', textAlign: 'center' }}>
-            <p style={{ margin: 0, fontSize: 15, fontWeight: 600 }}>No tokens on this network</p>
-            <p style={{ margin: '8px 0 16px', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>
-              {net === 'testnet' ? 'Add Arxon Testnet first. Tokens stay hidden until chain 7171 is on.' : 'Add an asset, then try send again.'}
-            </p>
-            <button
-              type="button"
-              onClick={() => (net === 'testnet' ? go('add-network') : leave())}
-              style={{ minHeight: 44, padding: '0 18px', border: 'none', borderRadius: 8, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-            >
-              {net === 'testnet' ? 'Add Arxon Testnet' : 'Back'}
-            </button>
-          </div>
-        ) : rows.map((token, index) => (
-          <button key={token.id} type="button" onClick={() => onPick(token.id)} style={{ ...rowBtn, height: 76, borderTop: index ? '1px solid #2a3447' : 'none' }}>
-            <TokenMark id={token.id} />
-            <span style={{ flex: 1, textAlign: 'left' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16, fontWeight: 600 }}>{token.name}</span>
-                {token.hidden && <span style={hiddenTag}><FigmaImg src={art('hidden.svg')} width={12} height={12} />Hidden</span>}
-              </span>
-              <span style={{ display: 'block', marginTop: 2, fontSize: 13, color: '#8b9097' }}>{token.amount}</span>
-            </span>
-            <span style={{ fontSize: 15, fontWeight: 600 }}>{token.fiat}</span>
-            {token.id === tokenId && <span style={checkBubble}><FigmaImg src={art('check.svg')} width={16} height={16} /></span>}
-          </button>
-        ))}
+      <div style={{ position: 'absolute', left: 16, top: 208, width: 358, overflow: 'hidden', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14 }}>
+        {tokenRows}
       </div>
-      <div style={{ position: 'absolute', left: 16, top: 604, width: 358, display: 'flex', gap: 10 }}>
-        <FigmaImg src={art('lock.svg')} width={18} height={18} />
-        <p style={{ margin: 0, width: 330, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Only Arxon supports private transfers. Other tokens are sent publicly.</p>
+      <div style={{ position: 'absolute', left: 16, top: 604, width: 358, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <span style={{ flexShrink: 0, width: 16, height: 16, marginTop: 1 }}>
+          <FigmaImg src={art('lock.svg')} width={16} height={16} />
+        </span>
+        <p style={{ margin: 0, flex: 1, minWidth: 0, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Only Arxon supports private transfers. Other tokens are sent publicly.</p>
       </div>
       {note ? <p role="alert" style={{ position: 'absolute', left: 16, top: 650, width: 358, margin: 0, fontSize: 13, color: '#fabf33', lineHeight: 1.35 }}>{note}</p> : null}
     </>
@@ -249,6 +307,7 @@ function PickWho({ query, setQuery, picked, symbol, chain, showChain, onChain, o
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
+  const fieldRef = useRef<HTMLInputElement>(null);
   const q = query.trim().toLowerCase();
   const sample = !live?.app;
   const accounts = sample ? PEOPLE.filter((person) => person.group === 'account' && (!q || person.name.toLowerCase().includes(q) || person.sub.toLowerCase().includes(q))) : [];
@@ -260,16 +319,47 @@ function PickWho({ query, setQuery, picked, symbol, chain, showChain, onChain, o
     : symbol.toUpperCase() === 'SOL' || (showChain && chain === 'solana')
       ? 'Paste a Solana address.'
       : `Paste a 0x address${net === 'testnet' ? ' or shielded key' : ''}.`;
+
+  if (live?.app) {
+    return (
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
+        <div style={{ flex: '0 0 auto', padding: '4px 16px 0' }}>
+          <LiveHead title="Send to" onBack={leave} />
+          <label style={{ ...frostField, height: 52, padding: '0 15px' }}>
+            <FigmaImg src={art('search.svg')} width={20} height={20} style={frostIcon} />
+            <input ref={fieldRef} className="send-input frost-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Address or name" aria-label="Address or name" style={frostInput} />
+            <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan.svg')} width={20} height={20} style={frostIcon} /></button>
+          </label>
+          <button
+            type="button"
+            onPointerDown={onPasteTap((text) => { setQuery(text.trim()); onPick(text.trim()); }, fieldRef)}
+            style={{ ...pasteBtn, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}
+          >
+            Paste from clipboard
+          </button>
+          {showChain ? <ChainPick chain={chain} onChain={onChain} /> : null}
+          <div style={{ marginTop: 12 }}>
+            <HintCard body={hint} icon={<FigmaImg src={art('lock.svg')} width={14} height={14} />} />
+          </div>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ flex: '0 0 auto', padding: '12px 16px 16px' }}>
+          <button type="button" disabled={!ready} onClick={() => go('send-amount')} style={{ ...livePrimary, opacity: ready ? 1 : 0.4 }}>Continue</button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <>
       <Back top={52} left={16} icon="back" onClick={leave} />
       <Title top={61.5} size={17} weight={600}>Send to</Title>
       <label style={{ ...search, top: 108 }}>
         <FigmaImg src={art('search.svg')} width={20} height={20} />
-        <input className="send-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Address or name" aria-label="Address or name" style={input} />
+        <input ref={fieldRef} className="send-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Address or name" aria-label="Address or name" style={input} />
         <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan.svg')} width={20} height={20} /></button>
       </label>
-      <button type="button" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) { setQuery(text.trim()); onPick(text.trim()); } }).catch(() => undefined)} style={pasteBtn}>Paste from clipboard</button>
+      <button type="button" onPointerDown={onPasteTap((text) => { setQuery(text.trim()); onPick(text.trim()); }, fieldRef)} style={pasteBtn}>Paste from clipboard</button>
       {accounts.length > 0 && <p style={kicker(240)}>MY ACCOUNTS</p>}
       {accounts.map((person) => (
         <button key={person.name} type="button" onClick={() => onPick(person.address)} style={{ ...cardBtn, top: 264, height: 72 }}>
@@ -296,7 +386,6 @@ function PickWho({ query, setQuery, picked, symbol, chain, showChain, onChain, o
         </div>
       )}
       {showChain ? <ChainPick chain={chain} onChain={onChain} top={228} /> : null}
-      {live?.app ? <p style={{ position: 'absolute', left: 24, top: 700, width: 342, margin: 0, fontSize: 12, color: '#8b9097' }}>{hint}</p> : null}
       <button type="button" disabled={!ready} onClick={() => go('send-amount')} style={{ ...primary, top: 744, opacity: ready ? 1 : 0.4 }}>Continue</button>
     </>
   );
@@ -313,7 +402,7 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
   const typed = Number(String(amount).replace(/,/g, ''));
   const over = Number.isFinite(typed) && typed > available + 1e-9;
   const canReview = ready && !over;
-  const privacy = token.id === 'arx' && (!live?.app || net === 'testnet');
+  const privacy = false;
   const privacyTop = vaulted ? 412 : 364;
   const keysTop = privacy ? privacyTop + 150 : vaulted ? 486 : 452;
   const choices = [
@@ -321,19 +410,26 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
     ['Receiver', 'Hide who receives'],
     ['Amount', 'Hide how much'],
   ];
+  const pull = usePullRefresh(() => live?.refresh?.());
   if (live?.app) {
     return (
       <div data-amount-entry style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: 'env(safe-area-inset-top, 0px)' }}>
         <div style={{ flex: '0 0 auto', padding: '4px 18px 0' }}>
           <LiveHead title={`Send ${token.symbol}`} onBack={leave} />
         </div>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+        <div
+          style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
+          onTouchStart={pull.onTouchStart}
+          onTouchMove={pull.onTouchMove}
+          onTouchEnd={pull.onTouchEnd}
+        >
           <div style={{ minHeight: '100%', display: 'flex', flexDirection: 'column', padding: '0 18px 8px', boxSizing: 'border-box' }}>
-            <div style={{ height: 52, boxSizing: 'border-box', background: '#1c2025', borderRadius: 12, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px' }}>
-              <span style={{ fontSize: 13, fontWeight: 500, color: '#8b9097' }}>To</span>
-              <span style={{ flex: 1, fontSize: 14, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
-              <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
-              <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} />              </button>
+            <PullHint pull={pull.pull} busy={pull.busy} />
+            <div style={{ ...frostField, height: 52, padding: '0 8px 0 14px' }}>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#5c6578' }}>To</span>
+              <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: who ? '#0c1018' : '#7a8294', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
+              <button type="button" aria-label="Paste" onPointerDown={onPasteTap((text) => onPaste(text.trim()))} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} style={frostIcon} /></button>
+              <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} style={frostIcon} /></button>
             </div>
             {showChain ? <ChainPick chain={chain} onChain={onChain} /> : null}
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: 148 }}>
@@ -344,8 +440,8 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
               {priceLabel ? <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>≈ {priceLabel}</p> : null}
               {over ? <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 13, color: '#f25252' }}>Not enough {token.symbol}</p> : null}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 12 }}>
-                <span style={availableBox}>Available {showAvail(available)} {token.symbol}</span>
-                <button type="button" onClick={onMax} style={{ ...chip, background: '#2a3447', color: '#accafe', fontWeight: 600, border: 'none', cursor: 'pointer', fontFamily: font.sans, minHeight: 44, borderRadius: 0 }}>Max</button>
+                <span style={{ ...frostAvail, color: over ? '#f25252' : '#0c1018' }}>Available {showAvail(available)} {token.symbol}</span>
+                <button type="button" onClick={onMax} style={{ ...chip, height: 36, minHeight: 36, padding: '0 14px', background: '#3d6dff', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer', fontFamily: font.sans, borderRadius: 12 }}>Max</button>
               </div>
             </div>
             {vaulted && token.vault ? (
@@ -391,7 +487,7 @@ function Amount({ token, who, amount, available, vaulted, flags, onFlag, onKey, 
       <div style={{ position: 'absolute', left: 18, top: 118, width: 354, height: 56, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px 0 16px' }}>
         <span style={{ fontSize: 14, fontWeight: 500, color: '#8b9097' }}>To</span>
         <span style={{ flex: 1, fontSize: 15, color: who ? '#fff' : '#5c5f64', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{who ? briefAddr(who) : 'Address or Arxon name'}</span>
-        <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) onPaste(text.trim()); }).catch(() => undefined)} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
+        <button type="button" aria-label="Paste" onPointerDown={onPasteTap((text) => onPaste(text.trim()))} style={iconBtn}><FigmaImg src={art('paste.svg')} width={20} height={20} /></button>
         <button type="button" aria-label="Scan" onClick={() => go('send-qr')} style={iconBtn}><FigmaImg src={art('scan-sm.svg')} width={20} height={20} /></button>
       </div>
       <div style={{ position: 'absolute', left: 0, top: 196, width: 390, display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
@@ -442,63 +538,36 @@ function Review({ token, to, amount, priceLabel, available, priv, flags, network
 }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState<string | null>(null);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
-  const flightHere = live?.flight?.screen === 'send-review' ? live.flight : null;
-  const remoteBusy = flightHere?.phase === 'processing';
-  const advanced = useRef(false);
-  useEffect(() => {
-    if (advanced.current) return;
-    if (flightHere?.phase === 'done' && !flightHere.detail) {
-      advanced.current = true;
-      go('send-success');
-    }
-  }, [flightHere?.phase, flightHere?.detail, go]);
+  useEffect(() => { void warmProver(); }, []);
+  const flightHere = live?.flight;
+  const quoted = useLiveFee({ amount, to, symbol: token.symbol, testnet: net === 'testnet', chain });
+  const pull = usePullRefresh(async () => {
+    await live?.refresh?.();
+    quoted.requote();
+  });
   const total = live?.app
-    ? `${amount} ${token.symbol} + fee`
+    ? quoted.totalLabel
     : `${(Number(amount.replace(/,/g, '')) + (token.id === 'arx' ? 0.0004 : 0)).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${token.symbol}`;
-  const showPrivacy = !live?.app || net === 'testnet';
+  const showPrivacy = false;
   const privacyRows: [string, string, string?][] = [
     ['Sender', flags.hideSender ? 'Hidden' : 'Visible', flags.hideSender ? '#accafe' : '#fff'],
     ['Receiver', flags.hideReceiver ? 'Hidden' : 'Visible', flags.hideReceiver ? '#accafe' : '#fff'],
     ['Amount', flags.hideAmount ? 'Hidden' : 'Visible', flags.hideAmount ? '#accafe' : '#fff'],
   ];
-  const fromLabel = live?.accountLabel || 'Account 01';
+  const fromLabel = (live?.accountLabel || 'Account 01').replace(/^Account\s+/i, 'Acc ');
   const sendQty = Number(String(amount).replace(/,/g, ''));
   const over = !!live?.app && Number.isFinite(sendQty) && sendQty > available + 1e-9;
-  const needsFee = !!live?.app && net !== 'testnet' && token.id !== 'arx';
-  const [feeText, setFeeText] = useState(live?.app ? (needsFee ? 'Checking fee…' : 'Paid in ARXt') : feeLabel);
+  const feeWait = !!live?.app && quoted.busy;
+  const shownFee = live?.app ? quoted.feeLabel : feeLabel;
   const [feeWarn, setFeeWarn] = useState<string | null>(over ? `Not enough ${token.symbol}` : null);
-  const [feeWait, setFeeWait] = useState(needsFee);
   useEffect(() => {
-    if (!live?.app || !needsFee) return;
-    let cancel = false;
-    setFeeWait(true);
     setFeeWarn(over ? `Not enough ${token.symbol}` : null);
-    void quoteLiveFee(live, token.symbol, chain, to, String(amount).replace(/,/g, ''), net === 'testnet').then((quote) => {
-      if (cancel) return;
-      if (!quote) {
-        setFeeText('Fee unavailable');
-        setFeeWarn('Could not load the network fee.');
-        setFeeWait(false);
-        return;
-      }
-      setFeeText(feeAmount(quote.fee, quote.unit));
-      const warn = over ? `Not enough ${token.symbol}` : feeCovers(quote, sendQty, liveTokenQty(live, 'mainnet', 'eth'), live.solBalance, live.btcBalance);
-      setFeeWarn(warn);
-      setFeeWait(false);
-    }).catch(() => {
-      if (cancel) return;
-      setFeeText('Fee unavailable');
-      setFeeWarn('Could not load the network fee.');
-      setFeeWait(false);
-    });
-    return () => { cancel = true; };
-  }, [live, needsFee, token.symbol, chain, to, amount, net, over, sendQty]);
-  async function confirm() {
+  }, [over, token.symbol]);
+  function confirm() {
     if (!live?.app) {
       go('send-success');
       return;
@@ -513,57 +582,73 @@ function Review({ token, to, amount, priceLabel, available, priv, flags, network
       setErr(symbol === 'BTC' ? 'Enter a Bitcoin address.' : symbol === 'SOL' || chain === 'solana' ? 'Enter a Solana address.' : net === 'testnet' ? 'Enter a 0x address or shielded destination.' : 'Enter a 0x address.');
       return;
     }
-    setBusy(true);
     setErr(null);
-    try {
-      const testnet = net === 'testnet';
-      await live.send(token.symbol, to, amount.replace(/,/g, ''), testnet, testnet && priv && token.id === 'arx' ? 'private' : 'home', testnet ? flags : undefined, chain);
-    } catch (e) {
+    const testnet = net === 'testnet';
+    go('send-success');
+    void live.send(token.symbol, to, amount.replace(/,/g, ''), testnet, 'home', undefined, chain).catch((e) => {
+      if (!alive.current) return;
       if (e instanceof PendingTxError) {
         setSubmitted(e.hash);
-        setErr(e.message);
+        return;
+      }
+      if (isTxCancelled(e)) {
+        live?.clearFlight();
         return;
       }
       const msg = plainTxError(e);
-      if (/reverted/i.test(msg)) {
-        if (alive.current) go('send-failed');
-        return;
-      }
+      go('send-failed');
       setErr(msg);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
-  const rawErr = err || feeWarn || (flightHere && flightHere.phase !== 'processing' ? flightHere.detail ?? null : null);
-  const shownErr = rawErr ? plainTxError(rawErr) : null;
-  const shownFee = live?.app ? feeText : feeLabel;
+  const rawErr = err || feeWarn || (flightHere?.phase === 'error' ? flightHere.detail ?? null : null);
+  const shownErr = rawErr && !isTxCancelled(rawErr) ? plainTxError(rawErr) : null;
   return (
     <>
       <Back top={56} left={18} icon="chev" onClick={leave} />
       <Title top={65.5} size={17} weight={700}>Review</Title>
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 108, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 18px 28px' }}>
+      <div
+        className="arxon-token-scroll"
+        style={{ position: 'absolute', left: 0, top: 108, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 18px 28px' }}
+        onTouchStart={live?.app ? pull.onTouchStart : undefined}
+        onTouchMove={live?.app ? pull.onTouchMove : undefined}
+        onTouchEnd={live?.app ? pull.onTouchEnd : undefined}
+      >
+        {live?.app ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
         <div style={{ textAlign: 'left' }}>
           <p style={{ margin: 0, fontSize: 14, color: '#8b9097' }}>You are sending</p>
           <p style={{ margin: '6px 0 0', fontSize: 40, fontWeight: 700 }}>{amount} {token.symbol}</p>
           {priceLabel ? <p style={{ margin: '6px 0 0', fontSize: 15, color: '#8b9097' }}>≈ {priceLabel}</p> : null}
         </div>
-        <div style={{ marginTop: 16, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, border: busy ? '1px solid #accafe' : '1px solid #2a3447', padding: '8px 16px', animation: busy ? 'arxon-card 1.1s ease-in-out infinite' : undefined }}>
-          <style>{`@keyframes arxon-card{0%,100%{box-shadow:0 0 0 rgba(172,202,254,0)}50%{box-shadow:0 0 18px rgba(172,202,254,0.35)}}`}</style>
-          <CenterLine label="To" value={briefAddr(to)} />
-          <CenterLine label="From" value={fromLabel} />
-          <CenterLine label="Network" value={networkLabel} />
-          {showPrivacy && privacyRows.map(([label, value, color]) => (
-            <CenterLine key={label} label={label} value={value} color={color} />
-          ))}
-          <CenterLine label="Network fee" value={shownFee} />
-          <CenterLine label="Total" value={total} />
+        <CardLoad extra={quoted.busy || pull.busy} kind="frost" h={148}>
+        <div style={{ marginTop: 16, boxSizing: 'border-box', padding: live?.app ? '8px 14px' : '8px 16px', ...(live?.app ? frostPanel : { background: '#1c2025', borderRadius: 16, border: '1px solid #2a3447' }) }}>
+          {live?.app ? (
+            <>
+              <FrostLine label="From" value={fromLabel} />
+              <FrostLine label="To" value={briefAddr(to)} />
+              <FrostLine label="Amount" value={`${amount} ${token.symbol}`} />
+              <FrostLine label="Network fee" value={shownFee} />
+              <FrostLine label="Total" value={total} />
+            </>
+          ) : (
+            <>
+              <CenterLine label="To" value={briefAddr(to)} />
+              <CenterLine label="From" value={fromLabel} />
+              <CenterLine label="Network" value={networkLabel} />
+              {showPrivacy && privacyRows.map(([label, value, color]) => (
+                <CenterLine key={label} label={label} value={value} color={color} />
+              ))}
+              <CenterLine label="Network fee" value={shownFee} />
+              <CenterLine label="Total" value={total} />
+            </>
+          )}
         </div>
+        </CardLoad>
         {priv && token.id === 'arx' ? <p style={{ margin: '12px 0 0', fontSize: 12, color: '#8b9097', lineHeight: 1.4, textAlign: 'left' }}>Hidden fields stay off the public record. This can’t be undone once confirmed.</p> : null}
         {shownErr ? <p style={{ margin: '12px 0 0', fontSize: 12, color: submitted || flightHere?.phase === 'done' ? '#accafe' : '#f25252', lineHeight: 1.35 }}>{shownErr}</p> : null}
         <div style={{ marginTop: 16 }}>
-          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} processing={busy || remoteBusy} disabled={busy || remoteBusy || !!submitted || feeWait || !!feeWarn || over} onConfirm={() => void confirm()} />
+          <SwipeConfirm label={submitted ? 'Submitted' : 'Confirm and send'} disabled={!!submitted || feeWait || !!feeWarn || over} onConfirm={() => confirm()} />
         </div>
-        <button type="button" onClick={() => { if (!busy && !remoteBusy) { live?.clearFlight(); leave(); } }} disabled={busy || remoteBusy} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
+        <button type="button" onClick={() => { live?.clearFlight(); leave(); }} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
       </div>
     </>
   );
@@ -571,23 +656,38 @@ function Review({ token, to, amount, priceLabel, available, priv, flags, network
 
 function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: string; symbol: string; privateSend: boolean; to: string; feeLabel: string; go: Go }) {
   const live = useLiveFrame();
+  const going = !!live?.app && live.flight?.phase === 'processing';
+  const failed = !!live?.app && live.flight?.phase === 'error';
+  useEffect(() => {
+    if (!failed) return;
+    if (isTxCancelled(live?.flight?.detail)) {
+      live?.clearFlight();
+      go('send-review');
+      return;
+    }
+    go('send-failed');
+  }, [failed, go, live]);
   if (live?.app) {
+    const title = going ? 'Sending' : privateSend ? 'Sent privately' : 'Sent';
+    const status = going ? 'Going through' : 'Sent';
+    const statusColor = going ? '#accafe' : '#3ddc84';
     return (
       <LiveScroll>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 48 }}>
           <div style={{ width: 96, height: 96, borderRadius: 48, background: '#accafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <FigmaImg src={art('check-lg.svg')} width={44} height={44} />
           </div>
-          <p style={{ margin: '28px 0 0', textAlign: 'center', fontSize: 26, fontWeight: 700 }}>{privateSend ? 'Sent privately' : 'Sent'}</p>
+          <p style={{ margin: '28px 0 0', textAlign: 'center', fontSize: 26, fontWeight: 700 }}>{title}</p>
           <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{amount} {symbol}</p>
         </div>
         <div style={{ marginTop: 24, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
           <Line label="To" value={briefAddr(to)} />
           <Line label="Network fee" value={feeLabel} />
-          <Line label="Status" value="Confirmed" valueColor="#3ddc84" />
+          <Line label="Status" value={status} valueColor={statusColor} />
+          {going ? null : <Line label="Credit" value={recipientCreditedInCopy(etaSecondsLabel())} />}
         </div>
         <button type="button" onClick={() => go('home-funded')} style={{ ...livePrimary, marginTop: 24 }}>Done</button>
-        <button type="button" onClick={() => go('receipt')} style={{ ...liveGhost, marginTop: 10 }}>View private receipt</button>
+        {privateSend && !going ? <button type="button" onClick={() => go('receipt')} style={{ ...liveGhost, marginTop: 10 }}>View private receipt</button> : null}
       </LiveScroll>
     );
   }
@@ -656,21 +756,25 @@ function Privacy({ flags, setFlags, go, leave }: { flags: boolean[]; setFlags: (
 }
 
 function Failed({ to, amount, symbol, go }: { to: string; amount: string; symbol: string; go: Go }) {
+  const live = useLiveFrame();
+  const why = live?.flight?.detail && !isTxCancelled(live.flight.detail)
+    ? live.flight.detail
+    : 'The network rejected this send. No fee was charged.';
   return (
-    <>
-      <img src={art('fail-glow.svg')} alt="" width={168} height={168} style={{ position: 'absolute', left: 111, top: 130 }} />
-      <img src={art('fail-ring.svg')} alt="" width={132} height={132} style={{ position: 'absolute', left: 129, top: 148 }} />
-      <img src={art('fail-core.svg')} alt="" width={96} height={96} style={{ position: 'absolute', left: 147, top: 166 }} />
-      <p style={{ position: 'absolute', left: 35, top: 334, width: 320, margin: 0, textAlign: 'center', fontSize: 26, fontWeight: 700 }}>Payment failed</p>
-      <p style={{ position: 'absolute', left: 35, top: 376, width: 320, margin: 0, textAlign: 'center', fontSize: 32, fontWeight: 700 }}>{amount} {symbol}</p>
-      <div style={{ position: 'absolute', left: 18, top: 440, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: 16 }}>
-        <Line label="To" value={briefAddr(to)} />
-        <Line label="Network fee" value="No fee charged" />
-        <Line label="Status" value="Not sent" valueColor="#f55c5c" />
-      </div>
-      <button type="button" onClick={() => go('send-review')} style={{ ...primary, top: 649, borderRadius: 8, height: 55 }}>Try again</button>
-      <button type="button" onClick={() => go('home-funded')} style={{ ...ghost, top: 714 }}>Back to Home</button>
-    </>
+    <FailSheet
+      kicker="Send"
+      title="Payment failed"
+      why={why}
+      rows={[
+        { label: 'Amount', value: `${amount} ${symbol}` },
+        { label: 'To', value: briefAddr(to) },
+        { label: 'Status', value: 'Not sent', tone: 'bad' },
+      ]}
+      primary="Try again"
+      secondary="Back to Home"
+      onPrimary={() => go('send-review')}
+      onSecondary={() => go('home-funded')}
+    />
   );
 }
 
@@ -810,7 +914,7 @@ function feeCovers(quote: { fee: number; pay: 'eth-value' | 'eth' | 'sol-value' 
 
 async function quoteLiveFee(live: NonNullable<ReturnType<typeof useLiveFrame>>, symbol: string, chain: StableChain, to: string, amount: string, testnet: boolean) {
   const sym = symbol.toUpperCase();
-  if (testnet || sym === 'ARX' || sym === 'ARXT') return null;
+  if (testnet || sym === 'ARX' || sym === 'ARXT' || sym === 'TARX') return null;
   if (sym === 'BTC' && live.btcAddress) {
     return { fee: await quoteBitcoinFee(live.btcAddress, amount), unit: 'BTC', pay: 'btc-value' as const };
   }

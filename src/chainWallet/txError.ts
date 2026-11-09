@@ -1,3 +1,8 @@
+export function isTxCancelled(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err || '');
+  return /user rejected|denied signature|rejected the request|send cancelled|cancelled/i.test(msg);
+}
+
 /** Turn a chain or library error into one short line for the review screen. */
 export function plainTxError(err: unknown): string {
   const raw = err instanceof Error ? err.message : String(err || '');

@@ -8,16 +8,23 @@ import { useAppHidesFigmaChrome } from './appChrome';
 import { clearVaultFails, registerVaultFail, sessionStore } from '@/chainWallet/session';
 import type { PrivacyFlags } from '@/chainWallet/privacy';
 import { isShieldedPk } from '@/chainWallet/routeSend';
-import { CenterLine, SwipeConfirm, SwipeVault } from './SwipeConfirm';
+import { CenterLine, ClickConfirm, TapAction } from './SwipeConfirm';
+import { onPasteTap } from '@/lib/readClipboard';
 import { ProfileAvatar } from './ProfileAvatar';
 import { useProfilePhoto } from './profilePhoto';
 import { usePullRefresh } from './pullRefresh';
+import { copyAddress } from './copyFlash';
 import { NetworkSheet } from './ReceiveScreens';
 import { applyNetwork, listNetworks, selectedNetwork } from './homeNetworks';
 import { briefAddr } from './briefAddr';
-import { plainTxError } from '@/chainWallet/txError';
+import { isTxCancelled, plainTxError } from '@/chainWallet/txError';
+import { FailSheet } from './FailSheet';
+import { etaSecondsLabel } from '@/chainWallet/clocks';
+import { recipientCreditedInCopy, vaultCreditedInCopy } from '@/chainWallet/txNotify';
+import { warmProver } from '@/chainWallet/prove';
 import { TestnetHistory } from './TestnetHistory';
-import { availableBox } from './LiveScroll';
+import { clusterBlue, FROST_PLACEHOLDER_CSS, frostAvail, frostField, frostIcon, frostInput, frostPanel, FrostLine, FrostNote, HintCard, itemCard, LiveHead, liveGhost, livePrimary, PullHint } from './LiveScroll';
+import { useLiveFee } from './useLiveFee';
 import { AccountSheet, type AccountSheetMode } from './AccountSheet';
 
 const IDS = new Set([
@@ -37,9 +44,9 @@ const HOME_FUNDED = 1398.6;
 const HOME_VAULTED = 978.6;
 const LOCK_MINUTES = [5, 10, 20, 30];
 
-let sessionOpen = false;
+let sessionOpen = true;
 let entryBody = 'vault';
-let lockRequired = true;
+let lockRequired = false;
 let homeTab = 'home-funded';
 let historyTab = 'activity';
 let vaultBody = 'vault-empty';
@@ -48,18 +55,17 @@ export function isVaultScreen(id: string) {
   return IDS.has(id);
 }
 
-/** Face ID & password → Opening the Vault. Off skips the password screen. */
+/** Face ID & password → Opening the Vault. Live app never gates the vault page. */
 export function setVaultLockRequired(on: boolean) {
   lockRequired = on;
-  sessionOpen = !on;
+  sessionOpen = true;
 }
 
-/** Vault tab opens Unlock while the vault session is closed, then the body Home already chose. */
+/** Vault tab opens the vault body. Password is not required to enter the page. */
 export function vaultEntry(body: string) {
   entryBody = body;
-  if (sessionStore.vaultLockedUntil() > Date.now()) return 'vault-locked';
-  if (!lockRequired || sessionOpen) return body;
-  return 'vault-lock';
+  sessionOpen = true;
+  return body;
 }
 
 /** Home, History, and Vault tabs follow the last Home the user opened. */
@@ -115,15 +121,41 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
   const [name, setName] = useState('Account 02');
 
   const expected = password.length >= 8 ? password : 'Arxon123!';
-  const leave = () => (back ? back() : go(behind && behind !== id ? behind : 'home-funded', false));
-  const fundedVault = () => go(token === 'ARX' && !madeSecond ? 'vault' : 'vault-many', false);
+  const leave = () => {
+    if (back) {
+      back();
+      return;
+    }
+    go(live?.app ? 'testnet' : (behind && behind !== id ? behind : 'home-funded'), false);
+  };
+  const fundedVault = () => go(live?.app ? 'testnet' : (token === 'ARX' && !madeSecond ? 'vault' : 'vault-many'), false);
 
   useEffect(() => {
+    if (!live?.app) return;
+    if (id !== 'vault-lock' && id !== 'vault-lock-wrong' && id !== 'vault-locked') return;
+    sessionOpen = true;
+    go(entryBody || 'vault', false);
+  }, [id, live?.app, go]);
+
+  useEffect(() => {
+    if (id === 'unshield-who' || id === 'unshield-addr') {
+      setSendKind('public');
+      setMask({ hideSender: true, hideReceiver: false, hideAmount: false, hideBalance: false });
+    } else if (id === 'priv-addr') {
+      setSendKind('private');
+      setMask({ hideSender: true, hideReceiver: true, hideAmount: true, hideBalance: false });
+    } else if (id === 'shield-explain' || id === 'vault-pick-in') {
+      setMask({ hideSender: true, hideReceiver: true, hideAmount: true, hideBalance: false });
+    }
+  }, [id]);
+
+  useEffect(() => {
+    if (live?.app) return;
     const next = id === 'vault-pending' ? 'vault-done' : id === 'priv-pending' ? 'priv-done' : id === 'unshield-pending' ? 'unshield-done' : '';
     if (!next) return;
     const t = window.setTimeout(() => go(next, false), 2000);
     return () => window.clearTimeout(t);
-  }, [id]);
+  }, [id, live?.app, go]);
 
   useEffect(() => {
     if (id !== 'vault-locked') return;
@@ -187,15 +219,21 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
   const sheet = id === 'vault-send-options';
   const account = id === 'accounts' || id === 'add-account';
   const net = useWalletNetwork();
+  const openPrivate = () => { setSendKind('private'); setMask({ hideSender: true, hideReceiver: true, hideAmount: true, hideBalance: false }); go('vault-send-token'); };
+  const openUnshield = () => { setSendKind('public'); setMask({ hideSender: true, hideReceiver: false, hideAmount: false, hideBalance: false }); go('unshield-who'); };
   if (net === 'mainnet') {
     if (id === 'vault-nofunds') rememberTabs('empty');
     else if (id === 'vault' || id === 'vault-many') rememberTabs('vaulted');
     else if (id === 'vault-empty') rememberTabs('funded');
   }
 
+  if (live?.app && !account && (id === 'vault-empty' || id === 'vault-nofunds' || id === 'vault' || id === 'vault-many' || sheet)) {
+    return <LiveVaultRedirect go={go} />;
+  }
+
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      <style>{`@keyframes vaultspin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes vaultspin{to{transform:rotate(360deg)}}${FROST_PLACEHOLDER_CSS}`}</style>
       {account ? (
         <Accounts id={id} go={go} made={madeSecond} name={name} setName={setName} onCreate={() => {
           if (live?.app) {
@@ -206,9 +244,11 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
           go('accounts', false);
         }} />
       ) : id === 'vault-empty' || id === 'vault-nofunds' || id === 'vault' || id === 'vault-many' || sheet ? (
-        <VaultHome many={id === 'vault-many'} hidden={hidden} broke={id === 'vault-nofunds' || id === 'vault-empty'} onEye={() => setHidden((v) => !v)} go={go} sheet={sheet} onPrivate={() => { setSendKind('private'); setMask({ hideSender: true, hideReceiver: true, hideAmount: true, hideBalance: false }); go('vault-send-token'); }} onUnshield={() => { setSendKind('public'); setMask({ hideSender: true, hideReceiver: false, hideAmount: false, hideBalance: false }); go('unshield-who'); }} />
+        <VaultHome many={id === 'vault-many'} hidden={hidden} broke={id === 'vault-nofunds' || id === 'vault-empty'} onEye={() => setHidden((v) => !v)} go={go} sheet={sheet} onPrivate={openPrivate} onUnshield={openUnshield} />
+      ) : live?.app && id === 'shield-explain' ? (
+        <Picker id="vault-pick-in" kind="private" query={query} setQuery={setQuery} leave={leave} onPick={(sym) => { setToken(sym); go('vault-amount'); }} />
       ) : id === 'shield-explain' ? (
-        <ShieldExplain leave={leave} onContinue={() => go('vault-pick-in')} />
+        <ShieldExplain leave={leave} onContinue={() => { setMask({ hideSender: true, hideReceiver: true, hideAmount: true, hideBalance: false }); go('vault-pick-in'); }} />
       ) : id === 'unshield-who' ? (
         <UnshieldWho leave={leave} onSelf={() => { setPayTo(live?.address || ''); go('vault-send-token'); }} onOther={() => { setPayTo(''); go('unshield-addr'); }} />
       ) : id === 'priv-addr' || id === 'unshield-addr' ? (
@@ -225,7 +265,7 @@ export function VaultScreens({ id, go, back, behind, password }: { id: string; g
       ) : id === 'vault-pending' || id === 'priv-pending' || id === 'unshield-pending' ? (
         <Pending id={id} go={go} amount={id === 'vault-pending' ? moveIn : sendAmt} />
       ) : id === 'vault-done' || id === 'move-home-done' || id === 'priv-done' || id === 'unshield-done' || id === 'vault-failed' ? (
-        <Result id={id} go={go} fundedVault={fundedVault} amount={id === 'move-home-done' ? moveOut : id === 'vault-done' ? moveIn : sendAmt} />
+        <Result id={id} go={go} fundedVault={fundedVault} amount={id === 'move-home-done' ? moveOut : id === 'vault-done' ? moveIn : sendAmt} to={payTo} />
       ) : (
         <Unlock wrong={id === 'vault-lock-wrong'} locked={id === 'vault-locked' && (lockUntil == null || remain > 0)} clock={clock} typed={typed} setTyped={setTyped} onUnlock={submitPassword} onFace={() => {
           if (live?.app) {
@@ -294,12 +334,26 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
     }
   }, [id, flightHere?.phase, flightHere?.detail, go]);
   const pinned = !!live?.app;
+  const pull = usePullRefresh(() => live?.refresh?.());
+  const note = movingIn
+    ? { title: 'Shielded balance', body: 'This amount leaves your public balance. The Vault total stays hidden.' }
+    : id === 'priv-amount'
+      ? { title: 'Private pay', body: 'Paid from your Vault. You choose what the public can see on the next screen.' }
+      : id === 'unshield-amount'
+        ? { title: 'Unshield', body: 'This returns a public balance. You choose what stays hidden on the next screen.' }
+        : null;
   return (
     <div data-amount-entry={pinned ? '1' : undefined} style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: pinned ? 'hidden' : undefined, paddingTop: pinned ? 'env(safe-area-inset-top, 0px)' : undefined }}>
       {pinned ? <Head title={title} onBack={leave} pinned /> : null}
-      <div style={{ flex: 1, minHeight: 0, overflowY: pinned ? 'auto' : undefined, display: 'flex', flexDirection: 'column' }}>
+      <div
+        style={{ flex: 1, minHeight: 0, overflowY: pinned ? 'auto' : undefined, display: 'flex', flexDirection: 'column', WebkitOverflowScrolling: pinned ? 'touch' : undefined }}
+        onTouchStart={pinned ? pull.onTouchStart : undefined}
+        onTouchMove={pinned ? pull.onTouchMove : undefined}
+        onTouchEnd={pinned ? pull.onTouchEnd : undefined}
+      >
       <div style={{ minHeight: pinned ? '100%' : undefined, display: 'flex', flexDirection: 'column', flex: pinned ? 1 : undefined }}>
       {pinned ? null : (<><PhoneStatus /><Head title={title} onBack={leave} /></>)}
+      {pinned ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
       <div style={{ flex: pinned ? 1 : undefined, display: 'flex', flexDirection: 'column', justifyContent: pinned ? 'center' : undefined }}>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: pinned ? 0 : 8, color: '#8b9097', fontSize: 13 }}>
         <span>{movingIn ? 'From  Home' : id === 'move-home' ? 'From  Vault' : 'To'}</span>
@@ -309,12 +363,12 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
       <div style={{ textAlign: 'center', marginTop: 18 }}>
         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end', gap: 8 }}>
           <span style={{ fontSize: live?.app ? 44 : 56, fontWeight: 700, lineHeight: 1, color: over ? '#f25252' : '#fff' }}>{amount ? qty(value, amount.includes('.') ? 2 : 0) : '0'}</span>
-          <span style={{ fontSize: 18, fontWeight: 600, color: '#accafe', marginBottom: 6 }}>{token}</span>
+          <span style={{ fontSize: 18, fontWeight: 600, color: '#accafe', marginBottom: 6 }}>{liveTicker(token, !!live?.app)}</span>
         </div>
         <p style={{ margin: '8px 0 0', color: '#8b9097', fontSize: 15 }}>{live?.app && token === 'ARX' ? '$0.00' : `≈ ${money(fiat)}`}</p>
       </div>
       <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 14 }}>
-        <span style={live?.app ? { ...availableBox, color: over ? '#f25252' : '#c9cdd4' } : { ...pill, color: over ? '#f25252' : '#8b9097' }}>Available {qty(available)} {token}</span>
+        <span style={live?.app ? { ...frostAvail, color: over ? '#f25252' : '#0c1018' } : { ...pill, color: over ? '#f25252' : '#8b9097' }}>Available {qty(available)} {liveTicker(token, !!live?.app)}</span>
         <Max onClick={() => fill(onKey, amount, max)} />
       </div>
       {over && <p style={{ margin: '10px 0 0', textAlign: 'center', color: '#f25252', fontSize: 13 }}>Not enough on {movingIn ? 'Home' : 'Vault'}</p>}
@@ -326,9 +380,13 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
           <span style={{ fontWeight: 600 }}>{money(after)}</span>
         </div>
       )}
-      {movingIn && <Note title="Shielded balance" body="This amount leaves your public balance. The Vault total stays hidden." />}
-      {id === 'priv-amount' && <Note title="Private pay" body="Paid from your Vault. You choose what the public can see on the next screen." />}
-      {id === 'unshield-amount' && <Note title="Unshield" body="This returns a public balance. You choose what stays hidden on the next screen." />}
+      {note && live?.app ? (
+        <div style={{ margin: '12px 18px 0' }}>
+          <FrostNote title={note.title} body={note.body} />
+        </div>
+      ) : note ? (
+        <Note title={note.title} body={note.body} />
+      ) : null}
       </div>
       </div>
       <div style={{ flex: '0 0 auto', marginTop: 8, padding: '0 18px 18px' }}>
@@ -345,8 +403,13 @@ function Amount({ id, token, to, amount, leave, onKey, go }: { id: string; token
               if (!alive.current || moved.current) return;
               moved.current = true;
               go('move-home-done');
-            }).catch(() => {
-              if (alive.current) go('vault-failed');
+            }).catch((e) => {
+              if (!alive.current) return;
+              if (isTxCancelled(e)) {
+                live.clearFlight();
+                return;
+              }
+              go('vault-failed');
             });
             return;
           }
@@ -365,57 +428,79 @@ function fill(onKey: (key: string) => void, current: string, max: number) {
   text.split('').forEach((ch) => onKey(ch));
 }
 
+function accShort(label?: string) {
+  const name = (label || 'Account 01').replace(/^Account\s+/i, 'Acc ');
+  return name;
+}
+
 function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: string; token: Sym; amount: string; to: string; mask: PrivacyFlags; setMask: (v: PrivacyFlags) => void; go: Go; leave: () => void }) {
   const live = useLiveFrame();
-  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const alive = useRef(true);
   useEffect(() => () => { alive.current = false; }, []);
-  const screenId = id === 'vault-review' ? 'vault-review' : id === 'priv-review' ? 'priv-review' : 'unshield-review';
+  useEffect(() => { void warmProver(); }, []);
   const doneId = id === 'vault-review' ? 'vault-done' : id === 'priv-review' ? 'priv-done' : 'unshield-done';
-  const flightHere = live?.flight?.screen === screenId ? live.flight : null;
-  const advanced = useRef(false);
-  useEffect(() => {
-    if (advanced.current) return;
-    if (flightHere?.phase === 'done' && !flightHere.detail) {
-      advanced.current = true;
-      go(doneId);
-    }
-  }, [flightHere?.phase, flightHere?.detail, doneId, go]);
+  const flightHere = live?.flight;
   const value = num(amount || '0');
   const fiat = value * price(token);
-  const total = live?.app ? `${qty(value)} ${token} + fee` : token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`;
-  const fee = feeText(!!live?.app);
   const shielding = id === 'vault-review';
   const paying = id === 'priv-review';
   const dest = shielding ? 'Your Vault' : shortAddr(to || (live?.address ?? ''));
+  const quoted = useLiveFee({
+    amount,
+    to: shielding ? (live?.address || '') : to,
+    symbol: token,
+    testnet: true,
+  });
+  const pull = usePullRefresh(async () => {
+    await live?.refresh?.();
+    quoted.requote();
+  });
+  const ticker = liveTicker(token, !!live?.app);
+  const fromText = shielding ? accShort(live?.accountLabel) : 'Vault';
+  const toText = shielding
+    ? (live?.address ? `Vault ${briefAddr(live.address)}` : 'Vault')
+    : (to ? (paying ? briefAddr(to) : briefAddr(to)) : dest || 'Add an address');
+  const amountText = `${qty(value)} ${ticker}`;
+  const feeTextLive = quoted.feeLabel;
+  const totalText = live?.app ? quoted.totalLabel : (token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`);
   const rows: [string, string, string?][] = shielding
-    ? [['From', live?.accountLabel ? `Home · ${live.accountLabel}` : 'Home · Account 01'], ['To', 'Vault'], ['Public balance', 'This amount leaves it'], ['Network fee', fee], ['Total', total]]
-    : [['From', 'Your Vault'], ['To', dest || 'Add an address'], ['Network', 'Arxon Testnet'], ['Network fee', fee], ['Total', total]];
+    ? [['From', live?.accountLabel ? `Home · ${live.accountLabel}` : 'Home · Account 01'], ['To', 'Vault'], ['Public balance', 'This amount leaves it'], ['Network fee', feeText(false)], ['Total', token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`]]
+    : [['From', 'Your Vault'], ['To', dest || 'Add an address'], ['Network', 'Arxon Testnet'], ['Network fee', feeText(false)], ['Total', token === 'ARX' ? `${qty(value + FEE, 4)} ARX` : `${qty(value)} ${token}`]];
   const verb = shielding ? 'You are shielding' : paying ? 'You are paying privately' : 'You are unshielding';
   const confirm = shielding ? 'Shield in' : paying ? 'Private pay' : 'Unshield';
-  return (
-    <div className="arxon-token-scroll" style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', paddingBottom: 28 }}>
-      <PhoneStatus />
-      <Head title="Review" onBack={leave} />
-      <div style={{ textAlign: 'left', marginTop: 8, padding: '0 18px' }}>
-        <p style={{ margin: 0, color: '#8b9097', fontSize: 14 }}>{verb}</p>
-        <p style={{ margin: '8px 0 0', fontSize: 32, fontWeight: 700 }}>{qty(value)} {token}</p>
-        <p style={{ margin: '6px 0 0', color: '#8b9097' }}>{live?.app && token === 'ARX' ? '$0.00' : `≈ ${money(fiat)}`}</p>
-      </div>
-      <div style={{ margin: '14px 18px 0', background: '#1c2025', border: busy ? '1px solid #accafe' : '1px solid #2a3447', borderRadius: 16, padding: '8px 16px', flex: '0 0 auto', animation: busy ? 'arxon-card 1.1s ease-in-out infinite' : undefined }}>
-        <style>{`@keyframes arxon-card{0%,100%{box-shadow:0 0 0 rgba(172,202,254,0)}50%{box-shadow:0 0 18px rgba(172,202,254,0.35)}}`}</style>
-        {rows.map(([label, valueText, color]) => (
-          <CenterLine key={label} label={label} value={valueText} color={color} />
-        ))}
-      </div>
-      <PrivacyCard mask={mask} setMask={setMask} />
-      <p style={{ margin: '10px 18px 0', color: '#8b9097', fontSize: 12, lineHeight: 1.4, textAlign: 'left' }}>
-        {shielding ? 'The amount you shield is no longer a public balance. Nobody can see the total held in your Vault.' : paying ? 'This pays from the Vault. Hidden fields stay off the public record.' : 'Unshielding creates a public balance at the address you chose.'}
-      </p>
+  if (live?.app) {
+    return (
+      <div
+        className="arxon-token-scroll"
+        style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: 'env(safe-area-inset-top, 0px) 0 28px' }}
+        onTouchStart={pull.onTouchStart}
+        onTouchMove={pull.onTouchMove}
+        onTouchEnd={pull.onTouchEnd}
+      >
+        <Head title="Review" onBack={leave} pinned />
+        <PullHint pull={pull.pull} busy={pull.busy} />
+        <div style={{ textAlign: 'left', marginTop: 4, padding: '0 18px' }}>
+          <p style={{ margin: 0, color: '#8b9097', fontSize: 14 }}>{verb}</p>
+          <p style={{ margin: '8px 0 0', fontSize: 32, fontWeight: 700 }}>{amountText}</p>
+          <p style={{ margin: '6px 0 0', color: '#8b9097' }}>$0.00</p>
+        </div>
+        <div style={{ margin: '12px 18px 0', ...frostPanel, padding: '8px 14px' }}>
+          <FrostLine label="From" value={fromText} />
+          <FrostLine label="To" value={toText} />
+          <FrostLine label="Amount" value={amountText} />
+          <FrostLine label="Network fee" value={feeTextLive} />
+          <FrostLine label="Total" value={totalText} />
+        </div>
+        <PrivacyCard mask={mask} setMask={setMask} keys={shielding ? ['hideAmount'] : paying ? ['hideSender', 'hideReceiver', 'hideAmount'] : ['hideReceiver']} />
+        <div style={{ margin: '10px 18px 0' }}>
+          <HintCard
+            body={shielding ? 'The amount you shield is no longer a public balance. Nobody can see the total held in your Vault.' : paying ? 'This pays from the Vault. Hidden fields stay off the public record.' : 'Unshielding creates a public balance at the address you chose.'}
+          />
+        </div>
       <div style={{ marginTop: 16, padding: '0 18px 28px', display: 'flex', flexDirection: 'column', gap: 10, flex: '0 0 auto' }}>
-        {err || (flightHere && flightHere.phase !== 'processing' ? flightHere.detail : null) ? <p style={{ margin: 0, color: flightHere?.phase === 'done' ? '#accafe' : '#f25252', fontSize: 12 }}>{err || flightHere?.detail}</p> : null}
-        <SwipeConfirm label={confirm} processing={busy || flightHere?.phase === 'processing'} disabled={busy || flightHere?.phase === 'processing'} onConfirm={() => {
+        {err || (flightHere?.phase === 'error' && !isTxCancelled(flightHere.detail)) ? <p style={{ margin: 0, color: '#f25252', fontSize: 12 }}>{err || flightHere?.detail}</p> : null}
+        <ClickConfirm label={confirm} onConfirm={() => {
           if (!live?.app) {
             go(shielding ? 'vault-pending' : paying ? 'priv-pending' : 'unshield-pending');
             return;
@@ -429,38 +514,70 @@ function Review({ id, token, amount, to, mask, setMask, go, leave }: { id: strin
             return;
           }
           if (token !== 'ARX') {
-            setErr('Only ARX can use the Vault on Arxon Testnet right now.');
+            setErr(`Only ${liveTicker('ARX', true)} can use the Vault on Arxon Testnet right now.`);
             return;
           }
-          setBusy(true);
           setErr(null);
           const mode = shielding ? 'vault' : paying ? 'private' : 'unshield';
-          const pendingId = shielding ? 'vault-pending' : paying ? 'priv-pending' : 'unshield-pending';
-          void live.send(token, to, amount, true, mode, mask)
-            .catch((e: unknown) => { if (alive.current) setErr(plainTxError(e)); })
-            .finally(() => { if (alive.current) setBusy(false); });
-          go(pendingId);
+          go(doneId);
+          void live.send(token, to, amount, true, mode, mask).catch((e) => {
+            if (!alive.current) return;
+            if (isTxCancelled(e)) {
+              live.clearFlight();
+              return;
+            }
+            go('vault-failed');
+          });
         }} />
         <button type="button" onClick={() => { live?.clearFlight(); leave(); }} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
+      </div>
+    </div>
+    );
+  }
+  return (
+    <div className="arxon-token-scroll" style={{ height: '100%', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', paddingBottom: 28 }}>
+      <PhoneStatus />
+      <Head title="Review" onBack={leave} />
+      <div style={{ textAlign: 'left', marginTop: 8, padding: '0 18px' }}>
+        <p style={{ margin: 0, color: '#8b9097', fontSize: 14 }}>{verb}</p>
+        <p style={{ margin: '8px 0 0', fontSize: 32, fontWeight: 700 }}>{qty(value)} {liveTicker(token, false)}</p>
+        <p style={{ margin: '6px 0 0', color: '#8b9097' }}>≈ {money(fiat)}</p>
+      </div>
+      <div style={{ margin: '14px 18px 0', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 16, padding: '8px 16px', flex: '0 0 auto' }}>
+        {rows.map(([label, valueText, color]) => (
+          <CenterLine key={label} label={label} value={valueText} color={color} />
+        ))}
+      </div>
+      <PrivacyCard mask={mask} setMask={setMask} keys={shielding ? ['hideAmount'] : paying ? ['hideSender', 'hideReceiver', 'hideAmount'] : ['hideReceiver']} />
+      <p style={{ margin: '10px 18px 0', color: '#8b9097', fontSize: 12, lineHeight: 1.4, textAlign: 'left' }}>
+        {shielding ? 'The amount you shield is no longer a public balance. Nobody can see the total held in your Vault.' : paying ? 'This pays from the Vault. Hidden fields stay off the public record.' : 'Unshielding creates a public balance at the address you chose.'}
+      </p>
+      <div style={{ marginTop: 16, padding: '0 18px 28px', display: 'flex', flexDirection: 'column', gap: 10, flex: '0 0 auto' }}>
+        <ClickConfirm label={confirm} onConfirm={() => {
+          go(shielding ? 'vault-pending' : paying ? 'priv-pending' : 'unshield-pending');
+        }} />
+        <button type="button" onClick={leave} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>Cancel</button>
       </div>
     </div>
   );
 }
 
-function PrivacyCard({ mask, setMask }: { mask: PrivacyFlags; setMask: (v: PrivacyFlags) => void }) {
+function PrivacyCard({ mask, setMask, keys }: { mask: PrivacyFlags; setMask: (v: PrivacyFlags) => void; keys?: (keyof PrivacyFlags)[] }) {
+  const live = useLiveFrame();
   const rows: { key: keyof PrivacyFlags; title: string; body: string }[] = [
     { key: 'hideSender', title: 'Sender address', body: 'Hide who the payment is from' },
     { key: 'hideReceiver', title: 'Receiver address', body: 'Hide who receives it' },
     { key: 'hideAmount', title: 'Amount', body: 'Hide how much moves' },
-  ];
+  ].filter((row) => !keys || keys.includes(row.key));
+  const frost = !!live?.app;
   return (
-    <div className="arxon-token-scroll" style={{ margin: '12px 18px 0', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 16, maxHeight: 196, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
-      <p style={{ margin: 0, padding: '12px 16px 0', fontSize: 13, fontWeight: 600, color: '#8b9097', textAlign: 'left' }}>SHOW OR HIDE</p>
+    <div className="arxon-token-scroll" style={{ margin: '12px 18px 0', ...(frost ? { ...frostPanel, padding: '8px 14px' } : { background: '#1c2025', border: '1px solid #2a3447', borderRadius: 16, padding: 0 }), maxHeight: 196, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+      <p style={{ margin: 0, padding: frost ? '4px 0 6px' : '12px 16px 0', fontSize: 12, fontWeight: 700, color: frost ? '#5c6578' : '#8b9097', textAlign: 'left', letterSpacing: 0.4 }}>SHOW OR HIDE</p>
       {rows.map((row, index) => (
-        <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderTop: index ? '1px solid #2a3447' : 'none' }}>
+        <div key={row.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: frost ? '8px 0' : '12px 16px', borderTop: index ? (frost ? '1px solid rgba(12,16,24,0.08)' : '1px solid #2a3447') : 'none' }}>
           <span style={{ flex: 1, textAlign: 'left' }}>
-            <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{row.title}</span>
-            <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097' }}>{row.body}</span>
+            <span style={{ display: 'block', fontSize: frost ? 13 : 15, fontWeight: 700, color: frost ? '#0c1018' : '#fff' }}>{row.title}</span>
+            <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: frost ? '#3a4254' : '#8b9097' }}>{row.body}</span>
           </span>
           <button type="button" aria-label={row.title} onClick={() => setMask({ ...mask, [row.key]: !mask[row.key] })} style={{ ...iconBtn, width: 52 }}>
             <FigmaImg src={mask[row.key] ? '/wallet-figma/send/toggle-on-lg.svg' : '/wallet-figma/send/toggle-off.svg'} width={48} height={28} />
@@ -541,7 +658,7 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
   async function copyKey() {
     if (!key) return;
     try {
-      await navigator.clipboard.writeText(key);
+      await copyAddress(key);
       setCopied(true);
     } catch {
       setCopied(false);
@@ -588,8 +705,8 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
         </div>
 
         <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-          <SwipeVault label="Private pay" onOpen={onPrivate} />
-          <SwipeVault label="Unshield" onOpen={onUnshield} />
+          <TapAction label="Private pay" onOpen={onPrivate} />
+          <TapAction label="Unshield" onOpen={onUnshield} />
         </div>
 
         <button type="button" onClick={() => { setCopied(false); setKeyOpen(true); }} style={live?.app ? liveReceive : receiveCard}>
@@ -660,6 +777,13 @@ function VaultHome({ many, hidden, broke, onEye, go, sheet, onPrivate, onUnshiel
   );
 }
 
+function LiveVaultRedirect({ go }: { go: Go }) {
+  useEffect(() => {
+    go('testnet', false);
+  }, [go]);
+  return null;
+}
+
 function demoHoldings(many: boolean, broke: boolean): VaultHolding[] {
   if (broke) return [];
   const arx: VaultHolding = { name: 'Arxon', symbol: 'ARX', amount: '1,000.00', icon: 'arx' };
@@ -669,9 +793,14 @@ function demoHoldings(many: boolean, broke: boolean): VaultHolding[] {
 
 function vaultHeadline(rows: VaultHolding[]) {
   if (!rows.length) return '0.00';
-  const arx = rows.find((row) => row.symbol === 'ARX');
+  const arx = rows.find((row) => row.symbol === 'ARX' || row.symbol === 'tARX' || row.symbol === 'ARXt');
   if (rows.length === 1) return rows[0].amount;
   return arx ? arx.amount : rows[0].amount;
+}
+
+function liveTicker(sym: string, liveApp = false) {
+  if (liveApp && (sym === 'ARX' || sym === 'ARXt' || sym === 'ARXT')) return 'tARX';
+  return sym;
 }
 
 function vaultTab(on: boolean): CSSProperties {
@@ -702,17 +831,52 @@ function Picker({ id, kind, query, setQuery, leave, onPick }: { id: string; kind
   const live = useLiveFrame();
   const incoming = id === 'vault-pick-in';
   const sending = id === 'vault-send-token';
-  const liveArx = incoming ? `${live?.publicArx ?? '0'} ARX` : `${Number(live?.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ARX`;
+  const liveArx = incoming ? `${live?.publicArx ?? '0'} ${liveTicker('ARX', !!live?.app)}` : `${Number(live?.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${liveTicker('ARX', !!live?.app)}`;
   const rows = (live?.app
     ? [['Arxon', 'ARX', liveArx, '$0.00']]
     : incoming
     ? [['Arxon', 'ARX', '1,400.00 ARX', '$588.00'], ['Tether', 'USDT', '120.00 USDT', '$120.00'], ['USD Coin', 'USDC', '30.00 USDC', '$30.00']]
     : [['Arxon', 'ARX', '1,000.00 ARX', '$420.00'], ['USD Coin', 'USDC', '30.00 USDC', '$30.00'], ['Tether', 'USDT', '40.00 USDT', '$40.00']]
   ).filter(([name, sym]) => `${name} ${sym}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const heading = incoming ? 'Shield in' : id === 'vault-pick-out' ? 'Move to Home' : kind === 'public' ? 'Unshield' : 'Private pay';
+  const note = incoming ? `Pick what to shield. On Arxon Testnet, only ${liveTicker('ARX', !!live?.app)} can move into the Vault.` : sending ? (kind === 'public' ? 'Pick the shielded balance to unshield.' : 'Pick the shielded balance to pay from.') : 'Moving out returns the token to Home.';
+  if (live?.app) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#050505', padding: 'max(54px, env(safe-area-inset-top, 0px)) 18px 16px', boxSizing: 'border-box' }}>
+        <LiveHead title={heading} onBack={leave} />
+        <label style={{ ...itemCard, ...frostField, minHeight: 48, padding: '0 14px', marginBottom: 12 }}>
+          <FigmaImg src="/wallet-figma/find/search.svg" width={18} height={18} style={frostIcon} />
+          <input className="frost-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens" style={frostInput} />
+        </label>
+        <p style={{ margin: '0 2px 8px', color: '#8b9097', fontSize: 12, fontWeight: 600 }}>{incoming ? 'CHOOSE A TOKEN' : 'SHIELDED BALANCE'}</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {rows.map(([name, sym, amount, fiat]) => (
+            <button key={sym} type="button" onClick={() => onPick(sym as Sym)} style={{ ...itemCard, cursor: 'pointer' }}>
+              <Tok sym={sym as Sym} />
+              <span style={{ flex: 1, textAlign: 'left', minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{name}</span>
+                <span style={{ display: 'block', marginTop: 3, fontSize: 12, color: '#8b9097' }}>{amount}</span>
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: '#8b9097' }}>{fiat}</span>
+            </button>
+          ))}
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <HintCard
+            title={incoming ? 'This balance stays hidden' : undefined}
+            body={incoming
+              ? `Every token you shield stays private. On Testnet, only ${liveTicker('ARX', true)} can move into the Vault.`
+              : note}
+            icon={incoming ? <FigmaImg src="/wallet-figma/home/shield.svg" width={14} height={14} /> : undefined}
+          />
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PhoneStatus />
-      <Head title={incoming ? 'Shield in' : id === 'vault-pick-out' ? 'Move to Home' : kind === 'public' ? 'Unshield' : 'Private pay'} onBack={leave} />
+      <Head title={heading} onBack={leave} />
       <label style={{ margin: '8px 18px 0', height: 48, borderRadius: 14, background: '#1c2025', display: 'flex', alignItems: 'center', gap: 8, padding: '0 14px' }}>
         <FigmaImg src="/wallet-figma/find/search.svg" width={20} height={20} />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 }} />
@@ -728,9 +892,7 @@ function Picker({ id, kind, query, setQuery, leave, onPick }: { id: string; kind
           <span style={{ fontWeight: 600 }}>{fiat}</span>
         </button>
       ))}
-      <p style={{ margin: '12px 18px 0', color: '#8b9097', fontSize: 12, lineHeight: 1.4 }}>
-        {incoming ? 'Pick what to shield. On Arxon Testnet, only ARX can move into the Vault.' : sending ? (kind === 'public' ? 'Pick the shielded balance to unshield.' : 'Pick the shielded balance to pay from.') : 'Moving out returns the token to Home.'}
-      </p>
+      <p style={{ margin: '12px 18px 0', color: '#8b9097', fontSize: 12, lineHeight: 1.4 }}>{note}</p>
     </div>
   );
 }
@@ -770,6 +932,28 @@ function shortAddr(value: string) {
 }
 
 function ShieldExplain({ leave, onContinue }: { leave: () => void; onContinue: () => void }) {
+  const live = useLiveFrame();
+  if (live?.app) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#050505', padding: 'max(54px, env(safe-area-inset-top, 0px)) 18px 16px', boxSizing: 'border-box' }}>
+        <LiveHead title="Shield in" onBack={leave} />
+        <div style={{ ...clusterBlue, borderRadius: 18, padding: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 44, height: 44, borderRadius: 22, background: 'rgba(12,16,24,0.55)', border: '1px solid rgba(172,202,254,0.35)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FigmaImg src="/wallet-figma/home/shield.svg" width={20} height={20} />
+            </span>
+            <p style={{ margin: 0, fontSize: 16, fontWeight: 700, lineHeight: 1.25 }}>This balance stays hidden</p>
+          </div>
+          <p style={{ margin: '10px 0 0', color: '#c5cad3', fontSize: 13, lineHeight: 1.4 }}>
+            Every token you shield, and the total shielded balance, stays private. Shielding hides that part of your wallet.
+          </p>
+        </div>
+        <div style={{ marginTop: 'auto' }}>
+          <button type="button" onClick={onContinue} style={{ ...livePrimary, height: 48 }}>Choose a token</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#050505' }}>
       <PhoneStatus />
@@ -791,6 +975,27 @@ function ShieldExplain({ leave, onContinue }: { leave: () => void; onContinue: (
 }
 
 function UnshieldWho({ leave, onSelf, onOther }: { leave: () => void; onSelf: () => void; onOther: () => void }) {
+  const live = useLiveFrame();
+  if (live?.app) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#050505', padding: 'max(54px, env(safe-area-inset-top, 0px)) 18px 16px', boxSizing: 'border-box' }}>
+        <LiveHead title="Unshield" onBack={leave} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button type="button" onClick={onSelf} style={{ ...itemCard, flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>To myself</span>
+            <span style={{ marginTop: 3, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Uses your own address. Then you pick the token and amount.</span>
+          </button>
+          <button type="button" onClick={onOther} style={{ ...itemCard, flexDirection: 'column', alignItems: 'flex-start', cursor: 'pointer' }}>
+            <span style={{ fontSize: 15, fontWeight: 600 }}>To someone else</span>
+            <span style={{ marginTop: 3, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Enter their 0x address, then the token and amount.</span>
+          </button>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <HintCard body="Where should this public balance go? Pick yourself or someone else." />
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PhoneStatus />
@@ -806,7 +1011,30 @@ function UnshieldWho({ leave, onSelf, onOther }: { leave: () => void; onSelf: ()
 
 function PayAddress({ id, value, setValue, leave, onNext, self }: { id: string; value: string; setValue: (v: string) => void; leave: () => void; onNext: () => void; self?: string | null }) {
   const paying = id === 'priv-addr';
+  const fieldRef = useRef<HTMLInputElement>(null);
   const ready = paying ? isShieldedPk(value) : /^0x[0-9a-fA-F]{40}$/.test(value.trim());
+  const live = useLiveFrame();
+  if (live?.app) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: '#050505', padding: 'max(54px, env(safe-area-inset-top, 0px)) 18px 16px', boxSizing: 'border-box' }}>
+        <LiveHead title={paying ? 'Private pay' : 'Unshield'} onBack={leave} />
+        <label style={{ ...itemCard, ...frostField, minHeight: 52, padding: '0 14px' }}>
+          <input className="frost-input" ref={fieldRef} value={value} onChange={(e) => setValue(e.target.value.trim())} placeholder={paying ? 'Shielded key' : '0x address'} style={frostInput} />
+        </label>
+        <button type="button" onPointerDown={onPasteTap((text) => setValue(text.trim()), fieldRef)} style={{ ...liveGhost, height: 44, marginTop: 10 }}>Paste</button>
+        {!paying && self ? <p style={{ margin: '10px 2px 0', color: '#5c5f64', fontSize: 12 }}>Your address is {shortAddr(self)}</p> : null}
+        <div style={{ marginTop: 12 }}>
+          <HintCard
+            title={paying ? 'Shielded key only' : 'Public address'}
+            body={paying ? 'Paste the shielded key of the wallet you are paying. A public address cannot receive this.' : 'Enter the 0x address that should receive the public balance.'}
+          />
+        </div>
+        <div style={{ marginTop: 'auto' }}>
+          <button type="button" disabled={!ready} onClick={onNext} style={{ ...livePrimary, height: 48, background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64' }}>Continue</button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       <PhoneStatus />
@@ -815,9 +1043,9 @@ function PayAddress({ id, value, setValue, leave, onNext, self }: { id: string; 
         {paying ? 'Paste the shielded key of the wallet you are paying. A public address cannot receive this.' : 'Enter the 0x address that should receive the public balance.'}
       </p>
       <label style={{ margin: '16px 18px 0', minHeight: 56, borderRadius: 14, background: '#1c2025', border: '1px solid #2a3447', display: 'flex', alignItems: 'center', padding: '0 14px', gap: 8 }}>
-        <input value={value} onChange={(e) => setValue(e.target.value.trim())} placeholder={paying ? 'Shielded key' : '0x address'} style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 }} />
+        <input ref={fieldRef} value={value} onChange={(e) => setValue(e.target.value.trim())} placeholder={paying ? 'Shielded key' : '0x address'} style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 }} />
       </label>
-      <button type="button" onClick={() => navigator.clipboard?.readText().then((text) => { if (text.trim()) setValue(text.trim()); }).catch(() => undefined)} style={{ margin: '12px 18px 0', height: 44, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Paste</button>
+      <button type="button" onPointerDown={onPasteTap((text) => setValue(text.trim()), fieldRef)} style={{ margin: '12px 18px 0', height: 44, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Paste</button>
       {!paying && self ? <p style={{ margin: '12px 18px 0', color: '#5c5f64', fontSize: 12 }}>Your address is {shortAddr(self)}</p> : null}
       <div style={{ marginTop: 'auto', padding: '0 18px 28px' }}>
         <button type="button" disabled={!ready} onClick={onNext} style={{ ...btn, width: '100%', background: ready ? '#accafe' : '#1c2025', color: ready ? '#0c1018' : '#5c5f64', border: 'none' }}>Continue</button>
@@ -835,9 +1063,14 @@ function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
   const advanced = useRef(false);
   useEffect(() => {
     if (advanced.current) return;
+    const doneId = id === 'vault-pending' ? 'vault-done' : id === 'priv-pending' ? 'priv-done' : 'unshield-done';
+    if (live?.app) {
+      advanced.current = true;
+      go(live.flight?.phase === 'error' ? 'vault-failed' : doneId);
+      return;
+    }
     const flight = live?.flight;
     if (!flight) return;
-    const doneId = id === 'vault-pending' ? 'vault-done' : id === 'priv-pending' ? 'priv-done' : 'unshield-done';
     if (flight.phase === 'done') {
       advanced.current = true;
       go(doneId);
@@ -847,10 +1080,10 @@ function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
       advanced.current = true;
       go('vault-failed');
     }
-  }, [live?.flight, id, go]);
+  }, [live?.app, live?.flight, id, go]);
   const title = id === 'vault-pending' ? 'Shielding' : id === 'priv-pending' ? 'Private pay' : 'Unshielding';
   const to = id === 'vault-pending' ? 'Vault' : vaultDest(id === 'priv-pending', live?.app ? live.address : undefined);
-  const shown = `${qty(num(amount || '0'))} ARX`;
+  const shown = `${qty(num(amount || '0'))} ${liveTicker('ARX', !!live?.app)}`;
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <PhoneStatus />
@@ -863,49 +1096,83 @@ function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
         <Line label="Status" value="Pending" color="#accafe" />
       </div>
       <p style={{ margin: '16px 28px 0', textAlign: 'center', color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>You can leave this screen. Your balances update once the move is confirmed.</p>
-      <button type="button" onClick={() => go(id === 'vault-pending' ? 'home-funded' : 'vault', false)} style={{ ...btn, marginTop: 'auto', marginBottom: 28, width: 354, background: '#accafe', color: '#0c1018', border: 'none' }}>{id === 'vault-pending' ? 'Back to Home' : 'Back to Vault'}</button>
+      <button type="button" onClick={() => go(id === 'vault-pending' ? (live?.app ? 'testnet' : 'home-funded') : (live?.app ? 'testnet' : 'vault'), false)} style={{ ...btn, marginTop: 'auto', marginBottom: 28, width: 354, background: '#accafe', color: '#0c1018', border: 'none' }}>{id === 'vault-pending' ? 'Back to Home' : 'Back to Vault'}</button>
     </div>
   );
 }
 
-function Result({ id, go, fundedVault, amount }: { id: string; go: Go; fundedVault: () => void; amount: string }) {
+function Result({ id, go, fundedVault, amount, to }: { id: string; go: Go; fundedVault: () => void; amount: string; to?: string }) {
   const live = useLiveFrame();
   const failed = id === 'vault-failed';
+  useEffect(() => {
+    if (failed || live?.flight?.phase !== 'error') return;
+    if (isTxCancelled(live.flight.detail)) {
+      live.clearFlight();
+      return;
+    }
+    go('vault-failed');
+  }, [failed, live, go]);
   const backHome = id === 'move-home-done';
-  const title = id === 'vault-done' ? 'Shielded' : id === 'move-home-done' ? 'Moved to Home' : id === 'priv-done' ? 'Private pay sent' : id === 'unshield-done' ? 'Unshielded' : 'Move failed';
-  const shown = `${qty(num(amount || '0'))} ARX`;
-  const vaultNow = live?.app ? `${Number(live.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ARX` : undefined;
+  const eta = etaSecondsLabel();
+  const going = !!live?.app && live.flight?.phase === 'processing';
+  const liveSent = !!live?.app && !failed && !going;
+  const title = going
+    ? (id === 'vault-done' ? 'Shielding' : id === 'priv-done' ? 'Sending' : id === 'unshield-done' ? 'Unshielding' : id === 'move-home-done' ? 'Moving' : 'Sending')
+    : liveSent
+    ? 'Sent'
+    : id === 'vault-done' ? 'Shielded' : id === 'move-home-done' ? 'Moved to Home' : id === 'priv-done' ? 'Private pay sent' : id === 'unshield-done' ? 'Unshielded' : 'Move failed';
+  const shown = `${qty(num(amount || '0'))} ${liveTicker('ARX', !!live?.app)}`;
+  const vaultNow = live?.app ? `${Number(live.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${liveTicker('ARX', true)}` : undefined;
+  const credit = id === 'vault-done' ? vaultCreditedInCopy(eta) : recipientCreditedInCopy(eta);
+  const dest = to?.trim() ? briefAddr(to) : vaultDest(id === 'priv-done', live?.app ? live.address : undefined);
+  const liveStatus: [string, string, string?] = going ? ['Status', 'Going through', '#accafe'] : ['Status', liveSent ? 'Sent' : 'Confirmed', '#3ddb85'];
   const rows: [string, string, string?][] = failed
     ? [['Network fee', 'No fee charged'], ['Vault', 'Not moved', '#f25252'], ['Status', 'Not moved', '#f25252']]
     : id === 'vault-done'
-      ? [['Where it is', 'Your Vault'], ['Vault balance', live?.app ? 'Only you can see it' : vaultNow ?? 'Hidden'], ['Status', 'Confirmed', '#3ddb85']]
+      ? live?.app
+        ? [['Where it is', 'Your Vault'], liveStatus, ...(going ? [] : [['Credit', credit] as [string, string]])]
+        : [['Where it is', 'Your Vault'], ['Vault balance', vaultNow ?? 'Hidden'], ['Status', 'Confirmed', '#3ddb85']]
       : id === 'move-home-done'
-        ? [['Home balance now', live?.app ? live.publicArx : '$1,188.60'], ['Vault balance', vaultNow ?? '$210.00'], ['Status', 'Confirmed', '#3ddb85']]
+        ? [['Home balance now', live?.app ? live.publicArx : '$1,188.60'], ['Vault balance', vaultNow ?? '$210.00'], liveStatus]
         : id === 'priv-done'
-          ? [['To', 'Shielded note'], ['Network fee', feeText(!!live?.app)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$315.00']]
-          : [['To', vaultDest(false, live?.app ? live.address : undefined)], ['Network fee', feeText(!!live?.app)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$210.00']];
+          ? live?.app
+            ? [['To', dest || 'Shielded note'], ['Network fee', feeText(true)], liveStatus, ...(going ? [] : [['Credit', credit] as [string, string]])]
+            : [['To', 'Shielded note'], ['Network fee', feeText(false)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$315.00']]
+          : live?.app
+            ? [['To', dest], ['Network fee', feeText(true)], liveStatus, ...(going ? [] : [['Credit', credit] as [string, string]])]
+            : [['To', vaultDest(false, live?.app ? live.address : undefined)], ['Network fee', feeText(!!live?.app)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$210.00']];
+  if (failed) {
+    return (
+      <FailSheet
+        kicker="Vault"
+        title="Move failed"
+        why={live?.flight?.detail && !isTxCancelled(live.flight.detail) ? live.flight.detail : 'The move did not go through. Vault balance is unchanged.'}
+        rows={[
+          { label: 'Amount', value: shown },
+          { label: 'To', value: dest || 'Your Vault' },
+          { label: 'Status', value: 'Not moved', tone: 'bad' },
+        ]}
+        primary="Try again"
+        secondary="Back to Vault"
+        onPrimary={() => go('vault-review')}
+        onSecondary={fundedVault}
+      />
+    );
+  }
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <PhoneStatus />
-      {failed ? (
-        <div style={{ marginTop: 96, width: 168, height: 168, position: 'relative' }}>
-          <img src="/wallet-figma/send/fail-glow.svg" alt="" width={168} height={168} style={{ position: 'absolute', left: 0, top: 0 }} />
-          <img src="/wallet-figma/send/fail-ring.svg" alt="" width={132} height={132} style={{ position: 'absolute', left: 18, top: 18 }} />
-          <img src="/wallet-figma/send/fail-core.svg" alt="" width={96} height={96} style={{ position: 'absolute', left: 36, top: 36 }} />
-        </div>
-      ) : (
-        <div style={{ marginTop: 110, width: 96, height: 96, borderRadius: 48, background: '#accafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <FigmaImg src="/wallet-figma/claim/check.svg" width={44} height={44} />
-        </div>
-      )}
+      <div style={{ marginTop: 110, width: 96, height: 96, borderRadius: 48, background: '#accafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <FigmaImg src="/wallet-figma/claim/check.svg" width={44} height={44} />
+      </div>
       <p style={{ margin: '22px 0 0', fontSize: 22, fontWeight: 700 }}>{title}</p>
       <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{shown}</p>
       <div style={{ marginTop: 22, width: 354, background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
         {rows.map(([label, value, color]) => <Line key={label} label={label} value={value} color={color} />)}
       </div>
       <div style={{ marginTop: 'auto', width: 354, paddingBottom: 28, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <button type="button" onClick={() => failed ? go('vault-review') : backHome ? go('home-funded') : fundedVault()} style={{ ...btn, background: '#accafe', color: '#0c1018', border: 'none' }}>{failed ? 'Try again' : 'Done'}</button>
-        <button type="button" onClick={() => failed || !backHome ? fundedVault() : go('home-funded')} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>
+        <button type="button" onClick={() => backHome ? go('home-funded') : fundedVault()} style={{ ...btn, background: '#accafe', color: '#0c1018', border: 'none' }}>Done</button>
+        <button type="button" onClick={() => backHome ? go('home-funded') : fundedVault()} style={{ ...btn, background: 'transparent', color: '#fff', border: '1px solid #2a3447' }}>
           {backHome ? 'Back to Home' : 'Back to Vault'}
         </button>
       </div>
@@ -1056,7 +1323,18 @@ function Mini({ label, onClick }: { label: string; onClick: () => void }) {
 }
 
 function Max({ onClick }: { onClick: () => void }) {
-  return <button type="button" onClick={onClick} style={{ ...pill, border: 'none', background: '#2a3447', color: '#accafe', fontWeight: 600, cursor: 'pointer', fontFamily: font.sans }}>Max</button>;
+  const live = useLiveFrame();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={live?.app
+        ? { height: 36, minWidth: 56, padding: '0 14px', border: 'none', borderRadius: 12, background: '#3d6dff', color: '#fff', fontFamily: font.sans, fontSize: 13, fontWeight: 700, cursor: 'pointer' }
+        : { ...pill, border: 'none', background: '#2a3447', color: '#accafe', fontWeight: 600, cursor: 'pointer', fontFamily: font.sans }}
+    >
+      Max
+    </button>
+  );
 }
 
 function PhoneStatus() {
@@ -1084,3 +1362,7 @@ const rowBtn: CSSProperties = { width: '100%', height: 68, border: 'none', backg
 const card: CSSProperties = { width: 170, height: 92, border: 'none', borderRadius: 16, background: '#1c2025', color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: 14, display: 'flex', flexDirection: 'column', gap: 6, cursor: 'pointer' };
 const sheet: CSSProperties = { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 18px 28px' };
 const handle: CSSProperties = { width: 36, height: 4, borderRadius: 2, background: '#5c5f64', margin: '0 auto' };
+const vaultStrip: CSSProperties = {
+  border: '1px solid #252a32',
+  background: '#14181d',
+};

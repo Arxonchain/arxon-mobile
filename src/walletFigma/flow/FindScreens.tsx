@@ -1,10 +1,12 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 import { hiddenTokens, setTokenHidden } from './tokenVisibility';
+import { onPasteTap } from '@/lib/readClipboard';
+import { FROST_PLACEHOLDER_CSS, frostField, frostIcon, frostInput } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/find/${name}`;
 
@@ -45,12 +47,12 @@ export function FindScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const leave = () => (back ? back() : go(id === 'add-token' ? 'manage' : 'home', false));
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      <style>{`.find-input::placeholder{color:#8b9097}`}</style>
+      <style>{`.find-input::placeholder{color:#8b9097}${FROST_PLACEHOLDER_CSS}`}</style>
       <Status clock={id === 'notifications' ? 'note' : 'flow'} />
       {id === 'search' && <Search go={go} leave={leave} />}
       {id === 'manage' && <Manage go={go} leave={leave} />}
       {id === 'add-token' && <AddToken go={go} leave={leave} />}
-      {id === 'notifications' && <Notes leave={leave} />}
+      {id === 'notifications' && <Notes leave={leave} go={go} />}
       {hideChrome ? null : (
       <div style={{ position: 'absolute', left: 8, top: 810, width: 375, height: 34, opacity: 0.25, pointerEvents: 'none' }}>
         <div style={{ position: 'absolute', left: '50%', bottom: 8, transform: 'translateX(-50%)', width: 134, height: 5, borderRadius: 100, background: '#fff' }} />
@@ -80,9 +82,9 @@ function Search({ go, leave }: { go: Go; leave: () => void }) {
       <button type="button" aria-label="Back" onClick={leave} style={{ ...backBtn, left: 18, top: 56 }}>
         <FigmaImg src={art('chev.svg')} width={20} height={20} />
       </button>
-      <label style={{ position: 'absolute', left: 66, top: 56, width: 306, height: 44, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #accafe', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px' }}>
-        <FigmaImg src={art('search.svg')} width={20} height={20} />
-        <input className="find-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens, addresses, dApps" aria-label="Search tokens, addresses, dApps" style={field} />
+      <label style={{ position: 'absolute', left: 66, top: 56, width: 306, height: 44, padding: '0 14px', ...(live?.app ? frostField : { boxSizing: 'border-box', background: '#1c2025', border: '1px solid #accafe', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10 }) }}>
+        <FigmaImg src={art('search.svg')} width={20} height={20} style={live?.app ? frostIcon : undefined} />
+        <input className={live?.app ? 'find-input frost-input' : 'find-input'} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens, addresses, dApps" aria-label="Search tokens, addresses, dApps" style={live?.app ? { ...frostInput, fontSize: 14 } : field} />
       </label>
       <div style={{ position: 'absolute', left: 18, top: 124, width: 354 }}>
         {rows.length > 0 && <p style={heading}>Suggested</p>}
@@ -138,9 +140,9 @@ function Manage({ go, leave }: { go: Go; leave: () => void }) {
   return (
     <>
       <Header title="Manage tokens" leave={leave} />
-      <label style={{ position: 'absolute', left: 18, top: 118, width: 354, height: 44, boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 14px' }}>
-        <FigmaImg src={art('search.svg')} width={20} height={20} />
-        <input className="find-input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens" aria-label="Search tokens" style={field} />
+      <label style={{ position: 'absolute', left: 18, top: 118, width: 354, height: 44, padding: '0 14px', ...(live?.app ? frostField : { boxSizing: 'border-box', background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10 }) }}>
+        <FigmaImg src={art('search.svg')} width={20} height={20} style={live?.app ? frostIcon : undefined} />
+        <input className={live?.app ? 'find-input frost-input' : 'find-input'} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search tokens" aria-label="Search tokens" style={live?.app ? { ...frostInput, fontSize: 14 } : field} />
       </label>
       <div style={{ position: 'absolute', left: 18, top: 178, width: 354 }}>
         {shown.length > 0 && <p style={heading}>Shown on Home</p>}
@@ -178,6 +180,7 @@ function ManageRow({ token, on, toggle }: { token: ManagedToken; on: boolean; to
 function AddToken({ go, leave }: { go: Go; leave: () => void }) {
   const live = useLiveFrame();
   const net = useWalletNetwork();
+  const fieldRef = useRef<HTMLInputElement>(null);
   const [address, setAddress] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const ready = address.trim().length > 0;
@@ -193,8 +196,8 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
         </Field>
         <Field label="Token contract address">
           <div style={{ ...box, height: 56, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', border: '1px solid #accafe' }}>
-            <input className="find-input" value={address} onChange={(e) => setAddress(e.target.value)} aria-label="Token contract address" style={{ ...field, fontSize: 15 }} />
-            <button type="button" aria-label="Paste" onClick={() => navigator.clipboard?.readText().then((text) => { if (text) setAddress(text.trim()); }).catch(() => undefined)} style={iconBtn}>
+            <input ref={fieldRef} className="find-input" value={address} onChange={(e) => setAddress(e.target.value)} aria-label="Token contract address" style={{ ...field, fontSize: 15 }} />
+            <button type="button" aria-label="Paste" onPointerDown={onPasteTap((text) => setAddress(text.trim()), fieldRef)} style={iconBtn}>
               <FigmaImg src={art('paste.svg')} width={20} height={20} />
             </button>
             <button type="button" aria-label="Scan" onClick={() => {
@@ -231,9 +234,25 @@ function AddToken({ go, leave }: { go: Go; leave: () => void }) {
   );
 }
 
-function Notes({ leave }: { leave: () => void }) {
+function noticeTime(at: number) {
+  const mins = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (mins < 1) return 'Now';
+  if (mins < 60) return `${mins}m`;
+  return `${Math.round(mins / 60)}h`;
+}
+
+function Notes({ leave, go }: { leave: () => void; go: Go }) {
   const live = useLiveFrame();
   const [tab, setTab] = useState<'all' | 'activity' | 'security'>('all');
+  const txNotes = (live?.app ? live.notices : []).map((row) => ({
+    title: row.title,
+    body: row.status === 'processing' ? 'Going through · tap to open' : row.status === 'done' ? 'Completed' : row.body,
+    time: noticeTime(row.at),
+    icon: (row.status === 'done' ? 'check' : row.status === 'error' ? 'up' : 'up') as NoteIcon,
+    tab: 'activity' as NoteTab,
+    unread: row.status === 'processing',
+    onOpen: () => go(row.resume, false),
+  }));
   const liveToday = live?.app
     ? live.activity.flatMap((group) => group.items).slice(0, 3).map((row) => ({
         title: row.title,
@@ -243,7 +262,7 @@ function Notes({ leave }: { leave: () => void }) {
         tab: 'activity' as NoteTab,
       }))
     : TODAY;
-  const today = liveToday.filter((item) => tab === 'all' || item.tab === tab);
+  const today = [...txNotes, ...liveToday].filter((item) => tab === 'all' || item.tab === tab);
   const earlier = live?.app ? [] : EARLIER.filter((item) => tab === 'all' || item.tab === tab);
   return (
     <>
@@ -259,7 +278,7 @@ function Notes({ leave }: { leave: () => void }) {
       {today.length > 0 && <p style={groupLabel(168)}>TODAY</p>}
       {today.length > 0 && (
         <div style={{ ...noteCard, top: 192 }}>
-          {today.map((item, index) => <NoteRow key={item.title} item={item} last={index === today.length - 1} />)}
+          {today.map((item, index) => <NoteRow key={`${item.title}-${index}`} item={item} last={index === today.length - 1} />)}
         </div>
       )}
       {earlier.length > 0 && <p style={groupLabel(today.length ? 440 : 168)}>EARLIER</p>}
@@ -272,9 +291,10 @@ function Notes({ leave }: { leave: () => void }) {
   );
 }
 
-function NoteRow({ item, last }: { item: { title: string; body: string; time: string; icon: NoteIcon; unread?: boolean }; last: boolean }) {
+function NoteRow({ item, last }: { item: { title: string; body: string; time: string; icon: NoteIcon; unread?: boolean; onOpen?: () => void }; last: boolean }) {
   return (
     <>
+      <button type="button" onClick={item.onOpen} disabled={!item.onOpen} style={{ display: 'block', width: '100%', border: 'none', background: 'none', color: 'inherit', fontFamily: font.sans, textAlign: 'left', padding: 0, cursor: item.onOpen ? 'pointer' : 'default' }}>
       <div style={{ minHeight: 74, display: 'flex', alignItems: 'flex-start', gap: 12, padding: '15px 15px 12px' }}>
         <span style={{ width: 44, height: 44, borderRadius: 22, background: '#11161f', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           <FigmaImg src={art(noteIcon(item.icon))} width={20} height={20} />
@@ -288,6 +308,7 @@ function NoteRow({ item, last }: { item: { title: string; body: string; time: st
           {item.unread && <span style={{ display: 'block', width: 8, height: 8, borderRadius: 4, background: '#accafe', marginLeft: 'auto', marginTop: 8 }} />}
         </span>
       </div>
+      </button>
       {!last && <div style={{ height: 1, background: '#2a3447', margin: '0 15px' }} />}
     </>
   );

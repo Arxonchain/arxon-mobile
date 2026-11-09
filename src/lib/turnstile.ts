@@ -47,6 +47,13 @@ export function isTurnstileConfigured(): boolean {
   return TURNSTILE_SITE_KEY.length > 0;
 }
 
+/** `127.0.0.1` is not on the Turnstile hostname allowlist. `localhost` is. */
+export function isTurnstileLoopbackIp(): boolean {
+  if (typeof window === 'undefined') return false;
+  const host = window.location.hostname;
+  return host === '127.0.0.1' || host === '0.0.0.0';
+}
+
 /**
  * Hostnames that MUST be listed on the Turnstile widget Hostname Management allowlist.
  *

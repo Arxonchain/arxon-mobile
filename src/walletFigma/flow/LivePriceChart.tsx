@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, type PointerEvent } from 'react';
 import type { ChartPoint } from '@/chainWallet/marketChart';
 import type { PricedSymbol } from '@/chainWallet/prices';
+import { SkelBone } from './ScreenSkeleton';
 
 const UP = '#3ddc84';
 const DOWN = '#ff5c5c';
@@ -14,6 +15,7 @@ export function LivePriceChart({
   width = 354,
   height = 150,
   formatUsd,
+  endDot = false,
 }: {
   symbol: PricedSymbol | null;
   points: ChartPoint[];
@@ -22,6 +24,7 @@ export function LivePriceChart({
   width?: number;
   height?: number;
   formatUsd: (usd: number) => string;
+  endDot?: boolean;
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState<number | null>(null);
@@ -77,9 +80,12 @@ export function LivePriceChart({
   }
 
   if (!geometry) {
+    if (loading) {
+      return <SkelBone h={height} r={18} />;
+    }
     return (
       <div style={box(width, height)}>
-        <span style={msg}>{loading ? 'Loading chart…' : 'No chart data'}</span>
+        <span style={msg}>No chart data</span>
       </div>
     );
   }
@@ -106,7 +112,10 @@ export function LivePriceChart({
           </linearGradient>
         </defs>
         <path d={geometry.area} fill={`url(#${gid})`} />
-        <path d={geometry.line} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+        <path d={geometry.line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+        {!active && endDot ? (
+          <circle cx={Math.min(geometry.coords[geometry.coords.length - 1].x, width - 6)} cy={geometry.coords[geometry.coords.length - 1].y} r="5" fill={color} stroke="#050505" strokeWidth="2" />
+        ) : null}
         {active ? (
           <>
             <line x1={active.x} x2={active.x} y1={0} y2={height} stroke="rgba(255,255,255,0.22)" strokeWidth="1" />
@@ -160,6 +169,43 @@ export function MarketSpark({ points, width = 76, height = 28 }: { points: Chart
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden style={{ display: 'block', flexShrink: 0, pointerEvents: 'none' }}>
       <path d={line} fill="none" stroke={up ? UP : DOWN} strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** Compact spark that fills remaining hero width, from the percent to the eye. */
+export function HeroSpark({ points, color }: { points: ChartPoint[]; color: string }) {
+  const width = 160;
+  const height = 28;
+  if (points.length < 2) {
+    return <span style={{ flex: 1, minWidth: 48, height, display: 'block' }} />;
+  }
+  const vals = points.map((pt) => pt.p);
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const pad = Math.max((max - min) * 0.12, Math.abs(max || min || 1) * 0.0025, 1e-8);
+  const lo = min - pad;
+  const span = max + pad - lo || 1;
+  const coords = points.map((pt, i) => {
+    const x = (i / (points.length - 1)) * width;
+    const y = height - ((pt.p - lo) / span) * (height - 6) - 3;
+    return { x, y };
+  });
+  const line = coords.map((pt, i) => `${i === 0 ? 'M' : 'L'}${pt.x.toFixed(2)} ${pt.y.toFixed(2)}`).join(' ');
+  const last = coords[coords.length - 1];
+  const area = `${line} L ${width} ${height} L 0 ${height} Z`;
+  const gid = `hero-spark-${color.replace(/[^a-z0-9]/gi, '')}`;
+  return (
+    <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden style={{ display: 'block', flex: 1, minWidth: 48, pointerEvents: 'none' }}>
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <path d={area} fill={`url(#${gid})`} />
+      <path d={line} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+      <circle cx={last.x} cy={last.y} r="2.2" fill={color} />
     </svg>
   );
 }

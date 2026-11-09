@@ -13,7 +13,6 @@ import { formatEther, parseEther, type Address } from 'viem';
 import { pushActivity, saveClocks } from './activity';
 import { assertKnownAnchor, DEFAULT_RPC, liveRpcUrl, PendingTxError, PRECOMPILE, publicClient, waitIncluded, walletClient } from './chain';
 import {
-  etaSecondsLabel,
   includeMs,
   logTxClocks,
   rememberIncludeMs,
@@ -32,7 +31,16 @@ import {
 } from './ethereum';
 import { isWalletNetworkId, type EthereumToken, type WalletNetworkId } from './networks';
 import { submitRelayed } from './relay';
-import { notifyTx } from './txNotify';
+import {
+  TITLE_PRIVATE,
+  TITLE_SHIELD,
+  TITLE_UNSHIELD,
+  creditedToTheirVaultCopy,
+  creditedToWalletCopy,
+  creditedToYourVaultCopy,
+  notifyTx,
+  walletReceivesCopy,
+} from './txNotify';
 import { assertWalletSecret, newMnemonic, resolveAccount } from './keys';
 import {
   currentPassword,
@@ -137,6 +145,8 @@ async function settleAfterSubmit(
   kind: string,
   amount: string,
   afterOk: () => Promise<void>,
+  confirmedTitle: string,
+  confirmedBody: string,
 ) {
   try {
     const receipt = await waitIncluded(rpcUrl, hash);
@@ -146,17 +156,17 @@ async function settleAfterSubmit(
     await saveClocks(hash, clocks);
     logTxClocks(kind, hash, clocks);
     if (receipt.status !== 'success') {
-      notifyTx('Transaction failed', `${amount} tARX ${kind} did not land.`, `tx-fail-${hash}`);
+      notifyTx('Send failed', `${amount} tARX did not go through.`, `tx-fail-${hash}`);
       return;
     }
     await afterOk();
-    notifyTx('Confirmed', `${amount} tARX ${kind} is in a block.`, `tx-ok-${hash}`);
+    notifyTx(confirmedTitle, confirmedBody, `tx-ok-${hash}`);
   } catch (e) {
     if (e instanceof PendingTxError) {
-      notifyTx('Still confirming', `${amount} tARX submitted. Waiting for the network.`, `tx-wait-${hash}`);
+      notifyTx('Still sending', `${amount} tARX is still going through.`, `tx-wait-${hash}`);
       return;
     }
-    notifyTx('Transaction failed', e instanceof Error ? e.message : `${kind} failed`, `tx-fail-${hash}`);
+    notifyTx('Send failed', e instanceof Error ? e.message : `${kind} failed`, `tx-fail-${hash}`);
   }
 }
 
@@ -284,7 +294,25 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   }, [ready, mnemonic, ensureKeys]);
 
   useEffect(() => {
-    if (ready) void warmProver();
+    if (!ready) return;
+    const warm = () => {
+      void warmProver();
+    };
+    let idle = 0;
+    const t = window.setTimeout(() => {
+      const ric = window.requestIdleCallback;
+      if (typeof ric === 'function') {
+        idle = ric(warm, { timeout: 8000 });
+      } else {
+        warm();
+      }
+    }, 4000);
+    return () => {
+      window.clearTimeout(t);
+      if (idle && typeof window.cancelIdleCallback === 'function') {
+        window.cancelIdleCallback(idle);
+      }
+    };
   }, [ready]);
 
   useEffect(() => {
@@ -298,31 +326,41 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       return;
     }
     const gen = ++rpcGen.current;
-    if (network === 'ethereum') {
-      try {
-        const { balances, error } = await fetchEthereumBalances(address);
-        if (gen !== rpcGen.current) return;
-        setEthBalances(balances);
-        setBalance(balances.ETH);
-        setRpcError(error);
-      } catch (e) {
-        if (gen !== rpcGen.current) return;
-        setEthBalances({ ETH: null, USDC: null, USDT: null });
-        setBalance(null);
-        setRpcError(e instanceof Error ? e.message : 'Ethereum RPC unreachable');
-      }
-      return;
-    }
     const url = (rpcOverride ?? rpcUrl).trim() || DEFAULT_RPC;
-    try {
-      const wei = await publicClient(url).getBalance({ address });
-      if (gen !== rpcGen.current) return;
-      setBalance(formatEther(wei));
-      setRpcError(null);
-    } catch (e) {
-      if (gen !== rpcGen.current) return;
+
+    const ethTask = fetchEthereumBalances(address)
+      .then((r) => ({ ok: true as const, r }))
+      .catch((e: unknown) => ({ ok: false as const, e }));
+    const arxTask = publicClient(url)
+      .getBalance({ address })
+      .then((wei) => ({ ok: true as const, wei }))
+      .catch((e: unknown) => ({ ok: false as const, e }));
+
+    const [ethRes, arxRes] = await Promise.all([ethTask, arxTask]);
+    if (gen !== rpcGen.current) return;
+
+    if (ethRes.ok) {
+      setEthBalances(ethRes.r.balances);
+      if (network === 'ethereum') {
+        setBalance(ethRes.r.balances.ETH);
+        setRpcError(ethRes.r.error);
+      }
+    } else {
+      setEthBalances({ ETH: null, USDC: null, USDT: null });
+      if (network === 'ethereum') {
+        setBalance(null);
+        setRpcError(ethRes.e instanceof Error ? ethRes.e.message : 'Ethereum RPC unreachable');
+      }
+    }
+
+    if (arxRes.ok) {
+      if (network === 'arxon') {
+        setBalance(formatEther(arxRes.wei));
+        setRpcError(null);
+      }
+    } else if (network === 'arxon') {
       setBalance(null);
-      setRpcError(e instanceof Error ? e.message : 'Arxon Testnet RPC unreachable');
+      setRpcError(arxRes.e instanceof Error ? arxRes.e.message : 'Arxon Testnet RPC unreachable');
     }
   }, [address, rpcUrl, network]);
 
@@ -449,11 +487,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         network: 'arxon',
         clocks: { ...clocks },
       });
-      notifyTx(
-        `${amount} tARX sent`,
-        `Receiver should have it in about ${etaSecondsLabel()}.`,
-        `tx-sent-${hash}`,
-      );
+      notifyTx(TITLE_SHIELD, creditedToYourVaultCopy(amount), `tx-sent-${hash}`);
       void settleAfterSubmit(rpcUrl, hash, clocks, 'shield', amount, async () => {
         onPhase?.('In block');
         await commitOutputs(
@@ -469,7 +503,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
           proof.pk_hex
         );
         await refreshNotes();
-      });
+      }, TITLE_SHIELD, creditedToYourVaultCopy(amount));
       return hash;
     },
     [mnemonic, rpcUrl, refreshNotes, accountIndex]
@@ -516,18 +550,14 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         clocks: { ...clocks },
       });
       pendingCms.current.add(note.cm.toLowerCase());
-      notifyTx(
-        `${amount} tARX sent`,
-        `Receiver should have it in about ${etaSecondsLabel()}.`,
-        `tx-sent-${hash}`,
-      );
+      notifyTx(TITLE_PRIVATE, walletReceivesCopy(amount, recipientPk), `tx-sent-${hash}`);
       void settleAfterSubmit(rpcUrl, hash, clocks, 'private pay', amount, async () => {
         onPhase?.('In block');
         pendingCms.current.delete(note.cm.toLowerCase());
         await markSpent(note.cm);
         await commitOutputs(await secretsToNotes(proof.notes), shieldedPk);
         await refreshNotes();
-      }).finally(() => {
+      }, TITLE_PRIVATE, creditedToTheirVaultCopy(amount, recipientPk)).finally(() => {
         pendingCms.current.delete(note.cm.toLowerCase());
       });
       return hash;
@@ -576,11 +606,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         clocks: { ...clocks },
       });
       pendingCms.current.add(note.cm.toLowerCase());
-      notifyTx(
-        `${amount} tARX sent`,
-        `Receiver should have it in about ${etaSecondsLabel()}.`,
-        `tx-sent-${hash}`,
-      );
+      notifyTx(TITLE_UNSHIELD, walletReceivesCopy(amount, to), `tx-sent-${hash}`);
       void settleAfterSubmit(rpcUrl, hash, clocks, 'unshield', amount, async () => {
         onPhase?.('In block');
         pendingCms.current.delete(note.cm.toLowerCase());
@@ -588,7 +614,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         await commitOutputs(await secretsToNotes(proof.notes), shieldedPk);
         await refreshNotes();
         await refreshBalance();
-      }).finally(() => {
+      }, TITLE_UNSHIELD, creditedToWalletCopy(amount, to)).finally(() => {
         pendingCms.current.delete(note.cm.toLowerCase());
       });
       return hash;
@@ -613,14 +639,10 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
         network: 'arxon',
         clocks: { ...clocks },
       });
-      notifyTx(
-        `${amount} tARX sent`,
-        `Receiver should have it in about ${etaSecondsLabel()}.`,
-        `tx-sent-${hash}`,
-      );
+      notifyTx('Sent', walletReceivesCopy(amount, to), `tx-sent-${hash}`);
       void settleAfterSubmit(rpcUrl, hash, clocks, 'send', amount, async () => {
         await refreshBalance();
-      });
+      }, 'Sent', creditedToWalletCopy(amount, to));
       return hash;
     },
     [mnemonic, rpcUrl, accountIndex, refreshBalance]

@@ -184,6 +184,8 @@ export const SCREENS: Scr[] = [
 
   s('home', '08.01 Home – First-timer', '08 · Home', 'home', { tab: 'home' }),
   s('testnet', 'Testnet home', '08 · Home', 'home', { tab: 'home' }),
+  s('public-wallet', 'Public ARX wallet', '08 · Home', 'home', { tab: 'home' }),
+  s('shielded-wallet', 'Shielded wallet', '08 · Home', 'home', { tab: 'home' }),
   s('home-hidden', '08.02 Home – Balance hidden', '08 · Home', 'home', { tab: 'home' }),
   s('home-funded', '08.03 Home – Funded', '08 · Home', 'home', { tab: 'home' }),
   s('more', '08.04 Home – More', '08 · Home', 'overlay', {

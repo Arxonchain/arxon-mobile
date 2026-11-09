@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react';
 import { isValidMnemonic, looksLikePrivateKey } from '@/chainWallet/keys';
-import { clipboardEventText, pasteFromUserGesture, readClipboardText } from '@/lib/readClipboard';
+import { clipboardEventText, onPasteTap } from '@/lib/readClipboard';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { font } from '@/walletFigma/tokens';
@@ -33,17 +33,9 @@ export function ImportWalletScreen({ go, back }: { go: Go; back?: () => void }) 
     return true;
   }
 
-  function paste(event: { preventDefault: () => void; stopPropagation: () => void }) {
-    event.preventDefault();
-    event.stopPropagation();
-    setErr(null);
-    const field = fieldRef.current;
-    if (field && applyPaste(pasteFromUserGesture(field))) return;
-    void readClipboardText().then((text) => {
-      if (applyPaste(text)) return;
-      fieldRef.current?.focus();
-    });
-  }
+  const paste = onPasteTap((text) => {
+    applyPaste(text);
+  }, fieldRef);
 
   async function importWallet() {
     if (busy) return;

@@ -5,8 +5,8 @@ import { font } from '@/walletFigma/tokens';
 export type WalletTabName = 'Home' | 'Explore' | 'Market' | 'Account' | 'Testnet';
 export type WalletNet = 'mainnet' | 'testnet';
 
-/** Keep tabbed lists above the 64px bar at y=728 in the 844 frame. */
-export const WALLET_TAB_CLEAR = 'calc(116px + env(safe-area-inset-bottom, 0px))';
+/** Keep lists clear of the inset floating pill. */
+export const WALLET_TAB_CLEAR = 'calc(200px + env(safe-area-inset-bottom, 0px))';
 
 export const WalletNetworkContext = createContext<WalletNet>('mainnet');
 
@@ -16,10 +16,10 @@ export function useWalletNetwork() {
 
 const TABS: { name: WalletTabName; src: string; w: number; h: number }[] = [
   { name: 'Home', src: '/wallet-figma/activity/tab-home.svg', w: 22, h: 22 },
-  { name: 'Market', src: '/wallet-figma/activity/tab-history.svg', w: 20, h: 20 },
-  { name: 'Explore', src: '/wallet-figma/activity/tab-explore.svg', w: 24, h: 24 },
-  { name: 'Testnet', src: '/wallet-figma/receive/globe-test.svg', w: 20, h: 20 },
-  { name: 'Account', src: '/wallet-figma/activity/tab-account.svg', w: 22, h: 22 },
+  { name: 'Market', src: '/wallet-figma/activity/tab-history.svg', w: 18, h: 18 },
+  { name: 'Explore', src: '/wallet-figma/activity/tab-explore.svg', w: 20, h: 20 },
+  { name: 'Testnet', src: '/wallet-figma/receive/globe-test.svg', w: 18, h: 18 },
+  { name: 'Account', src: '/wallet-figma/activity/tab-account.svg', w: 20, h: 20 },
 ];
 
 type Go = (id: string, remember?: boolean) => void;
@@ -52,14 +52,37 @@ export function pickWalletTab(
 
 const ACCENT = '#accafe';
 const IDLE = '#8c8f99';
-const ACTIVE_GLOW = 'rgba(172, 202, 254, 0.14)';
 
 export function WalletTabs({ active, onSelect }: { active: WalletTabName | null; onSelect: (tab: WalletTabName) => void }) {
   const live = useLiveFrame();
   return (
-    <nav style={{ position: 'absolute', left: 0, top: 728, width: 390, background: '#050505', zIndex: 8, overflow: 'visible', paddingBottom: live?.app ? 'env(safe-area-inset-bottom, 0px)' : 0 }}>
-      <div aria-hidden style={{ position: 'absolute', left: 0, right: 0, top: -28, height: 28, pointerEvents: 'none', background: 'linear-gradient(180deg, rgba(5,5,5,0) 0%, #050505 100%)' }} />
-      <div style={{ display: 'flex', padding: '0 2px' }}>
+    <nav style={{
+      position: 'absolute',
+      left: 0,
+      width: 390,
+      background: 'transparent',
+      zIndex: 8,
+      overflow: 'visible',
+      pointerEvents: 'none',
+      ...(live?.app
+        ? { top: 'auto', bottom: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))' }
+        : { top: 728, paddingBottom: 0 }),
+    }}>
+      <div style={{
+        pointerEvents: 'auto',
+        margin: live?.app ? '0 16px 6px' : '0 22px',
+        display: 'flex',
+        alignItems: 'center',
+        height: 64,
+        padding: '4px 2px',
+        borderRadius: 32,
+        background: 'rgba(10,12,16,0.88)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
+        backdropFilter: 'blur(24px)',
+        WebkitBackdropFilter: 'blur(24px)',
+        boxSizing: 'border-box',
+      }}>
         {TABS.map((tab) => {
           const on = tab.name === active;
           return (
@@ -70,10 +93,8 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName | null;
               onClick={() => onSelect(tab.name)}
               style={tabBtn(on)}
             >
-              <span style={iconHalo(on)}>
-                <span style={tabGlyph(tab.src, tab.w, tab.h, on)} />
-              </span>
-              {tab.name}
+              {tab.name === 'Home' && on ? <HomeFill /> : <span style={tabGlyph(tab.src, Math.max(16, tab.w - 2), Math.max(16, tab.h - 2), on)} />}
+              <span style={{ whiteSpace: 'nowrap', overflow: 'visible' }}>{tab.name}</span>
             </button>
           );
         })}
@@ -87,10 +108,19 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName | null;
   );
 }
 
+function HomeFill() {
+  return (
+    <svg width={20} height={20} viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 3.2 2.8 10.4c-.25.2-.1.7.3.7H5v8.4c0 .4.3.8.8.8h4.1v-5.4h4.2V20h4.1c.5 0 .8-.4.8-.8V11.1h1.9c.4 0 .55-.5.3-.7L12 3.2Z" fill="#accafe" />
+    </svg>
+  );
+}
+
 function tabBtn(on: boolean): CSSProperties {
   return {
     flex: 1,
-    height: 64,
+    minWidth: 0,
+    height: 56,
     border: 'none',
     background: 'none',
     color: on ? ACCENT : IDLE,
@@ -98,25 +128,15 @@ function tabBtn(on: boolean): CSSProperties {
     fontSize: 10,
     lineHeight: '12px',
     fontWeight: on ? 600 : 500,
+    letterSpacing: -0.2,
     cursor: 'pointer',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    padding: 0,
-  };
-}
-
-function iconHalo(on: boolean): CSSProperties {
-  return {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    background: on ? ACTIVE_GLOW : 'transparent',
+    gap: 4,
+    padding: '0 1px',
+    overflow: 'visible',
   };
 }
 

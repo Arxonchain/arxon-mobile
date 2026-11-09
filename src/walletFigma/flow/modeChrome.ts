@@ -41,6 +41,11 @@ export function isHomeRoot(id: string) {
   return HOME_IDS.has(id);
 }
 
+/** Wallet/Mining switch is mainnet home only. Live Testnet and Vault start at the avatar row. */
+export function showsModeToggle(id: string) {
+  return isHomeRoot(id) && id !== 'testnet';
+}
+
 export function isSetupScreen(id: string) {
   return isOnboardingScreen(id) || isWelcomeScreen(id);
 }

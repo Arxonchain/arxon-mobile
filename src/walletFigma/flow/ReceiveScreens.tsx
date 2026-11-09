@@ -8,6 +8,10 @@ import { useAppHidesFigmaChrome } from './appChrome';
 import { useWalletNetwork } from './WalletTabs';
 import { applyNetwork, listNetworks, saveNetwork, selectedNetwork, type HomeNetwork } from './homeNetworks';
 import { qrDataUrl } from '@/chainWallet/receiveQr';
+import { HintCard, IceToggle, PullHint } from './LiveScroll';
+import { copyAddress, shareText } from './copyFlash';
+import { usePullRefresh } from './pullRefresh';
+import { SkelBone } from './ScreenSkeleton';
 
 const art = (name: string) => `/wallet-figma/receive/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -94,7 +98,7 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
 }
 
 function receiveCopy(current: Net, liveApp: boolean) {
-  const arxon = !liveApp || current.scope === 'testnet' || current.asset === 'ARX' || current.asset === 'ARXt';
+  const arxon = !liveApp || current.scope === 'testnet' || current.asset === 'ARX' || current.asset === 'ARXt' || current.asset === 'tARX';
   const letter = arxon ? 'A' : (current.asset.replace(/t$/i, '').slice(0, 1) || 'A');
   const caption = arxon ? 'Your Arxon address' : `Your ${current.name} address`;
   const warn = arxon
@@ -160,21 +164,20 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc, st
     };
   }, [stablecoin, stableChain, address]);
 
+  const pull = usePullRefresh(() => live?.refresh?.());
   async function copyShown() {
     if (!shown) return;
-    try { await navigator.clipboard?.writeText(shown); } catch { /* preview still confirms */ }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
+    try {
+      await copyAddress(shown);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch { /* preview still confirms */ }
   }
 
   function share() {
     if (!shown) return;
     const title = showingKey ? 'Shielded key' : `${current.name} address`;
-    if (navigator.share) {
-      navigator.share({ title, text: shown }).catch(() => undefined);
-      return;
-    }
-    void copyShown();
+    void shareText(title, shown);
   }
 
   return (
@@ -182,7 +185,14 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc, st
       <PhoneStatus />
       <Back top={56} onClick={leave} />
       <p style={{ position: 'absolute', left: 70, top: 65.5, width: 250, margin: 0, textAlign: 'center', fontSize: 17, fontWeight: 700 }}>Receive</p>
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 0, top: 112, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '0 18px 28px' }}>
+      <div
+        className="arxon-token-scroll"
+        style={{ position: 'absolute', left: 0, top: 112, bottom: 0, width: 390, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '0 18px 28px' }}
+        onTouchStart={live?.app ? pull.onTouchStart : undefined}
+        onTouchMove={live?.app ? pull.onTouchMove : undefined}
+        onTouchEnd={live?.app ? pull.onTouchEnd : undefined}
+      >
+        {live?.app ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
         {stablecoin ? (
           <div style={{ display: 'flex', justifyContent: 'center', gap: 8 }}>
             <button type="button" onClick={() => setStableChain('ethereum')} style={chainChip(stableChain === 'ethereum')}>Ethereum</button>
@@ -195,31 +205,48 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc, st
             <FigmaImg src={art('chev-down.svg')} width={16} height={16} />
           </button>
         )}
+        {testnet ? (
+          <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center' }}>
+            <IceToggle
+              label="Public or shielded"
+              left="Public"
+              right="Shielded"
+              onRight={shielded}
+              onLeft={() => setShielded(false)}
+              onRightPick={() => setShielded(true)}
+              width={280}
+            />
+          </div>
+        ) : null}
+        {((showingKey && shieldQr) || chainQr || qrSrc) ? (
         <div style={{ position: 'relative', width: 264, height: 264, margin: '22px auto 0', borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
           <img src={showingKey && shieldQr ? shieldQr : chainQr || qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32, width: 200, height: 200, objectFit: 'contain' }} />
           <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>{copy.letter}</div>
         </div>
+        ) : (
+          <div style={{ width: 264, height: 264, margin: '22px auto 0' }}><SkelBone h={264} r={24} frost /></div>
+        )}
         <p style={{ margin: '18px 0 0', textAlign: 'center', fontSize: 13, color: '#8b9097' }}>{showingKey ? 'Shielded key' : stablecoin ? `Your ${chainName} address` : copy.caption}</p>
         <p style={{ margin: '8px 12px 0', textAlign: 'center', fontSize: 15, fontWeight: 500, wordBreak: 'break-all' }}>{shown || (showingKey ? 'Your shielded key is not ready yet.' : stablecoin && stableChain === 'solana' ? 'Your Solana address is not ready yet.' : '')}</p>
-        {about ? <p style={{ margin: '8px 8px 0', textAlign: 'left', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>{about}</p> : null}
-        {testnet ? (
-          <div style={{ marginTop: 14, background: '#1c2025', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 12, padding: 14 }}>
-            <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-              <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>Shielded key</span>
-              <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097', lineHeight: 1.35 }}>Off is your public address. On is the vault key.</span>
-            </span>
-            <button type="button" aria-label="Shielded key" aria-pressed={shielded} onClick={() => setShielded(!shielded)} style={iconBtn}>
-              <img src={shielded ? '/wallet-figma/send/toggle-on.svg' : '/wallet-figma/send/toggle-off.svg'} alt="" width={48} height={28} style={{ width: 48, height: 28, objectFit: 'contain', display: 'block' }} />
-            </button>
+        {live?.app ? (
+          <div style={{ marginTop: 12 }}>
+            <HintCard
+              title={showingKey ? 'Shielded key' : about ? 'Public address' : undefined}
+              body={warn}
+            />
           </div>
-        ) : null}
-        <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-          <img src={art('info.svg')} alt="" width={16} height={16} style={{ width: 16, height: 16, flex: '0 0 16px', objectFit: 'contain', display: 'block' }} />
-          <p style={{ margin: 0, flex: 1, fontSize: 12, color: '#5c5f64', lineHeight: 1.35, textAlign: 'left' }}>{warn}</p>
-        </div>
+        ) : (
+          <>
+            {about ? <p style={{ margin: '8px 8px 0', textAlign: 'left', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>{about}</p> : null}
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <img src={art('info.svg')} alt="" width={16} height={16} style={{ width: 16, height: 16, flex: '0 0 16px', objectFit: 'contain', display: 'block' }} />
+              <p style={{ margin: 0, flex: 1, fontSize: 12, color: '#5c5f64', lineHeight: 1.35, textAlign: 'left' }}>{warn}</p>
+            </div>
+          </>
+        )}
         <button type="button" onClick={() => void copyShown()} style={solidFlow}>
           <FigmaImg src={art('copy.svg')} width={18} height={18} />
-          {copied ? 'Copied' : showingKey ? 'Copy key' : 'Copy address'}
+          {copied ? 'Address copied' : showingKey ? 'Copy key' : 'Copy address'}
         </button>
         <button type="button" onClick={share} style={outlineFlow}>
           <FigmaImg src={art('share.svg')} width={18} height={18} />

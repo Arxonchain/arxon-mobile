@@ -3,6 +3,7 @@ import { FigmaImg } from '@/walletFigma/icons';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
+import { copyAddress, shareText } from './copyFlash';
 
 const art = (name: string) => `/wallet-figma/receipt/${name}`;
 const CODE = 'ARX-7K2M-93QD-LX4P';
@@ -30,29 +31,13 @@ export function ReceiptScreens({ id, go, back }: { id: string; go: Go; back?: ()
     : 'Private receipt · 25.00 ARX · Oct 7, 2026 · 4:12:36 PM';
 
   async function copyCode() {
-    try {
-      await navigator.clipboard.writeText(liveCode);
-    } catch {
-      /* preview can still show the confirmation */
-    }
+    await copyAddress(liveCode, 'Copied');
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
   }
 
   async function share(text: string) {
-    if (navigator.share) {
-      try {
-        await navigator.share({ text });
-        return;
-      } catch {
-        /* fall through to the clipboard */
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      /* nothing else to do in the preview */
-    }
+    await shareText('Arxon receipt', text);
   }
 
   return (

@@ -1,8 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { font } from '@/walletFigma/tokens';
+import ErrorBoundary from '@/components/system/ErrorBoundary';
 import FlowStudio from './FlowStudio';
 import { LiveFrameProvider } from './liveFrame';
+import { IceToggle } from './LiveScroll';
 import { ModeChromeContext } from './modeChrome';
 
 type Mode = 'wallet' | 'mining';
@@ -24,6 +25,7 @@ export function useWalletModeActions() {
 const MINE_PREFIXES = [
   '/mine',
   '/mining',
+  '/auth',
   '/arena',
   '/games',
   '/profile',
@@ -86,6 +88,17 @@ export default function ModeShell({ children }: { children: ReactNode }) {
   }, [mode]);
 
   useEffect(() => {
+    if (isMiningPath(location.pathname) && modeRef.current !== 'mining') {
+      setMode('mining');
+      try {
+        sessionStorage.setItem('arxon-app-mode', 'mining');
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
     if (mode === 'mining' && isMiningPath(location.pathname)) {
       lastMiningPath.current = `${location.pathname}${location.search}`;
     }
@@ -112,16 +125,18 @@ export default function ModeShell({ children }: { children: ReactNode }) {
           aria-hidden={mode !== 'wallet'}
           style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: mode === 'wallet' ? 'flex' : 'none', flexDirection: 'column' }}
         >
-          <LiveFrameProvider>
-            <FlowStudio app />
-          </LiveFrameProvider>
+          <ErrorBoundary soft>
+            <LiveFrameProvider>
+              <FlowStudio app />
+            </LiveFrameProvider>
+          </ErrorBoundary>
         </div>
         <div
           aria-hidden={mode !== 'mining'}
           className="arxon-mode-scroll"
           style={{ position: 'absolute', inset: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none' }}
         >
-          {mode === 'mining' || isMiningPath(location.pathname) ? children : null}
+          {mode === 'mining' ? <ErrorBoundary soft>{children}</ErrorBoundary> : null}
         </div>
         {showBar ? (
         <div
@@ -136,7 +151,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
             display: 'flex',
             justifyContent: 'center',
             pointerEvents: 'none',
-            background: 'linear-gradient(180deg, #050505 0%, #050505 62%, rgba(5,5,5,0) 100%)',
+            background: 'linear-gradient(180deg, rgba(33,62,115,0.38) 0%, rgba(22,40,78,0.16) 48%, rgba(5,5,5,0) 100%)',
           }}
         >
           <div style={{ pointerEvents: 'auto' }}>
@@ -152,78 +167,14 @@ export default function ModeShell({ children }: { children: ReactNode }) {
 }
 
 function ModeToggle({ mode, onChoose }: { mode: Mode; onChoose: (next: Mode) => void }) {
-  const mining = mode === 'mining';
   return (
-    <div
-      role="tablist"
-      aria-label="Wallet or Mining"
-      style={{
-        position: 'relative',
-        width: 180,
-        height: 40,
-        boxSizing: 'border-box',
-        padding: 3,
-        borderRadius: 20,
-        background: '#1c2025',
-        touchAction: 'manipulation',
-      }}
-    >
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute',
-          top: 3,
-          left: mining ? 90 : 3,
-          width: 87,
-          height: 34,
-          borderRadius: 17,
-          background: '#accafe',
-          transition: 'left 160ms ease',
-        }}
-      />
-      <div style={{ position: 'relative', zIndex: 1, display: 'flex', height: 34 }}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!mining}
-          onClick={(e) => {
-            e.stopPropagation();
-            onChoose('wallet');
-          }}
-          style={modeBtn(!mining)}
-        >
-          Wallet
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={mining}
-          onClick={(e) => {
-            e.stopPropagation();
-            onChoose('mining');
-          }}
-          style={modeBtn(mining)}
-        >
-          Mining
-        </button>
-      </div>
-    </div>
+    <IceToggle
+      label="Wallet or Mining"
+      left="Wallet"
+      right="Mining"
+      onRight={mode === 'mining'}
+      onLeft={() => onChoose('wallet')}
+      onRightPick={() => onChoose('mining')}
+    />
   );
-}
-
-function modeBtn(on: boolean) {
-  return {
-    flex: 1,
-    height: 34,
-    border: 'none',
-    background: 'transparent',
-    cursor: 'pointer',
-    color: on ? '#0c1018' : '#8c8f99',
-    fontFamily: font.sans,
-    fontSize: 13,
-    fontWeight: 600,
-    lineHeight: '34px',
-    padding: 0,
-    touchAction: 'manipulation' as const,
-  };
 }

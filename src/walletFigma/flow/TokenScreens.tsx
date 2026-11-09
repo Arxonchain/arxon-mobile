@@ -11,6 +11,10 @@ import { CHART_RANGES, RANGE_SUFFIX, pricedChartSymbol, type ChartRange } from '
 import { useMarketChart } from '@/hooks/useMarketChart';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { formatPct, formatUsd, quoteFor } from '@/chainWallet/prices';
+import { CoinLogo } from './HomeMarket';
+import { PullHint, sheetGlass } from './LiveScroll';
+import { usePullRefresh } from './pullRefresh';
+import { useMarketFavs } from './marketFavs';
 
 const art = (name: string) => `/wallet-figma/token/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -135,23 +139,62 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
     : liveTok
       ? liveTok.tone === 'flat'
       : !!frame.flat;
-  const vaultLabel = live?.app
-    ? (net === 'testnet' && frame.title === 'Arxon' && Number(live.shielded) > 0 ? `${live.shielded} ARX in Vault` : undefined)
-    : frame.vault;
+  const vaultLabel = live?.app ? undefined : frame.vault;
   const [star, setStar] = useState(false);
+  const favs = useMarketFavs();
+  const liveSymbol = liveTok?.symbol ?? titleSymbol(frame.title);
+  const liveStar = favs.has(liveSymbol);
   const liveN = liveTok ? Number(liveTok.amount.replace(/[^0-9.]/g, '')) : 0;
   const empty = live?.app ? !(Number.isFinite(liveN) && liveN > 0) : !!frame.empty;
   const liveRows = live?.app
     ? live.activity.flatMap((group) => group.items).filter((row) => {
         const sym = liveTok?.symbol ?? '';
-        return !sym || row.token === sym || row.token === `t${sym}` || ((sym === 'ARX' || sym === 'ARXt') && (row.token === 'ARX' || row.token === 'tARX' || !row.token));
+        return !sym || row.token === sym || row.token === `t${sym}` || ((sym === 'ARX' || sym === 'ARXt' || sym === 'tARX') && (row.token === 'ARX' || row.token === 'tARX' || row.token === 'ARXt' || !row.token));
       }).slice(0, 2)
     : undefined;
   const activityTop = frame.card ? 636 : 544;
   const rowsTop = frame.card ? 672 : 580;
-  const leave = () => (back ? back() : go(empty ? 'home' : 'home-funded', false));
+  const leave = () => {
+    if (back) {
+      back();
+      return;
+    }
+    go(live?.app && net === 'testnet' ? 'testnet' : (empty ? 'home' : 'home-funded'), false);
+  };
   const sendTo = live?.app ? 'send-token' : frame.vaultFunds ? 'send-amount-vault' : 'send-token';
   const swapTo = live?.app ? 'swap' : frame.vaultFunds ? 'swap-vault' : 'swap';
+
+  if (live?.app) {
+    return (
+      <LiveToken
+        title={frame.title}
+        amount={amount}
+        fiat={fiat}
+        change={change}
+        changeUp={changeUp}
+        changeFlat={changeFlat}
+        vaultLabel={vaultLabel}
+        marketSym={marketSym}
+        spotUsd={formatUsd(spot?.usd) || '—'}
+        range={range}
+        setRange={setRange}
+        chart={chart}
+        format={format}
+        liveRows={liveRows ?? []}
+        empty={empty}
+        emptyCopy={frame.empty ?? 'Your activity will show up here.'}
+        sendTo={sendTo}
+        swapTo={swapTo}
+        symbol={liveSymbol}
+        icon={tokenIcon(frame.title)}
+        star={liveStar}
+        onStar={() => favs.toggle(liveSymbol)}
+        go={go}
+        leave={leave}
+        onReceive={() => { live.setReceiveAsset(liveTok?.symbol ?? titleSymbol(frame.title)); go('receive'); }}
+      />
+    );
+  }
 
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
@@ -273,14 +316,193 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
   );
 }
 
+function tokenIcon(title: string): 'btc' | 'eth' | 'sol' | 'usdt' | 'usdc' | 'arx' {
+  if (title === 'Bitcoin') return 'btc';
+  if (title === 'Solana') return 'sol';
+  if (title === 'Arxon') return 'arx';
+  if (title === 'Tether') return 'usdt';
+  if (title === 'USD Coin') return 'usdc';
+  return 'eth';
+}
+
 function titleSymbol(title: string) {
   if (title === 'Bitcoin') return 'BTC';
   if (title === 'Solana') return 'SOL';
-  if (title === 'Arxon') return 'ARXt';
+  if (title === 'Arxon') return 'tARX';
   if (title === 'Tether') return 'USDT';
   if (title === 'USD Coin') return 'USDC';
   return 'ETH';
 }
+
+function StarMark({ on }: { on: boolean }) {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden>
+      <path
+        d="M10 2.92l2.17 4.5 4.91.66-3.58 3.42.83 4.92L10 14.17l-4.33 2.25.83-4.92-3.58-3.42 4.91-.66L10 2.92Z"
+        fill={on ? '#accafe' : 'none'}
+        stroke={on ? '#accafe' : '#fff'}
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function LiveToken({
+  title, amount, fiat, change, changeUp, changeFlat, vaultLabel, marketSym, spotUsd,
+  range, setRange, chart, format, liveRows, empty, emptyCopy, sendTo, swapTo, symbol, icon, star, onStar, go, leave, onReceive,
+}: {
+  title: string;
+  amount: string;
+  fiat: string;
+  change: string;
+  changeUp: boolean;
+  changeFlat: boolean;
+  vaultLabel?: string;
+  marketSym: ReturnType<typeof pricedChartSymbol>;
+  spotUsd: string;
+  range: ChartRange;
+  setRange: (v: ChartRange) => void;
+  chart: ReturnType<typeof useMarketChart>;
+  format: (usd: number) => string;
+  liveRows: { title: string; sub: string; amount: string; fiat?: string; tone?: string; kind?: string; hash?: string; to?: string }[];
+  empty: boolean;
+  emptyCopy: string;
+  sendTo: string;
+  swapTo: string;
+  symbol: string;
+  icon: ReturnType<typeof tokenIcon>;
+  star: boolean;
+  onStar: () => void;
+  go: Go;
+  leave: () => void;
+  onReceive: () => void;
+}) {
+  const live = useLiveFrame();
+  const qty = amount.replace(/\s+[A-Za-z]+$/, '');
+  const changeShort = change.replace(/\s+(Today|24h|1H|1D|1W|1M|1Y|All)$/i, '');
+  const pull = usePullRefresh(() => live?.refresh?.());
+  return (
+    <div style={{ position: 'relative', width: 390, height: 844, overflow: 'hidden', fontFamily: font.sans, color: '#fff', background: '#050505' }}>
+      <div
+        className="arxon-token-scroll"
+        style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 78, overflowY: 'auto', WebkitOverflowScrolling: 'touch', padding: 'max(54px, env(safe-area-inset-top, 0px)) 18px 16px', boxSizing: 'border-box' }}
+        onTouchStart={live?.app ? pull.onTouchStart : undefined}
+        onTouchMove={live?.app ? pull.onTouchMove : undefined}
+        onTouchEnd={live?.app ? pull.onTouchEnd : undefined}
+      >
+        {live?.app ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
+        <div style={{ display: 'flex', alignItems: 'center', minHeight: 44, marginBottom: 8 }}>
+          <button type="button" aria-label="Back" onClick={leave} style={liveRound}>
+            <FigmaImg src={art('chev.svg')} width={20} height={20} />
+          </button>
+          <span style={{ flex: 1 }} />
+          <button type="button" aria-label={star ? 'Remove from favourites' : 'Add to favourites'} aria-pressed={star} onClick={onStar} style={liveRound}>
+            <StarMark on={star} />
+          </button>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
+          {icon === 'arx' ? (
+            <span style={{ width: 44, height: 44, borderRadius: 22, background: '#90b9ff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <FigmaImg src="/wallet-figma/home/arx-mask.png" width={22} height={16} />
+            </span>
+          ) : (
+            <CoinLogo kind={icon} />
+          )}
+          <div style={{ minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{symbol} ({title})</p>
+            <p style={{ margin: '4px 0 0', fontSize: 22, fontWeight: 700 }}>{spotUsd}</p>
+          </div>
+          <span style={{ marginLeft: 'auto', flexShrink: 0, minHeight: 28, padding: '0 10px', borderRadius: 14, display: 'inline-flex', alignItems: 'center', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', background: changeFlat ? 'rgba(140,143,153,0.16)' : changeUp ? 'rgba(61,220,132,0.16)' : 'rgba(242,82,82,0.16)', color: changeFlat ? '#8c8f99' : changeUp ? '#3ddc84' : '#f25252' }}>
+            {changeUp && !changeFlat ? '↑ ' : !changeUp && !changeFlat ? '↓ ' : ''}{changeShort}
+          </span>
+        </div>
+        <div style={{ margin: '8px -6px 4px', height: 196, overflow: 'hidden' }}>
+          <LivePriceChart symbol={marketSym} points={chart.points} loading={chart.loading} error={chart.error} width={354} height={196} formatUsd={format} endDot />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6, margin: '12px 0 16px' }}>
+          {CHART_RANGES.map((label) => {
+            const on = range === label;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => setRange(label)}
+                style={{
+                  flex: 1,
+                  height: 32,
+                  border: 'none',
+                  borderRadius: 16,
+                  background: on ? '#accafe' : 'rgba(28,32,37,0.9)',
+                  color: on ? '#0c1018' : '#8b9097',
+                  fontFamily: font.sans,
+                  fontSize: 12,
+                  fontWeight: on ? 700 : 500,
+                  cursor: 'pointer',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ ...sheetGlass, borderRadius: 18, display: 'flex', alignItems: 'stretch', padding: '14px 0' }}>
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#8c8f99' }}>Balance</p>
+            <p style={{ margin: '6px 0 0', fontSize: 16, fontWeight: 700 }}>{qty || amount}</p>
+          </div>
+          <div style={{ width: 1, background: 'rgba(255,255,255,0.08)' }} />
+          <div style={{ flex: 1, textAlign: 'center' }}>
+            <p style={{ margin: 0, fontSize: 12, color: '#8c8f99' }}>Value</p>
+            <p style={{ margin: '6px 0 0', fontSize: 16, fontWeight: 700 }}>{fiat || spotUsd}</p>
+          </div>
+        </div>
+        {vaultLabel ? (
+          <button type="button" onClick={() => go(vaultEntry('vault'))} style={{ marginTop: 10, width: '100%', border: 'none', ...sheetGlass, borderRadius: 14, padding: '10px 12px', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 500, cursor: 'pointer', textAlign: 'left' }}>
+            {vaultLabel} · not counted here
+          </button>
+        ) : null}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', margin: '18px 0 8px' }}>
+          <span style={{ fontSize: 16, fontWeight: 700 }}>Recent</span>
+          {liveRows.length > 0 ? (
+            <button type="button" onClick={() => go('activity')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>See all</button>
+          ) : null}
+        </div>
+        {empty || liveRows.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: '#8b9097' }}>{emptyCopy}</p>
+        ) : liveRows.map((row) => {
+          const inbound = row.tone === 'in' || row.kind === 'received';
+          return (
+            <button
+              key={row.title + row.sub}
+              type="button"
+              onClick={() => {
+                if (row.hash) void live?.openTx(row.hash);
+                go(row.to || 'tx');
+              }}
+              style={{ width: '100%', marginBottom: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,12,16,0.88)', borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, color: '#fff', fontFamily: font.sans, cursor: 'pointer', textAlign: 'left' }}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{row.title}</span>
+                <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097' }}>{row.sub}</span>
+              </span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: inbound ? '#3ddc84' : '#fff' }}>{row.amount}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'max(40px, calc(28px + env(safe-area-inset-bottom, 0px)))', display: 'flex', justifyContent: 'center', gap: 8, padding: '0 24px', pointerEvents: 'none' }}>
+        <button type="button" onClick={() => go(swapTo)} style={{ ...ghostBtn, pointerEvents: 'auto' }}>Swap</button>
+        <button type="button" onClick={onReceive} style={{ ...ghostBtn, pointerEvents: 'auto' }}>Receive</button>
+        <button type="button" onClick={() => go(sendTo)} style={{ ...sendBtn, pointerEvents: 'auto' }}>Send {symbol}</button>
+      </div>
+    </div>
+  );
+}
+
+const liveRound: CSSProperties = { width: 40, height: 40, borderRadius: 20, border: 'none', background: 'rgba(28,32,37,0.72)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 };
+const ghostBtn: CSSProperties = { flex: '0 0 auto', height: 38, minWidth: 86, padding: '0 14px', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 12, background: 'rgba(16,18,24,0.92)', color: '#fff', fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer' };
+const sendBtn: CSSProperties = { flex: '0 0 auto', height: 38, minWidth: 96, padding: '0 14px', border: 'none', borderRadius: 12, background: '#accafe', color: '#0c1018', fontFamily: font.sans, fontSize: 13, fontWeight: 700, cursor: 'pointer' };
 
 function Action({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
   return (

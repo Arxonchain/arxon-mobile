@@ -3,6 +3,8 @@ import AppFailureScreen from "./AppFailureScreen";
 
 interface Props {
   children: ReactNode;
+  /** Reset the pane without reloading the whole app. */
+  soft?: boolean;
 }
 
 interface State {
@@ -26,7 +28,7 @@ class ErrorBoundary extends Component<Props, State> {
 
   handleRetry = () => {
     this.setState({ hasError: false, error: null });
-    window.location.reload();
+    if (!this.props.soft) window.location.reload();
   };
 
   render() {

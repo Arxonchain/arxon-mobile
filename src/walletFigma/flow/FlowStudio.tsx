@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { App } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import { FigmaImg } from '@/walletFigma/icons';
 import { font, ink } from '@/walletFigma/tokens';
 import { SCREENS, SCREEN_MAP, type Scr, type TabId } from './catalog';
@@ -26,9 +28,14 @@ import { isExploreScreen, ExploreScreens } from './ExploreScreens';
 import { InAppBrowserHost } from './InAppBrowserHost';
 import { WalletNetworkContext, type WalletNet } from './WalletTabs';
 import { useLiveFrame } from './liveFrame';
-import { isHomeRoot, isOnboardingScreen, isSetupScreen, isWelcomeScreen, useModeChrome } from './modeChrome';
+import { AppGloss } from './LiveScroll';
+import { ScreenSkeleton, SkelCss } from './ScreenSkeleton';
+import { livePaintReady, routeFamily, skeletonKind } from './livePaint';
+import { isHomeRoot, isOnboardingScreen, isSetupScreen, isWelcomeScreen, showsModeToggle, useModeChrome } from './modeChrome';
+import { closeInAppBrowse, isBrowseOpen } from './inAppBrowse';
 import { markBootOk } from '@/lib/bootState';
 import { sessionStore } from '@/chainWallet/session';
+import { onCopyFlash } from './copyFlash';
 
 const PHRASE = ['canyon', 'river', 'amber', 'north', 'silver', 'garden', 'orbit', 'maple', 'quiet', 'harbor', 'velvet', 'stone'];
 
@@ -70,8 +77,11 @@ const APP_SCROLL_CSS = `
   width: 100% !important;
   box-sizing: border-box;
 }
+.arxon-app-gloss > .arxon-app-scroll > div {
+  background-color: transparent !important;
+}
 .arxon-app-scroll {
-  -webkit-overflow-scrolling: touch;
+  -webkit-overflow-scrolling: auto;
   overscroll-behavior: contain;
   touch-action: pan-x pan-y;
 }
@@ -82,6 +92,11 @@ const APP_SCROLL_CSS = `
   touch-action: pan-x;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-x: contain;
+}
+.arxon-app-scroll .promo-clip {
+  overflow: hidden !important;
+  border-radius: 20px;
+  isolation: isolate;
 }
 .arxon-app-frame nav {
   position: absolute !important;
@@ -96,8 +111,22 @@ const APP_SCROLL_CSS = `
   overflow: hidden !important;
 }
 `;
+
+const PRESS_CSS = `
+.arxon-app-frame button,
+.arxon-flow-frame button {
+  -webkit-tap-highlight-color: transparent;
+  transition: scale 90ms ease, translate 90ms ease, filter 90ms ease;
+}
+.arxon-app-frame button:active:not(:disabled),
+.arxon-flow-frame button:active:not(:disabled) {
+  scale: 0.97;
+  translate: 0 1px;
+  filter: brightness(0.9);
+}
+`;
 const CHECKS = [3, 7, 12];
-const SPLASH_HOLD_MS = 3500;
+const SPLASH_HOLD_MS = 700;
 const SPLASH_DONE_KEY = 'arxon.splash.done';
 const LIVE_SCREEN_KEY = 'arxon.live.screen';
 
@@ -126,7 +155,11 @@ function initialLiveScreen(app: boolean): string {
     } catch {
       /* ignore */
     }
-    return 'gateway';
+    return sessionStore.hasPassword() ? 'unlock' : 'gateway';
+  }
+  if (sessionStore.hasPassword()) {
+    markSplashPlayed();
+    return 'unlock';
   }
   const started = window.__ARXON_SPLASH_AT__;
   if (started && Date.now() - started >= SPLASH_HOLD_MS) {
@@ -156,14 +189,19 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const [phrasePick, setPhrasePick] = useState<string[]>(['', '', '']);
   const [flags, setFlags] = useState([true, true, false, false]);
   const [note, setNote] = useState<string | null>(null);
+  const [pageSlow, setPageSlow] = useState(false);
+  const flightToast = useRef<string | null>(null);
   const [menu, setMenu] = useState(!app);
   const [net, setNet] = useState<WalletNet>('mainnet');
   const stageRef = useRef<HTMLDivElement>(null);
   const jumpRef = useRef<string | null>(null);
+  const backRef = useRef<() => void>(() => {});
   const netSynced = useRef(false);
   const [fit, setFit] = useState(1);
 
   const screen = SCREEN_MAP[id] ?? SCREENS[0];
+
+  useEffect(() => onCopyFlash((msg) => setNote(msg)), []);
 
   useEffect(() => {
     if (app && id === 'splash') return;
@@ -236,23 +274,28 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   useEffect(() => {
     if (id !== 'splash') return;
     if (jumpRef.current) return;
-    if (app && live?.startId && live.startId !== 'splash') return;
+    if (app && live?.ready && live.startId && live.startId !== 'splash') {
+      markSplashPlayed();
+      setId(live.startId);
+      return;
+    }
     if (app && splashAlreadyPlayed()) {
-      setId('gateway');
+      setId(sessionStore.hasPassword() ? 'unlock' : 'gateway');
       return;
     }
     const started = window.__ARXON_SPLASH_AT__ || Date.now();
     const remain = Math.max(0, SPLASH_HOLD_MS - (Date.now() - started));
     const t = window.setTimeout(() => {
       markSplashPlayed();
-      setId('gateway');
+      const next = app && live?.startId && live.startId !== 'splash' ? live.startId : 'gateway';
+      setId(next);
     }, remain);
     return () => window.clearTimeout(t);
-  }, [id, app, live?.startId]);
+  }, [id, app, live?.startId, live?.ready]);
 
   useEffect(() => {
     if (!app) return;
-    setShowToggle(!isOnboardingScreen(id) && !live?.locked && isHomeRoot(id));
+    setShowToggle(!isOnboardingScreen(id) && !live?.locked && showsModeToggle(id));
   }, [app, id, live?.locked, setShowToggle]);
 
   useEffect(() => {
@@ -307,9 +350,12 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       // Keyboard shrinks the WebView. Keep the 390 frame where it is.
       const w = fullW - rawW > 72 ? fullW : rawW;
       const h = fullH - rawH > 72 ? fullH : rawH;
-      const cover = Math.max(w / 390, h / 844);
+      const fitW = w / 390;
+      const fitH = h / 844;
+      const cover = Math.max(fitW, fitH);
       const welcome = isWelcomeScreen(id);
-      const scale = welcome ? cover : (844 * cover - h > 16 ? h / 844 : cover);
+      // Welcome cover-fills. Wallet pages contain so list cards are not cropped on the sides.
+      const scale = welcome ? cover : Math.min(fitW, fitH);
       const frameW = 390 * scale;
       const frameH = 844 * scale;
       setAppScale(scale);
@@ -382,13 +428,20 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       if (live?.app) {
         if (
           (dest === 'testnet' && live.testnetAdded) ||
+          dest === 'public-wallet' ||
+          dest === 'shielded-wallet' ||
           dest.startsWith('vault') ||
           dest.startsWith('priv-') ||
           dest.startsWith('unshield-') ||
           dest.startsWith('shield-') ||
           dest === 'send-amount-vault'
         ) {
-          if (dest === 'testnet' || live.testnetAdded) void live.setNetwork('arxon');
+          if (
+            (dest === 'testnet' || dest === 'public-wallet' || dest === 'shielded-wallet' || live.testnetAdded)
+            && live.chainNetwork !== 'arxon'
+          ) {
+            void live.setNetwork('arxon');
+          }
         } else if (dest === 'home' || dest.startsWith('home-')) {
           void live.setNetwork('ethereum');
         }
@@ -400,6 +453,8 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         return;
       }
       if (
+        dest === 'public-wallet' ||
+        dest === 'shielded-wallet' ||
         dest.startsWith('vault') ||
         dest.startsWith('priv-') ||
         dest.startsWith('unshield-') ||
@@ -431,7 +486,16 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   }
 
   function back() {
+    if (isBrowseOpen()) {
+      closeInAppBrowse();
+      return;
+    }
     const walleted = Boolean(live?.app && (live.address || live.startId === 'home' || live.startId === 'unlock'));
+    const tabHome = net === 'testnet' || id === 'testnet' || id === 'public-wallet' || id === 'shielded-wallet' || id.startsWith('vault') || id.startsWith('priv-') || id.startsWith('unshield-') || id.startsWith('shield-') ? 'testnet' : 'home-funded';
+    if (walleted && isHomeRoot(id)) {
+      if (Capacitor.isNativePlatform()) void App.minimizeApp();
+      return;
+    }
     let rest = stack.slice();
     while (rest.length) {
       const prev = rest[rest.length - 1];
@@ -445,7 +509,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     }
     setStack([]);
     if (walleted && !isOnboardingScreen(id) && !isWelcomeScreen(id)) {
-      setId('home');
+      setId(tabHome);
       return;
     }
     if (id === 'create') {
@@ -456,8 +520,19 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
       setId('slide16');
     }
   }
+  backRef.current = back;
 
-  const homeDesigned = id === 'home' || id === 'home-hidden' || id === 'home-funded' || id === 'more' || id === 'home-vaulted' || id === 'home-unvaulted' || id === 'testnet';
+  useEffect(() => {
+    if (!app || !Capacitor.isNativePlatform()) return;
+    const pending = App.addListener('backButton', () => {
+      backRef.current();
+    });
+    return () => {
+      void pending.then((handle) => handle.remove());
+    };
+  }, [app]);
+
+  const homeDesigned = id === 'home' || id === 'home-hidden' || id === 'home-funded' || id === 'more' || id === 'home-vaulted' || id === 'home-unvaulted' || id === 'testnet' || id === 'public-wallet' || id === 'shielded-wallet';
   const marketDesigned = id === 'market';
   const tokenDesigned = id.startsWith('token-');
   const sendDesigned = isSendScreen(id);
@@ -476,6 +551,36 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const parent = !designed && screen.parent ? SCREEN_MAP[screen.parent] : null;
   const shown = parent && (screen.kind === 'overlay' || screen.overlay) ? parent : screen;
   const overlay = parent && (screen.kind === 'overlay' || screen.overlay) ? screen : null;
+  const pageGloss = app && !isWelcomeScreen(id);
+  const family = routeFamily(id);
+  const skel = skeletonKind(id);
+  const paintOk = livePaintReady(id, live, net);
+
+  useEffect(() => {
+    if (!app || paintOk || !skel) {
+      setPageSlow(false);
+      return;
+    }
+    const t = window.setTimeout(() => setPageSlow(true), 450);
+    return () => window.clearTimeout(t);
+  }, [app, paintOk, skel, id]);
+
+  useEffect(() => {
+    if (!app || !live?.app || !live.flight) return;
+    const f = live.flight;
+    const watching = id === f.screen || id === f.done || id === 'send-failed' || id === 'vault-failed' || id === 'send-success';
+    const key = `${f.nid}:${f.phase}`;
+    if (watching) {
+      if (f.phase !== 'processing') flightToast.current = key;
+      return;
+    }
+    if (flightToast.current === key) return;
+    flightToast.current = key;
+    if (f.phase === 'processing') setNote(`${f.title} is still going through`);
+    else if (f.phase === 'done') setNote(`${f.title} completed`);
+    else if (/cancelled/i.test(f.detail || '')) return;
+    else setNote(f.detail || `${f.title} failed`);
+  }, [app, id, live?.app, live?.flight]);
 
   const sections = useMemo(() => {
     const groups: { name: string; items: Scr[] }[] = [];
@@ -538,7 +643,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
         <div ref={stageRef} style={{ flex: 1, width: '100%', minHeight: 0, height: app ? '100%' : undefined, display: 'flex', justifyContent: app ? undefined : 'center', alignItems: 'flex-start', overflow: 'hidden', position: app ? 'relative' : undefined, background: app ? '#050505' : undefined }}>
         <WalletNetworkContext.Provider value={net}>
         <div
-          className={app ? 'arxon-app-frame' : 'arxon-flow-frame'}
+          className={app ? `arxon-app-frame${pageGloss ? ' arxon-app-gloss' : ''}` : 'arxon-flow-frame'}
           style={app
           ? {
             width: 390,
@@ -552,7 +657,9 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
             overflow: 'hidden',
           }
           : { width: 390, height: 844, zoom: fit, background: ink.page, borderRadius: 28, overflow: 'auto', position: 'relative', boxShadow: '0 20px 80px rgba(0,0,0,0.45)', display: 'flex', flexDirection: 'column', flexShrink: 0, WebkitOverflowScrolling: 'touch' }}>
-          <style>{HIDE_SCROLLBARS_CSS}{app ? APP_SCROLL_CSS : ''}</style>
+          <style>{HIDE_SCROLLBARS_CSS}{app ? APP_SCROLL_CSS : ''}{PRESS_CSS}</style>
+          {pageGloss ? <AppGloss /> : null}
+          {app ? <SkelCss /> : null}
           <div
             className={app ? 'arxon-app-scroll' : undefined}
             style={app ? {
@@ -561,15 +668,17 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
               right: 0,
               top: 0,
               bottom: 0,
-              overflowX: 'hidden',
-              overflowY: 'auto',
-              WebkitOverflowScrolling: 'touch',
+              zIndex: 1,
+              overflow: 'hidden',
             } : { height: '100%' }}
           >
-          {homeDesigned ? (
-            <HomeScreens id={id} network={id === 'testnet' || net === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
+          <div key={family} style={{ position: 'relative', height: '100%', width: '100%' }}>
+          {app && skel && !paintOk && pageSlow ? (
+            <ScreenSkeleton kind={skel} />
+          ) : homeDesigned ? (
+            <HomeScreens key={id} id={id} network={id === 'testnet' || id === 'public-wallet' || id === 'shielded-wallet' || net === 'testnet' ? 'testnet' : 'mainnet'} go={go} back={back} behind={stack[stack.length - 1]} />
           ) : marketDesigned ? (
-            <MarketScreen go={go} />
+            <MarketScreen go={go} back={back} />
           ) : tokenDesigned ? (
             <TokenScreens id={id} go={go} back={back} />
           ) : sendDesigned ? (
@@ -613,21 +722,8 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
           )}
           {shown.tab && !homeDesigned && !marketDesigned && !tokenDesigned && !sendDesigned && !receiveDesigned && !swapDesigned && !buyDesigned && !activityDesigned && !receiptDesigned && !claimDesigned && !vaultDesigned && !accountDesigned && !privacyDesigned && !exploreDesigned && <PhoneTabs active={shown.tab} go={go} />}
           </div>
+          </div>
           <InAppBrowserHost />
-          {live?.app && live.flight && id !== live.flight.screen && !(live.flight.phase === 'done' && !live.flight.detail && id === live.flight.done) ? (
-            <button
-              type="button"
-              onClick={() => {
-                const flight = live.flight;
-                if (!flight) return;
-                const dest = flight.phase === 'done' && !flight.detail ? flight.done : flight.screen;
-                go(dest, false);
-              }}
-              style={{ position: 'absolute', left: 18, right: 18, bottom: 120, zIndex: 40, minHeight: 44, borderRadius: 12, border: '1px solid #accafe', background: '#1c2433', color: '#fff', fontFamily: font.sans, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}
-            >
-              {live.flight.title} · {live.flight.phase === 'processing' ? 'Still processing' : live.flight.phase === 'error' ? 'Needs attention' : 'Finished'}
-            </button>
-          ) : null}
           {overlay && (
             <button type="button" onClick={() => go(overlay.parent || 'home', false)} style={{ position: 'absolute', inset: 0, zIndex: 6, background: 'rgba(0,0,0,0.55)', border: 'none', padding: 0 }}>
               <div onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: ink.card, borderRadius: '16px 16px 0 0', padding: 18, textAlign: 'left' }}>

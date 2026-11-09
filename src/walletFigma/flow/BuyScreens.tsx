@@ -7,7 +7,10 @@ import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { CoinLogo } from './HomeMarket';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
-import { Unavailable } from './LiveScroll';
+import { frostPanel, FrostLine, PullHint, Unavailable } from './LiveScroll';
+import { useLiveFee } from './useLiveFee';
+import { usePullRefresh } from './pullRefresh';
+import { briefAddr } from './briefAddr';
 
 const art = (name: string) => `/wallet-figma/buy/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -216,26 +219,64 @@ function Review({
 }) {
   const live = useLiveFrame();
   const [err, setErr] = useState<string | null>(null);
+  const quoted = useLiveFee({ amount: String(qty), to: live?.address || '', symbol: asset.symbol });
+  const pull = usePullRefresh(async () => {
+    await live?.refresh?.();
+    quoted.requote();
+  });
+  const feeShown = live?.app ? quoted.feeLabel : '$0.00';
+  const fromText = live?.app
+    ? `${(live.accountLabel || 'Acc 01').replace(/^Account\s+/i, 'Acc ')}${live.address ? ` ${briefAddr(live.address)}` : ''}`
+    : 'Account 01 · arx1q7…m2d9';
   return (
     <>
       <Back onClick={leave} />
       <p style={title}>Review order</p>
-      <div style={{ position: 'absolute', left: 18, top: 124, width: 354, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div style={{ background: '#1c2025', borderRadius: 16, padding: '18px 20px' }}>
-          <p style={kicker}>You pay</p>
-          <p style={{ margin: '4px 0 0', fontSize: 32, fontWeight: 700 }}>${money(dollars)}</p>
-          <div style={{ height: 10 }} />
-          <p style={kicker}>You receive</p>
-          <p style={{ margin: '4px 0 0', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {asset.symbol}</p>
+      <div
+        style={{ position: 'absolute', left: 18, top: 108, right: 18, bottom: 28, overflowY: 'auto', WebkitOverflowScrolling: 'touch', display: 'flex', flexDirection: 'column', gap: 12 }}
+        onTouchStart={live?.app ? pull.onTouchStart : undefined}
+        onTouchMove={live?.app ? pull.onTouchMove : undefined}
+        onTouchEnd={live?.app ? pull.onTouchEnd : undefined}
+      >
+        {live?.app ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
+        <div style={{ ...(live?.app ? frostPanel : { background: '#1c2025', borderRadius: 16 }), padding: live?.app ? '12px 14px' : '18px 20px' }}>
+          <p style={{ ...kicker, color: live?.app ? '#5c6578' : undefined }}>You pay</p>
+          <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: live?.app ? '#0c1018' : '#fff' }}>${money(dollars)}</p>
+          <div style={{ height: 8 }} />
+          <p style={{ ...kicker, color: live?.app ? '#5c6578' : undefined }}>You receive</p>
+          <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 700, color: live?.app ? '#3d6dff' : '#accafe' }}>{qty.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 6 })} {asset.symbol}</p>
         </div>
-        <div style={{ background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
-          <CenterLine label="Token" value={`${asset.name} · ${asset.symbol}`} />
-          <CenterLine label="Rate" value={usd ? `1 ${asset.symbol} = ${formatUsd(usd)}` : '—'} />
-          <CenterLine label="Provider fee" value={`$${money(PROVIDER)}`} />
-          <CenterLine label="Network fee" value="$0.00" />
-          <CenterLine label="Deliver to" value={live?.app ? `${live.accountLabel}${live.address ? ` · ${live.address.slice(0, 6)}…${live.address.slice(-4)}` : ''}` : 'Account 01 · arx1q7…m2d9'} />
-          <CenterLine label="Total" value={`$${money(total)}`} />
+        <div style={{ ...(live?.app ? frostPanel : { background: '#1c2025', borderRadius: 16 }), padding: live?.app ? '8px 14px' : '8px 16px' }}>
+          {live?.app ? (
+            <>
+              <FrostLine label="From" value={fromText} />
+              <FrostLine label="To" value={`${asset.name} · ${asset.symbol}`} />
+              <FrostLine label="Amount" value={`${qty.toLocaleString('en-US', { maximumFractionDigits: 6 })} ${asset.symbol}`} />
+              <FrostLine label="Network fee" value={feeShown} />
+              <FrostLine label="Total" value={`$${money(total)}`} />
+            </>
+          ) : (
+            <>
+              <CenterLine label="Token" value={`${asset.name} · ${asset.symbol}`} />
+              <CenterLine label="Rate" value={usd ? `1 ${asset.symbol} = ${formatUsd(usd)}` : '—'} />
+              <CenterLine label="Provider fee" value={`$${money(PROVIDER)}`} />
+              <CenterLine label="Network fee" value="$0.00" />
+              <CenterLine label="Deliver to" value={fromText} />
+              <CenterLine label="Total" value={`$${money(total)}`} />
+            </>
+          )}
         </div>
+        {live?.app ? (
+          <div style={{ ...frostPanel, padding: '8px 12px', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ flex: 1 }}>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: '#0c1018' }}>Hide my balance</span>
+              <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#3a4254' }}>Keep your balance off public view</span>
+            </span>
+            <button type="button" aria-label="Hide my balance" aria-pressed={hide} onClick={() => setHide(!hide)} style={iconBtn}>
+              <FigmaImg src={hide ? '/wallet-figma/send/toggle-on.svg' : '/wallet-figma/send/toggle-off.svg'} width={hide ? 46 : 48} height={28} />
+            </button>
+          </div>
+        ) : (
         <div style={{ height: 72, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 12, padding: '0 12px' }}>
           <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <FigmaImg src="/wallet-figma/send/shield-sm.svg" width={16} height={16} />
@@ -248,17 +289,18 @@ function Review({
             <FigmaImg src={hide ? '/wallet-figma/send/toggle-on.svg' : '/wallet-figma/send/toggle-off.svg'} width={hide ? 46 : 48} height={28} />
           </button>
         </div>
-      </div>
-      <div style={{ position: 'absolute', left: 18, top: 700, width: 354 }}>
-        {err ? <p style={{ margin: '0 0 8px', color: '#f25252', fontSize: 12, textAlign: 'center' }}>{err}</p> : null}
-        <SwipeConfirm label={`Pay $${money(total)}`} onConfirm={() => {
-          if (live?.app) {
-            setErr('Coming soon');
-            return;
-          }
-          go('buy-status');
-        }} />
-        <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>By continuing you agree to the provider’s terms.</p>
+        )}
+        <div style={{ marginTop: 8 }}>
+          {err ? <p style={{ margin: '0 0 8px', color: '#f25252', fontSize: 12, textAlign: 'center' }}>{err}</p> : null}
+          <SwipeConfirm label={`Pay $${money(total)}`} onConfirm={() => {
+            if (live?.app) {
+              setErr('Coming soon');
+              return;
+            }
+            go('buy-status');
+          }} />
+          <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 12, color: '#8b9097' }}>By continuing you agree to the provider’s terms.</p>
+        </div>
       </div>
     </>
   );

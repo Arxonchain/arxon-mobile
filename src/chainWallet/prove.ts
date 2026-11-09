@@ -112,7 +112,7 @@ function workerHandle() {
   }
 }
 
-function callWorker<T>(method: 'keys' | 'shield' | 'transfer' | 'unshield', body: unknown): Promise<T> | null {
+function callWorker<T>(method: 'keys' | 'shield' | 'transfer' | 'unshield' | 'warm', body: unknown): Promise<T> | null {
   const worker = workerHandle();
   if (!worker) return null;
   const id = ++workerSeq;
@@ -251,12 +251,12 @@ async function call<T>(
   return postHttp(`/v1/${method}`, body);
 }
 
-/** Load wasm and run the Halo2 warm path so the first send is not a cold start. */
+/** Warm Halo2 in the worker after Home is on screen. Never run this on the UI thread. */
 export async function warmProver() {
   if (!onWeb()) return;
   try {
-    const api = await loadWasm();
-    api?.warm();
+    const pending = callWorker<boolean>('warm', {});
+    if (pending) await pending;
   } catch {
     /* first send still loads the prover */
   }

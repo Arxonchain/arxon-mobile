@@ -1,4 +1,4 @@
-import { createPublicClient, createWalletClient, defineChain, http, type Hex } from 'viem';
+import { createPublicClient, createWalletClient, defineChain, formatEther, http, parseEther, type Address, type Hex } from 'viem';
 import { resolveAccount } from './keys';
 
 export const ARXON = defineChain({
@@ -101,6 +101,29 @@ export function publicClient(rpcUrl: string) {
     chain: defineChain({ ...ARXON, rpcUrls: { default: { http: [rpcUrl] } } }),
     transport: http(rpcUrl, { timeout: 60_000 }),
   });
+}
+
+/** On-chain gas for an Arxon transfer. Returns 0 when the node quotes nothing. */
+export async function quoteArxonFee(rpcUrl: string, from: Address, to: Address | undefined, amount: string): Promise<number> {
+  try {
+    const client = publicClient(liveRpcUrl(rpcUrl));
+    const gasPrice = await client.getGasPrice();
+    let gas = 21_000n;
+    try {
+      const dest = to && /^0x[0-9a-fA-F]{40}$/.test(to) ? to : from;
+      gas = await client.estimateGas({
+        account: from,
+        to: dest,
+        value: parseEther((amount || '0').trim() || '0'),
+      });
+    } catch {
+      /* typical transfer if vault/shield simulation is not available */
+    }
+    const fee = Number(formatEther(gas * gasPrice));
+    return Number.isFinite(fee) && fee > 0 ? fee : 0;
+  } catch {
+    return 0;
+  }
 }
 
 export class PendingTxError extends Error {

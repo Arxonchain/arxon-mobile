@@ -160,7 +160,8 @@ export default function AuthLandingV2() {
           authFailed = true;
           throw error;
         }
-        navigate(Capacitor.isNativePlatform() ? '/mine' : '/');
+        const miningHome = Capacitor.isNativePlatform() || import.meta.env.VITE_WALLET_SHELL === 'true';
+        navigate(miningHome ? '/mine' : '/');
       } else if (mode === 'forgot') {
         const { error } = await resetPassword(email, token || undefined);
         if (error) {
@@ -251,9 +252,7 @@ export default function AuthLandingV2() {
         <div
           className="p-8 rounded-3xl border border-cyan-400/25 shadow-2xl"
           style={{
-            background: 'linear-gradient(165deg, rgba(10,28,48,0.72) 0%, rgba(5,14,28,0.82) 100%)',
-            backdropFilter: 'blur(22px)',
-            WebkitBackdropFilter: 'blur(22px)',
+            background: 'linear-gradient(165deg, #0a1c30 0%, #050e1c 100%)',
             boxShadow: '0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px rgba(79,216,235,0.1)',
           }}
         >

@@ -9,6 +9,7 @@ import { currentPassword, sessionStore, type AutoLock } from '@/chainWallet/sess
 import { FingerprintMark } from './BioMark';
 import { readPrivacyUi, writeDefaultPrivacy, writePrivacyUi, type PrivacyUi } from '@/walletFigma/privacyPrefs';
 import { resolvePhraseWords } from './phraseWords';
+import { copyAddress } from './copyFlash';
 
 const art = (name: string) => `/wallet-figma/privacy/${name}`;
 const onToggle = '/wallet-figma/send/toggle-on.svg';
@@ -573,7 +574,7 @@ function Shown({ onBack, onHide, onDone }: { onBack: () => void; onHide: () => v
           <div style={{ marginTop: 18 }}>
             <WordGrid />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 16, marginTop: 12 }}>
-              <button type="button" disabled={!usable} onClick={() => { if (!usable) return; navigator.clipboard?.writeText(words.join(' ')).catch(() => undefined); setCopied(true); }} style={{ ...textBtn, opacity: usable ? 1 : 0.45 }}>{copied ? 'Copied' : 'Copy'}</button>
+              <button type="button" disabled={!usable} onClick={() => { if (!usable) return; void copyAddress(words.join(' '), 'Copied').then(() => setCopied(true)); }} style={{ ...textBtn, opacity: usable ? 1 : 0.45 }}>{copied ? 'Copied' : 'Copy'}</button>
               <button type="button" onClick={onHide} style={textBtn}>Hide</button>
             </div>
             {live?.app && !usable ? (

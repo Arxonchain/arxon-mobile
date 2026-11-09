@@ -11,6 +11,8 @@ import { DISPLAY_CURRENCIES, readDisplayCurrency, writeDisplayCurrency, type Dis
 import { ProfileAvatar } from './ProfileAvatar';
 import { useProfilePhoto } from './profilePhoto';
 import { usePullRefresh } from './pullRefresh';
+import { BackChip, PullHint, sheetGlass } from './LiveScroll';
+import { copyAddress } from './copyFlash';
 
 const art = (name: string) => `/wallet-figma/account/${name}`;
 const ADDRESS = 'arx1q8x4m2k7f9v3d6h0w5z...t7c2n4p';
@@ -49,11 +51,12 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
           editing={live?.app ? editing : false}
           draftName={draftName}
           onDraft={setDraftName}
-          onCopy={live?.app ? undefined : () => {
+          onCopy={() => {
             if (!full) return;
-            navigator.clipboard?.writeText(full).catch(() => undefined);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1200);
+            void copyAddress(full).then(() => {
+              setCopied(true);
+              window.setTimeout(() => setCopied(false), 1400);
+            }).catch(() => undefined);
           }}
           onRename={live?.app ? () => {
             setDraftName(live.accountLabel);
@@ -66,6 +69,7 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
             setEditing(false);
           }}
           go={go}
+          onBack={live?.app ? () => leave('home') : undefined}
           onLogout={async () => {
           if (live?.logout) await live.logout();
           go('slide16', false);
@@ -105,7 +109,7 @@ export function AccountScreens({ id, go, back }: { id: string; go: Go; back?: ()
   );
 }
 
-function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, onSaveName, go, label, shortAddr, onLogout }: {
+function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, onSaveName, go, label, shortAddr, onLogout, onBack }: {
   code: string;
   copied: boolean;
   onCopy?: () => void;
@@ -118,6 +122,7 @@ function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, 
   label: string;
   shortAddr: string;
   onLogout: () => void | Promise<void>;
+  onBack?: () => void;
 }) {
   const net = useWalletNetwork();
   const live = useLiveFrame();
@@ -126,10 +131,33 @@ function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, 
   return (
     <>
       <PhoneStatus />
-      <div style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', overflowX: 'hidden' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
-        <div style={{ padding: live?.app ? '56px 16px 24px' : '64px 18px 88px' }}>
-          <p style={{ margin: 0, fontSize: live?.app ? 24 : 26, fontWeight: 700, lineHeight: 1.2 }}>Account</p>
-          <div style={{ marginTop: live?.app ? 14 : 18, minHeight: 84, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, display: 'flex', alignItems: 'center', gap: 14, padding: 16 }}>
+      <div
+        className="arxon-token-scroll"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          boxSizing: 'border-box',
+          padding: live?.app ? '56px 16px 0' : '64px 18px 88px',
+          paddingBottom: live?.app ? WALLET_TAB_CLEAR : 88,
+        }}
+        onTouchStart={pull.onTouchStart}
+        onTouchMove={pull.onTouchMove}
+        onTouchEnd={pull.onTouchEnd}
+      >
+        {live?.app ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {onBack ? <BackChip onBack={onBack} /> : null}
+            <p style={{ margin: 0, flex: 1, fontSize: live?.app ? 24 : 26, fontWeight: 700, lineHeight: 1.2 }}>Account</p>
+          </div>
+          <div style={{ marginTop: live?.app ? 14 : 18, minHeight: 84, boxSizing: 'border-box', background: live?.app ? undefined : '#1c2025', borderRadius: live?.app ? 22 : 16, display: 'flex', alignItems: 'center', gap: 14, padding: 16, ...(live?.app ? sheetGlass : {}) }}>
             <ProfileAvatar size={52} photo={photo} accountIndex={live?.accountIndex ?? 0} />
             <span style={{ flex: 1, minWidth: 0 }}>
               {editing ? (
@@ -142,7 +170,7 @@ function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, 
               ) : (
                 <span style={{ display: 'block', fontSize: 17, fontWeight: 700, lineHeight: 1.3 }}>{label}</span>
               )}
-              <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{copied ? 'Copied' : shortAddr}</span>
+              <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{copied ? 'Address copied' : shortAddr}</span>
             </span>
             {editing ? (
               <button type="button" onClick={onSaveName} style={{ ...iconBtn, width: 64, borderRadius: 8, background: '#accafe', color: '#0c1018', fontSize: 13, fontWeight: 700 }}>Save</button>
@@ -157,7 +185,7 @@ function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, 
             )}
           </div>
           <p style={live?.app ? liveKicker : accountKicker}>SECURITY & PRIVACY</p>
-          <div style={accountCard}>
+          <div style={live?.app ? liveAccountCard : accountCard}>
             <Row icon={art('key.svg')} label="Recovery phrase" onClick={() => go('view-verify')} />
             <Row icon={art('face.svg')} label={live?.app ? 'Fingerprint, Face ID & password' : 'Face ID & password'} onClick={() => go('face-settings')} />
             {net === 'testnet' && <Row icon={art('shield.svg')} label="Private mode" value="On" onClick={() => go('privacy')} />}
@@ -171,13 +199,13 @@ function Account({ code, copied, onCopy, onRename, editing, draftName, onDraft, 
             </>
           )}
           <p style={live?.app ? liveKicker : accountKicker}>PREFERENCES</p>
-          <div style={accountCard}>
+          <div style={live?.app ? liveAccountCard : accountCard}>
             <Row icon={art('dollar.svg')} label="Currency" value={code} onClick={() => go('currency')} />
             <Row icon={art('globe.svg')} label="Network" value={selectedNetwork(net).name} onClick={() => go('network')} />
             <Row icon="/wallet-figma/explore/apps.svg" label="Connected apps" value={live?.app ? String(live.wcSessions.length) : undefined} onClick={() => go('connected')} />
             <Row icon={art('help.svg')} label="Help & support" onClick={() => go('help')} />
           </div>
-          <div style={{ ...accountCard, marginTop: 22 }}>
+          <div style={{ ...(live?.app ? liveAccountCard : accountCard), marginTop: 22 }}>
             <button type="button" onClick={() => void onLogout()} style={rowBtn}>
               <span style={{ flex: 1, minWidth: 0, textAlign: 'left', fontSize: 15, fontWeight: 500, lineHeight: 1.3, color: '#f25252' }}>Log out</span>
             </button>
@@ -403,6 +431,7 @@ function EditMark() {
 const iconBg: CSSProperties = { width: 36, height: 36, borderRadius: 18, background: '#2a3447', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const accountKicker: CSSProperties = { margin: '22px 4px 8px', fontSize: 12, fontWeight: 600, color: '#5c5f64' };
 const accountCard: CSSProperties = { background: '#1c2025', borderRadius: 16, overflow: 'hidden' };
+const liveAccountCard: CSSProperties = { ...sheetGlass, borderRadius: 22, overflow: 'hidden' };
 const rowBtn: CSSProperties = { width: '100%', minHeight: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', cursor: 'pointer', boxSizing: 'border-box' };
 const backBtn: CSSProperties = { position: 'absolute', left: 18, top: 56, width: 40, height: 40, borderRadius: 20, border: 'none', background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 };
 const listCard: CSSProperties = { position: 'absolute', left: 18, top: 192, width: 354, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, overflow: 'hidden' };

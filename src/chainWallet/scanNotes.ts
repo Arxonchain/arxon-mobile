@@ -2,7 +2,7 @@ import { decodeFunctionData, formatEther, type Hex, type Transaction } from 'vie
 
 import { pushActivity } from './activity';
 import { PRECOMPILE, publicClient } from './chain';
-import { notifyTx } from './txNotify';
+import { TITLE_RECEIVED, creditedToYourVaultCopy, notifyTx } from './txNotify';
 import { decryptNote, toHex } from './noteCipher';
 import { adoptIncomingNotes, hydrateLeaves } from './notes';
 import { storage } from './storage';
@@ -154,7 +154,7 @@ async function scanIncomingNotesInner(
       token: 'tARX',
       network: 'arxon',
     });
-    notifyTx('You received tARX', `${amount} tARX landed in your Vault.`, `tx-recv-${note.hash}`);
+    notifyTx(TITLE_RECEIVED, creditedToYourVaultCopy(amount), `tx-recv-${note.hash}`);
   }
   await storage.setLeafScanAt(to.toString());
   return added.length;

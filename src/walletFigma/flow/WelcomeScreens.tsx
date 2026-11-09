@@ -77,7 +77,7 @@ export function OfficialSplash({ ready = true, onFinish }: { ready?: boolean; on
 
   useEffect(() => {
     if (!ready) return;
-    const t = window.setTimeout(() => finishRef.current(), 2800);
+    const t = window.setTimeout(() => finishRef.current(), 600);
     return () => window.clearTimeout(t);
   }, [ready]);
 

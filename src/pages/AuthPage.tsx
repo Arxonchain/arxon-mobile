@@ -324,7 +324,7 @@ export default function AuthPage() {
               </div>
             )}
 
-            {/* Bot protection — visible managed widget (required while Supabase CAPTCHA is on). */}
+            {captchaRequired ? (
             <TurnstileWidget
               key={mode}
               action={mode}
@@ -339,6 +339,7 @@ export default function AuthPage() {
                 setCaptchaVerifiedAt(null);
               }}
             />
+            ) : null}
 
             {/* Forgot password link */}
             {mode === 'signin' && (

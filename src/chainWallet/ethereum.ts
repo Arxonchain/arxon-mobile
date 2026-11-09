@@ -184,7 +184,7 @@ export async function sendEthereumNative(
       to,
       value: parseEther(amount),
     });
-    await waitEth(rpcUrl, hash);
+    void waitEth(rpcUrl, hash);
     return hash;
   } catch (e) {
     if (e instanceof PendingTxError) throw e;
@@ -226,7 +226,7 @@ export async function sendEthereumToken(
             args: [to, value],
             gas: BigInt(120_000),
           });
-    await waitEth(rpcUrl, hash);
+    void waitEth(rpcUrl, hash);
     return hash;
   } catch (e) {
     if (e instanceof PendingTxError) throw e;

@@ -40,7 +40,7 @@
     <link rel="apple-touch-icon" href="/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Readex+Pro:wght@400;500&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Readex+Pro:wght@400;500&family=Rajdhani:wght@400;500;600;700&display=swap" media="print" onload="this.media='all'" />
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
@@ -292,6 +292,17 @@
     <div id="root"></div>
     <script>
       (function () {
+        // USB live APK opens http://127.0.0.1:8080 — Turnstile rejects that host.
+        // localhost is on the widget allowlist; adb reverse serves both.
+        try {
+          if (location.hostname === "127.0.0.1" && location.port === "8080") {
+            location.replace(
+              "http://localhost:8080" + location.pathname + location.search + location.hash
+            );
+            return;
+          }
+        } catch (e) {}
+
         var boot = document.getElementById("arxon-boot");
         var errBox = document.getElementById("arxon-boot-error");
         var errMsg = document.getElementById("arxon-boot-error-msg");

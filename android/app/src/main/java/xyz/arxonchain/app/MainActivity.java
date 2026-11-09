@@ -4,8 +4,11 @@ import android.app.Activity;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.graphics.Color;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
@@ -24,7 +27,9 @@ import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Capacitor loads the bundled app via BridgeWebViewClient#shouldInterceptRequest (virtual
@@ -58,6 +63,7 @@ public class MainActivity extends BridgeActivity {
       configureWebViewForTurnstile(webView);
       if (webView != null) {
         webView.addJavascriptInterface(new ClipboardBridge(this), "ArxonClipboard");
+        webView.addJavascriptInterface(new ShareBridge(this), "ArxonShare");
         webView.addJavascriptInterface(new BiometricBridge(this), "ArxonBiometric");
         webView.addJavascriptInterface(new BrowserBridge(this), "ArxonInAppBrowser");
       }
@@ -198,8 +204,35 @@ public class MainActivity extends BridgeActivity {
     return "'" + raw.replace("\\", "\\\\").replace("'", "\\'").replace("\n", " ").replace("\r", "") + "'";
   }
 
+  public static final class ShareBridge {
+    private final Activity activity;
+
+    ShareBridge(Activity activity) {
+      this.activity = activity;
+    }
+
+    @JavascriptInterface
+    public void share(String title, String text) {
+      activity.runOnUiThread(() -> {
+        try {
+          Intent send = new Intent(Intent.ACTION_SEND);
+          send.setType("text/plain");
+          send.putExtra(Intent.EXTRA_TEXT, text == null ? "" : text);
+          if (title != null && !title.isEmpty()) {
+            send.putExtra(Intent.EXTRA_SUBJECT, title);
+          }
+          String headline = title == null || title.isEmpty() ? "Share" : title;
+          activity.startActivity(Intent.createChooser(send, headline));
+        } catch (Exception e) {
+          Log.w(TAG, "Share failed", e);
+        }
+      });
+    }
+  }
+
   public static final class ClipboardBridge {
     private final Context context;
+    private final Handler main = new Handler(Looper.getMainLooper());
 
     ClipboardBridge(Context context) {
       this.context = context.getApplicationContext();
@@ -207,6 +240,61 @@ public class MainActivity extends BridgeActivity {
 
     @JavascriptInterface
     public String read() {
+      if (Looper.myLooper() == Looper.getMainLooper()) {
+        return readNow();
+      }
+      final String[] slot = { "" };
+      final CountDownLatch done = new CountDownLatch(1);
+      main.post(() -> {
+        slot[0] = readNow();
+        done.countDown();
+      });
+      try {
+        if (!done.await(2, TimeUnit.SECONDS)) {
+          return "";
+        }
+      } catch (InterruptedException e) {
+        return "";
+      }
+      return slot[0];
+    }
+
+    @JavascriptInterface
+    public String readText() {
+      return read();
+    }
+
+    /** Write without going through WebView clipboard APIs (those can toast “pasted from clipboard”). */
+    @JavascriptInterface
+    public void write(String text) {
+      if (text == null) {
+        return;
+      }
+      if (Looper.myLooper() == Looper.getMainLooper()) {
+        writeNow(text);
+        return;
+      }
+      main.post(() -> writeNow(text));
+    }
+
+    @JavascriptInterface
+    public void writeText(String text) {
+      write(text);
+    }
+
+    private void writeNow(String text) {
+      try {
+        ClipboardManager manager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
+        if (manager == null) {
+          return;
+        }
+        manager.setPrimaryClip(ClipData.newPlainText("address", text));
+      } catch (Exception e) {
+        Log.w(TAG, "Clipboard write failed", e);
+      }
+    }
+
+    private String readNow() {
       try {
         ClipboardManager manager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         if (manager == null || !manager.hasPrimaryClip()) {

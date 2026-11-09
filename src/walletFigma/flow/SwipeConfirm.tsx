@@ -63,6 +63,73 @@ export function SwipeVault({ label, onOpen }: { label: string; onOpen: () => voi
   );
 }
 
+function ProcessingWord() {
+  const [n, setN] = useState(0);
+  useEffect(() => {
+    const timer = window.setInterval(() => setN((value) => (value + 1) % 4), 400);
+    return () => window.clearInterval(timer);
+  }, []);
+  return <>Processing{'.'.repeat(n)}</>;
+}
+
+/** Clickable stand-in for the old Private pay / Unshield swipe pills. */
+export function TapAction({ label, onOpen }: { label: string; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      style={{
+        flex: 1,
+        minWidth: 0,
+        height: 44,
+        borderRadius: 22,
+        border: 'none',
+        background: '#1c2025',
+        color: '#fff',
+        fontFamily: font.sans,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** Confirm control that taps instead of swiping. Same size as SwipeConfirm. */
+export function ClickConfirm({ label, disabled, processing, onConfirm }: { label: string; disabled?: boolean; processing?: boolean; onConfirm: () => void }) {
+  return (
+    <button
+      type="button"
+      disabled={disabled || processing}
+      onClick={() => {
+        if (!disabled && !processing) onConfirm();
+      }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: 48,
+        borderRadius: 12,
+        border: 'none',
+        background: processing ? '#1c2025' : disabled ? '#161a1f' : '#accafe',
+        color: processing || disabled ? '#fff' : '#0c1018',
+        fontFamily: font.sans,
+        fontSize: 15,
+        fontWeight: 600,
+        cursor: disabled || processing ? 'default' : 'pointer',
+        flex: '0 0 auto',
+        opacity: disabled && !processing ? 0.55 : 1,
+        overflow: 'hidden',
+      }}
+    >
+      <style>{`@keyframes arxon-process{0%{transform:translateX(-120%)}100%{transform:translateX(220%)}}`}</style>
+      {processing ? <div style={{ position: 'absolute', top: 0, bottom: 0, width: '40%', background: 'linear-gradient(90deg, transparent, rgba(172,202,254,0.45), transparent)', animation: 'arxon-process 1.1s linear infinite' }} /> : null}
+      <span style={{ position: 'relative' }}>{processing ? <ProcessingWord /> : label}</span>
+    </button>
+  );
+}
+
 /** Rectangular swipe, same gesture as Private pay on Testnet. */
 export function SwipeConfirm({ label, disabled, processing, onConfirm }: { label: string; disabled?: boolean; processing?: boolean; onConfirm: () => void }) {
   const track = useRef<HTMLDivElement>(null);
@@ -127,15 +194,6 @@ export function SwipeConfirm({ label, disabled, processing, onConfirm }: { label
       </div>
     </div>
   );
-}
-
-function ProcessingWord() {
-  const [n, setN] = useState(0);
-  useEffect(() => {
-    const timer = window.setInterval(() => setN((value) => (value + 1) % 4), 400);
-    return () => window.clearInterval(timer);
-  }, []);
-  return <>Processing{'.'.repeat(n)}</>;
 }
 
 export function CenterLine({ label, value, color = '#fff' }: { label: string; value: string; color?: string }) {

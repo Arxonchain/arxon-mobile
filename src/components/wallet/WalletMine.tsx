@@ -26,7 +26,14 @@ export default function WalletMine() {
 
   if (!user) {
     return (
-      <div style={{ paddingBottom: 110 }}>
+      <div
+        style={{
+          minHeight: '100%',
+          background: '#02060e',
+          paddingTop: 'max(56px, calc(env(safe-area-inset-top, 0px) + 44px))',
+          paddingBottom: 24,
+        }}
+      >
         <AuthLandingV2 />
       </div>
     );

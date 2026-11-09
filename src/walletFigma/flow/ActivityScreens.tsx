@@ -9,7 +9,8 @@ import { explorerTxUrl, openExternal } from './openExternal';
 import { usePullRefresh } from './pullRefresh';
 import { isMainnetActivity, TestnetHistory } from './TestnetHistory';
 import { briefAddr } from './briefAddr';
-import { LiveHead, LiveScroll, liveGhost, livePrimary } from './LiveScroll';
+import { BackChip, LiveHead, LiveScroll, liveGhost, livePrimary, sheetGlass } from './LiveScroll';
+import { copyAddress } from './copyFlash';
 
 const art = (name: string) => `/wallet-figma/activity/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -143,7 +144,10 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
       <div style={frame}>
         <LiveHistory
           go={go}
+          onBack={leave}
           mainnet={mainnet}
+          type={type}
+          setType={setType}
           refreshing={refreshing}
           refreshed={refreshed}
           onRefresh={() => void refreshHistory()}
@@ -194,9 +198,14 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
   );
 }
 
-function LiveHistory({ go, mainnet, refreshing, refreshed, onRefresh, onFilter, showSheet, draft, setDraft, onClose, onReset, onApply }: {
+const HIST_CHIPS = ['All', 'Sent', 'Received', 'Swaps', 'Private', 'Vault', 'Mainnet', 'Testnet'];
+
+function LiveHistory({ go, onBack, mainnet, type, setType, refreshing, refreshed, onRefresh, onFilter, showSheet, draft, setDraft, onClose, onReset, onApply }: {
   go: Go;
+  onBack?: () => void;
   mainnet: { day: string; items: (Row & { hash?: string })[] }[];
+  type: string;
+  setType: (v: string) => void;
   refreshing: boolean;
   refreshed: boolean;
   onRefresh: () => void;
@@ -209,46 +218,92 @@ function LiveHistory({ go, mainnet, refreshing, refreshed, onRefresh, onFilter, 
   onApply: () => void;
 }) {
   const live = useLiveFrame();
-  const flat = mainnet.flatMap((group) => group.items.map((item) => ({ ...item, day: group.day })));
+  const mainRows = mainnet.flatMap((group) => group.items.map((item) => ({ ...item, day: group.day, net: 'mainnet' as const })));
+  const testRows = (live?.activity ?? [])
+    .flatMap((group) => group.items.map((item) => ({ ...item, day: group.day })))
+    .filter((row) => !isMainnetActivity(row))
+    .map((row) => ({ ...row, net: 'testnet' as const }));
+  const chip = type === 'Vault moves' ? 'Vault' : type;
+  const rows = [...mainRows, ...testRows].filter((row) => {
+    if (chip === 'Mainnet') return row.net === 'mainnet';
+    if (chip === 'Testnet') return row.net === 'testnet';
+    if (chip === 'All') return true;
+    if (chip === 'Sent') return row.kind === 'sent' || row.kind === 'private';
+    if (chip === 'Received') return row.kind === 'received';
+    if (chip === 'Swaps') return row.kind === 'swap';
+    if (chip === 'Private') return row.kind === 'private';
+    if (chip === 'Vault') return row.kind === 'vault';
+    return true;
+  });
+  function pickChip(label: string) {
+    setType(label === 'Vault' ? 'Vault moves' : label);
+  }
   return (
     <>
       <PhoneStatus />
-      <Header onFilter={onFilter} onRefresh={onRefresh} title="History" spinning={refreshing} />
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 16, top: 108, width: 358, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 12 }}>
-        <section>
-          <p style={sectionTitle}>Mainnet</p>
-          {flat.length === 0 ? (
-            <p style={emptyCopy}>No mainnet activity yet. Ethereum sends and receives show up here.</p>
-          ) : flat.map((row) => (
+      <Header onFilter={onFilter} onRefresh={onRefresh} title="History" spinning={refreshing} onBack={onBack} />
+      <div style={{ position: 'absolute', left: 0, right: 0, top: 108, height: 48, padding: '0 16px', boxSizing: 'border-box' }}>
+        <div className="arxon-token-scroll" style={{ display: 'flex', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 6 }}>
+          {HIST_CHIPS.map((label) => {
+            const on = chip === label;
+            return (
+              <button
+                key={label}
+                type="button"
+                onClick={() => pickChip(label)}
+                style={{
+                  flexShrink: 0,
+                  height: 36,
+                  padding: '0 16px',
+                  border: on ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                  borderRadius: 18,
+                  background: on ? '#accafe' : 'rgba(10,12,16,0.88)',
+                  color: on ? '#0c1018' : '#fff',
+                  fontFamily: font.sans,
+                  fontSize: 13,
+                  fontWeight: on ? 600 : 500,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 16, top: 164, width: 358, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
+        {refreshing ? <p style={{ margin: 0, fontSize: 12, color: '#accafe' }}>Refreshing…</p> : null}
+        {!refreshing && refreshed ? <p style={{ margin: 0, fontSize: 12, color: '#8b9097' }}>Activity updated</p> : null}
+        {rows.length === 0 ? (
+          <p style={emptyCopy}>Nothing in this filter yet.</p>
+        ) : rows.map((row) => {
+          const inbound = row.kind === 'received';
+          const tone = inbound ? '#3ddc84' : row.amount.trim().startsWith('-') ? '#f25252' : '#fff';
+          return (
             <button
-              key={`${row.hash ?? row.title}-${row.sub}`}
+              key={`${row.hash ?? row.title}-${row.sub}-${row.net}`}
               type="button"
               onClick={() => {
                 if (row.hash) void live?.openTx(row.hash);
                 go(row.to || 'tx');
               }}
-              style={histRow}
+              style={histCard}
             >
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{row.title}</span>
-                <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: '#8b9097' }}>{row.day} · {row.sub}</span>
+              <span style={{ ...kindMark, background: inbound ? 'rgba(61,220,132,0.16)' : row.kind === 'private' || row.kind === 'vault' ? 'rgba(172,202,254,0.14)' : 'rgba(255,92,92,0.12)' }}>
+                <Icon kind={row.kind} />
               </span>
-              <span style={{ fontSize: 13, fontWeight: 600 }}>{row.amount}</span>
+              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 600 }}>{row.title}</span>
+                <span style={{ display: 'block', marginTop: 3, fontSize: 12, color: '#8b9097' }}>{row.day} · {row.sub}</span>
+              </span>
+              <span style={{ textAlign: 'right', flexShrink: 0 }}>
+                <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: tone }}>{row.amount}</span>
+                <span style={{ display: 'block', marginTop: 3, fontSize: 11, color: '#8b9097' }}>{row.net === 'testnet' ? 'Testnet' : 'Mainnet'}</span>
+              </span>
             </button>
-          ))}
-        </section>
-        <section>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-            <p style={{ ...sectionTitle, margin: 0 }}>Testnet</p>
-            <button type="button" aria-label="Refresh testnet activity" onClick={onRefresh} style={{ ...round, width: 44, height: 44 }}>
-              <RefreshGlyph spinning={refreshing} />
-            </button>
-          </div>
-          <p style={{ margin: '0 0 8px', fontSize: 12, color: refreshing ? '#accafe' : '#8b9097', minHeight: 16 }}>
-            {refreshing ? 'Refreshing testnet activity…' : refreshed ? 'Testnet activity updated' : 'Private pay stays under Vault.'}
-          </p>
-          <TestnetHistory go={go} />
-        </section>
+          );
+        })}
       </div>
       <Tabs go={go} here="activity" />
       {showSheet ? <Filter draft={draft} setDraft={setDraft} onClose={onClose} onReset={onReset} onApply={onApply} /> : null}
@@ -294,10 +349,11 @@ function filterRows(type: string, token: string, date = 'Any time') {
   })).filter((group) => group.items.length);
 }
 
-function Header({ onFilter, onRefresh, title = 'Activity', spinning = false }: { onFilter?: () => void; onRefresh?: () => void; title?: string; spinning?: boolean }) {
+function Header({ onFilter, onRefresh, title = 'Activity', spinning = false, onBack }: { onFilter?: () => void; onRefresh?: () => void; title?: string; spinning?: boolean; onBack?: () => void }) {
   return (
-    <div style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>{title}</p>
+    <div style={{ position: 'absolute', left: 18, top: 58, width: 354, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      {onBack ? <BackChip onBack={onBack} /> : null}
+      <p style={{ margin: 0, flex: 1, fontSize: onBack ? 22 : 26, fontWeight: 700, minWidth: 0 }}>{title}</p>
       <div style={{ display: 'flex', gap: 8 }}>
         {onRefresh ? (
           <button type="button" aria-label="Refresh" onClick={onRefresh} style={round}>
@@ -403,7 +459,7 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
           {fiat ? <p style={{ margin: '6px 0 0', textAlign: 'center', fontSize: 14, color: '#8b9097' }}>{fiat}</p> : null}
           <span style={{ marginTop: 12, minHeight: 28, borderRadius: 14, background: '#12301f', color: '#3ddc97', fontSize: 12, fontWeight: 600, display: 'inline-flex', alignItems: 'center', padding: '0 14px' }}>{status}</span>
         </div>
-        <div style={{ marginTop: 16, background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, padding: '4px 16px' }}>
+        <div style={{ marginTop: 16, padding: '4px 16px', ...sheetGlass, borderRadius: 22 }}>
           {rows.map(([label, value], index) => (
             <div key={label} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 0', fontSize: 14, borderTop: index ? '1px solid #2a3447' : 'none' }}>
               <span style={{ flex: '0 0 108px', color: '#8b9097' }}>{label}</span>
@@ -411,7 +467,7 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
             </div>
           ))}
         </div>
-        <button type="button" onClick={() => navigator.clipboard?.writeText(hash).catch(() => undefined)} style={{ marginTop: 12, width: '100%', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '12px 15px', cursor: 'pointer', minHeight: 56 }}>
+        <button type="button" onClick={() => void copyAddress(hash, 'Copied')} style={{ marginTop: 12, width: '100%', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '12px 15px', cursor: 'pointer', minHeight: 56 }}>
           <span style={{ display: 'block', fontSize: 12, color: '#8b9097' }}>Transaction hash</span>
           <span style={{ display: 'block', marginTop: 2, fontSize: 14, fontWeight: 500, wordBreak: 'break-all' }}>{hashLabel}</span>
         </button>
@@ -447,7 +503,7 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
           </div>
         ))}
       </div>
-      <button type="button" onClick={() => navigator.clipboard?.writeText(hash).catch(() => undefined)} style={{ position: 'absolute', left: 16, top: 636, width: 358, height: 56, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '9px 15px', cursor: 'pointer' }}>
+      <button type="button" onClick={() => void copyAddress(hash, 'Copied')} style={{ position: 'absolute', left: 16, top: 636, width: 358, height: 56, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderRadius: 14, color: '#fff', fontFamily: font.sans, textAlign: 'left', padding: '9px 15px', cursor: 'pointer' }}>
         <span style={{ display: 'block', fontSize: 12, color: '#8b9097' }}>Transaction hash</span>
         <span style={{ display: 'block', marginTop: 2, fontSize: 14, fontWeight: 500 }}>{hashLabel}</span>
         <span style={{ position: 'absolute', right: 15, top: 17 }}><FigmaImg src={art('copy.svg')} width={20} height={20} /></span>
@@ -544,3 +600,20 @@ const barBtn: CSSProperties = { position: 'absolute', left: 16, width: 358, heig
 const sectionTitle: CSSProperties = { margin: '0 0 8px', fontSize: 13, fontWeight: 700, letterSpacing: 0.4, color: '#accafe' };
 const emptyCopy: CSSProperties = { margin: 0, fontSize: 13, color: '#8b9097', lineHeight: 1.4 };
 const histRow: CSSProperties = { width: '100%', border: 'none', background: '#1c2025', color: '#fff', borderRadius: 12, padding: '10px 12px', marginTop: 8, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' };
+const histCard: CSSProperties = {
+  width: '100%',
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(10,12,16,0.88)',
+  color: '#fff',
+  borderRadius: 18,
+  padding: '12px 14px',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 12,
+  textAlign: 'left',
+  fontFamily: font.sans,
+  cursor: 'pointer',
+  boxSizing: 'border-box',
+  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+};
+const kindMark: CSSProperties = { width: 40, height: 40, borderRadius: 20, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };

@@ -13,7 +13,7 @@ const REMOTE_URL = 'https://arxon-mobile.pages.dev';
  */
 const liveUsb = process.env.CAPACITOR_LIVE_USB === 'true';
 const bundleLocal = !liveUsb && process.env.CAPACITOR_BUNDLE_LOCAL === 'true';
-const LIVE_URL = process.env.CAPACITOR_LIVE_URL || 'http://127.0.0.1:8080';
+const LIVE_URL = process.env.CAPACITOR_LIVE_URL || 'http://localhost:8080';
 
 /** Domains the WebView may navigate / frame for auth + Turnstile challenges. */
 const ALLOW_NAVIGATION = [

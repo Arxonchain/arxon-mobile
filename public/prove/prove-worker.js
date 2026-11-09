@@ -29,6 +29,11 @@ self.onmessage = (event) => {
       return;
     }
     try {
+      if (data.method === 'warm') {
+        api.warm();
+        self.postMessage({ id: data.id, ok: true, result: true });
+        return;
+      }
       if (data.method !== 'keys') api.warm();
       const result = JSON.parse(api[data.method](JSON.stringify(data.body)));
       self.postMessage({ id: data.id, ok: true, result });

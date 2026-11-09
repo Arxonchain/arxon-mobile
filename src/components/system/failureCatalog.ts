@@ -33,61 +33,57 @@ export interface FailureCopy {
 export const failureCatalog: Record<FailureType, FailureCopy> = {
   ota_load_failed: {
     title: "Can't reach Arxon",
-    message:
-      'The app could not load its latest version. Check your internet connection or try again in a moment.',
+    message: 'The latest app version could not load. Check internet, then retry.',
     icon: Globe,
     primaryLabel: 'Retry',
     secondaryLabel: 'Restart app',
   },
   offline: {
     title: 'No connection',
-    message:
-      'Arxon needs an internet connection to load and sync. Check Wi‑Fi or mobile data, then retry.',
+    message: 'Arxon needs internet to load. Check Wi‑Fi or mobile data, then retry.',
     icon: WifiOff,
     primaryLabel: 'Retry',
   },
   backend_down: {
     title: 'Service unavailable',
-    message:
-      'Our servers are temporarily unreachable. Your account is safe — please try again shortly.',
+    message: 'Our servers are unreachable right now. Your account is safe — try again shortly.',
     icon: ServerCrash,
-    primaryLabel: 'Retry now',
+    primaryLabel: 'Retry',
   },
   session_expired: {
     title: 'Session expired',
-    message: 'Your session has ended. Sign in again to continue mining and playing.',
+    message: 'Sign in again to continue.',
     icon: ShieldOff,
     primaryLabel: 'Sign in',
   },
   timeout: {
     title: 'Taking too long',
-    message: 'The app is loading slowly or the connection timed out. Retry or restart the app.',
+    message: 'The connection timed out. Retry, or restart the app if it stays stuck.',
     icon: Clock,
     primaryLabel: 'Retry',
     secondaryLabel: 'Restart app',
   },
   maintenance: {
     title: 'Maintenance in progress',
-    message:
-      "We're upgrading Arxon. Mining continues in the background — check back in a few minutes.",
+    message: 'Arxon is upgrading. Check back in a few minutes.',
     icon: Wrench,
     primaryLabel: 'Retry',
   },
   update_required: {
     title: 'Update required',
-    message: 'A new version of Arxon is available. Update from the store to continue.',
+    message: 'A new version is available. Update from the store to continue.',
     icon: Download,
     primaryLabel: 'Update app',
   },
   not_found: {
     title: 'Page not found',
-    message: "This page doesn't exist or has moved. Head back to the dashboard.",
+    message: "This page doesn't exist or has moved.",
     icon: AlertTriangle,
     primaryLabel: 'Go home',
   },
   unknown: {
     title: 'Something went wrong',
-    message: 'An unexpected error occurred. Refresh the app and try again.',
+    message: 'Refresh the app and try again.',
     icon: AlertTriangle,
     primaryLabel: 'Refresh',
   },

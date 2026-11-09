@@ -4,7 +4,10 @@ import { font } from '@/walletFigma/tokens';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
 import { CenterLine, SwipeConfirm } from './SwipeConfirm';
-import { Unavailable } from './LiveScroll';
+import { frostPanel, FrostLine, HintCard, PullHint, Unavailable } from './LiveScroll';
+import { useLiveFee } from './useLiveFee';
+import { usePullRefresh } from './pullRefresh';
+import { useWalletNetwork } from './WalletTabs';
 
 const art = (name: string) => `/wallet-figma/swap/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -29,6 +32,7 @@ export function isSwapScreen(id: string) {
 
 export function SwapScreens({ id, go, back }: { id: string; go: Go; back?: () => void }) {
   const live = useLiveFrame();
+  const net = useWalletNetwork();
   const [pay, setPay] = useState('arx');
   const [recv, setRecv] = useState('btc');
   const [amount, setAmount] = useState('0');
@@ -42,7 +46,13 @@ export function SwapScreens({ id, go, back }: { id: string; go: Go; back?: () =>
   const quote = ready ? numeric * pairRate(pay, recv) : 0;
   const shownPay = ready ? numeric : 100;
   const shownQuote = ready ? quote : 0.0004;
-  const leave = () => (back ? back() : go(vaultMode ? 'home-vaulted' : 'home-funded', false));
+  const leave = () => {
+    if (back) {
+      back();
+      return;
+    }
+    go(live?.app && net === 'testnet' ? 'testnet' : (vaultMode ? 'home-vaulted' : 'home-funded'), false);
+  };
 
   useEffect(() => {
     if (id === 'swap-vault') setVaultMode(true);
@@ -231,30 +241,58 @@ function Picker({ query, setQuery, onChoose, onClose }: { query: string; setQuer
 
 function Review({ pay, recv, amount, quote, go, leave }: { pay: Tok; recv: Tok; amount: number; quote: number; go: Go; leave: () => void }) {
   const live = useLiveFrame();
+  const net = useWalletNetwork();
   const [err, setErr] = useState<string | null>(null);
   const rate = pairRate(pay.id, recv.id);
-  const total = amount + FEE;
+  const quoted = useLiveFee({ amount: String(amount), to: live?.address || '', symbol: pay.symbol, testnet: net === 'testnet' });
+  const pull = usePullRefresh(async () => {
+    await live?.refresh?.();
+    quoted.requote();
+  });
+  const total = live?.app ? quoted.totalLabel : `${(amount + FEE).toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${pay.symbol}`;
+  const feeShown = live?.app ? quoted.feeLabel : `${FEE} ${pay.symbol}`;
   return (
     <>
       <PhoneStatus />
       <Back onClick={leave} />
       <p style={title}>Review swap</p>
-      <div style={{ position: 'absolute', left: 18, top: 118, width: 354, height: 120, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+      <div
+        style={{ position: 'absolute', left: 18, top: 108, right: 18, bottom: 28, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}
+        onTouchStart={live?.app ? pull.onTouchStart : undefined}
+        onTouchMove={live?.app ? pull.onTouchMove : undefined}
+        onTouchEnd={live?.app ? pull.onTouchEnd : undefined}
+      >
+      {live?.app ? <PullHint pull={pull.pull} busy={pull.busy} /> : null}
+      <div style={{ width: '100%', minHeight: 100, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, paddingTop: 8 }}>
         <p style={{ margin: 0, fontSize: 14, color: '#8b9097' }}>You pay</p>
         <p style={{ margin: 0, fontSize: 40, fontWeight: 700 }}>{amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {pay.symbol}</p>
         <p style={{ margin: 0, fontSize: 15, color: '#8b9097' }}>≈ ${(amount * usd(pay)).toFixed(2)}</p>
       </div>
-      <div style={{ position: 'absolute', left: 18, top: 250, width: 354, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
-        <CenterLine label="You receive" value={`${showQuote(quote)} ${recv.symbol}`} />
-        <CenterLine label="Rate" value={`1 ${pay.symbol} ≈ ${showRate(rate)} ${recv.symbol}`} />
-        <CenterLine label="Slippage" value="0.5%" />
-        <CenterLine label="Privacy" value="Private" color="#accafe" />
-        <CenterLine label="Network fee" value={`${FEE} ${pay.symbol}`} />
-        <CenterLine label="Total" value={`${total.toLocaleString('en-US', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ${pay.symbol}`} />
+      <div style={{ marginTop: 12, width: '100%', boxSizing: 'border-box', padding: live?.app ? '8px 14px' : '8px 16px', ...(live?.app ? frostPanel : { background: '#1c2025', borderRadius: 16 }) }}>
+        {live?.app ? (
+          <>
+            <FrostLine label="From" value={(live.accountLabel || 'Acc 01').replace(/^Account\s+/i, 'Acc ')} />
+            <FrostLine label="To" value={`${showQuote(quote)} ${recv.symbol}`} />
+            <FrostLine label="Amount" value={`${amount.toLocaleString('en-US', { maximumFractionDigits: 4 })} ${pay.symbol}`} />
+            <FrostLine label="Network fee" value={feeShown} />
+            <FrostLine label="Total" value={total} />
+          </>
+        ) : (
+          <>
+            <CenterLine label="You receive" value={`${showQuote(quote)} ${recv.symbol}`} />
+            <CenterLine label="Rate" value={`1 ${pay.symbol} ≈ ${showRate(rate)} ${recv.symbol}`} />
+            <CenterLine label="Slippage" value="0.5%" />
+            <CenterLine label="Privacy" value="Private" color="#accafe" />
+            <CenterLine label="Network fee" value={feeShown} />
+            <CenterLine label="Total" value={total} />
+          </>
+        )}
       </div>
-      <p style={{ position: 'absolute', left: 30, top: 527, width: 330, margin: 0, fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Swap amounts stay hidden on-chain. The final amount can vary by up to the slippage.</p>
-      {err ? <p style={{ position: 'absolute', left: 24, top: 600, width: 342, margin: 0, color: '#f25252', fontSize: 12 }}>{err}</p> : null}
-      <div style={{ position: 'absolute', left: 18, top: 640, width: 354 }}>
+      {live?.app ? <div style={{ marginTop: 12 }}><HintCard body="Swap amounts stay hidden on-chain. The final amount can vary by up to the slippage." /></div> : (
+        <p style={{ margin: '16px 12px 0', fontSize: 12, color: '#5c5f64', lineHeight: 1.4 }}>Swap amounts stay hidden on-chain. The final amount can vary by up to the slippage.</p>
+      )}
+      {err ? <p style={{ margin: '12px 0 0', color: '#f25252', fontSize: 12 }}>{err}</p> : null}
+      <div style={{ marginTop: 16 }}>
         <SwipeConfirm label="Confirm swap" onConfirm={() => {
           if (live?.app) {
             setErr('Coming soon');
@@ -263,7 +301,8 @@ function Review({ pay, recv, amount, quote, go, leave }: { pay: Tok; recv: Tok; 
           go('swap-success');
         }} />
       </div>
-      <button type="button" onClick={leave} style={{ ...ghost, top: 714 }}>Cancel</button>
+      <button type="button" onClick={leave} style={{ ...ghost, position: 'relative', left: 0, top: 0, width: '100%', marginTop: 10 }}>Cancel</button>
+      </div>
       <HomeBar />
     </>
   );

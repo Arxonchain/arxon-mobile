@@ -10,6 +10,7 @@ import { openExternal } from './openExternal';
 import { hostOf, readBrowseHistory, recordBrowseVisit, toBrowseUrl } from './browseHistory';
 import { usePullRefresh } from './pullRefresh';
 import { subscribeInAppBrowse } from './inAppBrowse';
+import { BackChip, FROST_PLACEHOLDER_CSS, frostField, frostIcon, frostInput, itemCard, LiveHead } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/explore/${name}`;
 const SCREENS = new Set(['explore', 'dapps', 'arxswap']);
@@ -56,12 +57,13 @@ export function ExploreScreens({ id, go, back }: { id: string; go: Go; back?: ()
   const leave = (fallback: string) => (back ? back() : go(fallback, false));
   return (
     <div style={{ position: 'relative', width: 390, height: 844, background: '#050505', overflow: 'hidden', fontFamily: font.sans, color: '#fff' }}>
-      {id === 'dapps' ? <DappList onBack={() => leave('explore')} /> : <Explore go={go} />}
+      <style>{FROST_PLACEHOLDER_CSS}</style>
+      {id === 'dapps' ? <DappList onBack={() => leave('explore')} /> : <Explore go={go} onBack={back} />}
     </div>
   );
 }
 
-function Explore({ go }: { go: Go }) {
+function Explore({ go, onBack }: { go: Go; onBack?: () => void }) {
   const live = useLiveFrame();
   const [query, setQuery] = useState('');
   const [section, setSection] = useState<Section>('all');
@@ -94,19 +96,193 @@ function Explore({ go }: { go: Go }) {
 
   const connected = live?.app ? live.wcSessions.length : 0;
   const show = (which: Section) => section === 'all' || section === which;
-  const headTop = live?.app ? 72 : 44;
+  const app = !!live?.app;
+  const headTop = app ? 72 : 44;
+  const padX = app ? 20 : 18;
+  const searchStyle = app ? { ...searchBox, ...frostField, margin: 0 } : searchBox;
+  const fieldStyle = app ? frostInput : searchInput;
+  const listBody = (
+    <>
+        {pull.pull > 8 || pull.busy ? (
+          <p style={{ margin: '0 0 8px', textAlign: 'center', fontSize: 12, color: '#accafe' }}>
+            {pull.busy ? 'Refreshing…' : 'Release to refresh'}
+          </p>
+        ) : null}
+
+        {show('browser') ? (
+          <Section first label="RECENT">
+            {visits.length > 0 ? (
+              <ItemStack live={app}>
+                {visits.slice(0, 8).map((visit, index) => (
+                  <button key={visit.url + visit.at} type="button" onClick={() => void openSite(visit.title, visit.url)} style={app ? itemCard : { ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+                    <SiteLogo name={visit.title} url={visit.url} letter={(hostOf(visit.url)[0] || 'A').toUpperCase()} />
+                    <span style={copy}>
+                      <span style={title}>{visit.title}</span>
+                      <span style={sub}>{hostOf(visit.url)}</span>
+                    </span>
+                    <span style={openMark}>Open</span>
+                  </button>
+                ))}
+              </ItemStack>
+            ) : (
+              <p style={app ? { ...itemCard, color: '#8b9097', fontSize: 13, lineHeight: 1.35, cursor: 'default' } : { margin: 0, padding: '16px 14px', fontSize: 13, color: '#8b9097', lineHeight: 1.35, background: '#1c2126', borderRadius: 16, minHeight: 0 }}>
+                Sites you open in Arxon show up here.
+              </p>
+            )}
+            <p style={kicker}>EXPLORERS</p>
+            <ItemStack live={app}>
+              {EXPLORERS.map((rowItem, index) => (
+                <button key={rowItem.url} type="button" onClick={() => void openSite(rowItem.name, rowItem.url)} style={app ? itemCard : { ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+                  <SiteLogo name={rowItem.name} url={rowItem.url} letter={rowItem.name.slice(0, 1)} />
+                  <span style={copy}>
+                    <span style={title}>{rowItem.name}</span>
+                    <span style={sub}>{rowItem.chain} · {hostOf(rowItem.url)}</span>
+                  </span>
+                  <span style={openMark}>Open</span>
+                </button>
+              ))}
+            </ItemStack>
+          </Section>
+        ) : null}
+
+        {show('dapps') ? (
+          <Section
+            first={!show('browser')}
+            label="DAPPS"
+            extra={section === 'dapps' ? null : <button type="button" onClick={() => go('dapps')} style={seeAll}>See all</button>}
+          >
+            <ItemStack live={app}>
+              {(section === 'dapps' ? DAPPS : DAPPS.slice(0, 6)).map((dapp, index) => (
+                <button key={dapp.url} type="button" onClick={() => void openSite(dapp.name, dapp.url)} style={app ? itemCard : { ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+                  <SiteLogo name={dapp.name} url={dapp.url} letter={dapp.letter} color={dapp.color} />
+                  <span style={copy}>
+                    <span style={title}>{dapp.name}</span>
+                    <span style={sub}>{dapp.chain} · {dapp.blurb}</span>
+                  </span>
+                  <span style={openMark}>Open</span>
+                </button>
+              ))}
+            </ItemStack>
+          </Section>
+        ) : null}
+
+        {show('tools') ? (
+          <Section first={!show('browser') && !show('dapps')} label="WALLET TOOLS">
+            <ItemStack live={app}>
+              <button type="button" onClick={() => go('buy')} style={app ? itemCard : row}>
+                <span style={{ ...mark, background: '#293342' }}><FigmaImg src={art('buy.svg')} width={18} height={18} /></span>
+                <span style={copy}>
+                  <span style={title}>Buy crypto</span>
+                  <span style={sub}>Buy with a card in your local currency</span>
+                </span>
+                <FigmaImg src={art('chev.svg')} width={18} height={18} />
+              </button>
+              <button type="button" onClick={() => go('connected')} style={app ? itemCard : { ...row, borderTop: '1px solid #29333d' }}>
+                <span style={{ ...mark, background: '#293342' }}><FigmaImg src={art('apps.svg')} width={18} height={18} /></span>
+                <span style={copy}>
+                  <span style={title}>Connected apps</span>
+                  <span style={sub}>{app ? (connected ? `${connected} connected` : 'None connected') : 'Manage WalletConnect sessions'}</span>
+                </span>
+                <FigmaImg src={art('chev.svg')} width={18} height={18} />
+              </button>
+              <div style={app ? { ...itemCard, cursor: 'default' } : { ...row, borderTop: '1px solid #29333d', cursor: 'default' }}>
+                <span style={{ ...mark, background: '#293342' }}>P</span>
+                <span style={copy}>
+                  <span style={title}>Partners</span>
+                  <span style={sub}>On-ramps and tools we add with partners</span>
+                </span>
+                <span style={{ color: '#5c5f64', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Soon</span>
+              </div>
+            </ItemStack>
+          </Section>
+        ) : null}
+    </>
+  );
+
+  if (app) {
+    return (
+      <>
+        <div
+          ref={scroller}
+          className="arxon-token-scroll"
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            top: 0,
+            bottom: 0,
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            touchAction: 'pan-y',
+            boxSizing: 'border-box',
+            padding: 'max(54px, env(safe-area-inset-top, 0px)) 20px calc(140px + env(safe-area-inset-bottom, 0px))',
+          }}
+          onTouchStart={pull.onTouchStart}
+          onTouchMove={pull.onTouchMove}
+          onTouchEnd={pull.onTouchEnd}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+            {onBack ? <BackChip onBack={onBack} /> : null}
+            <p style={{ margin: 0, flex: 1, fontSize: onBack ? 22 : 26, fontWeight: 700 }}>Explore</p>
+            <button type="button" aria-label="Refresh" onClick={() => void refresh()} style={iconRound}>
+              <RefreshMark spinning={pull.busy} />
+            </button>
+          </div>
+          <form onSubmit={submit} style={searchStyle}>
+            <FigmaImg src={art('apps.svg')} width={18} height={18} style={app ? frostIcon : undefined} />
+            <input
+              className={app ? 'frost-input' : undefined}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search or enter a site"
+              aria-label="Search or enter a site"
+              style={fieldStyle}
+            />
+            <button type="submit" style={app ? { ...goBtn, background: '#213e73', color: '#fff' } : goBtn}>Open</button>
+          </form>
+          {notice ? <p style={{ margin: '8px 0 0', fontSize: 12, color: '#fabf33' }}>{notice}</p> : null}
+          <div className="arxon-token-scroll" role="tablist" aria-label="Explore sections" style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '12px 0 14px', paddingBottom: 2, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+            {TABS.map((tab) => {
+              const on = section === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={on}
+                  onClick={() => setSection(tab.id)}
+                  style={{
+                    ...chip,
+                    border: on ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                    background: on ? '#accafe' : 'rgba(10,12,16,0.88)',
+                    color: on ? '#0c1018' : '#fff',
+                  }}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+          {listBody}
+        </div>
+        <Tabs go={go} />
+      </>
+    );
+  }
 
   return (
     <>
       <PhoneStatus />
-      <div style={{ position: 'absolute', left: 0, right: 0, top: headTop, padding: '8px 18px 0', boxSizing: 'border-box', background: '#050505', zIndex: 2 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <p style={{ margin: 0, fontSize: 26, fontWeight: 700 }}>Explore</p>
+      <div style={{ position: 'absolute', left: 0, right: 0, top: headTop, padding: `8px ${padX}px 0`, boxSizing: 'border-box', background: '#050505', zIndex: 2, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+          {app && onBack ? <BackChip onBack={onBack} /> : null}
+          <p style={{ margin: 0, flex: 1, fontSize: app && onBack ? 22 : 26, fontWeight: 700 }}>Explore</p>
           <button type="button" aria-label="Refresh" onClick={() => void refresh()} style={iconRound}>
             <RefreshMark spinning={pull.busy} />
           </button>
         </div>
-        <form onSubmit={submit} style={searchBox}>
+        <form onSubmit={submit} style={searchStyle}>
           <FigmaImg src={art('apps.svg')} width={18} height={18} />
           <input
             value={query}
@@ -118,125 +294,37 @@ function Explore({ go }: { go: Go }) {
           <button type="submit" style={goBtn}>Open</button>
         </form>
         {notice ? <p style={{ margin: '8px 0 0', fontSize: 12, color: '#fabf33' }}>{notice}</p> : null}
-        <div role="tablist" aria-label="Explore sections" style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '12px 0 8px', paddingBottom: 2, width: '100%', maxWidth: '100%', minWidth: 0 }}>
-          {TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={section === tab.id}
-              onClick={() => setSection(tab.id)}
-              style={{
-                ...chip,
-                background: section === tab.id ? '#accafe' : '#1c2025',
-                color: section === tab.id ? '#0c1018' : '#fff',
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <div className="arxon-token-scroll" role="tablist" aria-label="Explore sections" style={{ display: 'flex', gap: 8, overflowX: 'auto', margin: '12px 0 8px', paddingBottom: 2, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
+          {TABS.map((tab) => {
+            const on = section === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={on}
+                onClick={() => setSection(tab.id)}
+                style={{
+                  ...chip,
+                  border: on ? 'none' : '1px solid rgba(255,255,255,0.10)',
+                  background: on ? '#accafe' : app ? 'rgba(10,12,16,0.88)' : '#1c2025',
+                  color: on ? '#0c1018' : '#fff',
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
       <div
         ref={scroller}
-        style={{ position: 'absolute', left: 0, right: 0, top: headTop + (notice ? 196 : 176), bottom: WALLET_TAB_CLEAR, overflowX: 'hidden', overflowY: 'auto', padding: '4px 18px 24px', boxSizing: 'border-box' }}
+        style={{ position: 'absolute', left: 0, right: 0, top: headTop + (notice ? 196 : 176), bottom: WALLET_TAB_CLEAR, overflowX: 'hidden', overflowY: 'auto', padding: `8px ${padX}px 28px`, boxSizing: 'border-box' }}
         onTouchStart={pull.onTouchStart}
         onTouchMove={pull.onTouchMove}
         onTouchEnd={pull.onTouchEnd}
       >
-        {pull.pull > 8 || pull.busy ? (
-          <p style={{ margin: '0 0 8px', textAlign: 'center', fontSize: 12, color: '#accafe' }}>
-            {pull.busy ? 'Refreshing…' : 'Release to refresh'}
-          </p>
-        ) : null}
-
-        {show('browser') ? (
-          <Section first label="RECENT">
-            {visits.length > 0 ? (
-              <div style={card}>
-                {visits.slice(0, 8).map((visit, index) => (
-                  <button key={visit.url + visit.at} type="button" onClick={() => void openSite(visit.title, visit.url)} style={{ ...(live?.app ? liveRow : row), borderTop: index ? '1px solid #29333d' : 'none' }}>
-                    <SiteLogo name={visit.title} url={visit.url} letter={(hostOf(visit.url)[0] || 'A').toUpperCase()} />
-                    <span style={copy}>
-                      <span style={title}>{visit.title}</span>
-                      <span style={sub}>{hostOf(visit.url)}</span>
-                    </span>
-                    <span style={openMark}>Open</span>
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <p style={{ margin: 0, padding: '16px 14px', fontSize: 13, color: '#8b9097', lineHeight: 1.35, background: '#1c2126', borderRadius: 16, minHeight: 0 }}>
-                Sites you open in Arxon show up here.
-              </p>
-            )}
-            <p style={kicker}>EXPLORERS</p>
-            <div style={card}>
-              {EXPLORERS.map((rowItem, index) => (
-                <button key={rowItem.url} type="button" onClick={() => void openSite(rowItem.name, rowItem.url)} style={{ ...(live?.app ? liveRow : row), borderTop: index ? '1px solid #29333d' : 'none' }}>
-                  <SiteLogo name={rowItem.name} url={rowItem.url} letter={rowItem.name.slice(0, 1)} />
-                  <span style={copy}>
-                    <span style={title}>{rowItem.name}</span>
-                    <span style={sub}>{rowItem.chain} · {hostOf(rowItem.url)}</span>
-                  </span>
-                  <span style={openMark}>Open</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-        ) : null}
-
-        {show('dapps') ? (
-          <Section
-            first={!show('browser')}
-            label="DAPPS"
-            extra={section === 'dapps' ? null : <button type="button" onClick={() => go('dapps')} style={seeAll}>See all</button>}
-          >
-            <div style={card}>
-              {(section === 'dapps' ? DAPPS : DAPPS.slice(0, 6)).map((app, index) => (
-                <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...(live?.app ? liveRow : row), borderTop: index ? '1px solid #29333d' : 'none' }}>
-                  <SiteLogo name={app.name} url={app.url} letter={app.letter} color={app.color} />
-                  <span style={copy}>
-                    <span style={title}>{app.name}</span>
-                    <span style={sub}>{app.chain} · {app.blurb}</span>
-                  </span>
-                  <span style={openMark}>Open</span>
-                </button>
-              ))}
-            </div>
-          </Section>
-        ) : null}
-
-        {show('tools') ? (
-          <Section first={!show('browser') && !show('dapps')} label="WALLET TOOLS">
-            <div style={card}>
-              <button type="button" onClick={() => go('buy')} style={row}>
-                <span style={{ ...mark, background: '#293342' }}><FigmaImg src={art('buy.svg')} width={18} height={18} /></span>
-                <span style={copy}>
-                  <span style={title}>Buy crypto</span>
-                  <span style={sub}>Buy with a card in your local currency</span>
-                </span>
-                <FigmaImg src={art('chev.svg')} width={18} height={18} />
-              </button>
-              <button type="button" onClick={() => go('connected')} style={{ ...row, borderTop: '1px solid #29333d' }}>
-                <span style={{ ...mark, background: '#293342' }}><FigmaImg src={art('apps.svg')} width={18} height={18} /></span>
-                <span style={copy}>
-                  <span style={title}>Connected apps</span>
-                  <span style={sub}>{live?.app ? (connected ? `${connected} connected` : 'None connected') : 'Manage WalletConnect sessions'}</span>
-                </span>
-                <FigmaImg src={art('chev.svg')} width={18} height={18} />
-              </button>
-              <div style={{ ...row, borderTop: '1px solid #29333d', cursor: 'default' }}>
-                <span style={{ ...mark, background: '#293342' }}>P</span>
-                <span style={copy}>
-                  <span style={title}>Partners</span>
-                  <span style={sub}>On-ramps and tools we add with partners</span>
-                </span>
-                <span style={{ color: '#5c5f64', fontSize: 12, fontWeight: 600, flexShrink: 0 }}>Soon</span>
-              </div>
-            </div>
-          </Section>
-        ) : null}
+        {listBody}
       </div>
       <Tabs go={go} />
     </>
@@ -245,7 +333,7 @@ function Explore({ go }: { go: Go }) {
 
 function Section({ first, label, extra, children }: { first?: boolean; label: string; extra?: ReactNode; children: ReactNode }) {
   return (
-    <div style={{ marginTop: first ? 0 : 10, width: '100%', maxWidth: '100%' }}>
+    <div style={{ marginTop: first ? 0 : 10, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 28, minHeight: 28, maxHeight: 28, margin: '0 4px 6px' }}>
         <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: '#5c5f64', letterSpacing: 0.6 }}>{label}</p>
         {extra}
@@ -255,21 +343,63 @@ function Section({ first, label, extra, children }: { first?: boolean; label: st
   );
 }
 
+function ItemStack({ live, children }: { live?: boolean; children: ReactNode }) {
+  if (live) return <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: '100%', minWidth: 0, boxSizing: 'border-box' }}>{children}</div>;
+  return <div style={card}>{children}</div>;
+}
+
 function DappList({ onBack }: { onBack: () => void }) {
+  const live = useLiveFrame();
+  const app = !!live?.app;
+  if (app) {
+    return (
+      <div
+        className="arxon-token-scroll"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          overflowX: 'hidden',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          touchAction: 'pan-y',
+          boxSizing: 'border-box',
+          padding: 'max(54px, env(safe-area-inset-top, 0px)) 20px 28px',
+        }}
+      >
+        <LiveHead title="dApps" onBack={onBack} />
+        <p style={{ margin: '0 0 14px', color: '#8b9097', fontSize: 13, lineHeight: 1.4 }}>Working sites for the chains in this wallet.</p>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {DAPPS.map((dapp) => (
+            <button key={dapp.url} type="button" onClick={() => void openSite(dapp.name, dapp.url)} style={itemCard}>
+              <SiteLogo name={dapp.name} url={dapp.url} letter={dapp.letter} color={dapp.color} />
+              <span style={copy}>
+                <span style={title}>{dapp.name}</span>
+                <span style={sub}>{hostOf(dapp.url)} · {dapp.chain}</span>
+              </span>
+              <span style={openMark}>Open</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <>
       <NoteStatus />
       <Back onClick={onBack} />
       <p style={{ position: 'absolute', left: 24, top: 106, margin: 0, fontSize: 30, fontWeight: 700 }}>dApps</p>
       <p style={{ position: 'absolute', left: 24, top: 152, margin: 0, width: 336, color: '#8b9097', fontSize: 15 }}>Working sites for the chains in this wallet.</p>
-      <div style={{ position: 'absolute', left: 18, top: 200, width: 354, bottom: 24, overflowX: 'hidden', overflowY: 'auto' }}>
+      <div style={{ position: 'absolute', left: 18, top: 200, width: 354, bottom: 24, overflowX: 'hidden', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 0 }}>
         <div style={card}>
-          {DAPPS.map((app, index) => (
-            <button key={app.url} type="button" onClick={() => void openSite(app.name, app.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
-              <SiteLogo name={app.name} url={app.url} letter={app.letter} color={app.color} />
+          {DAPPS.map((dapp, index) => (
+            <button key={dapp.url} type="button" onClick={() => void openSite(dapp.name, dapp.url)} style={{ ...row, borderTop: index ? '1px solid #29333d' : 'none' }}>
+              <SiteLogo name={dapp.name} url={dapp.url} letter={dapp.letter} color={dapp.color} />
               <span style={copy}>
-                <span style={title}>{app.name}</span>
-                <span style={sub}>{hostOf(app.url)} · {app.chain}</span>
+                <span style={title}>{dapp.name}</span>
+                <span style={sub}>{hostOf(dapp.url)} · {dapp.chain}</span>
               </span>
               <span style={openMark}>Open</span>
             </button>
@@ -358,13 +488,12 @@ function PhoneStatus() {
 const kicker: CSSProperties = { margin: '12px 4px 8px', fontSize: 12, fontWeight: 600, color: '#5c5f64', letterSpacing: 0.6 };
 const card: CSSProperties = { width: '100%', maxWidth: '100%', background: '#1c2126', borderRadius: 16, overflow: 'hidden', height: 'auto' };
 const row: CSSProperties = { width: '100%', height: 64, minHeight: 64, maxHeight: 64, border: 'none', background: 'none', color: '#fff', fontFamily: font.sans, display: 'flex', alignItems: 'center', gap: 12, padding: '0 14px', cursor: 'pointer', boxSizing: 'border-box', overflow: 'hidden' };
-const liveRow: CSSProperties = { ...row, height: 56, minHeight: 56, maxHeight: 56, gap: 10, padding: '0 12px' };
 const mark: CSSProperties = { width: 40, height: 40, borderRadius: 20, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 15, flexShrink: 0 };
 const copy: CSSProperties = { flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden' };
 const title: CSSProperties = { display: 'block', fontSize: 15, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const sub: CSSProperties = { display: 'block', marginTop: 2, fontSize: 12, color: '#8c8f99', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 const openMark: CSSProperties = { color: '#accafe', fontSize: 13, fontWeight: 600, flexShrink: 0 };
-const searchBox: CSSProperties = { height: 48, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px', width: '100%', maxWidth: '100%' };
+const searchBox: CSSProperties = { height: 48, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px', width: '100%', maxWidth: '100%', minWidth: 0, margin: 0 };
 const searchInput: CSSProperties = { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 };
 const goBtn: CSSProperties = { minHeight: 36, minWidth: 56, border: 'none', borderRadius: 10, background: '#2a3447', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 };
 const iconRound: CSSProperties = { width: 40, height: 40, border: 'none', borderRadius: 20, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 };

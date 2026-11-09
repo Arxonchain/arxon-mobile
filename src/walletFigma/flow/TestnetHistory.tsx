@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { font } from '@/walletFigma/tokens';
 import { useLiveFrame, type LiveActivity } from './liveFrame';
+import { CardLoad } from './useCardLoad';
 
 type Go = (id: string, remember?: boolean) => void;
 type Place = 'all' | 'home' | 'vault';
@@ -20,7 +21,7 @@ export function isMainnetActivity(row: { network?: string }) {
   return row.network === 'ethereum' || row.network === 'bitcoin' || row.network === 'solana';
 }
 
-export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limit?: number; place?: Place }) {
+export function TestnetHistory({ go, limit, place: lockedPlace, tone }: { go: Go; limit?: number; place?: Place; tone?: 'sheet' }) {
   const live = useLiveFrame();
   const [place, setPlace] = useState<Place>(lockedPlace ?? 'all');
   const [model, setModel] = useState<Model>('all');
@@ -50,23 +51,22 @@ export function TestnetHistory({ go, limit, place: lockedPlace }: { go: Go; limi
           </div>
         </>
       )}
+      <CardLoad kind="rows" n={limit ?? 5}>
       {rows.length === 0 ? (
         <p style={{ margin: '4px 0 0', fontSize: 13, color: '#8b9097', lineHeight: 1.4 }}>
           {!live?.app ? 'Testnet payments show up here.' : testnet.length === 0 ? 'No testnet transactions yet.' : matched.length === 0 && where === 'vault' ? 'No vault transactions yet. Private pay is filed here.' : 'Nothing matches this filter.'}
         </p>
       ) : grouped ? (
-        <Grouped rows={rows} go={go} />
+        <Grouped rows={rows} go={go} sheet={tone === 'sheet'} />
       ) : rows.map((row) => (
-        <HistoryLine key={`${row.hash ?? row.title}-${row.sub}`} row={row} go={go} />
+        <HistoryLine key={`${row.hash ?? row.title}-${row.sub}`} row={row} go={go} sheet={!!tone || !!limit} />
       ))}
-      {limit && matched.length > limit ? (
-        <button type="button" onClick={() => go('activity')} style={{ border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 14, fontWeight: 600, textAlign: 'left', padding: '4px 0', cursor: 'pointer' }}>See all</button>
-      ) : null}
+      </CardLoad>
     </div>
   );
 }
 
-function HistoryLine({ row, go }: { row: Item; go: Go }) {
+function HistoryLine({ row, go, sheet }: { row: Item; go: Go; sheet?: boolean }) {
   const live = useLiveFrame();
   return (
     <button
@@ -75,7 +75,7 @@ function HistoryLine({ row, go }: { row: Item; go: Go }) {
         if (row.hash) void live?.openTx(row.hash);
         go(row.to || 'tx');
       }}
-      style={{ width: '100%', border: 'none', background: '#1c2025', color: '#fff', borderRadius: 12, padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' }}
+      style={{ width: '100%', border: 'none', borderTop: sheet ? '1px solid rgba(255,255,255,0.05)' : 'none', background: sheet ? 'transparent' : '#1c2025', color: '#fff', borderRadius: sheet ? 0 : 12, padding: sheet ? '12px 2px' : '10px 12px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' }}
     >
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'block', fontSize: 14, fontWeight: 600 }}>{row.title}</span>
@@ -86,26 +86,26 @@ function HistoryLine({ row, go }: { row: Item; go: Go }) {
   );
 }
 
-function Grouped({ rows, go }: { rows: Item[]; go: Go }) {
+function Grouped({ rows, go, sheet }: { rows: Item[]; go: Go; sheet?: boolean }) {
   const home = rows.filter((row) => row.place !== 'vault');
   const vault = rows.filter((row) => row.place === 'vault');
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <Group label="Home" rows={home} empty="No home transactions yet." go={go} />
-      <Group label="Vault" rows={vault} empty="No vault transactions yet. Private pay is filed here." go={go} />
+      <Group label="Home" rows={home} empty="No home transactions yet." go={go} sheet={sheet} />
+      <Group label="Vault" rows={vault} empty="No vault transactions yet. Private pay is filed here." go={go} sheet={sheet} />
     </div>
   );
 }
 
-function Group({ label, rows, empty, go }: { label: string; rows: Item[]; empty: string; go: Go }) {
+function Group({ label, rows, empty, go, sheet }: { label: string; rows: Item[]; empty: string; go: Go; sheet?: boolean }) {
   return (
     <div>
       <p style={{ margin: '4px 0 6px', fontSize: 12, fontWeight: 700, letterSpacing: 0.4, color: '#8c8f99' }}>{label}</p>
       {rows.length === 0 ? (
         <p style={{ margin: 0, fontSize: 13, color: '#8b9097', lineHeight: 1.35 }}>{empty}</p>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {rows.map((row) => <HistoryLine key={`${row.hash ?? row.title}-${row.sub}`} row={row} go={go} />)}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: sheet ? 0 : 8 }}>
+          {rows.map((row) => <HistoryLine key={`${row.hash ?? row.title}-${row.sub}`} row={row} go={go} sheet={sheet} />)}
         </div>
       )}
     </div>

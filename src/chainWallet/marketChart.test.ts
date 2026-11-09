@@ -9,6 +9,7 @@ describe('market charts', () => {
     expect(pricedChartSymbol('USDT')).toBe('USDT');
     expect(pricedChartSymbol('USDC')).toBe('USDC');
     expect(pricedChartSymbol('ARXt')).toBeNull();
+    expect(pricedChartSymbol('tARX')).toBeNull();
     expect(pricedChartSymbol('USDTarx')).toBeNull();
   });
 

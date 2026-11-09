@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { getAddress, type Address } from 'viem';
 import { loadActivity, mergeIncoming, pushActivity, type ActivityItem } from '@/chainWallet/activity';
@@ -10,8 +10,8 @@ import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { useHideBalance } from '@/chainWallet/hideBalance';
 import type { EthereumToken, WalletNetworkId } from '@/chainWallet/networks';
 import { quoteFor } from '@/chainWallet/prices';
-import { VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
-import { routeSend } from '@/chainWallet/routeSend';
+import { DEFAULT_FLAGS, VAULT_FLAGS, UNSHIELD_FLAGS, type PrivacyFlags } from '@/chainWallet/privacy';
+import { parseDest, routeSend } from '@/chainWallet/routeSend';
 import { inspectTx, scanRecentFrom, type InspectedTx } from '@/chainWallet/inspect';
 import { isRelayerPayer, RELAYER_PAYER, RELAYER_PAYER_B } from '@/chainWallet/relay';
 import { addListedToken, loadListedTokens, type ListedToken } from '@/chainWallet/tokens';
@@ -83,6 +83,16 @@ export type TxFlight = {
   title: string;
   phase: 'processing' | 'done' | 'error';
   detail?: string;
+  nid: string;
+};
+
+export type WalletNotice = {
+  id: string;
+  title: string;
+  body: string;
+  status: 'processing' | 'done' | 'error';
+  resume: string;
+  at: number;
 };
 
 function flightFor(mode: LiveSendMode, symbol: string): Pick<TxFlight, 'screen' | 'done' | 'title'> {
@@ -112,6 +122,7 @@ type LiveFrame = {
   ready: boolean;
   locked: boolean;
   address: string | null;
+  rpcUrl: string;
   accountLabel: string;
   accounts: { index: number; label: string }[];
   accountIndex: number;
@@ -182,7 +193,10 @@ type LiveFrame = {
   setReceiveAsset: (symbol: string) => void;
   scanQr: () => Promise<string>;
   refresh: () => Promise<void>;
+  refreshHome: () => Promise<void>;
+  refreshing: boolean;
   flight: TxFlight | null;
+  notices: WalletNotice[];
   clearFlight: () => void;
   renameAccount: (label: string) => void;
 };
@@ -325,20 +339,56 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const [testnetAdded, setTestnetAdded] = useState(() => sessionStore.testnetAdded());
   const [vaultTokens, setVaultTokens] = useState<VaultHolding[]>([]);
   const [flight, setFlight] = useState<TxFlight | null>(null);
+  const [notices, setNotices] = useState<WalletNotice[]>([]);
+  const nidSeq = useRef(0);
+  const trackFlight = useCallback((next: TxFlight) => {
+    setFlight(next);
+    const body = next.phase === 'processing'
+      ? 'Going through'
+      : next.phase === 'done'
+        ? 'Completed'
+        : (next.detail || 'Failed');
+    const resume = next.phase === 'done' ? 'activity' : next.screen;
+    setNotices((prev) => [
+      { id: next.nid, title: next.title, body, status: next.phase, resume, at: Date.now() },
+      ...prev.filter((row) => row.id !== next.nid),
+    ].slice(0, 12));
+  }, []);
+  const startFlight = useCallback((meta: Pick<TxFlight, 'screen' | 'done' | 'title'>): TxFlight => {
+    nidSeq.current += 1;
+    const next: TxFlight = { ...meta, nid: `tx-${nidSeq.current}`, phase: 'processing' };
+    trackFlight(next);
+    return next;
+  }, [trackFlight]);
   const [labelRev, setLabelRev] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshDepth = useRef(0);
+  const beginRefresh = useCallback(() => {
+    refreshDepth.current += 1;
+    setRefreshing(true);
+  }, []);
+  const endRefresh = useCallback(() => {
+    refreshDepth.current = Math.max(0, refreshDepth.current - 1);
+    if (refreshDepth.current === 0) setRefreshing(false);
+  }, []);
 
   const refreshVault = useCallback(async () => {
-    const listedNow = await loadListedTokens();
-    setListed(listedNow);
-    const cached = await loadCachedVaultHoldings(listedNow);
-    setVaultTokens(cached);
+    beginRefresh();
     try {
-      if (wallet.network === 'arxon') await wallet.refreshNotes();
-      setVaultTokens(await loadVaultHoldings(wallet.rpcUrl, listedNow));
-    } catch {
-      setVaultTokens(await loadCachedVaultHoldings(listedNow));
+      const listedNow = await loadListedTokens();
+      setListed(listedNow);
+      const cached = await loadCachedVaultHoldings(listedNow);
+      setVaultTokens(cached);
+      try {
+        if (wallet.network === 'arxon') await wallet.refreshNotes();
+        setVaultTokens(await loadVaultHoldings(wallet.rpcUrl, listedNow));
+      } catch {
+        setVaultTokens(await loadCachedVaultHoldings(listedNow));
+      }
+    } finally {
+      endRefresh();
     }
-  }, [wallet.network, wallet.rpcUrl, wallet.refreshNotes]);
+  }, [wallet.network, wallet.rpcUrl, wallet.refreshNotes, beginRefresh, endRefresh]);
 
   useEffect(() => {
     let cancel = false;
@@ -567,22 +617,25 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     },
   ];
 
+  const arxtAmount = `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} tARX`;
+  const usdtAmount = listedStable(listed, 'USDT');
+  const usdcAmount = listedStable(listed, 'USDC');
   const testnetTokens: LiveTok[] = testnetAdded
     ? [
         {
           name: 'Arxon',
-          amount: `${qty(wallet.network === 'arxon' ? wallet.balance : arx, 4)} ARXt`,
-          value: '$0.00',
+          amount: arxtAmount,
+          value: arxtAmount,
           change: 'Arxon Testnet',
           tone: 'flat',
           icon: 'arx',
           to: 'token-arx',
-          symbol: 'ARXt',
+          symbol: 'tARX',
         },
         {
           name: 'Tether',
-          amount: listedStable(listed, 'USDT'),
-          value: '$0.00',
+          amount: usdtAmount,
+          value: usdtAmount,
           change: 'Arxon Testnet',
           tone: 'flat',
           icon: 'usdt',
@@ -591,8 +644,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         },
         {
           name: 'USD Coin',
-          amount: listedStable(listed, 'USDC'),
-          value: '$0.00',
+          amount: usdcAmount,
+          value: usdcAmount,
           change: 'Arxon Testnet',
           tone: 'flat',
           icon: 'usdc',
@@ -628,21 +681,21 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         }
       }
       const meta = flightFor(mode, symbol);
-      setFlight({ ...meta, phase: 'processing' });
+      const flying = startFlight(meta);
       try {
         if (mode === 'vault' || mode === 'private' || mode === 'unshield') {
           if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
         }
         if (mode === 'vault') {
           await wallet.sendShielded(amount, paymentFlags ?? VAULT_FLAGS);
-          setFlight({ ...meta, phase: 'done' });
+          trackFlight({ ...flying, phase: 'done' });
           return;
         }
         if (mode === 'unshield') {
           const dest = to.trim();
           if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) throw new Error('Unshield needs a 0x address.');
           await wallet.sendUnshield(getAddress(dest) as Address, amount, paymentFlags ?? UNSHIELD_FLAGS);
-          setFlight({ ...meta, phase: 'done' });
+          trackFlight({ ...flying, phase: 'done' });
           return;
         }
         if (mode === 'private') {
@@ -654,7 +707,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
               ? flags
               : VAULT_FLAGS;
           await wallet.sendPrivate(dest, amount, privateFlags);
-          setFlight({ ...meta, phase: 'done' });
+          trackFlight({ ...flying, phase: 'done' });
           return;
         }
         const dest = to.trim();
@@ -663,10 +716,24 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         }
         if (testnet || isArxonSymbol(symbol)) {
           if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
+          if (mode === 'home') {
+            const homeDest = parseDest(dest);
+            if (homeDest.kind === 'public') {
+              await wallet.sendArx(getAddress(homeDest.address) as Address, amount);
+              trackFlight({ ...flying, phase: 'done' });
+              return;
+            }
+            if (homeDest.kind === 'shielded') {
+              await wallet.sendPrivate(homeDest.pk, amount, VAULT_FLAGS);
+              trackFlight({ ...flying, phase: 'done' });
+              return;
+            }
+            throw new Error('Enter a 0x address or shielded destination.');
+          }
           const routed = routeSend({
             to: dest,
             amount,
-            flags,
+            flags: paymentFlags ?? flags ?? DEFAULT_FLAGS,
             notes: wallet.notes,
             publicArx: wallet.balance,
             shieldedPk: wallet.shieldedPk,
@@ -676,23 +743,23 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           }
           if (routed.kind === 'shield') {
             await wallet.sendShielded(amount, flags);
-            setFlight({ ...meta, phase: 'done' });
+            trackFlight({ ...flying, phase: 'done' });
             return;
           }
           if (routed.kind === 'private') {
             if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
             await wallet.sendPrivate(routed.pk, amount, flags);
-            setFlight({ ...meta, phase: 'done' });
+            trackFlight({ ...flying, phase: 'done' });
             return;
           }
           if (routed.kind === 'unshield') {
             if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
             await wallet.sendUnshield(routed.to, amount, flags);
-            setFlight({ ...meta, phase: 'done' });
+            trackFlight({ ...flying, phase: 'done' });
             return;
           }
           await wallet.sendArx(routed.to, amount);
-          setFlight({ ...meta, phase: 'done' });
+          trackFlight({ ...flying, phase: 'done' });
           return;
         }
         if (symbol === 'BTC' || symbol === 'SOL' || ((symbol === 'USDT' || symbol === 'USDC') && chain === 'solana')) {
@@ -703,7 +770,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
             await pushActivity({ hash, kind: 'transfer', to: dest, amount, maskBits: 0, at: Date.now(), token: 'BTC', network: 'bitcoin' });
             setActivity(groupActivity(await loadActivity()));
             setBalTick((n) => n + 1);
-            setFlight({ ...meta, phase: 'done' });
+            trackFlight({ ...flying, phase: 'done' });
             return;
           }
           if (!isSolAddress(dest)) throw new Error('Enter a Solana address.');
@@ -713,7 +780,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           await pushActivity({ hash, kind: 'transfer', to: dest, amount, maskBits: 0, at: Date.now(), token: symbol, network: 'solana' });
           setActivity(groupActivity(await loadActivity()));
           setBalTick((n) => n + 1);
-          setFlight({ ...meta, phase: 'done' });
+          trackFlight({ ...flying, phase: 'done' });
           return;
         }
         if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) {
@@ -725,16 +792,16 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         const addr = getAddress(dest) as Address;
         if (wallet.network !== 'ethereum') await wallet.setNetwork('ethereum');
         await wallet.sendEthereum(symbol, addr, amount);
-        setFlight({ ...meta, phase: 'done' });
+        trackFlight({ ...flying, phase: 'done' });
       } catch (e) {
         const pending = e instanceof PendingTxError;
         const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
-        setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
+        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail });
         if (pending) throw e;
         throw new Error(detail);
       }
     },
-    [wallet],
+    [wallet, startFlight, trackFlight],
   );
 
   const scanQr = useCallback(() => scanAddressQr(), []);
@@ -744,6 +811,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     ready: wallet.ready,
     locked: wallet.locked || (!!currentPassword() === false && sessionStore.hasPassword() && tick >= 0 && autoLockDue()),
     address: wallet.address,
+    rpcUrl: wallet.rpcUrl || DEFAULT_RPC,
     accountLabel: current?.label || (wallet.address ? short(wallet.address) : 'Account 01'),
     accounts,
     accountIndex: wallet.accountIndex,
@@ -958,31 +1026,29 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           : null,
       }),
     vaultMoveIn: async (amount: string) => {
-      const meta = { screen: 'vault-review', done: 'vault-done', title: 'Shield in' };
-      setFlight({ ...meta, phase: 'processing' });
+      const flying = startFlight({ screen: 'vault-review', done: 'vault-done', title: 'Shield in' });
       try {
         if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
         await wallet.sendShielded(amount, VAULT_FLAGS);
-        setFlight({ ...meta, phase: 'done' });
+        trackFlight({ ...flying, phase: 'done' });
       } catch (e) {
         const pending = e instanceof PendingTxError;
         const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
-        setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
+        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail });
         throw e;
       }
     },
     vaultMoveOut: async (amount: string) => {
       if (!wallet.address) throw new Error('No account');
-      const meta = { screen: 'move-home', done: 'move-home-done', title: 'Move to Home' };
-      setFlight({ ...meta, phase: 'processing' });
+      const flying = startFlight({ screen: 'move-home', done: 'move-home-done', title: 'Move to Home' });
       try {
         if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
         await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
-        setFlight({ ...meta, phase: 'done' });
+        trackFlight({ ...flying, phase: 'done' });
       } catch (e) {
         const pending = e instanceof PendingTxError;
         const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
-        setFlight({ ...meta, phase: pending ? 'done' : 'error', detail, done: pending ? meta.screen : meta.done });
+        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail });
         throw e;
       }
     },
@@ -1032,26 +1098,75 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     receiveQr,
     setReceiveAsset,
     scanQr,
+    refreshing,
     refresh: async () => {
-      await Promise.allSettled([
-        wallet.refreshBalance(),
-        wallet.network === 'arxon' ? wallet.refreshNotes() : Promise.resolve(),
-        refreshPrices(),
-        loadActivity().then((items) => setActivity(groupActivity(items))),
-      ]);
-      if (!wallet.address) return;
-      const address = wallet.address as Address;
-      void scanRecentFrom(wallet.rpcUrl || DEFAULT_RPC, address, 256)
-        .then(async (hashes) => {
-          if (!hashes.length) return;
-          await mergeIncoming(wallet.rpcUrl || DEFAULT_RPC, hashes, address);
-          setActivity(groupActivity(await loadActivity()));
-        })
-        .catch(() => {
-          /* The saved list is already on screen. */
+      beginRefresh();
+      try {
+        await Promise.allSettled([
+          wallet.refreshBalance(),
+          wallet.network === 'arxon' ? wallet.refreshNotes() : Promise.resolve(),
+          refreshPrices(),
+          loadActivity().then((items) => setActivity(groupActivity(items))),
+        ]);
+        if (!wallet.address) return;
+        const address = wallet.address as Address;
+        void scanRecentFrom(wallet.rpcUrl || DEFAULT_RPC, address, 256)
+          .then(async (hashes) => {
+            if (!hashes.length) return;
+            await mergeIncoming(wallet.rpcUrl || DEFAULT_RPC, hashes, address);
+            setActivity(groupActivity(await loadActivity()));
+          })
+          .catch(() => {
+            /* The saved list is already on screen. */
+          });
+      } finally {
+        endRefresh();
+      }
+    },
+    refreshHome: async () => {
+      beginRefresh();
+      try {
+        const jobs: Promise<unknown>[] = [
+          wallet.refreshBalance(),
+          wallet.network === 'arxon' ? wallet.refreshNotes() : Promise.resolve(),
+          refreshPrices(),
+        ];
+        if (wallet.network === 'arxon') {
+          jobs.push((async () => {
+            const listedNow = await loadListedTokens();
+            setListed(listedNow);
+            setVaultTokens(await loadCachedVaultHoldings(listedNow));
+          })());
+        }
+        await Promise.allSettled(jobs);
+      } finally {
+        endRefresh();
+      }
+      void loadActivity().then((items) => setActivity(groupActivity(items)));
+      if (wallet.address) {
+        const address = wallet.address as Address;
+        void scanRecentFrom(wallet.rpcUrl || DEFAULT_RPC, address, 256)
+          .then(async (hashes) => {
+            if (!hashes.length) return;
+            await mergeIncoming(wallet.rpcUrl || DEFAULT_RPC, hashes, address);
+            setActivity(groupActivity(await loadActivity()));
+          })
+          .catch(() => {
+            /* The saved list is already on screen. */
+          });
+      }
+      if (wallet.network === 'arxon') {
+        void loadListedTokens().then(async (listedNow) => {
+          try {
+            setVaultTokens(await loadVaultHoldings(wallet.rpcUrl, listedNow));
+          } catch {
+            setVaultTokens(await loadCachedVaultHoldings(listedNow));
+          }
         });
+      }
     },
     flight,
+    notices,
     clearFlight: () => setFlight(null),
     renameAccount: (label: string) => {
       const name = label.trim().replace(/\s+/g, ' ').slice(0, 32);
@@ -1100,7 +1215,11 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     format,
     refreshPrices,
     flight,
+    notices,
+    startFlight,
+    trackFlight,
     labelRev,
+    refreshing,
   ]);
 
   return <LiveFrameContext.Provider value={value}>{children}</LiveFrameContext.Provider>;
@@ -1138,19 +1257,20 @@ function groupActivity(items: ActivityItem[]): LiveActivity[] {
           : model === 'private'
             ? 'private'
             : 'sent';
-    const who = item.kind === 'shield' ? '' : briefAddr(item.to);
-    const when = new Date(item.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const who = item.kind === 'shield' ? '' : briefAddr(item.to || '');
+    const when = new Date(item.at || Date.now()).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const where = item.kind === 'receive' ? 'Vault' : place === 'home' ? 'Home' : 'Vault';
+    const hash = item.hash || '';
     current.items.push({
       title: item.kind === 'receive' ? 'Received' : model === 'shield' ? 'Shield in' : model === 'unshield' ? 'Unshield' : model === 'private' ? 'Private pay' : model === 'public' ? 'Sent' : 'On-chain',
       sub: `${where}${who ? ` · ${who}` : ''} · ${when}`,
-      amount: item.amount ? shownAmount(`${item.amount} ${item.token ?? ''}`) : item.hash.slice(0, 10),
+      amount: item.amount ? shownAmount(`${item.amount} ${item.token ?? ''}`) : hash.slice(0, 10) || 'Sent',
       fiat: item.network === 'ethereum' ? 'Ethereum' : item.network === 'bitcoin' ? 'Bitcoin' : item.network === 'solana' ? 'Solana' : 'Arxon Testnet',
       kind,
       tint: item.kind === 'receive' ? '#3ddc84' : undefined,
       token: item.token ?? 'ARX',
       to: item.kind === 'private' ? 'receipt' : 'tx',
-      hash: item.hash,
+      hash,
       model,
       place,
       party: item.to,
