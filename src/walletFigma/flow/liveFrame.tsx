@@ -83,6 +83,7 @@ export type TxFlight = {
   title: string;
   phase: 'processing' | 'done' | 'error';
   detail?: string;
+  hash?: string;
   nid: string;
 };
 
@@ -110,6 +111,10 @@ export type LiveInspect = {
   status: string;
   vault: boolean;
   rows: [string, string][];
+  /** Every field in full for History and the shareable receipt image. */
+  fullRows?: [string, string][];
+  /** History opens full; the post-txn completed page opens truncated. */
+  detail?: 'short' | 'full';
   /** Full counterparty address. Shown only on the private receipt. */
   fullTo?: string;
   /** This wallet's address. The receipt shows it in full. Other screens use the short form. */
@@ -139,7 +144,7 @@ type LiveFrame = {
   testnetTokens: LiveTok[];
   activity: LiveActivity[];
   inspect: LiveInspect | null;
-  openTx: (hash: string) => Promise<void>;
+  openTx: (hash: string, opts?: { detail?: 'short' | 'full' }) => Promise<void>;
   words: string[] | null;
   shielded: string;
   shieldedPk: string | null;
@@ -687,15 +692,15 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
         }
         if (mode === 'vault') {
-          await wallet.sendShielded(amount, paymentFlags ?? VAULT_FLAGS);
-          trackFlight({ ...flying, phase: 'done' });
+          const hash = await wallet.sendShielded(amount, paymentFlags ?? VAULT_FLAGS);
+          trackFlight({ ...flying, phase: 'done', hash });
           return;
         }
         if (mode === 'unshield') {
           const dest = to.trim();
           if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) throw new Error('Unshield needs a 0x address.');
-          await wallet.sendUnshield(getAddress(dest) as Address, amount, paymentFlags ?? UNSHIELD_FLAGS);
-          trackFlight({ ...flying, phase: 'done' });
+          const hash = await wallet.sendUnshield(getAddress(dest) as Address, amount, paymentFlags ?? UNSHIELD_FLAGS);
+          trackFlight({ ...flying, phase: 'done', hash });
           return;
         }
         if (mode === 'private') {
@@ -706,8 +711,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
             : flags.hideSender || flags.hideReceiver || flags.hideAmount
               ? flags
               : VAULT_FLAGS;
-          await wallet.sendPrivate(dest, amount, privateFlags);
-          trackFlight({ ...flying, phase: 'done' });
+          const hash = await wallet.sendPrivate(dest, amount, privateFlags);
+          trackFlight({ ...flying, phase: 'done', hash });
           return;
         }
         const dest = to.trim();
@@ -719,13 +724,13 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           if (mode === 'home') {
             const homeDest = parseDest(dest);
             if (homeDest.kind === 'public') {
-              await wallet.sendArx(getAddress(homeDest.address) as Address, amount);
-              trackFlight({ ...flying, phase: 'done' });
+              const hash = await wallet.sendArx(getAddress(homeDest.address) as Address, amount);
+              trackFlight({ ...flying, phase: 'done', hash });
               return;
             }
             if (homeDest.kind === 'shielded') {
-              await wallet.sendPrivate(homeDest.pk, amount, VAULT_FLAGS);
-              trackFlight({ ...flying, phase: 'done' });
+              const hash = await wallet.sendPrivate(homeDest.pk, amount, VAULT_FLAGS);
+              trackFlight({ ...flying, phase: 'done', hash });
               return;
             }
             throw new Error('Enter a 0x address or shielded destination.');
@@ -742,24 +747,24 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
             throw new Error(routed.label);
           }
           if (routed.kind === 'shield') {
-            await wallet.sendShielded(amount, flags);
-            trackFlight({ ...flying, phase: 'done' });
+            const hash = await wallet.sendShielded(amount, flags);
+            trackFlight({ ...flying, phase: 'done', hash });
             return;
           }
           if (routed.kind === 'private') {
             if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
-            await wallet.sendPrivate(routed.pk, amount, flags);
-            trackFlight({ ...flying, phase: 'done' });
+            const hash = await wallet.sendPrivate(routed.pk, amount, flags);
+            trackFlight({ ...flying, phase: 'done', hash });
             return;
           }
           if (routed.kind === 'unshield') {
             if (routed.shieldFirst) await wallet.sendShielded(amount, flags);
-            await wallet.sendUnshield(routed.to, amount, flags);
-            trackFlight({ ...flying, phase: 'done' });
+            const hash = await wallet.sendUnshield(routed.to, amount, flags);
+            trackFlight({ ...flying, phase: 'done', hash });
             return;
           }
-          await wallet.sendArx(routed.to, amount);
-          trackFlight({ ...flying, phase: 'done' });
+          const hash = await wallet.sendArx(routed.to, amount);
+          trackFlight({ ...flying, phase: 'done', hash });
           return;
         }
         if (symbol === 'BTC' || symbol === 'SOL' || ((symbol === 'USDT' || symbol === 'USDC') && chain === 'solana')) {
@@ -770,7 +775,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
             await pushActivity({ hash, kind: 'transfer', to: dest, amount, maskBits: 0, at: Date.now(), token: 'BTC', network: 'bitcoin' });
             setActivity(groupActivity(await loadActivity()));
             setBalTick((n) => n + 1);
-            trackFlight({ ...flying, phase: 'done' });
+            trackFlight({ ...flying, phase: 'done', hash });
             return;
           }
           if (!isSolAddress(dest)) throw new Error('Enter a Solana address.');
@@ -780,7 +785,7 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           await pushActivity({ hash, kind: 'transfer', to: dest, amount, maskBits: 0, at: Date.now(), token: symbol, network: 'solana' });
           setActivity(groupActivity(await loadActivity()));
           setBalTick((n) => n + 1);
-          trackFlight({ ...flying, phase: 'done' });
+          trackFlight({ ...flying, phase: 'done', hash });
           return;
         }
         if (!/^0x[0-9a-fA-F]{40}$/.test(dest)) {
@@ -791,12 +796,12 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
         }
         const addr = getAddress(dest) as Address;
         if (wallet.network !== 'ethereum') await wallet.setNetwork('ethereum');
-        await wallet.sendEthereum(symbol, addr, amount);
-        trackFlight({ ...flying, phase: 'done' });
+        const hash = await wallet.sendEthereum(symbol, addr, amount);
+        trackFlight({ ...flying, phase: 'done', hash });
       } catch (e) {
         const pending = e instanceof PendingTxError;
         const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
-        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail });
+        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail, hash: e instanceof PendingTxError ? e.hash : flying.hash });
         if (pending) throw e;
         throw new Error(detail);
       }
@@ -837,7 +842,8 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     testnetTokens,
     activity,
     inspect,
-    openTx: async (hash: string) => {
+    openTx: async (hash: string, opts?: { detail?: 'short' | 'full' }) => {
+      const detail = opts?.detail ?? 'short';
       const saved = activity.flatMap((group) => group.items).find((item) => item.hash?.toLowerCase() === hash.toLowerCase());
       const fullTo = saved?.party && /^0x[0-9a-fA-F]{16,}$/.test(saved.party) ? saved.party : undefined;
       const fullFrom = wallet.address || undefined;
@@ -848,27 +854,45 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
           return fullFrom ? [['From', briefAddr(fullFrom)]] : [];
         });
         if (fullFrom && !rows.some(([label]) => label === 'From')) rows.splice(Math.min(1, rows.length), 0, ['From', briefAddr(fullFrom)]);
-        return { ...base, fullTo, fullFrom, accountLabel, rows };
+        const fullRows = (base.fullRows ?? base.rows).map(([label, value]): [string, string] => {
+          if (label === 'From' && fullFrom) return [label, accountLabel ? `${accountLabel} · ${fullFrom}` : fullFrom];
+          if (label === 'To' && fullTo) return [label, fullTo];
+          return [label, value];
+        });
+        if (fullFrom && !fullRows.some(([label]) => label === 'From')) fullRows.splice(Math.min(1, fullRows.length), 0, ['From', accountLabel ? `${accountLabel} · ${fullFrom}` : fullFrom]);
+        if (fullTo && !fullRows.some(([label]) => label === 'To')) fullRows.splice(Math.min(2, fullRows.length), 0, ['To', fullTo]);
+        return { ...base, fullTo: fullTo || base.fullTo, fullFrom: fullFrom || base.fullFrom, accountLabel, rows, fullRows, detail };
       };
       if (!/^0x[0-9a-fA-F]{64}$/.test(hash)) {
         const netName = saved?.network === 'bitcoin' ? 'Bitcoin' : 'Solana';
         const fromAddr = saved?.network === 'bitcoin' ? alt?.btc || '' : alt?.sol || '';
+        const rows: [string, string][] = [
+          ['From', fromAddr ? `${accountLabel} · ${briefAddr(fromAddr)}` : accountLabel],
+          ...(saved?.party ? [['To', briefAddr(saved.party)] as [string, string]] : []),
+          ['Network', netName],
+          ['Status', 'Successful'],
+          ['Hash', briefAddr(hash) === hash ? `${hash.slice(0, 10)}…${hash.slice(-6)}` : briefAddr(hash)],
+        ];
+        const fullRows: [string, string][] = [
+          ['From', fromAddr ? `${accountLabel} · ${fromAddr}` : accountLabel],
+          ...(saved?.party ? [['To', saved.party] as [string, string]] : []),
+          ['Network', netName],
+          ['Status', 'Successful'],
+          ['Hash', hash],
+        ];
         setInspect({
           hash,
           title: saved?.title || 'Sent',
           amount: saved?.amount || `${hash.slice(0, 10)}…`,
           fiat: netName,
-          status: 'Submitted',
+          status: 'Successful',
           vault: false,
           fullTo: saved?.party,
           fullFrom: fromAddr || undefined,
           accountLabel,
-          rows: [
-            ['From', fromAddr ? `${accountLabel} · ${fromAddr}` : accountLabel],
-            ...(saved?.party ? [['To', saved.party] as [string, string]] : []),
-            ['Network', netName],
-            ['Hash', hash],
-          ],
+          rows,
+          fullRows,
+          detail,
         });
         return;
       }
@@ -887,6 +911,11 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
             ['Hash', `${hash.slice(0, 10)}…${hash.slice(-6)}`],
             ['Network', wallet.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet'],
           ],
+          fullRows: [
+            ['Hash', hash],
+            ['Network', wallet.network === 'ethereum' ? 'Ethereum' : 'Arxon Testnet'],
+          ],
+          detail,
         }));
       }
     },
@@ -1029,12 +1058,12 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       const flying = startFlight({ screen: 'vault-review', done: 'vault-done', title: 'Shield in' });
       try {
         if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-        await wallet.sendShielded(amount, VAULT_FLAGS);
-        trackFlight({ ...flying, phase: 'done' });
+        const hash = await wallet.sendShielded(amount, VAULT_FLAGS);
+        trackFlight({ ...flying, phase: 'done', hash });
       } catch (e) {
         const pending = e instanceof PendingTxError;
         const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
-        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail });
+        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail, hash: e instanceof PendingTxError ? e.hash : flying.hash });
         throw e;
       }
     },
@@ -1043,12 +1072,12 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
       const flying = startFlight({ screen: 'move-home', done: 'move-home-done', title: 'Move to Home' });
       try {
         if (wallet.network !== 'arxon') await wallet.setNetwork('arxon');
-        await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
-        trackFlight({ ...flying, phase: 'done' });
+        const hash = await wallet.sendUnshield(wallet.address, amount, UNSHIELD_FLAGS);
+        trackFlight({ ...flying, phase: 'done', hash });
       } catch (e) {
         const pending = e instanceof PendingTxError;
         const detail = pending ? (e instanceof Error ? e.message : 'Transaction submitted') : plainTxError(e);
-        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail });
+        trackFlight({ ...flying, phase: pending ? 'done' : 'error', detail, hash: e instanceof PendingTxError ? e.hash : flying.hash });
         throw e;
       }
     },
@@ -1287,21 +1316,47 @@ function toLiveInspect(row: InspectedTx): LiveInspect {
     row.kind === 'shield' ? 'Moved to Vault' : row.kind === 'unshield' ? 'Moved to Home' : row.kind === 'private' ? 'Sent privately' : 'Sent';
   const amount = row.valueArx && Number(row.valueArx) > 0 ? `${row.valueArx} ARX` : row.kind === 'private' ? 'Amount hidden' : row.hash.slice(0, 10);
   const hidden = row.rows.filter((item) => item.state === 'hidden').map((item) => item.label);
+  const status = row.status === 'success' ? 'Successful' : row.status === 'reverted' ? 'Failed' : 'Pending';
+  const pick = (label: string) => row.rows.find((item) => item.label === label)?.value;
+  const gas = pick('Gas');
+  const anchor = pick('Anchor');
+  const payout = pick('Payout');
+  const toFull = payout && /^0x/i.test(payout) ? payout : row.to ?? undefined;
+  const privacy = hidden.length ? hidden.join(', ') : row.kind === 'private' ? 'Amount, Receiver, Sender' : 'Public';
+  const date = row.blockNumber ? `Block ${row.blockNumber}` : 'Pending';
+  const fromShort = isRelayerPayer(row.from) ? null : short(row.from);
+  const rows: [string, string][] = [
+    ['Date', date],
+    ...(fromShort ? [['From', fromShort] as [string, string]] : []),
+    ['To', toFull ? short(toFull) : '—'],
+    ['Amount', amount],
+    ['Privacy', privacy],
+    ['Status', status],
+    ...(gas ? [['Gas', fieldText(gas)] as [string, string]] : []),
+    ...(anchor ? [['Anchor', fieldText(anchor)] as [string, string]] : []),
+  ];
+  const fullRows: [string, string][] = [
+    ['Date', date],
+    ['From', row.from],
+    ['To', toFull ?? '—'],
+    ['Amount', amount],
+    ['Privacy', privacy],
+    ['Status', status],
+    ...(gas ? [['Gas', gas] as [string, string]] : []),
+    ...(anchor ? [['Anchor', anchor] as [string, string]] : []),
+    ['Hash', row.hash],
+  ];
   return {
     hash: row.hash,
     title,
     amount,
     fiat: row.kind === 'private' ? 'Private' : 'Arxon Testnet',
-    status: row.status === 'success' ? 'Confirmed' : row.status === 'reverted' ? 'Reverted' : 'Pending',
+    status,
     vault,
-    rows: [
-      ['Date', row.blockNumber ? `Block ${row.blockNumber}` : 'Pending'],
-      ...(isRelayerPayer(row.from) ? [] : [['From', short(row.from)] as [string, string]]),
-      ['To', row.to ? short(row.to) : '—'],
-      ['Amount', amount],
-      ['Privacy', hidden.length ? hidden.join(', ') : row.kind === 'private' ? 'Private' : 'Public'],
-      ...row.rows.slice(0, 4).map((item): [string, string] => [item.label, fieldText(item.value)]),
-    ],
+    rows,
+    fullRows,
+    fullTo: toFull,
+    fullFrom: isRelayerPayer(row.from) ? undefined : row.from,
   };
 }
 

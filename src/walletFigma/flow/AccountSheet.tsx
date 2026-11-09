@@ -80,7 +80,7 @@ export function AccountSheet({ mode, setMode, go }: { mode: AccountSheetMode; se
 }
 
 const dim: CSSProperties = { position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.55)', padding: 0, cursor: 'pointer' };
-const sheet: CSSProperties = { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1, background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 18px calc(28px + env(safe-area-inset-bottom, 0px))', maxHeight: '86%', overflowY: 'auto' };
+const sheet: CSSProperties = { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 1, background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 18px calc(28px + env(safe-area-inset-bottom, 0px))', maxHeight: 640, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' };
 const handle: CSSProperties = { width: 36, height: 4, borderRadius: 2, background: '#5c5f64', margin: '0 auto 12px' };
 const title: CSSProperties = { margin: '0 0 8px', fontSize: 20, fontWeight: 700 };
 const copy: CSSProperties = { margin: 0, color: '#8b9097', fontSize: 13, lineHeight: 1.4 };

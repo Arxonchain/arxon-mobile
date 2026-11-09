@@ -658,6 +658,7 @@ function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: st
   const live = useLiveFrame();
   const going = !!live?.app && live.flight?.phase === 'processing';
   const failed = !!live?.app && live.flight?.phase === 'error';
+  const hash = live?.app ? live.flight?.hash : undefined;
   useEffect(() => {
     if (!failed) return;
     if (isTxCancelled(live?.flight?.detail)) {
@@ -667,10 +668,19 @@ function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: st
     }
     go('send-failed');
   }, [failed, go, live]);
+  useEffect(() => {
+    if (!hash || going || !live?.app) return;
+    void live.openTx(hash, { detail: 'short' });
+    // openTx is stable enough for this one-shot preload.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, going]);
+  function viewReceipt() {
+    if (hash) void live?.openTx(hash, { detail: 'short' });
+    go('receipt');
+  }
   if (live?.app) {
-    const title = going ? 'Sending' : privateSend ? 'Sent privately' : 'Sent';
-    const status = going ? 'Going through' : 'Sent';
-    const statusColor = going ? '#accafe' : '#3ddc84';
+    const title = going ? 'Sending' : 'Payment successful';
+    const status = going ? 'Pending' : 'Successful';
     return (
       <LiveScroll>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginTop: 48 }}>
@@ -680,14 +690,18 @@ function Success({ amount, symbol, privateSend, to, feeLabel, go }: { amount: st
           <p style={{ margin: '28px 0 0', textAlign: 'center', fontSize: 26, fontWeight: 700 }}>{title}</p>
           <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 32, fontWeight: 700, color: '#accafe' }}>{amount} {symbol}</p>
         </div>
-        <div style={{ marginTop: 24, boxSizing: 'border-box', background: '#1c2025', borderRadius: 16, padding: '8px 16px' }}>
-          <Line label="To" value={briefAddr(to)} />
-          <Line label="Network fee" value={feeLabel} />
-          <Line label="Status" value={status} valueColor={statusColor} />
-          {going ? null : <Line label="Credit" value={recipientCreditedInCopy(etaSecondsLabel())} />}
+        <div style={{ marginTop: 24, padding: '8px 14px', ...frostPanel }}>
+          <FrostLine label="To" value={briefAddr(to)} />
+          <FrostLine label="Network fee" value={feeLabel} />
+          <FrostLine label="Status" value={status} />
+          {going ? null : <FrostLine label="Credit" value={recipientCreditedInCopy(etaSecondsLabel())} />}
         </div>
-        <button type="button" onClick={() => go('home-funded')} style={{ ...livePrimary, marginTop: 24 }}>Done</button>
-        {privateSend && !going ? <button type="button" onClick={() => go('receipt')} style={{ ...liveGhost, marginTop: 10 }}>View private receipt</button> : null}
+        {going ? null : (
+          <>
+            <button type="button" onClick={() => go('home-funded')} style={{ ...livePrimary, marginTop: 24 }}>Done</button>
+            <button type="button" onClick={viewReceipt} style={{ ...liveGhost, marginTop: 10 }}>View private receipt</button>
+          </>
+        )}
       </LiveScroll>
     );
   }
@@ -760,6 +774,7 @@ function Failed({ to, amount, symbol, go }: { to: string; amount: string; symbol
   const why = live?.flight?.detail && !isTxCancelled(live.flight.detail)
     ? live.flight.detail
     : 'The network rejected this send. No fee was charged.';
+  const hash = live?.flight?.hash;
   return (
     <FailSheet
       kicker="Send"
@@ -768,12 +783,24 @@ function Failed({ to, amount, symbol, go }: { to: string; amount: string; symbol
       rows={[
         { label: 'Amount', value: `${amount} ${symbol}` },
         { label: 'To', value: briefAddr(to) },
-        { label: 'Status', value: 'Not sent', tone: 'bad' },
+        { label: 'Status', value: 'Failed', tone: 'bad' },
       ]}
       primary="Try again"
       secondary="Back to Home"
       onPrimary={() => go('send-review')}
       onSecondary={() => go('home-funded')}
+      extra={hash ? (
+        <button
+          type="button"
+          onClick={() => {
+            void live?.openTx(hash, { detail: 'short' });
+            go('receipt');
+          }}
+          style={{ ...liveGhost, height: 40, marginTop: 4, color: '#0c1018', borderColor: 'rgba(12,16,24,0.16)' }}
+        >
+          View private receipt
+        </button>
+      ) : null}
     />
   );
 }

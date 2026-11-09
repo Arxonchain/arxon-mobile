@@ -72,7 +72,7 @@ function HistoryLine({ row, go, sheet }: { row: Item; go: Go; sheet?: boolean })
     <button
       type="button"
       onClick={() => {
-        if (row.hash) void live?.openTx(row.hash);
+        if (row.hash) void live?.openTx(row.hash, { detail: 'full' });
         go(row.to || 'tx');
       }}
       style={{ width: '100%', border: 'none', borderTop: sheet ? '1px solid rgba(255,255,255,0.05)' : 'none', background: sheet ? 'transparent' : '#1c2025', color: '#fff', borderRadius: sheet ? 0 : 12, padding: sheet ? '12px 2px' : '10px 12px', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', fontFamily: font.sans, cursor: 'pointer' }}

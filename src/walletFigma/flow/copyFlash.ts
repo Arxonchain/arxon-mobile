@@ -49,11 +49,20 @@ export async function copyAddress(value: string, msg = 'Address copied') {
   flashCopy(msg);
 }
 
+type ArxonShare = {
+  share?: (headline: string, value: string) => void;
+  shareImage?: (headline: string, dataUrl: string) => void;
+};
+
+function nativeShare() {
+  return (window as unknown as { ArxonShare?: ArxonShare }).ArxonShare;
+}
+
 /** Opens the system share sheet. Copies and toasts if share is unavailable. */
 export async function shareText(title: string, text: string) {
   const body = text.trim();
   if (!body) return;
-  const native = (window as unknown as { ArxonShare?: { share?: (headline: string, value: string) => void } }).ArxonShare;
+  const native = nativeShare();
   if (typeof native?.share === 'function') {
     native.share(title, body);
     return;
@@ -67,4 +76,42 @@ export async function shareText(title: string, text: string) {
     }
   }
   await copyAddress(body, 'Copied');
+}
+
+async function blobDataUrl(blob: Blob) {
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read this image.'));
+    reader.readAsDataURL(blob);
+  });
+}
+
+/** Share a PNG (receipt screenshot). Falls back to download, then copy. */
+export async function shareImage(title: string, blob: Blob, filename: string) {
+  const native = nativeShare();
+  if (typeof native?.shareImage === 'function') {
+    native.shareImage(title, await blobDataUrl(blob));
+    return;
+  }
+  const file = new File([blob], filename, { type: 'image/png' });
+  const nav = navigator as Navigator & { canShare?: (data: ShareData) => boolean };
+  if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
+    try {
+      await nav.share({ title, files: [file] });
+      return;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.rel = 'noopener';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(url), 4_000);
+  flashCopy('Receipt image ready');
 }

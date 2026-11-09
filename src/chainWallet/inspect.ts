@@ -88,7 +88,7 @@ export async function inspectTx(rpcUrl: string, hash: Hex): Promise<InspectedTx>
 
   const statusRow: InspectedTx['rows'][number] = {
     label: 'Status',
-    value: status === 'success' ? 'Included' : status === 'reverted' ? 'Reverted (not applied)' : 'Pending',
+    value: status === 'success' ? 'Successful' : status === 'reverted' ? 'Failed' : 'Pending',
     state: status === 'reverted' ? 'public' : 'info',
   };
 

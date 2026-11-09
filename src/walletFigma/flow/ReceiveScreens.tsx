@@ -275,7 +275,7 @@ export function NetworkSheet({ nets, selected, onPick, onAdd, onClose, fixed = f
     <div style={{ position: fixed ? 'fixed' : 'absolute', inset: 0, zIndex: fixed ? 9 : 'auto' }}>
       <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.55)', padding: 0, cursor: 'pointer' }} />
       <NoteStatus />
-      <div style={{ position: 'absolute', left: 0, ...(fixed ? { bottom: 0, maxHeight: '100%', overflowY: 'auto' as const } : { top: 844 - height }), width: 390, height, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '28px 28px 0 0' }}>
+      <div style={{ position: 'absolute', left: 0, ...(fixed ? { bottom: 0, height: Math.min(height, 640), overflowY: 'auto' as const, WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' } : { top: 844 - height, height }), width: 390, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '28px 28px 0 0' }}>
         <div style={{ position: 'absolute', left: 170, top: 9, width: 48, height: 4, borderRadius: 2, background: '#2a3447' }} />
         <p style={{ position: 'absolute', left: 23, top: 31, margin: 0, fontSize: 20, fontWeight: 700 }}>Select network</p>
         {nets.map((net, index) => (
@@ -304,6 +304,7 @@ export function NetworkSheet({ nets, selected, onPick, onAdd, onClose, fixed = f
           </span>
         </button>
         <button type="button" onClick={onAdd} style={{ position: 'absolute', left: 15, top: 83 + nets.length * 84 + 100, width: 358, height: 52, borderRadius: 14, border: '1px solid #2a3447', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 16, fontWeight: 600, cursor: 'pointer' }}>Add network</button>
+        <div aria-hidden style={{ height }} />
       </div>
     </div>
   );

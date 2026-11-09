@@ -1104,6 +1104,7 @@ function Pending({ id, go, amount }: { id: string; go: Go; amount: string }) {
 function Result({ id, go, fundedVault, amount, to }: { id: string; go: Go; fundedVault: () => void; amount: string; to?: string }) {
   const live = useLiveFrame();
   const failed = id === 'vault-failed';
+  const hash = live?.app ? live.flight?.hash : undefined;
   useEffect(() => {
     if (failed || live?.flight?.phase !== 'error') return;
     if (isTxCancelled(live.flight.detail)) {
@@ -1112,6 +1113,11 @@ function Result({ id, go, fundedVault, amount, to }: { id: string; go: Go; funde
     }
     go('vault-failed');
   }, [failed, live, go]);
+  useEffect(() => {
+    if (!hash || failed || live?.flight?.phase === 'processing' || !live?.app) return;
+    void live.openTx(hash, { detail: 'short' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hash, failed, live?.flight?.phase]);
   const backHome = id === 'move-home-done';
   const eta = etaSecondsLabel();
   const going = !!live?.app && live.flight?.phase === 'processing';
@@ -1119,28 +1125,32 @@ function Result({ id, go, fundedVault, amount, to }: { id: string; go: Go; funde
   const title = going
     ? (id === 'vault-done' ? 'Shielding' : id === 'priv-done' ? 'Sending' : id === 'unshield-done' ? 'Unshielding' : id === 'move-home-done' ? 'Moving' : 'Sending')
     : liveSent
-    ? 'Sent'
+    ? 'Payment successful'
     : id === 'vault-done' ? 'Shielded' : id === 'move-home-done' ? 'Moved to Home' : id === 'priv-done' ? 'Private pay sent' : id === 'unshield-done' ? 'Unshielded' : 'Move failed';
   const shown = `${qty(num(amount || '0'))} ${liveTicker('ARX', !!live?.app)}`;
   const vaultNow = live?.app ? `${Number(live.shielded || 0).toLocaleString(undefined, { maximumFractionDigits: 4 })} ${liveTicker('ARX', true)}` : undefined;
   const credit = id === 'vault-done' ? vaultCreditedInCopy(eta) : recipientCreditedInCopy(eta);
   const dest = to?.trim() ? briefAddr(to) : vaultDest(id === 'priv-done', live?.app ? live.address : undefined);
-  const liveStatus: [string, string, string?] = going ? ['Status', 'Going through', '#accafe'] : ['Status', liveSent ? 'Sent' : 'Confirmed', '#3ddb85'];
+  const liveStatus: [string, string, string?] = going ? ['Status', 'Pending'] : ['Status', 'Successful'];
   const rows: [string, string, string?][] = failed
-    ? [['Network fee', 'No fee charged'], ['Vault', 'Not moved', '#f25252'], ['Status', 'Not moved', '#f25252']]
+    ? [['Network fee', 'No fee charged'], ['Vault', 'Not moved'], ['Status', 'Failed']]
     : id === 'vault-done'
       ? live?.app
         ? [['Where it is', 'Your Vault'], liveStatus, ...(going ? [] : [['Credit', credit] as [string, string]])]
-        : [['Where it is', 'Your Vault'], ['Vault balance', vaultNow ?? 'Hidden'], ['Status', 'Confirmed', '#3ddb85']]
+        : [['Where it is', 'Your Vault'], ['Vault balance', vaultNow ?? 'Hidden'], ['Status', 'Successful']]
       : id === 'move-home-done'
         ? [['Home balance now', live?.app ? live.publicArx : '$1,188.60'], ['Vault balance', vaultNow ?? '$210.00'], liveStatus]
         : id === 'priv-done'
           ? live?.app
             ? [['To', dest || 'Shielded note'], ['Network fee', feeText(true)], liveStatus, ...(going ? [] : [['Credit', credit] as [string, string]])]
-            : [['To', 'Shielded note'], ['Network fee', feeText(false)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$315.00']]
+            : [['To', 'Shielded note'], ['Network fee', feeText(false)], ['Status', 'Successful'], ['Vault balance now', vaultNow ?? '$315.00']]
           : live?.app
             ? [['To', dest], ['Network fee', feeText(true)], liveStatus, ...(going ? [] : [['Credit', credit] as [string, string]])]
-            : [['To', vaultDest(false, live?.app ? live.address : undefined)], ['Network fee', feeText(!!live?.app)], ['Status', 'Confirmed', '#3ddb85'], ['Vault balance now', vaultNow ?? '$210.00']];
+            : [['To', vaultDest(false, live?.app ? live.address : undefined)], ['Network fee', feeText(!!live?.app)], ['Status', 'Successful'], ['Vault balance now', vaultNow ?? '$210.00']];
+  function viewReceipt() {
+    if (hash) void live?.openTx(hash, { detail: 'short' });
+    go('receipt');
+  }
   if (failed) {
     return (
       <FailSheet
@@ -1150,13 +1160,39 @@ function Result({ id, go, fundedVault, amount, to }: { id: string; go: Go; funde
         rows={[
           { label: 'Amount', value: shown },
           { label: 'To', value: dest || 'Your Vault' },
-          { label: 'Status', value: 'Not moved', tone: 'bad' },
+          { label: 'Status', value: 'Failed', tone: 'bad' },
         ]}
         primary="Try again"
         secondary="Back to Vault"
         onPrimary={() => go('vault-review')}
         onSecondary={fundedVault}
+        extra={hash ? (
+          <button type="button" onClick={viewReceipt} style={{ ...liveGhost, height: 40, marginTop: 4, color: '#0c1018', borderColor: 'rgba(12,16,24,0.16)' }}>
+            View private receipt
+          </button>
+        ) : null}
       />
+    );
+  }
+  if (live?.app) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', boxSizing: 'border-box', padding: '0 18px 28px' }}>
+        <PhoneStatus />
+        <div style={{ marginTop: 110, width: 96, height: 96, borderRadius: 48, background: '#accafe', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <FigmaImg src="/wallet-figma/claim/check.svg" width={44} height={44} />
+        </div>
+        <p style={{ margin: '22px 0 0', fontSize: 22, fontWeight: 700 }}>{title}</p>
+        <p style={{ margin: '8px 0 0', fontSize: 28, fontWeight: 700 }}>{shown}</p>
+        <div style={{ marginTop: 22, width: '100%', padding: '8px 14px', ...frostPanel }}>
+          {rows.map(([label, value]) => <FrostLine key={label} label={label} value={value} />)}
+        </div>
+        {going ? null : (
+          <div style={{ marginTop: 'auto', width: '100%', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <button type="button" onClick={() => backHome ? go('home-funded') : fundedVault()} style={livePrimary}>Done</button>
+            <button type="button" onClick={viewReceipt} style={liveGhost}>View private receipt</button>
+          </div>
+        )}
+      </div>
     );
   }
   return (

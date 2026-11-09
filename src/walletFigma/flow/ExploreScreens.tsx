@@ -319,7 +319,7 @@ function Explore({ go, onBack }: { go: Go; onBack?: () => void }) {
       </div>
       <div
         ref={scroller}
-        style={{ position: 'absolute', left: 0, right: 0, top: headTop + (notice ? 196 : 176), bottom: WALLET_TAB_CLEAR, overflowX: 'hidden', overflowY: 'auto', padding: `8px ${padX}px 28px`, boxSizing: 'border-box' }}
+        style={{ position: 'absolute', left: 0, right: 0, top: headTop + (notice ? 196 : 176), bottom: 0, overflowX: 'hidden', overflowY: 'auto', padding: `8px ${padX}px ${WALLET_TAB_CLEAR}px`, boxSizing: 'border-box' }}
         onTouchStart={pull.onTouchStart}
         onTouchMove={pull.onTouchMove}
         onTouchEnd={pull.onTouchEnd}

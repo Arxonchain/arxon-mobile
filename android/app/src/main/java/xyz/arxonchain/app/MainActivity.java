@@ -6,9 +6,11 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.util.Base64;
 import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
@@ -22,11 +24,14 @@ import androidx.annotation.NonNull;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.content.ContextCompat;
+import androidx.core.content.FileProvider;
 
 import com.getcapacitor.Bridge;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebViewClient;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
@@ -225,6 +230,43 @@ public class MainActivity extends BridgeActivity {
           activity.startActivity(Intent.createChooser(send, headline));
         } catch (Exception e) {
           Log.w(TAG, "Share failed", e);
+        }
+      });
+    }
+
+    @JavascriptInterface
+    public void shareImage(String title, String dataUrl) {
+      activity.runOnUiThread(() -> {
+        try {
+          if (dataUrl == null || dataUrl.isEmpty()) {
+            return;
+          }
+          String raw = dataUrl;
+          int comma = raw.indexOf(',');
+          if (comma >= 0) {
+            raw = raw.substring(comma + 1);
+          }
+          byte[] bytes = Base64.decode(raw, Base64.DEFAULT);
+          File file = new File(activity.getCacheDir(), "arxon-receipt.png");
+          try (FileOutputStream out = new FileOutputStream(file)) {
+            out.write(bytes);
+          }
+          Uri uri = FileProvider.getUriForFile(
+              activity,
+              activity.getPackageName() + ".fileprovider",
+              file
+          );
+          Intent send = new Intent(Intent.ACTION_SEND);
+          send.setType("image/png");
+          send.putExtra(Intent.EXTRA_STREAM, uri);
+          send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+          if (title != null && !title.isEmpty()) {
+            send.putExtra(Intent.EXTRA_SUBJECT, title);
+          }
+          String headline = title == null || title.isEmpty() ? "Share receipt" : title;
+          activity.startActivity(Intent.createChooser(send, headline));
+        } catch (Exception e) {
+          Log.w(TAG, "Share image failed", e);
         }
       });
     }

@@ -5,8 +5,8 @@ import { font } from '@/walletFigma/tokens';
 export type WalletTabName = 'Home' | 'Explore' | 'Market' | 'Account' | 'Testnet';
 export type WalletNet = 'mainnet' | 'testnet';
 
-/** Keep lists clear of the inset floating pill. */
-export const WALLET_TAB_CLEAR = 'calc(200px + env(safe-area-inset-bottom, 0px))';
+/** Keep lists clear of the inset floating pill. Pixel number so Android WebView always applies it. */
+export const WALLET_TAB_CLEAR = 148;
 
 export const WalletNetworkContext = createContext<WalletNet>('mainnet');
 

@@ -288,7 +288,7 @@ export function TokenScreens({ id, go, back }: { id: string; go: Go; back?: () =
         const hash = 'hash' in row ? row.hash : undefined;
         return (
         <button key={row.title + row.sub} type="button" onClick={() => {
-          if (hash) void live?.openTx(hash);
+          if (hash) void live?.openTx(hash, { detail: 'full' });
           go(row.to || 'tx');
         }} style={{ ...activity, top: rowsTop + index * 64 }}>
           <span style={iconWrap}>
@@ -477,7 +477,7 @@ function LiveToken({
               key={row.title + row.sub}
               type="button"
               onClick={() => {
-                if (row.hash) void live?.openTx(row.hash);
+                if (row.hash) void live?.openTx(row.hash, { detail: 'full' });
                 go(row.to || 'tx');
               }}
               style={{ width: '100%', marginBottom: 8, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(10,12,16,0.88)', borderRadius: 16, padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 10, color: '#fff', fontFamily: font.sans, cursor: 'pointer', textAlign: 'left' }}

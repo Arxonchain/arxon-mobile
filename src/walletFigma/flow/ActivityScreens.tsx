@@ -172,7 +172,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
           <PhoneStatus />
           <Header onFilter={testnetLive ? undefined : openFilter} onRefresh={() => void live?.refresh?.()} title={testnetLive ? 'Testnet history' : 'Activity'} />
           {testnetLive ? (
-            <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: 118, width: 354, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y' }}>
+            <div className="arxon-token-scroll" style={{ position: 'absolute', left: 18, top: 118, width: 354, bottom: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', paddingBottom: WALLET_TAB_CLEAR, boxSizing: 'border-box' }}>
               <TestnetHistory go={go} />
             </div>
           ) : vaultList || none ? (
@@ -187,7 +187,7 @@ export function ActivityScreens({ id, go, back }: { id: string; go: Go; back?: (
           {!testnetLive && empty && <Empty title="No activity yet" body="Your sent, received and swapped transactions will show up here." action="Fund your wallet" onAction={() => go('receive')} />}
           {!testnetLive && none && <Empty title="No Vault moves" body="Moves between Home and your Vault will show up here." action="Clear filter" onAction={clear} />}
           {!testnetLive && filteredBlank && <Empty title="No activity yet" body="Nothing in this range. Try another date or token." action="Clear filter" onAction={clear} />}
-          {!testnetLive && !empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash); }} onRefresh={() => live?.refresh?.()} />}
+          {!testnetLive && !empty && !none && !filteredBlank && <List groups={groups} go={go} onOpen={(hash) => { if (hash) void live?.openTx(hash, { detail: 'full' }); }} onRefresh={() => live?.refresh?.()} />}
           <Tabs go={go} here={empty ? 'activity-empty' : vaultList ? 'activity-filtered' : none ? 'activity-none' : 'activity'} />
           {showSheet && (
             <Filter draft={draft} setDraft={setDraft} onClose={leave} onReset={() => { setDraft({ type: 'All', token: 'All tokens', date: 'Any time' }); clear(); }} onApply={apply} />
@@ -272,7 +272,7 @@ function LiveHistory({ go, onBack, mainnet, type, setType, refreshing, refreshed
           })}
         </div>
       </div>
-      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 16, top: 164, width: 358, bottom: WALLET_TAB_CLEAR, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 12 }}>
+      <div className="arxon-token-scroll" style={{ position: 'absolute', left: 16, top: 164, width: 358, bottom: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: WALLET_TAB_CLEAR, boxSizing: 'border-box' }}>
         {refreshing ? <p style={{ margin: 0, fontSize: 12, color: '#accafe' }}>Refreshing…</p> : null}
         {!refreshing && refreshed ? <p style={{ margin: 0, fontSize: 12, color: '#8b9097' }}>Activity updated</p> : null}
         {rows.length === 0 ? (
@@ -285,7 +285,7 @@ function LiveHistory({ go, onBack, mainnet, type, setType, refreshing, refreshed
               key={`${row.hash ?? row.title}-${row.sub}-${row.net}`}
               type="button"
               onClick={() => {
-                if (row.hash) void live?.openTx(row.hash);
+                if (row.hash) void live?.openTx(row.hash, { detail: 'full' });
                 go(row.to || 'tx');
               }}
               style={histCard}
@@ -304,6 +304,7 @@ function LiveHistory({ go, onBack, mainnet, type, setType, refreshing, refreshed
             </button>
           );
         })}
+        <div aria-hidden style={{ height: 24, flexShrink: 0 }} />
       </div>
       <Tabs go={go} here="activity" />
       {showSheet ? <Filter draft={draft} setDraft={setDraft} onClose={onClose} onReset={onReset} onApply={onApply} /> : null}
@@ -369,7 +370,7 @@ function Header({ onFilter, onRefresh, title = 'Activity', spinning = false, onB
 function List({ groups, go, onOpen, onRefresh }: { groups: { day: string; items: (Row & { hash?: string })[] }[]; go: Go; onOpen?: (hash?: string) => void; onRefresh?: () => Promise<void> | void }) {
   const pull = usePullRefresh(() => onRefresh?.());
   return (
-    <div style={{ position: 'absolute', left: 18, top: 176, width: 354, bottom: WALLET_TAB_CLEAR, overflow: 'auto' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
+    <div style={{ position: 'absolute', left: 18, top: 176, width: 354, bottom: 0, overflow: 'auto', paddingBottom: WALLET_TAB_CLEAR, boxSizing: 'border-box' }} onTouchStart={pull.onTouchStart} onTouchMove={pull.onTouchMove} onTouchEnd={pull.onTouchEnd}>
       {groups.map((group) => (
         <div key={group.day}>
           <p style={{ margin: '6px 0 4px', fontSize: 13, fontWeight: 500, color: '#8b9097' }}>{group.day}</p>
@@ -432,7 +433,7 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
   const title = inspect?.title ?? (loading ? 'Transaction' : vault ? 'Moved to Vault' : 'Sent privately');
   const amount = inspect?.amount ?? (loading ? '—' : vault ? '1,000.00 ARX' : '25.00 ARX');
   const fiat = inspect?.fiat ?? (loading ? '' : vault ? '$420.00' : '≈ $10.50');
-  const status = inspect?.status ?? (loading ? 'Pending' : 'Confirmed');
+  const status = inspect?.status ?? (loading ? 'Pending' : 'Successful');
   const hash = inspect?.hash ?? (loading ? '' : '0x7f3a…c91e');
   const hashLabel = inspect ? `${inspect.hash.slice(0, 10)}…${inspect.hash.slice(-4)}` : loading ? '—' : '0x7f3a…c91e';
 
@@ -471,7 +472,10 @@ function Detail({ id, go, leave }: { id: string; go: Go; leave: () => void }) {
           <span style={{ display: 'block', fontSize: 12, color: '#8b9097' }}>Transaction hash</span>
           <span style={{ display: 'block', marginTop: 2, fontSize: 14, fontWeight: 500, wordBreak: 'break-all' }}>{hashLabel}</span>
         </button>
-        <button type="button" onClick={() => go(vault ? 'activity' : 'receipt')} style={{ ...livePrimary, marginTop: 16 }}>{vault ? 'Back to Activity' : 'View private receipt'}</button>
+        <button type="button" onClick={() => {
+          if (!vault && hash) void live?.openTx(hash, { detail: 'full' });
+          go(vault ? 'activity' : 'receipt');
+        }} style={{ ...livePrimary, marginTop: 16 }}>{vault ? 'Back to Activity' : 'View private receipt'}</button>
         {!vault ? <button type="button" onClick={explorer} style={{ ...liveGhost, marginTop: 10 }}>View on explorer</button> : null}
       </LiveScroll>
     );
@@ -524,14 +528,15 @@ function Filter({ draft, setDraft, onClose, onReset, onApply }: {
   const live = useLiveFrame();
   const groups: [string, string, string[]][] = [['Type', 'type', TYPES], ['Token', 'token', TOKENS], ['Date', 'date', DATES]];
   const sheet: CSSProperties = live?.app
-    ? { position: 'absolute', left: 0, right: 0, bottom: 0, maxHeight: 'calc(100% - 48px)', overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px calc(28px + env(safe-area-inset-bottom, 0px))', zIndex: 4 }
-    : { position: 'absolute', left: 0, top: 383, width: 390, boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px 28px', zIndex: 4 };
+    ? { position: 'absolute', left: 0, right: 0, bottom: 0, height: 620, maxHeight: '78%', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px 0', zIndex: 12, overflow: 'hidden' }
+    : { position: 'absolute', left: 0, top: 383, width: 390, bottom: 0, display: 'flex', flexDirection: 'column', boxSizing: 'border-box', background: '#11161f', border: '1px solid #2a3447', borderBottom: 'none', borderRadius: '24px 24px 0 0', padding: '10px 16px 0', zIndex: 12, overflow: 'hidden' };
   return (
     <>
-      <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.6)', padding: 0, cursor: 'pointer', zIndex: 3 }} />
+      <button type="button" aria-label="Close" onClick={onClose} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.6)', padding: 0, cursor: 'pointer', zIndex: 11 }} />
       <div style={sheet}>
-        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#5c5f64', margin: '0 auto' }} />
-        <p style={{ margin: '14px 0 0', fontSize: 20, fontWeight: 700 }}>Filter activity</p>
+        <div style={{ width: 36, height: 4, borderRadius: 2, background: '#5c5f64', margin: '0 auto', flexShrink: 0 }} />
+        <p style={{ margin: '14px 0 0', fontSize: 20, fontWeight: 700, flexShrink: 0 }}>Filter activity</p>
+        <div className="arxon-token-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', marginTop: 4, paddingBottom: 8 }}>
         {groups.map(([label, key, options]) => (
           <div key={label} style={{ marginTop: 14 }}>
             <p style={{ margin: '0 0 10px', fontSize: 13, fontWeight: 500, color: '#8b9097' }}>{label}</p>
@@ -545,7 +550,8 @@ function Filter({ draft, setDraft, onClose, onReset, onApply }: {
             </div>
           </div>
         ))}
-        <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexShrink: 0, padding: '12px 0 calc(16px + env(safe-area-inset-bottom, 0px))' }}>
           <button type="button" onClick={onReset} style={{ ...barBtn, position: 'relative', left: 0, top: 0, width: 173, background: '#11161f', color: '#fff', border: '1px solid #2a3447' }}>Reset</button>
           <button type="button" onClick={onApply} style={{ ...barBtn, position: 'relative', left: 0, top: 0, width: 173, background: '#accafe', color: '#0c1018', border: 'none' }}>Apply</button>
         </div>
