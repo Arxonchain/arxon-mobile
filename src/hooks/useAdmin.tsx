@@ -1,18 +1,18 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { User } from "@supabase/supabase-js";
-import { checkUserIsAdmin } from "@/lib/adminAuth";
+import { getAdminScope, type AdminScope } from "@/lib/adminAuth";
 
 export const useAdmin = () => {
   const [user, setUser] = useState<User | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [adminScope, setAdminScope] = useState<AdminScope>(null);
   const [loading, setLoading] = useState(true);
 
   const checkAdmin = async (u: User) => {
     try {
-      setIsAdmin(await checkUserIsAdmin(u));
+      setAdminScope(await getAdminScope(u));
     } catch {
-      setIsAdmin(false);
+      setAdminScope(null);
     } finally {
       setLoading(false);
     }
@@ -26,7 +26,7 @@ export const useAdmin = () => {
         setLoading(true);
         checkAdmin(u);
       } else {
-        setIsAdmin(false);
+        setAdminScope(null);
         setLoading(false);
       }
     });
@@ -44,5 +44,9 @@ export const useAdmin = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  return { user, isAdmin, loading };
+  const isAdmin = adminScope === "full";
+  const isArenaAdmin = adminScope === "arena";
+  const canAccessAdmin = adminScope === "full" || adminScope === "arena";
+
+  return { user, isAdmin, isArenaAdmin, canAccessAdmin, adminScope, loading };
 };

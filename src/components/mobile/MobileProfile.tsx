@@ -68,7 +68,7 @@ export default function MobileProfile() {
   const { user, signOut }           = useAuth();
   const { points, rank }            = usePoints();
   const { profile, refetchProfile } = useProfile();
-  const { isAdmin }                 = useAdmin();
+  const { isAdmin, isArenaAdmin }   = useAdmin();
   const { preferences: pushPrefs, updatePreferences: updatePushPrefs, requestPermission } = usePushNotifications();
 
   const [copied,      setCopied]      = useState(false);
@@ -87,6 +87,7 @@ export default function MobileProfile() {
   useEffect(() => {
     setIsAdminUser(isAdmin);
   }, [isAdmin]);
+  const showArenaOps = isArenaAdmin && !isAdmin;
 
   // Load x_handle from profile
   useEffect(() => {
@@ -238,6 +239,11 @@ export default function MobileProfile() {
                       <span style={{fontSize:10, fontWeight:700, color:'hsl(255 50% 72%)'}}>⚡ Admin</span>
                     </div>
                   )}
+                  {showArenaOps && (
+                    <div style={{background:'hsl(255 50% 60%/0.12)', border:'1px solid hsl(255 50% 60%/0.3)', borderRadius:20, padding:'4px 10px'}}>
+                      <span style={{fontSize:10, fontWeight:700, color:'hsl(255 50% 72%)'}}>Arena</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -368,6 +374,41 @@ export default function MobileProfile() {
                   onClick={() => navigate(item.path)}
                   style={{display:'flex', alignItems:'center', gap:12, padding:'13px 16px',
                     cursor:'pointer', borderBottom: i < ADMIN_MENU.length - 1 ? '1px solid hsl(255 50% 60%/0.06)' : 'none'}}>
+                  <div style={{width:38, height:38, borderRadius:13, background:item.bg,
+                    border:`1px solid ${item.col}22`, flexShrink:0,
+                    display:'flex', alignItems:'center', justifyContent:'center'}}>
+                    <item.Icon size={17} color={item.col}/>
+                  </div>
+                  <div style={{flex:1, minWidth:0}}>
+                    <p style={{fontSize:13, fontWeight:600, color:'hsl(215 18% 88%)'}}>{item.label}</p>
+                    <p style={{fontSize:10, color:'hsl(215 14% 38%)', marginTop:1}}>{item.sub}</p>
+                  </div>
+                  <ChevronRight size={14} color="hsl(255 50% 55%)"/>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+
+        {showArenaOps && (
+          <motion.div variants={fadeUp}>
+            <div style={{display:'flex', alignItems:'center', gap:10, marginBottom:14}}>
+              <div style={{flex:1, height:1, background:'hsl(255 50% 60%/0.2)'}}/>
+              <div style={{display:'flex', alignItems:'center', gap:6,
+                background:'hsl(255 50% 60%/0.08)', border:'1px solid hsl(255 50% 60%/0.25)',
+                borderRadius:20, padding:'5px 14px'}}>
+                <span style={{fontSize:10, fontWeight:700, color:'hsl(255 50% 72%)',
+                  textTransform:'uppercase', letterSpacing:'0.14em'}}>Arena ops</span>
+              </div>
+              <div style={{flex:1, height:1, background:'hsl(255 50% 60%/0.2)'}}/>
+            </div>
+            <div style={{background:'hsl(255 50% 60%/0.04)', border:'1px solid hsl(255 50% 60%/0.12)',
+              borderRadius:22, padding:'4px 0', marginBottom:24}}>
+              {ADMIN_MENU.filter((item) => item.path === '/admin/arena' || item.path === '/admin/battle-history').map((item, i, list) => (
+                <motion.div key={item.path} whileTap={{scale:0.98, x:2}}
+                  onClick={() => navigate(item.path)}
+                  style={{display:'flex', alignItems:'center', gap:12, padding:'13px 16px',
+                    cursor:'pointer', borderBottom: i < list.length - 1 ? '1px solid hsl(255 50% 60%/0.06)' : 'none'}}>
                   <div style={{width:38, height:38, borderRadius:13, background:item.bg,
                     border:`1px solid ${item.col}22`, flexShrink:0,
                     display:'flex', alignItems:'center', justifyContent:'center'}}>

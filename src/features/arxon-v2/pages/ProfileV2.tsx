@@ -95,7 +95,7 @@ export default function ProfileV2() {
   const { user, signOut } = useAuth();
   const { points, rank } = usePoints();
   const { profile, refetchProfile } = useProfile();
-  const { isAdmin } = useAdmin();
+  const { isAdmin, isArenaAdmin } = useAdmin();
   const { preferences: pushPrefs, updatePreferences: updatePushPrefs, requestPermission } = usePushNotifications();
 
   const [copied, setCopied] = useState(false);
@@ -248,6 +248,11 @@ export default function ProfileV2() {
                   {isAdmin && (
                     <span style={{ fontSize: 9, fontWeight: 800, color: neon.purple, background: `${neon.purple}18`, border: `1px solid ${neon.purple}35`, borderRadius: 16, padding: '3px 8px' }}>
                       Admin
+                    </span>
+                  )}
+                  {isArenaAdmin && !isAdmin && (
+                    <span style={{ fontSize: 9, fontWeight: 800, color: neon.purple, background: `${neon.purple}18`, border: `1px solid ${neon.purple}35`, borderRadius: 16, padding: '3px 8px' }}>
+                      Arena
                     </span>
                   )}
                 </div>
@@ -470,6 +475,15 @@ export default function ProfileV2() {
           <motion.div variants={fadeUp} style={{ marginTop: 4 }}>
             <NeonMenuGroup title="Admin">
               {ADMIN_MENU.map((item) => (
+                <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
+              ))}
+            </NeonMenuGroup>
+          </motion.div>
+        )}
+        {isArenaAdmin && !isAdmin && (
+          <motion.div variants={fadeUp} style={{ marginTop: 4 }}>
+            <NeonMenuGroup title="Arena ops">
+              {ADMIN_MENU.filter((item) => item.path === '/admin/arena' || item.path === '/admin/battle-history').map((item) => (
                 <NeonMenuRow key={item.path} icon={item.Icon} label={item.label} sub={item.sub} accent={item.accent} onClick={() => navigate(item.path)} />
               ))}
             </NeonMenuGroup>

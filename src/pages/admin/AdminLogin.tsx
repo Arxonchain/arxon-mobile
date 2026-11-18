@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, Shield } from "lucide-react";
-import { checkUserIsAdmin } from "@/lib/adminAuth";
+import { getAdminScope } from "@/lib/adminAuth";
 import { TurnstileWidget, isTurnstileConfigured } from "@/components/auth/TurnstileWidget";
 
 const AdminLogin = () => {
@@ -28,8 +28,10 @@ const AdminLogin = () => {
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user && (await checkUserIsAdmin(session.user))) {
-        navigate("/admin", { replace: true });
+      if (session?.user) {
+        const scope = await getAdminScope(session.user);
+        if (scope === "full") navigate("/admin", { replace: true });
+        else if (scope === "arena") navigate("/admin/arena", { replace: true });
       }
       setCheckingSession(false);
     });
@@ -62,7 +64,8 @@ const AdminLogin = () => {
         throw authError;
       }
 
-      if (!(await checkUserIsAdmin(authData.user))) {
+      const scope = authData.user ? await getAdminScope(authData.user) : null;
+      if (!scope) {
         await supabase.auth.signOut();
         toast({
           title: "Access Denied",
@@ -74,9 +77,12 @@ const AdminLogin = () => {
 
       toast({
         title: "Welcome back!",
-        description: "Successfully logged into admin dashboard.",
+        description:
+          scope === "arena"
+            ? "Arena markets access only."
+            : "Successfully logged into admin dashboard.",
       });
-      navigate("/admin");
+      navigate(scope === "arena" ? "/admin/arena" : "/admin");
     } catch (error: any) {
       authFailed = true;
       toast({

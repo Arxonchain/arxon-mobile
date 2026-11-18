@@ -9,7 +9,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { ADMIN_NAV_SECTIONS, AdminNavItem } from "@/lib/adminNav";
+import { getVisibleAdminNavSections, AdminNavItem } from "@/lib/adminNav";
+import type { AdminScope } from "@/lib/adminAuth";
 
 const SECTION_META: Record<string, { icon: typeof LayoutDashboard; accent: string; bg: string }> = {
   Overview: { icon: LayoutDashboard, accent: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
@@ -70,14 +71,17 @@ function NavTile({
 function AdminMobileMenuPanel({
   onClose,
   userEmail,
+  adminScope,
 }: {
   onClose: () => void;
   userEmail?: string | null;
+  adminScope: AdminScope;
 }) {
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<string | null>(null);
+  const sections = getVisibleAdminNavSections(adminScope);
 
-  const section = ADMIN_NAV_SECTIONS.find((s) => s.title === activeSection);
+  const section = sections.find((s) => s.title === activeSection);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -116,7 +120,7 @@ function AdminMobileMenuPanel({
       <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 py-4 touch-pan-y">
         {!activeSection ? (
           <div className="grid grid-cols-2 gap-3">
-            {ADMIN_NAV_SECTIONS.map((sec) => {
+            {sections.map((sec) => {
               const meta = SECTION_META[sec.title] ?? SECTION_META.Overview;
               const Icon = meta.icon;
               return (
@@ -143,7 +147,7 @@ function AdminMobileMenuPanel({
           </div>
         )}
 
-        {!activeSection && (
+        {!activeSection && adminScope === "full" && (
           <div className="mt-6">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70 mb-2 px-1">
               Quick access
@@ -164,7 +168,9 @@ function AdminMobileMenuPanel({
             <User className="h-4 w-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-foreground truncate">Admin</p>
+            <p className="text-xs font-medium text-foreground truncate">
+              {adminScope === "arena" ? "Arena operator" : "Admin"}
+            </p>
             <p className="text-[10px] text-muted-foreground truncate">{userEmail || "Signed in"}</p>
           </div>
         </div>
@@ -185,9 +191,11 @@ function AdminMobileMenuPanel({
 export function AdminMobileHeader({
   pageTitle,
   userEmail,
+  adminScope,
 }: {
   pageTitle: string;
   userEmail?: string | null;
+  adminScope: AdminScope;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -211,7 +219,7 @@ export function AdminMobileHeader({
             side="left"
             className="w-full max-w-none sm:max-w-md p-0 flex flex-col h-[100dvh] max-h-[100dvh] overflow-hidden border-r bg-sidebar [&>button:last-child]:hidden"
           >
-            <AdminMobileMenuPanel onClose={close} userEmail={userEmail} />
+            <AdminMobileMenuPanel onClose={close} userEmail={userEmail} adminScope={adminScope} />
           </SheetContent>
         </Sheet>
         <div className="flex items-center gap-2 min-w-0 flex-1">

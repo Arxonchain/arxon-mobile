@@ -100,7 +100,10 @@ async function isServiceRoleCredential(
 /**
  * Require service-role JWT/secret, matching ADMIN_FUNCTION_SECRET header, or admin user_roles row.
  */
-export async function requireAdminOrService(req: Request): Promise<AdminAuthResult> {
+export async function requireAdminOrService(
+  req: Request,
+  allowedRoles: string[] = ["admin"],
+): Promise<AdminAuthResult> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
   const adminSecret = Deno.env.get("ADMIN_FUNCTION_SECRET") ?? "";
@@ -139,14 +142,14 @@ export async function requireAdminOrService(req: Request): Promise<AdminAuthResu
     return { ok: false, status: 401, error: "Unauthorized" };
   }
 
-  const { data: roleRow } = await supabase
+  const roles = allowedRoles.length ? allowedRoles : ["admin"];
+  const { data: roleRows } = await supabase
     .from("user_roles")
     .select("role")
     .eq("user_id", user.id)
-    .eq("role", "admin")
-    .maybeSingle();
+    .in("role", roles);
 
-  if (!roleRow) {
+  if (!roleRows?.length) {
     return { ok: false, status: 403, error: "Admin access required" };
   }
 

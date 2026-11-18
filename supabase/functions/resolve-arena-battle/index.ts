@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const auth = await requireAdminOrService(req);
+    const auth = await requireAdminOrService(req, ["admin", "arena_admin"]);
     if (!auth.ok) return adminAuthResponse(auth);
 
     const supabase = auth.supabase;

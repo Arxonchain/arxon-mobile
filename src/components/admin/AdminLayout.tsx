@@ -1,12 +1,14 @@
-import { Outlet, Navigate, Link } from "react-router-dom";
+import { Outlet, Navigate, Link, useLocation } from "react-router-dom";
 import AdminSidebar from "./AdminSidebar";
 import { useAdmin } from "@/hooks/useAdmin";
 import ErrorBoundary from "@/components/system/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { isArenaAdminPath } from "@/lib/adminAuth";
 
 const AdminLayout = () => {
-  const { user, isAdmin, loading } = useAdmin();
+  const { user, isAdmin, isArenaAdmin, canAccessAdmin, loading } = useAdmin();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -23,13 +25,13 @@ const AdminLayout = () => {
     return <Navigate to="/admin/login" replace />;
   }
 
-  if (!isAdmin) {
+  if (!canAccessAdmin) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-sm">
           <h1 className="text-2xl font-bold text-foreground">Access Denied</h1>
           <p className="text-muted-foreground text-sm">
-            You don't have admin privileges. Sign in with an admin account or return to the app.
+            You don't have access to this area. Sign in with an authorized account or return to the app.
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
             <Button asChild variant="outline">
@@ -48,6 +50,10 @@ const AdminLayout = () => {
         </div>
       </div>
     );
+  }
+
+  if (isArenaAdmin && !isAdmin && !isArenaAdminPath(location.pathname)) {
+    return <Navigate to="/admin/arena" replace />;
   }
 
   return (

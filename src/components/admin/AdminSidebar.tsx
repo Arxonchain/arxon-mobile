@@ -6,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAdmin } from "@/hooks/useAdmin";
-import { ADMIN_NAV_SECTIONS, getAdminPageTitle } from "@/lib/adminNav";
+import { getVisibleAdminNavSections, getAdminPageTitle } from "@/lib/adminNav";
 import { AdminMobileHeader } from "./AdminMobileMenu";
 
 const SidebarContent = ({
@@ -14,13 +14,16 @@ const SidebarContent = ({
   onCollapse,
   onNavigate,
   userEmail,
+  adminScope,
 }: {
   collapsed: boolean;
   onCollapse?: () => void;
   onNavigate?: () => void;
   userEmail?: string | null;
+  adminScope: "full" | "arena" | null;
 }) => {
   const navigate = useNavigate();
+  const sections = getVisibleAdminNavSections(adminScope);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -35,7 +38,9 @@ const SidebarContent = ({
             <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
               <span className="text-primary-foreground font-bold text-sm">A</span>
             </div>
-            <span className="font-bold text-foreground truncate">ARXON Admin</span>
+            <span className="font-bold text-foreground truncate">
+              {adminScope === "arena" ? "Arena Ops" : "ARXON Admin"}
+            </span>
           </div>
         )}
         {onCollapse && (
@@ -48,7 +53,7 @@ const SidebarContent = ({
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 space-y-4 pb-4">
-        {ADMIN_NAV_SECTIONS.map((section) => (
+        {sections.map((section) => (
           <div key={section.title}>
             {!collapsed && (
               <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
@@ -117,7 +122,9 @@ const SidebarContent = ({
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">Admin</p>
+              <p className="text-sm font-medium text-foreground truncate">
+                {adminScope === "arena" ? "Arena operator" : "Admin"}
+              </p>
               <p className="text-xs text-muted-foreground truncate">{userEmail || "Signed in"}</p>
             </div>
           )}
@@ -142,12 +149,12 @@ const SidebarContent = ({
 const AdminSidebar = () => {
   const [collapsed, setCollapsed] = useState(false);
   const isMobile = useIsMobile();
-  const { user } = useAdmin();
+  const { user, adminScope } = useAdmin();
   const location = useLocation();
   const pageTitle = getAdminPageTitle(location.pathname);
 
   if (isMobile) {
-    return <AdminMobileHeader pageTitle={pageTitle} userEmail={user?.email} />;
+    return <AdminMobileHeader pageTitle={pageTitle} userEmail={user?.email} adminScope={adminScope} />;
   }
 
   return (
@@ -161,6 +168,7 @@ const AdminSidebar = () => {
         collapsed={collapsed}
         onCollapse={() => setCollapsed(!collapsed)}
         userEmail={user?.email}
+        adminScope={adminScope}
       />
     </aside>
   );

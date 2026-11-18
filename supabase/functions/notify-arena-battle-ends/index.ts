@@ -21,7 +21,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const auth = await requireAdminOrService(req);
+    const auth = await requireAdminOrService(req, ["admin", "arena_admin"]);
     if (!auth.ok) return adminAuthResponse(auth);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";

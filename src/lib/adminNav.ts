@@ -64,6 +64,19 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = ADMIN_NAV_SECTIONS.flatMap((s) => s.items);
 
+const ARENA_ONLY_PATHS = new Set(["/admin/arena", "/admin/battle-history"]);
+
+export function getVisibleAdminNavSections(scope: "full" | "arena" | null): AdminNavSection[] {
+  if (scope === "full") return ADMIN_NAV_SECTIONS;
+  if (scope !== "arena") return [];
+  return ADMIN_NAV_SECTIONS
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => ARENA_ONLY_PATHS.has(item.path)),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
 export function getAdminPageTitle(pathname: string): string {
   const item = ADMIN_NAV_ITEMS.find(
     (n) => n.path === pathname || (n.path !== "/admin" && pathname.startsWith(n.path))
