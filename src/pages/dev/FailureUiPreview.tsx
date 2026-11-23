@@ -5,6 +5,7 @@ import PageErrorState from '@/components/system/PageErrorState';
 import SlowLoadOverlay from '@/components/system/SlowLoadOverlay';
 import { errorUi } from '@/components/system/errorUiTokens';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
+import { ErrorCard } from '@/components/system/ErrorPopup';
 
 /** Phone bezel — sizes to flex parent; transform clips fixed overlays here. */
 function PhoneFrame({ children }: { children: React.ReactNode }) {
@@ -12,9 +13,8 @@ function PhoneFrame({ children }: { children: React.ReactNode }) {
     <div
       style={{
         aspectRatio: '390 / 844',
-        width: 'auto',
+        width: 'min(390px, 100%)',
         height: 'auto',
-        maxWidth: 'min(390px, 100%)',
         maxHeight: '100%',
         borderRadius: 44,
         overflow: 'hidden',
@@ -80,15 +80,53 @@ interface Scenario {
 
 const scenarios: Scenario[] = [
   {
+    id: 'public-toast',
+    title: 'In-app error popup',
+    description: 'White frost card, same as Connect Wallet. One design for every error; icon, title, and next step change by kind.',
+    render: () => (
+      <MockPageShell>
+        <div style={{ padding: 16, opacity: 0.45 }}>
+          <div style={{ height: 72, borderRadius: 18, background: 'rgba(255,255,255,0.08)', marginBottom: 12 }} />
+          <div style={{ height: 120, borderRadius: 18, background: 'rgba(255,255,255,0.06)' }} />
+        </div>
+        <div
+          style={{
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '24px 20px',
+            boxSizing: 'border-box',
+          }}
+        >
+          <ErrorCard kind="unknown" onClose={() => {}} />
+        </div>
+      </MockPageShell>
+    ),
+  },
+  {
+    id: 'error-kinds',
+    title: 'Error kinds',
+    description: 'Not one message for all. Network, claim, mining, wallet each get their own icon and next step.',
+    render: () => (
+      <MockPageShell>
+        <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 12, overflow: 'auto', height: '100%' }}>
+          <ErrorCard kind="network" />
+          <ErrorCard kind="claim" />
+          <ErrorCard kind="mining" />
+          <ErrorCard kind="wallet" />
+        </div>
+      </MockPageShell>
+    ),
+  },
+  {
     id: 'ota-dns',
     title: 'OTA / bundle load failed',
     description: 'DNS resolution failed loading the web bundle (ERR_NAME_NOT_RESOLVED). Shown before the app boots.',
     render: () => (
-      <AppLoadFailureScreen
-        kind="dns"
-        detail="ERR_NAME_NOT_RESOLVED · arxon-mobile.pages.dev"
-        showRestart
-      />
+      <AppLoadFailureScreen kind="dns" showRestart />
     ),
   },
   {
@@ -151,13 +189,9 @@ const scenarios: Scenario[] = [
   {
     id: 'crash',
     title: 'Unknown / crash',
-    description: 'ErrorBoundary catch-all with optional dev stack trace.',
+    description: 'ErrorBoundary catch-all. Technical traces stay in the console, not on the card.',
     render: () => (
-      <AppFailureScreen
-        failureType="unknown"
-        onPrimary={() => {}}
-        devError={new Error('TypeError: Cannot read properties of undefined (reading "balance")')}
-      />
+      <AppFailureScreen failureType="unknown" onPrimary={() => {}} />
     ),
   },
   {

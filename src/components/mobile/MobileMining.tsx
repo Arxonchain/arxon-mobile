@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { useMining } from '@/hooks/useMining';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
@@ -92,7 +93,7 @@ const MIN_CLAIM_ARX = 10;
 
       {/* ── Header ── */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'52px 20px 0'}}>
-        <button onClick={()=>navigate(-1)} className="press"
+        <button onClick={()=>goBack(navigate)} className="press"
           style={{width:40,height:40,borderRadius:14,background:'hsl(215 25% 11%)',
             border:'1px solid hsl(215 22% 18%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <ChevronLeft size={20} color="hsl(215 25% 55%)"/>

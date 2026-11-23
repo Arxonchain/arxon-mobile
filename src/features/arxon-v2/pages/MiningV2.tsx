@@ -1,5 +1,4 @@
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import { useCallback, useEffect, useState } from 'react';
 import { Copy, Zap } from 'lucide-react';
 import { useMining } from '@/hooks/useMining';
@@ -12,7 +11,6 @@ import { MiningPillWidget } from '../components/DashboardWidgets';
 import { NeonPanel, NeonEyebrow } from '../design/NeonKit';
 import { neon } from '../design/neonTokens';
 import { V2Page, V2Header, V2Button, V2ButtonGhost, fadeUp, stagger } from '../design/Kit';
-import { APP_PREVIEW_BASE } from '../preview/AppPreviewContext';
 
 const MAX_HOURS = 8;
 const MIN_CLAIM_ARX = 10;
@@ -26,7 +24,6 @@ function fmtTime(s: number) {
 
 export default function MiningV2({ preview = false }: { preview?: boolean }) {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const { points, rank } = usePoints();
   const { profile } = useProfile();
   const [showAuth, setShowAuth] = useState(false);
@@ -101,11 +98,6 @@ export default function MiningV2({ preview = false }: { preview?: boolean }) {
     toast({ title: 'Copied!', description: 'Referral code copied to clipboard' });
   };
 
-  const goBack = () => {
-    if (preview) navigate(APP_PREVIEW_BASE);
-    else navigate(-1);
-  };
-
   const statusBadge = (
     <div style={{
       display: 'flex', alignItems: 'center', gap: 5,
@@ -124,7 +116,7 @@ export default function MiningV2({ preview = false }: { preview?: boolean }) {
 
   return (
     <V2Page>
-      <V2Header title="Mining" subtitle="Live session dashboard" onBack={goBack} right={statusBadge} />
+      <V2Header title="Mining" subtitle="Live session dashboard" right={statusBadge} />
 
       <motion.div variants={stagger} initial="hidden" animate="show" style={{ padding: '0 20px' }}>
         <motion.div variants={fadeUp} style={{ marginTop: 14 }}>

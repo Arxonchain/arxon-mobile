@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
 import { TrendingDown, TrendingUp } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { usePullToRefresh } from '@/hooks/usePullToRefresh';
-import PullToRefreshIndicator from '@/components/mobile/PullToRefreshIndicator';
+import { usePullRefresh } from '@/walletFigma/flow/pullRefresh';
+import { MineLoad } from '../components/MineLoad';
+import { V2Page } from '../design/Kit';
 import {
-  V2Page, V2Header, V2Card, V2SectionHeader, fadeUp, stagger,
-} from '../design/Kit';
-import { v2 } from '../design/tokens';
+  EmptyCopy,
+  GlassSheet,
+  pc,
+  ProfileHead,
+  TokenRow,
+} from '../design/ProfileChrome';
 
 interface LedgerEntry {
   id: string;
@@ -27,17 +29,17 @@ const CATEGORY_LABELS: Record<string, string> = {
   referral: 'Referral',
   checkin: 'Check-in',
   campaign: 'Campaign',
-  arena_stake: 'Arena Stake',
-  arena_reward: 'Arena Win',
-  nexus_send: 'Nexus Send',
-  nexus_receive: 'Nexus Receive',
-  nexus_bonus: 'Nexus Bonus',
+  arena_stake: 'Arena stake',
+  arena_reward: 'Arena win',
+  nexus_send: 'Nexus send',
+  nexus_receive: 'Nexus receive',
+  nexus_bonus: 'Nexus bonus',
   restoration: 'Restored',
   game: 'Game',
-  dice_stake: 'Dice Stake',
-  dice_win: 'Dice Win',
-  dice_free_roll: 'Dice Free Roll',
-  dice_refund: 'Dice Refund',
+  dice_stake: 'Dice stake',
+  dice_win: 'Dice win',
+  dice_free_roll: 'Dice free roll',
+  dice_refund: 'Dice refund',
 };
 
 function relTime(iso: string) {
@@ -53,14 +55,13 @@ function relTime(iso: string) {
 }
 
 export default function PointsHistoryV2() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [entries, setEntries] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchHistory = useCallback(async () => {
+  const fetchHistory = useCallback(async (silent = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const { data, error } = await supabase
         .from('points_ledger' as any)
@@ -102,92 +103,50 @@ export default function PointsHistoryV2() {
     return () => { supabase.removeChannel(channel); };
   }, [fetchHistory, user]);
 
-  const ptr = usePullToRefresh(fetchHistory);
+  const pull = usePullRefresh(() => fetchHistory(true), { threshold: 28 });
 
   return (
-    <V2Page style={{ position: 'relative' }}>
-      <div
-        ref={ptr.scrollRef}
-        onTouchStart={ptr.onTouchStart}
-        onTouchMove={ptr.onTouchMove}
-        onTouchEnd={ptr.onTouchEnd}
-      >
-        <PullToRefreshIndicator pullDistance={ptr.pullDistance} isRefreshing={ptr.isRefreshing} />
-        <motion.div
-          variants={stagger}
-          initial="hidden"
-          animate="show"
-          style={{
-            transform: `translateY(${ptr.isRefreshing ? 60 : ptr.pullDistance * 0.7}px)`,
-            transition: ptr.pullDistance === 0 && !ptr.isRefreshing ? 'transform 0.2s ease' : 'none',
-          }}
-        >
-          <V2Header eyebrow="Account" title="Points History" subtitle="Credits & deductions" onBack={() => navigate(-1)} />
-
-          <div style={{ padding: '0 16px 0' }}>
-            <motion.p variants={fadeUp} style={{ fontSize: 12, color: v2.brand.mutedSoft, marginBottom: 16, lineHeight: 1.5 }}>
-              Every ARX-P added or removed from your balance — tasks, mining, arena, Nexus, and restorations.
-            </motion.p>
-
-            {loading ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} style={{ height: 72, borderRadius: v2.radius.lg, background: v2.brand.raised, opacity: 1 - i * 0.15 }} />
-                ))}
-              </div>
-            ) : entries.length === 0 ? (
-              <motion.div variants={fadeUp}>
-                <V2Card padding="40px 20px" style={{ textAlign: 'center' }}>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: v2.brand.mutedSoft, margin: 0 }}>No history yet</p>
-                  <p style={{ fontSize: 12, color: v2.brand.muted, marginTop: 6 }}>
-                    Complete tasks, mine, or use Nexus to see activity here.
-                  </p>
-                </V2Card>
-              </motion.div>
-            ) : (
-              <>
-                <motion.div variants={fadeUp}>
-                  <V2SectionHeader title="Recent Activity" badge={`${entries.length} entries`} />
-                </motion.div>
-                {entries.map((entry, i) => {
-                  const isCredit = entry.amount > 0;
-                  const col = isCredit ? v2.accent.mining : v2.accent.danger;
-                  const label = CATEGORY_LABELS[entry.category] || entry.category;
-
-                  return (
-                    <motion.div key={entry.id} variants={fadeUp} initial="hidden" animate="show" transition={{ delay: i * 0.02 }}>
-                      <V2Card accent={col} padding="14px 16px" style={{ marginBottom: 8 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                          <div style={{
-                            width: 40, height: 40, borderRadius: v2.radius.sm, flexShrink: 0,
-                            background: `${col}18`, border: `1px solid ${col}33`,
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          }}>
-                            {isCredit ? <TrendingUp size={18} color={col} /> : <TrendingDown size={18} color={col} />}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: '0 0 2px' }}>
-                              {entry.description}
-                            </p>
-                            <p style={{ fontSize: 10, color: v2.brand.muted, margin: 0 }}>
-                              {label} · {relTime(entry.created_at)}
-                              {entry.balance_after != null && (
-                                <> · Balance: {Math.round(entry.balance_after).toLocaleString()}</>
-                              )}
-                            </p>
-                          </div>
-                          <p style={{ fontSize: 14, fontWeight: 800, color: col, flexShrink: 0, margin: 0 }}>
-                            {isCredit ? '+' : ''}{Math.round(entry.amount).toLocaleString()}
-                          </p>
-                        </div>
-                      </V2Card>
-                    </motion.div>
-                  );
-                })}
-              </>
-            )}
-          </div>
-        </motion.div>
+    <V2Page pull={pull}>
+      <ProfileHead
+        title="Points history"
+        subtitle="Credits and deductions"
+      />
+      <div style={{ padding: '0 16px 12px' }}>
+        <MineLoad waiting={loading} extra={pull.busy} kind="rows" rowCount={6} radius={22}>
+          {entries.length === 0 ? (
+            <GlassSheet>
+              <EmptyCopy title="No history yet" body="Complete tasks, mine, or use Nexus and activity will show here." />
+            </GlassSheet>
+          ) : (
+            <GlassSheet title={`${entries.length} entries`}>
+              {entries.map((entry) => {
+                const credit = entry.amount > 0;
+                const label = CATEGORY_LABELS[entry.category] || entry.category;
+                return (
+                  <TokenRow
+                    key={entry.id}
+                    wrap
+                    icon={credit ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                    glyphBg={credit ? 'rgba(61,220,132,0.22)' : 'rgba(242,82,82,0.22)'}
+                    title={entry.description || label}
+                    sub={`${label} · ${relTime(entry.created_at)}${entry.balance_after != null ? ` · ${Math.round(entry.balance_after).toLocaleString()} ARX-P` : ''}`}
+                    trailing={
+                      <span style={{
+                        fontSize: 13,
+                        fontWeight: 700,
+                        color: credit ? pc.good : pc.danger,
+                        flexShrink: 0,
+                        fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        {credit ? '+' : ''}{Math.round(entry.amount).toLocaleString()}
+                      </span>
+                    }
+                  />
+                );
+              })}
+            </GlassSheet>
+          )}
+        </MineLoad>
       </div>
     </V2Page>
   );

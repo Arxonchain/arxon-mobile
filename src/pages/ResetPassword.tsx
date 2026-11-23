@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { publicFacingMessage } from "@/lib/publicError";
 import { usePasswordRecoverySession } from "@/hooks/usePasswordRecoverySession";
 import { clearPasswordRecovery } from "@/lib/auth/passwordRecoveryGate";
 import arxonLogo from "@/assets/arxon-icon.svg";
@@ -61,7 +62,7 @@ export default function ResetPassword() {
       setTimeout(() => navigate("/auth?mode=signin"), 2000);
     } catch (err: any) {
       console.error("Password update error:", err);
-      setErrorMessage(err.message || "Failed to reset password. Please try again.");
+      setErrorMessage(publicFacingMessage(err));
     } finally {
       setUpdating(false);
     }

@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { User, Mail, Lock, Sparkles, Zap, ArrowRight, Gift, Loader2, KeyRound, Eye, EyeOff } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
+import { publicErrorToast, publicFacingMessage, PUBLIC_ERROR_HINT } from "@/lib/publicError";
 import { supabase } from "@/integrations/supabase/client";
 import { validatePassword } from "@/lib/passwordValidation";
 import PasswordStrengthMeter from "@/components/auth/PasswordStrengthMeter";
@@ -108,11 +109,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
 
       if (error) {
         authFailed = true;
-        toast({
-          title: "Reset Failed",
-          description: error.message || "Unable to send reset link. Try again later.",
-          variant: "destructive",
-        });
+        toast(publicErrorToast(error, 'auth'));
       } else {
         toast({
           title: "Reset Link Sent",
@@ -123,11 +120,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
       }
     } catch (error: any) {
       authFailed = true;
-      toast({
-        title: "Error",
-        description: error?.message || "Something went wrong. Please try again.",
-        variant: "destructive",
-      });
+      toast(publicErrorToast(error, 'auth'));
     } finally {
       setLoading(false);
       if (authFailed) invalidateCaptcha();
@@ -204,7 +197,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
         if (error) {
           authFailed = true;
           const msg = error.message?.toLowerCase() || '';
-          let description = error.message;
+          let description = publicFacingMessage(error.message, PUBLIC_ERROR_HINT);
           if (msg.includes('invalid login') || msg.includes('invalid credentials')) {
             description = 'Invalid email or password. Please try again.';
           } else if (msg.includes('network') || msg.includes('fetch') || msg.includes('edge function')) {
@@ -234,7 +227,7 @@ const AuthDialog = ({ open, onOpenChange, initialReferralCode = "" }: AuthDialog
           authFailed = true;
           const msg = error.message?.toLowerCase() || '';
           let title = 'Sign Up Failed';
-          let description = error.message;
+          let description = publicFacingMessage(error.message, PUBLIC_ERROR_HINT);
 
           if (msg.includes('timed out') || msg.includes('timeout') || msg.includes('504') || msg.includes('deadline')) {
             title = 'Connection Error';

@@ -2,8 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Sparkles, Swords, Target } from 'lucide-react';
-import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
-import bannerWordForge from '@/assets/word-forge/ui/banner-word-forge-clean.png';
 import bannerTasks from '@/assets/word-forge/ui/banner-tasks-clean.png';
 import bannerArena from '@/assets/word-forge/ui/banner-arena-clean.png';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
@@ -25,29 +23,13 @@ interface Slide {
   icon?: 'sparkles' | 'swords' | 'target';
 }
 
-const WORD_FORGE_SLIDE: Slide = {
-  id: 'word-forge',
-  gradient: 'linear-gradient(125deg, rgba(6,28,48,0.98) 0%, rgba(4,18,36,0.96) 52%, rgba(8,32,52,0.88) 100%)',
-  eyebrow: 'Word Game',
-  title: 'Word Forge',
-  subtitle: 'Connect letters. Earn ARX-P.',
-  cta: 'Play Now',
-  path: '/word-forge',
-  accent: neon.cyan,
-  heroImage: bannerWordForge,
-  heroMode: 'cutout',
-  heroSize: 158,
-  icon: 'sparkles',
-};
-
 const SLIDES: Slide[] = [
-  ...(WORD_FORGE_ENABLED ? [WORD_FORGE_SLIDE] : []),
   {
     id: 'arena',
-    gradient: 'linear-gradient(125deg, rgba(28,8,36,0.98) 0%, rgba(18,6,28,0.96) 45%, rgba(8,4,18,0.94) 100%)',
+    gradient: 'rgba(10,12,16,0.88)',
     eyebrow: 'Live Battles',
-    title: 'Game Arena',
-    subtitle: 'Pick your battleground.',
+    title: 'Arena',
+    subtitle: 'Stake ARX-P on live predictions.',
     cta: 'Enter Arena',
     path: '/arena',
     accent: neon.purple,
@@ -57,7 +39,7 @@ const SLIDES: Slide[] = [
   },
   {
     id: 'tasks',
-    gradient: 'linear-gradient(125deg, rgba(8,32,28,0.98) 0%, rgba(6,22,20,0.96) 52%, rgba(4,14,18,0.94) 100%)',
+    gradient: 'rgba(10,12,16,0.88)',
     eyebrow: 'Daily Rewards',
     title: 'Tasks',
     subtitle: 'Complete missions. Boost mining.',
@@ -115,22 +97,14 @@ function HeroArt({ slide }: { slide: Slide }) {
 
   return (
     <>
-      {slide.id === 'word-forge' && (
-        <div style={{
-          position: 'absolute', right: -6, top: '50%', transform: 'translateY(-46%)',
-          width: slide.heroSize ?? 108, height: slide.heroSize ?? 108, borderRadius: '50%',
-          background: `radial-gradient(circle, ${slide.accent}33 0%, transparent 68%)`,
-          pointerEvents: 'none',
-        }} />
-      )}
       <img
         src={slide.heroImage}
         alt=""
         aria-hidden
         style={{
           position: 'absolute',
-          right: slide.id === 'word-forge' ? -10 : 4,
-          bottom: slide.id === 'word-forge' ? -14 : -2,
+          right: 4,
+          bottom: -2,
           width: slide.heroSize ?? 108,
           height: slide.heroSize ?? 108,
           objectFit: 'contain',
@@ -143,14 +117,12 @@ function HeroArt({ slide }: { slide: Slide }) {
   );
 }
 
-export function DashboardActivityCarousel({ forceShowWordForge = false }: { forceShowWordForge?: boolean } = {}) {
+export function DashboardActivityCarousel() {
   const navigate = useNavigate();
   const location = useLocation();
   const routePrefix = location.pathname.startsWith('/ui-preview') ? '/ui-preview' : '';
   const [index, setIndex] = useState(0);
-  const slides = forceShowWordForge && !WORD_FORGE_ENABLED
-    ? [WORD_FORGE_SLIDE, ...SLIDES.filter((s) => s.id !== 'word-forge')]
-    : SLIDES;
+  const slides = SLIDES;
   const count = slides.length;
 
   const next = useCallback(() => {
@@ -180,11 +152,11 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
           style={{
             borderRadius: 20,
             overflow: 'hidden',
-            border: `1px solid ${slide.accent}30`,
-            boxShadow: `0 12px 32px -10px ${slide.accent}28, 0 4px 16px rgba(0,0,0,0.4)`,
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
             background: slide.gradient,
             position: 'relative',
-            minHeight: slide.id === 'word-forge' ? 136 : 128,
+            minHeight: 128,
           }}
         >
           <HeroArt slide={slide} />
@@ -194,7 +166,7 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
             padding: '14px 14px 13px',
             maxWidth: slide.heroMode === 'arena-blend' ? '58%' : '62%',
             display: 'flex', flexDirection: 'column', justifyContent: 'center',
-            minHeight: slide.id === 'word-forge' ? 136 : 128,
+            minHeight: 128,
           }}>
             <p style={{
               margin: 0, fontSize: 8, fontWeight: 800, letterSpacing: '0.2em',
@@ -225,9 +197,8 @@ export function DashboardActivityCarousel({ forceShowWordForge = false }: { forc
                 alignSelf: 'flex-start',
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 padding: '8px 14px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                background: `linear-gradient(135deg, ${slide.accent}, rgba(79,216,235,0.75))`,
-                color: '#061018', fontSize: 10, fontWeight: 900, letterSpacing: '0.04em',
-                boxShadow: `0 4px 16px ${slide.accent}44, inset 0 1px 0 rgba(255,255,255,0.35)`,
+                background: '#accafe',
+                color: '#0c1018', fontSize: 10, fontWeight: 700, letterSpacing: '0.04em',
                 fontFamily: neon.font,
               }}
             >

@@ -4,6 +4,7 @@ import { BackendUnavailableError } from '@/lib/backendHealth';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { COMMUNITY_LINKS, SOCIAL_POST_REQUIRED_TERMS } from '@/lib/communityLinks';
 
 const SOCIAL_POST_POINTS = 50; // Points per quality post
@@ -209,11 +210,7 @@ export const useSocialSubmissions = () => {
       return true;
     } catch (error: any) {
       console.error('Error submitting post:', error);
-      toast({
-        title: error instanceof BackendUnavailableError ? 'Service Unavailable' : 'Submission Failed',
-        description: error?.message || 'Please try again',
-        variant: "destructive",
-      });
+      toast(publicErrorToast(error, error instanceof BackendUnavailableError ? 'unknown' : 'claim'));
       return false;
     } finally {
       setSubmitting(false);
@@ -267,11 +264,7 @@ export const useSocialSubmissions = () => {
       if (claimError) throw claimError;
       const result = claimResult as any;
       if (!result?.success) {
-        toast({
-          title: "Claim Failed",
-          description: result?.error || "Could not claim rewards",
-          variant: "destructive",
-        });
+        toast(publicErrorToast(result?.error, 'claim'));
         return false;
       }
 
@@ -310,11 +303,7 @@ export const useSocialSubmissions = () => {
       return true;
     } catch (error: any) {
       console.error('Claim error:', error);
-      toast({
-        title: "Claim Failed",
-        description: error.message || "Could not claim rewards",
-        variant: "destructive",
-      });
+      toast(publicErrorToast(error, 'claim'));
       return false;
     } finally {
       setClaiming(null);

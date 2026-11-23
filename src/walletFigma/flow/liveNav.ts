@@ -128,22 +128,14 @@ export async function beforeGo(input: LiveNavInput): Promise<NavDecision> {
       return { block: true, note: 'Enter the wallet password to encrypt the Google Drive backup.' };
     }
     try {
-      try {
-        const restored = await downloadDriveBackup(pass);
-        await wallet.importWallet(restored);
-        return { note: 'Wallet restored from Google Drive.' };
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : '';
-        if (!msg.includes('No Arxon backup')) {
-          return { block: true, note: msg || 'Google Drive backup failed.' };
-        }
+      if (wallet.mnemonic) {
+        const box = await uploadDriveBackup(pass, wallet.mnemonic);
+        sessionStore.setBackup(box);
+        return { note: 'Encrypted backup saved to Google Drive.' };
       }
-      if (!wallet.mnemonic) {
-        return { block: true, note: 'No wallet on this device and no Google Drive backup opened with that password.' };
-      }
-      const box = await uploadDriveBackup(pass, wallet.mnemonic);
-      sessionStore.setBackup(box);
-      return { note: 'Encrypted backup saved to Google Drive.' };
+      const restored = await downloadDriveBackup(pass);
+      await wallet.importWallet(restored);
+      return { note: 'Wallet restored from Google Drive.' };
     } catch (e) {
       return { block: true, note: e instanceof Error ? e.message : 'Google Drive backup failed.' };
     }

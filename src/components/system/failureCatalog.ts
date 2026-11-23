@@ -33,10 +33,10 @@ export interface FailureCopy {
 export const failureCatalog: Record<FailureType, FailureCopy> = {
   ota_load_failed: {
     title: "Can't reach Arxon",
-    message: 'The latest app version could not load. Check internet, then retry.',
+    message: 'Check internet, then retry.',
     icon: Globe,
     primaryLabel: 'Retry',
-    secondaryLabel: 'Restart app',
+    secondaryLabel: 'Restart',
   },
   offline: {
     title: 'No connection',
@@ -58,10 +58,10 @@ export const failureCatalog: Record<FailureType, FailureCopy> = {
   },
   timeout: {
     title: 'Taking too long',
-    message: 'The connection timed out. Retry, or restart the app if it stays stuck.',
+    message: 'The connection timed out. Retry, or restart if it stays stuck.',
     icon: Clock,
     primaryLabel: 'Retry',
-    secondaryLabel: 'Restart app',
+    secondaryLabel: 'Restart',
   },
   maintenance: {
     title: 'Maintenance in progress',
@@ -73,7 +73,7 @@ export const failureCatalog: Record<FailureType, FailureCopy> = {
     title: 'Update required',
     message: 'A new version is available. Update from the store to continue.',
     icon: Download,
-    primaryLabel: 'Update app',
+    primaryLabel: 'Update',
   },
   not_found: {
     title: 'Page not found',
@@ -83,7 +83,7 @@ export const failureCatalog: Record<FailureType, FailureCopy> = {
   },
   unknown: {
     title: 'Something went wrong',
-    message: 'Refresh the app and try again.',
+    message: 'Pull down to refresh, or close and reopen.',
     icon: AlertTriangle,
     primaryLabel: 'Refresh',
   },

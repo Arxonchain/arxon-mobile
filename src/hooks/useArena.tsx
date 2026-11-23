@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from 'sonner';
+import { PUBLIC_ERROR_HINT } from '@/lib/publicError';
 
 export interface ArenaBattle {
   id: string;
@@ -377,7 +378,8 @@ export const useArena = () => {
       } else if (error.message?.includes('Minimum stake')) {
         toast.error('Minimum stake is 100 ARX-P');
       } else {
-        toast.error(error.message || 'Failed to cast vote');
+        console.error(error);
+        toast.error(PUBLIC_ERROR_HINT);
       }
       return false;
     } finally {

@@ -7,6 +7,43 @@ import {
 import leaderboardKing from '@/assets/word-forge/ui/leaderboard-king.png';
 import { getArenaPoolStats } from '@/lib/arenaPoolStats';
 import { neon } from '../design/neonTokens';
+import { sheetGlass } from '@/walletFigma/flow/LiveScroll';
+
+const sheetList: CSSProperties = {
+  borderRadius: 22,
+  padding: '2px 12px 8px',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  ...sheetGlass,
+};
+
+const tokenListRow: CSSProperties = {
+  width: '100%',
+  height: 44,
+  minHeight: 44,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  border: 'none',
+  background: 'none',
+  color: '#fff',
+  padding: 0,
+  cursor: 'pointer',
+  fontFamily: neon.font,
+  textAlign: 'left',
+};
+
+const tokenGlyph: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: '#1c2025',
+  color: '#fff',
+};
 
 export interface DayEarning {
   date: string;
@@ -367,27 +404,16 @@ export function BalanceGlassCard({
 
   return (
     <div style={{
-      borderRadius: 24,
-      padding: '16px 16px 12px',
+      borderRadius: 22,
+      padding: '16px 14px 12px',
       position: 'relative',
       overflow: 'hidden',
-      background: 'linear-gradient(155deg, rgba(9,22,40,0.98) 0%, rgba(5,14,28,0.99) 50%, rgba(4,10,22,1) 100%)',
-      border: '1px solid rgba(79,216,235,0.2)',
-      boxShadow: '0 20px 48px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 36px rgba(79,216,235,0.06)',
+      border: '1px solid rgba(255,255,255,0.08)',
+      background: 'rgba(10,12,16,0.88)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+      backdropFilter: 'blur(22px)',
+      WebkitBackdropFilter: 'blur(22px)',
     }}>
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: 'radial-gradient(circle at 18% 22%, rgba(255,255,255,0.04) 1px, transparent 1px)',
-        backgroundSize: '20px 20px',
-        opacity: 0.3,
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        background: `
-          radial-gradient(ellipse 90% 70% at 100% 0%, rgba(79,216,235,0.18) 0%, transparent 55%),
-          radial-gradient(ellipse 60% 50% at 0% 100%, rgba(59,130,246,0.06) 0%, transparent 50%)
-        `,
-      }} />
 
       <div style={{ position: 'relative', zIndex: 1, paddingTop: 4 }}>
         <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'rgba(232,252,255,0.42)' }}>
@@ -395,7 +421,7 @@ export function BalanceGlassCard({
         </p>
         <p style={{
           margin: '8px 0 0', fontSize: 34, fontWeight: 900, letterSpacing: '-1.5px', lineHeight: 1.05,
-          color: neon.text, textShadow: '0 0 28px rgba(79,216,235,0.25)',
+          color: neon.text,
         }}>
           {displayVal.toLocaleString()}
           <span style={{ fontSize: 13, fontWeight: 800, color: neon.cyan, marginLeft: 6 }}>ARX-P</span>
@@ -880,8 +906,8 @@ export type ExploreBoxItem = {
 };
 
 const EXPLORE_BASE = {
-  background: 'linear-gradient(165deg, rgba(10,28,48,0.96) 0%, rgba(5,14,28,0.98) 55%, rgba(3,8,18,1) 100%)',
-  border: '1px solid rgba(79,216,235,0.22)',
+  background: 'rgba(10,12,16,0.88)',
+  border: '1px solid rgba(255,255,255,0.08)',
   accent: neon.cyan,
 } as const;
 
@@ -960,8 +986,8 @@ function ExploreBoxDecor({ variant }: { variant: ExploreBoxItem['variant'] }) {
 function ExploreBoxIcon({ variant }: { variant: ExploreBoxItem['variant'] }) {
   const shell: CSSProperties = {
     width: 36, height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    background: 'rgba(79,216,235,0.1)', border: '1px solid rgba(79,216,235,0.28)',
-    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08), 0 3px 10px rgba(79,216,235,0.1)',
+    background: 'rgba(172,202,254,0.12)', border: '1px solid rgba(255,255,255,0.10)',
+    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
   };
 
   if (variant === 'leaderboard') {
@@ -998,7 +1024,7 @@ function ExploreBox({ item }: { item: ExploreBoxItem }) {
         fontFamily: neon.font,
         background: EXPLORE_BASE.background,
         border: EXPLORE_BASE.border,
-        boxShadow: '0 8px 20px rgba(0,0,0,0.32), inset 0 1px 0 rgba(255,255,255,0.06)',
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
         width: '100%',
         display: 'flex',
         flexDirection: 'column',
@@ -1008,7 +1034,7 @@ function ExploreBox({ item }: { item: ExploreBoxItem }) {
       <ExploreBoxDecor variant={item.variant} />
       <div style={{
         position: 'absolute', top: 0, left: 0, width: '45%', height: '100%', pointerEvents: 'none',
-        background: 'linear-gradient(105deg, rgba(79,216,235,0.1) 0%, transparent 72%)',
+        background: 'linear-gradient(105deg, rgba(172,202,254,0.08) 0%, transparent 72%)',
       }} />
       <div style={{
         position: 'absolute', top: 0, left: -40, width: 40, height: '100%', pointerEvents: 'none',
@@ -1027,7 +1053,7 @@ function ExploreBox({ item }: { item: ExploreBoxItem }) {
               <span style={{
                 display: 'inline-block', marginBottom: 4,
                 fontSize: 7, fontWeight: 900, padding: '2px 6px', borderRadius: 6,
-                background: 'rgba(79,216,235,0.14)', border: '1px solid rgba(79,216,235,0.35)', color: neon.cyan,
+                background: 'rgba(172,202,254,0.14)', border: '1px solid rgba(255,255,255,0.12)', color: neon.cyan,
               }}>
                 {item.badge}
               </span>
@@ -1056,9 +1082,9 @@ function ExploreBox({ item }: { item: ExploreBoxItem }) {
           fontSize: 9,
           fontWeight: 800,
           letterSpacing: '0.04em',
-          background: 'linear-gradient(180deg, rgba(79,216,235,0.2) 0%, rgba(79,216,235,0.08) 100%)',
-          border: '1px solid rgba(79,216,235,0.28)',
-          color: neon.text,
+          background: '#accafe',
+          border: 'none',
+          color: '#0c1018',
           boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.1)',
         }}>
           {item.cta}
@@ -1109,28 +1135,37 @@ function battleCountdown(endsAt: string) {
   return `${s}s left`;
 }
 
-function PoolSplitBar({ pctA, pctB, pctC, hasSideC }: { pctA: number; pctB: number; pctC: number; hasSideC: boolean }) {
-  if (hasSideC) {
-    return (
-      <div style={{ display: 'flex', height: 5, borderRadius: 99, overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
-        <div style={{ width: `${pctA}%`, background: `linear-gradient(90deg, ${neon.cyan}, ${neon.cyan}aa)` }} />
-        <div style={{ width: `${pctC}%`, background: `linear-gradient(90deg, ${neon.gold}, ${neon.gold}aa)` }} />
-        <div style={{ width: `${pctB}%`, background: `linear-gradient(90deg, ${neon.purple}, ${neon.purple}aa)` }} />
-      </div>
-    );
-  }
+function SheetHead({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
-    <div style={{ display: 'flex', height: 5, borderRadius: 99, overflow: 'hidden', background: 'rgba(255,255,255,0.06)' }}>
-      <div style={{ width: `${pctA}%`, background: `linear-gradient(90deg, ${neon.cyan}, ${neon.teal})` }} />
-      <div style={{ width: `${pctB}%`, background: `linear-gradient(90deg, ${neon.purple}, #7c3aed)` }} />
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 }}>
+      <span style={{ fontSize: 16, fontWeight: 700, color: '#fff', fontFamily: neon.font }}>{title}</span>
+      {action && onAction ? (
+        <button
+          type="button"
+          onClick={onAction}
+          style={{
+            border: 'none',
+            background: 'none',
+            color: '#accafe',
+            fontSize: 13,
+            fontWeight: 500,
+            minHeight: 40,
+            padding: '8px 4px',
+            cursor: 'pointer',
+            fontFamily: neon.font,
+          }}
+        >
+          {action}
+        </button>
+      ) : null}
     </div>
   );
 }
 
 export function LiveBattleCard({ battle, onClick }: { battle: DashBattle; onClick: () => void }) {
-  const { pctA, pctB, pctC, hasSideC } = getArenaPoolStats(battle);
-  const [bannerHidden, setBannerHidden] = useState(false);
+  const { pctA, pctB } = getArenaPoolStats(battle);
   const [countdown, setCountdown] = useState(() => battleCountdown(battle.ends_at));
+  const lead = pctA >= pctB ? { name: battle.side_a_name, pct: pctA } : { name: battle.side_b_name, pct: pctB };
 
   useEffect(() => {
     setCountdown(battleCountdown(battle.ends_at));
@@ -1139,94 +1174,22 @@ export function LiveBattleCard({ battle, onClick }: { battle: DashBattle; onClic
   }, [battle.ends_at]);
 
   return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.98 }}
-      onClick={onClick}
-      style={{
-        minWidth: 228,
-        maxWidth: 228,
-        flexShrink: 0,
-        borderRadius: 18,
-        overflow: 'hidden',
-        cursor: 'pointer',
-        padding: 0,
-        textAlign: 'left',
-        fontFamily: neon.font,
-        background: 'linear-gradient(165deg, rgba(14,8,28,0.98) 0%, rgba(6,4,16,0.99) 100%)',
-        border: '1px solid rgba(168,85,247,0.28)',
-        boxShadow: '0 12px 32px rgba(0,0,0,0.45), 0 0 24px rgba(168,85,247,0.08), inset 0 1px 0 rgba(255,255,255,0.06)',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <div style={{ height: 82, position: 'relative', flexShrink: 0, background: `linear-gradient(135deg, rgba(88,28,135,0.5), rgba(12,20,40,0.9))` }}>
-        {battle.banner_image && !bannerHidden && (
-          <img
-            src={battle.banner_image}
-            alt=""
-            onError={() => setBannerHidden(true)}
-            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
-          />
-        )}
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: 'linear-gradient(180deg, rgba(0,0,0,0.08) 0%, rgba(4,6,14,0.55) 55%, rgba(6,4,16,0.98) 100%)',
-        }} />
-        <div style={{
-          position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 5,
-          padding: '3px 8px', borderRadius: 8,
-          background: 'rgba(220,38,38,0.85)', border: '1px solid rgba(255,100,100,0.4)',
-          boxShadow: '0 0 12px rgba(255,68,68,0.35)',
-        }}>
-          <div style={{ width: 5, height: 5, borderRadius: '50%', background: '#fff', animation: 'livePulse 1.2s ease-in-out infinite' }} />
-          <span style={{ fontSize: 7, fontWeight: 900, letterSpacing: '0.12em', color: '#fff' }}>LIVE</span>
-        </div>
-        <span style={{
-          position: 'absolute', top: 8, right: 8, fontSize: 8, fontWeight: 700,
-          padding: '3px 7px', borderRadius: 8,
-          background: 'rgba(0,0,0,0.45)', border: '1px solid rgba(255,255,255,0.12)', color: neon.textMuted,
-          fontVariantNumeric: 'tabular-nums',
-        }}>
-          {countdown}
+    <motion.button type="button" whileTap={{ scale: 0.99 }} onClick={onClick} style={tokenListRow}>
+      <span style={tokenGlyph}>
+        <Swords size={15} strokeWidth={2.2} />
+      </span>
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {battle.title || 'Arena'}
         </span>
-      </div>
-
-      <div style={{ padding: '10px 11px 11px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <p style={{
-          margin: 0, fontSize: 12, fontWeight: 800, color: neon.text, lineHeight: 1.25,
-          overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-        }}>
-          {battle.title || 'Arena Battle'}
-        </p>
-
-        <PoolSplitBar pctA={pctA} pctB={pctB} pctC={pctC} hasSideC={hasSideC} />
-
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: hasSideC ? '1fr 1fr 1fr' : '1fr 1fr',
-          gap: 6,
-        }}>
-          {[
-            { name: battle.side_a_name, pct: pctA, color: neon.cyan },
-            ...(hasSideC ? [{ name: battle.side_c_name || 'Draw', pct: pctC, color: neon.gold }] : []),
-            { name: battle.side_b_name, pct: pctB, color: neon.purple },
-          ].map((side) => (
-            <div key={side.name} style={{ minWidth: 0 }}>
-              <p style={{
-                margin: 0, fontSize: 8, fontWeight: 600, color: neon.textMuted,
-                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                {side.name}
-              </p>
-              <p style={{ margin: '2px 0 0', fontSize: 12, fontWeight: 900, color: side.color, fontVariantNumeric: 'tabular-nums' }}>
-                {side.pct}%
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <style>{'@keyframes livePulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.45;transform:scale(.85)}}'}</style>
+        <span style={{ fontSize: 11, color: '#8c8f99' }}>LIVE · {countdown}</span>
+      </span>
+      <span style={{ display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'right', flexShrink: 0 }}>
+        <span style={{ fontSize: 13, fontWeight: 650 }}>{lead.pct}%</span>
+        <span style={{ fontSize: 11, color: '#8c8f99', maxWidth: 88, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {lead.name}
+        </span>
+      </span>
     </motion.button>
   );
 }
@@ -1240,37 +1203,47 @@ export function LiveBattleStrip({
   onBattleClick?: (id: string) => void;
   onViewAll?: () => void;
 }) {
-  if (battles.length === 0) {
-    return (
-      <div style={{
-        borderRadius: 18, padding: '22px 16px', textAlign: 'center',
-        background: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(168,85,247,0.22)',
-      }}>
-        <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: neon.textMuted }}>No live battles right now</p>
-        {onViewAll && (
-          <button type="button" onClick={onViewAll} style={{
-            marginTop: 10, padding: '7px 14px', borderRadius: 10, border: '1px solid rgba(168,85,247,0.35)',
-            background: 'rgba(168,85,247,0.12)', color: neon.purple, fontSize: 9, fontWeight: 800, cursor: 'pointer', fontFamily: neon.font,
-          }}>
-            Browse Arena
-          </button>
-        )}
-      </div>
-    );
-  }
-
   return (
-    <div
-      className="scrollbar-none"
-      style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 4, WebkitOverflowScrolling: 'touch' }}
-    >
-      {battles.map((b) => (
-        <LiveBattleCard
-          key={b.id}
-          battle={b}
-          onClick={() => (onBattleClick ? onBattleClick(b.id) : onViewAll?.())}
-        />
-      ))}
+    <div style={sheetList}>
+      <SheetHead title="Arena" action={battles.length ? 'All' : undefined} onAction={onViewAll} />
+      {battles.length === 0 ? (
+        <div style={{ padding: '22px 12px 26px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: 13, color: '#8c8f99', fontFamily: neon.font }}>
+            No live battles right now
+          </p>
+          {onViewAll && (
+            <button
+              type="button"
+              onClick={onViewAll}
+              style={{
+                marginTop: 14,
+                height: 40,
+                padding: '0 22px',
+                borderRadius: 20,
+                border: 'none',
+                background: '#ffffff',
+                color: '#0c1018',
+                fontSize: 14,
+                fontWeight: 650,
+                cursor: 'pointer',
+                fontFamily: neon.font,
+              }}
+            >
+              Browse
+            </button>
+          )}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          {battles.slice(0, 5).map((b) => (
+            <LiveBattleCard
+              key={b.id}
+              battle={b}
+              onClick={() => (onBattleClick ? onBattleClick(b.id) : onViewAll?.())}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1300,9 +1273,6 @@ export interface ActivityFeedItem {
   time: string;
   isCredit?: boolean;
 }
-
-/** Brand light-blue tint blended into primary copy (62% text + 38% cyan) */
-const ACTIVITY_TEXT = '#b8eff8';
 
 export function inferActivityKind(category?: string, description?: string): ActivityKind {
   const cat = (category || '').toLowerCase();
@@ -1375,14 +1345,31 @@ function ActivityKindIcon({ kind, size = 16 }: { kind: ActivityKind; size?: numb
   }
 }
 
+function shortActivityLabel(kind: ActivityKind, label: string) {
+  if (kind === 'mining' || kind === 'mining_active') return 'Mining';
+  if (kind === 'task') return 'Task';
+  if (kind === 'arena') return 'Arena';
+  if (kind === 'nexus') return 'Nexus';
+  if (kind === 'referral') return 'Referral';
+  if (kind === 'social') return 'Social';
+  if (kind === 'checkin') return 'Check-in';
+  if (kind === 'campaign') return 'Campaign';
+  if (kind === 'restoration') return 'Restore';
+  if (kind === 'game' || kind === 'dice') return 'Game';
+  if (/mining/i.test(label)) return 'Mining';
+  if (/task|mission/i.test(label)) return 'Task';
+  if (/arena|battle/i.test(label)) return 'Arena';
+  const cut = label.split(/[·(+]/)[0]?.trim();
+  return cut && cut.length < 18 ? cut : 'Activity';
+}
+
 function ActivityFeedRow({
   item,
-  isLast,
   onClick,
   liveEarn,
 }: {
   item: ActivityFeedItem;
-  isLast: boolean;
+  isLast?: boolean;
   onClick?: () => void;
   liveEarn?: number;
 }) {
@@ -1396,77 +1383,44 @@ function ActivityFeedRow({
       type="button"
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      style={{
-        width: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 9,
-        padding: '7px 0',
-        border: 'none',
-        borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.04)',
-        background: 'transparent',
-        cursor: onClick ? 'pointer' : 'default',
-        fontFamily: neon.font,
-        textAlign: 'left',
-      }}
+      style={{ ...tokenListRow, cursor: onClick ? 'pointer' : 'default' }}
     >
-      <div style={{
-        width: 26,
-        height: 26,
-        borderRadius: 8,
-        flexShrink: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        color: ACTIVITY_TEXT,
-        background: `${neon.cyan}10`,
-        border: `1px solid ${neon.cyan}22`,
-        position: 'relative',
-      }}>
-        <ActivityKindIcon kind={item.kind} size={13} />
+      <span style={{ ...tokenGlyph, position: 'relative' }}>
+        <ActivityKindIcon kind={item.kind} size={15} />
         {isLive && (
-          <div style={{
-            position: 'absolute', top: -1, right: -1, width: 6, height: 6, borderRadius: '50%',
-            background: neon.cyan, border: '1.5px solid rgba(6,12,24,0.95)',
-            animation: 'activityPulse 1.4s ease-in-out infinite',
-          }} />
+          <span
+            style={{
+              position: 'absolute',
+              top: 1,
+              right: 1,
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              background: neon.cyan,
+              border: '2px solid #14161a',
+            }}
+          />
         )}
-      </div>
-
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-        <p style={{
-          margin: 0,
-          flex: 1,
-          minWidth: 0,
-          fontSize: 12,
-          fontWeight: 500,
-          lineHeight: 1.2,
-          color: ACTIVITY_TEXT,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-        }}>
-          {item.label}
-          <span style={{ opacity: 0.6, fontWeight: 400 }}>
-            {' · '}{isLive ? 'live' : item.sub}
-          </span>
-        </p>
-
-        <span style={{
+      </span>
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, textAlign: 'left' }}>
+        <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {shortActivityLabel(item.kind, item.label)}
+        </span>
+        <span style={{ fontSize: 11, color: '#8c8f99' }}>{isLive ? 'Live' : item.sub}</span>
+      </span>
+      <span
+        style={{
+          display: 'flex',
+          alignItems: 'baseline',
+          gap: 4,
           flexShrink: 0,
-          fontSize: 12,
-          fontWeight: 500,
-          lineHeight: 1.2,
-          color: ACTIVITY_TEXT,
           fontVariantNumeric: 'tabular-nums',
           whiteSpace: 'nowrap',
-        }}>
-          {displayVal}
-          <span style={{ opacity: 0.55, fontWeight: 400, fontSize: 10, marginLeft: 3 }}>
-            ARX-P
-          </span>
-        </span>
-      </div>
+        }}
+      >
+        <span style={{ fontSize: 13, fontWeight: 650 }}>{displayVal}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#8c8f99' }}>ARX-P</span>
+      </span>
     </motion.button>
   );
 }
@@ -1477,12 +1431,14 @@ export function RecentActivityFeed({
   liveEarn,
   onItemClick,
   onEmptyAction,
+  embedded = false,
 }: {
   items: ActivityFeedItem[];
   isMiningLive?: boolean;
   liveEarn?: number;
   onItemClick?: () => void;
   onEmptyAction?: () => void;
+  embedded?: boolean;
 }) {
   const feedItems = useMemo(() => {
     if (!isMiningLive || liveEarn == null) return items;
@@ -1491,7 +1447,7 @@ export function RecentActivityFeed({
     const liveRow: ActivityFeedItem = {
       id: '__live_mining__',
       kind: 'mining_active',
-      label: 'Mining Session',
+      label: 'Mining',
       sub: 'In progress',
       val: null,
       accent: neon.teal,
@@ -1501,79 +1457,23 @@ export function RecentActivityFeed({
     return [liveRow, ...items].slice(0, 5);
   }, [items, isMiningLive, liveEarn]);
 
-  const netPositive = useMemo(
-    () => feedItems.reduce((sum, it) => {
-      if (!it.val || it.isCredit === false) return sum;
-      const n = Number(it.val.replace(/[+,\s]/g, ''));
-      return sum + (Number.isFinite(n) ? n : 0);
-    }, isMiningLive && liveEarn ? liveEarn : 0),
-    [feedItems, isMiningLive, liveEarn],
-  );
-
   if (feedItems.length === 0) {
     return (
-      <div style={{
-        borderRadius: 18,
-        padding: '24px 18px',
-        textAlign: 'center',
-        background: 'linear-gradient(165deg, rgba(12,28,48,0.55) 0%, rgba(6,14,28,0.75) 100%)',
-        border: '1px dashed rgba(79,216,235,0.22)',
-        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.04)',
-      }}>
-        <div style={{
-          width: 44, height: 44, borderRadius: 14, margin: '0 auto 12px',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: `${neon.teal}12`, border: `1px solid ${neon.teal}35`, color: neon.teal,
-        }}>
-          <Pickaxe size={20} strokeWidth={2.2} />
-        </div>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: ACTIVITY_TEXT }}>No activity yet</p>
-        <p style={{ margin: '6px 0 0', fontSize: 11, fontWeight: 400, color: ACTIVITY_TEXT, lineHeight: 1.45 }}>
-          Mine, complete tasks, or join Arena battles to build your feed.
+      <div style={embedded ? undefined : sheetList}>
+        {!embedded && <SheetHead title="History" action="All" onAction={onItemClick} />}
+        <p style={{ margin: '8px 0 10px', fontSize: 13, color: '#8c8f99', fontFamily: neon.font }}>
+          No activity yet
         </p>
-        {onEmptyAction && (
-          <button type="button" onClick={onEmptyAction} style={{
-            marginTop: 14, padding: '8px 16px', borderRadius: 10,
-            border: `1px solid ${neon.cyan}47`,
-            background: `${neon.cyan}1a`,
-            color: ACTIVITY_TEXT, fontSize: 10, fontWeight: 500, cursor: 'pointer', fontFamily: neon.font,
-          }}>
-            Start Mining
-          </button>
-        )}
       </div>
     );
   }
 
   return (
-    <div style={{
-      borderRadius: 18,
-      overflow: 'hidden',
-      background: 'linear-gradient(165deg, rgba(14,32,54,0.88) 0%, rgba(8,18,36,0.94) 100%)',
-      border: '1px solid rgba(79,216,235,0.18)',
-      boxShadow: '0 10px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)',
-    }}>
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        padding: '7px 12px 6px',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-      }}>
-        <span style={{ fontSize: 9, fontWeight: 500, color: ACTIVITY_TEXT, opacity: 0.75, letterSpacing: '0.03em' }}>
-          {feedItems.length} recent{isMiningLive ? ' · live' : ''}
-        </span>
-        {netPositive > 0 && (
-          <span style={{
-            fontSize: 9, fontWeight: 500, color: ACTIVITY_TEXT, opacity: 0.75,
-            fontVariantNumeric: 'tabular-nums',
-          }}>
-            +{Math.round(netPositive).toLocaleString()} ARX-P
-          </span>
-        )}
-      </div>
-
-      <div style={{ padding: '2px 12px 8px' }}>
+    <div style={embedded ? undefined : sheetList}>
+      {!embedded && (
+        <SheetHead title="History" action="All" onAction={onItemClick} />
+      )}
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {feedItems.map((item, i) => (
           <ActivityFeedRow
             key={item.id}
@@ -1584,7 +1484,6 @@ export function RecentActivityFeed({
           />
         ))}
       </div>
-      <style>{'@keyframes activityPulse{0%,100%{opacity:1}50%{opacity:.45}}'}</style>
     </div>
   );
 }

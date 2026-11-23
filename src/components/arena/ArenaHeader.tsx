@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Swords, ArrowLeft, Zap, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { Button } from '@/components/ui/button';
 
 interface ArenaHeaderProps {
@@ -19,7 +20,7 @@ const ArenaHeader = ({ totalPoints, activeBoost }: ArenaHeaderProps) => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/')}
+              onClick={() => goBack(navigate)}
               className="text-muted-foreground hover:text-foreground"
             >
               <ArrowLeft className="w-5 h-5" />

@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { useProfile } from '@/hooks/useProfile';
@@ -13,6 +14,7 @@ import {
   BarChart3, Megaphone, RotateCcw, Coins,
 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { supabase } from '@/integrations/supabase/client';
 import InAppNotificationBell from '@/components/mobile/InAppNotificationBell';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
@@ -39,7 +41,7 @@ const MENU = [
   {Icon:Users,   label:'Referrals',    sub:'Earn 100 ARX-P per friend', path:'/referrals', col:'hsl(155 45% 43%)', bg:'hsl(155 45% 43%/0.1)'},
   {Icon:Wallet,  label:'Wallet',       sub:'Connect your Web3 wallet',  path:'/wallet',    col:'hsl(215 35% 62%)', bg:'hsl(215 35% 62%/0.1)'},
   {Icon:Shield,  label:'Security',     sub:'Password & account security', path:'/settings?tab=security', col:'hsl(215 32% 72%)', bg:'hsl(215 32% 72%/0.1)'},
-  {Icon:BookOpen,label:'Litepaper',    sub:'Guides & documentation',    path:'/litepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
+  {Icon:BookOpen,label:'Whitepaper',    sub:'Guides & documentation',    path:'/whitepaper', col:'hsl(215 18% 52%)', bg:'hsl(215 18% 52%/0.08)'},
   {Icon:Settings,label:'App Settings', sub:'Notifications & display',   path:'/settings',  col:'hsl(215 18% 45%)', bg:'hsl(215 18% 45%/0.08)'},
 ];
 
@@ -110,7 +112,7 @@ export default function MobileProfile() {
       setEditingX(false);
       toast({ title: 'Saved!', description: handleToSave ? `@${handleToSave} linked` : 'X handle removed' });
     } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+      toast(publicErrorToast(e, 'verify'));
     } finally { setSavingX(false); }
   };
 
@@ -149,7 +151,7 @@ export default function MobileProfile() {
       await refetchProfile();
       toast({ title:'Profile updated!', description:'Avatar saved successfully' });
     } catch (err: any) {
-      toast({ title:'Upload failed', description:err.message, variant:'destructive' });
+      toast(publicErrorToast(err, 'upload'));
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = '';
@@ -164,7 +166,7 @@ export default function MobileProfile() {
       {/* Header */}
       <motion.div variants={fadeUp}
         style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'52px 20px 0'}}>
-        <button onClick={() => navigate(-1)} className="press"
+        <button onClick={() => goBack(navigate)} className="press"
           style={{width:40, height:40, borderRadius:14, background:'hsl(215 25% 11%)',
             border:'1px solid hsl(215 22% 18%)', display:'flex', alignItems:'center',
             justifyContent:'center', cursor:'pointer'}}>

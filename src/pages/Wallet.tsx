@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Wallet, Clock, Pickaxe, ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { Button } from '@/components/ui/button';
 import AnimatedBackground from '@/components/layout/AnimatedBackground';
 
@@ -47,7 +48,7 @@ const WalletPage = () => {
             </Button>
             
             <Button
-              onClick={() => navigate('/')}
+              onClick={() => goBack(navigate)}
               variant="outline"
               className="w-full"
             >

@@ -14,12 +14,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import { CheckCircle, Clock, ExternalLink, Gift, Target, Star, Zap, Flame, ChevronLeft, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { useCheckin } from '@/hooks/useCheckin';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import AuthDialog from '@/components/auth/AuthDialog';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import PullToRefreshIndicator from '@/components/mobile/PullToRefreshIndicator';
@@ -188,7 +190,7 @@ export default function Tasks() {
         toast({ title: 'Already Completed', description: "Points were already credited for this task" });
       }
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+      toast(publicErrorToast(err, 'claim'));
     } finally {
       setCompleting(null);
     }
@@ -214,7 +216,7 @@ export default function Tasks() {
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
         padding:'52px 20px 0'}}>
-        <button onClick={()=>navigate('/')} style={{width:40,height:40,borderRadius:14,
+        <button onClick={()=>goBack(navigate)} style={{width:40,height:40,borderRadius:14,
           background:'hsl(215 25% 11%)',border:'1px solid hsl(215 22% 18%)',
           display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',outline:'none'}}>
           <ChevronLeft size={20} color="hsl(215 25% 55%)"/>

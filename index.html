@@ -225,41 +225,64 @@
       }
       #arxon-boot-error {
         display: none;
-        max-width: 320px;
-        width: calc(100% - 48px);
+        position: absolute;
+        left: 32px;
+        right: 32px;
+        top: 50%;
+        transform: translateY(-50%);
+        box-sizing: border-box;
+        padding: 18px 18px 16px;
         text-align: center;
-        padding: 32px 28px 28px;
-        background: rgba(255, 255, 255, 0.06);
-        border-radius: 24px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 24px 64px rgba(0, 0, 0, 0.45), 0 0 48px rgba(79, 216, 235, 0.18);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
+        background: radial-gradient(120% 90% at 88% 0%, rgba(172,202,254,0.95) 0%, rgba(232,240,255,0.7) 38%, #ffffff 72%), linear-gradient(180deg, #ffffff 0%, #eef3ff 100%);
+        border-radius: 22px;
+        border: 1px solid rgba(61,109,255,0.32);
+        box-shadow: 0 8px 18px rgba(0,0,0,0.12);
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      #arxon-boot-error.is-on {
+        display: flex;
+      }
+      #arxon-boot-error-mark {
+        width: 36px;
+        height: 36px;
+        border-radius: 18px;
+        background: rgba(242,82,82,0.14);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #f25252;
+        font-size: 22px;
+        line-height: 1;
+        font-weight: 500;
       }
       #arxon-boot-error h2 {
-        margin: 0 0 10px;
-        font-size: 20px;
+        margin: 10px 0 0;
+        font-size: 17px;
         font-weight: 800;
-        color: #e8fcff;
-        letter-spacing: 0.03em;
+        color: #0c1018;
+        letter-spacing: -0.3px;
+        line-height: 1.25;
       }
       #arxon-boot-error p {
-        margin: 0 0 20px;
-        font-size: 14px;
-        line-height: 1.55;
-        color: rgba(232,252,255,0.55);
+        margin: 6px 0 0;
+        font-size: 12px;
+        line-height: 1.45;
+        font-weight: 500;
+        color: #3a4254;
       }
       #arxon-boot-retry {
         width: 100%;
-        padding: 14px 18px;
-        border-radius: 16px;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        background: linear-gradient(135deg, #4FD8EB, #7FE7C4);
-        color: #02060e;
-        font-size: 14px;
-        font-weight: 800;
+        height: 40px;
+        margin-top: 14px;
+        border-radius: 12px;
+        border: none;
+        background: #accafe;
+        color: #0c1018;
+        font-size: 15px;
+        font-weight: 700;
         cursor: pointer;
-        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 8px 32px rgba(79, 216, 235, 0.55);
       }
       @keyframes arxonBootSpin { to { transform: rotate(360deg); } }
     </style>
@@ -284,8 +307,9 @@
         <img src="/wallet-figma/wordmark.png" alt="Arxon" width="1280" height="500" style="position:absolute;left:77px;top:375.9px;width:236px;height:92.19px;max-width:none;object-fit:contain" />
       </div>
       <div id="arxon-boot-error">
+        <div id="arxon-boot-error-mark" aria-hidden="true">×</div>
         <h2>Can't load Arxon</h2>
-        <p id="arxon-boot-error-msg">The app could not start. Check your internet connection and try again.</p>
+        <p id="arxon-boot-error-msg">Check internet, then retry.</p>
         <button type="button" id="arxon-boot-retry">Retry</button>
       </div>
     </div>
@@ -318,7 +342,8 @@
           var stage = document.getElementById("arxon-boot-stage");
           if (stage) stage.style.display = "none";
           if (errMsg && message) errMsg.textContent = message;
-          errBox.style.display = "block";
+          errBox.classList.add("is-on");
+          errBox.style.display = "flex";
         }
 
         var host = location.hostname;
@@ -364,7 +389,7 @@
         }
 
         window.__ARXON_MARK_BOOT_FAILED__ = function (reason) {
-          showBootError(reason || "The app could not start. Check your connection and try again.");
+          showBootError(reason || "Check internet, then retry.");
         };
 
         if (retryBtn) {
@@ -378,7 +403,7 @@
           function (e) {
             var t = e.target;
             if (t && t.tagName === "SCRIPT") {
-              showBootError("Could not download the app. Check your network and retry.");
+              showBootError("Could not download. Check your network and retry.");
             }
           },
           true

@@ -6,6 +6,7 @@ import OtpEmailPrompt from "@/components/auth/OtpEmailPrompt";
 import { applyPendingReferralCode } from "@/lib/referral/applyPendingReferral";
 import { markPasswordRecovery } from "@/lib/auth/passwordRecoveryGate";
 import { takeStashedAuthCallbackHash } from "@/lib/auth/parseAuthAppLink";
+import { publicFacingMessage } from "@/lib/publicError";
 
 /**
  * Handles all auth callbacks from email links (confirmation, recovery, magic links).
@@ -125,7 +126,7 @@ const AuthConfirm = () => {
           if (error) {
             console.error("AuthConfirm: verifyOtp(token) error:", error);
             setStatus("error");
-            setMessage(error.message || "Failed to verify. Please try again.");
+            setMessage(publicFacingMessage(error, "Failed to verify. Please try again."));
             return;
           }
 
@@ -163,7 +164,7 @@ const AuthConfirm = () => {
           if (error) {
             console.error("AuthConfirm: setSession error:", error);
             setStatus("error");
-            setMessage(error.message || "Failed to verify. Please try again.");
+            setMessage(publicFacingMessage(error, "Failed to verify. Please try again."));
             return;
           }
 
@@ -198,7 +199,7 @@ const AuthConfirm = () => {
           if (error) {
             console.error("AuthConfirm: Code exchange error:", error);
             setStatus("error");
-            setMessage(error.message || "Failed to verify. Please try again.");
+            setMessage(publicFacingMessage(error, "Failed to verify. Please try again."));
             return;
           }
 
@@ -245,7 +246,7 @@ const AuthConfirm = () => {
           if (error) {
             console.error("AuthConfirm: verifyOtp(token_hash) error:", error);
             setStatus("error");
-            setMessage(error.message || "Failed to verify. Please try again.");
+            setMessage(publicFacingMessage(error, "Failed to verify. Please try again."));
             return;
           }
 
@@ -324,7 +325,7 @@ const AuthConfirm = () => {
 
     if (error) {
       console.error("AuthConfirm: verifyOtp(email+token) error:", error);
-      setOtpError(error.message || "Failed to verify. Please try again.");
+      setOtpError(publicFacingMessage(error, "Failed to verify. Please try again."));
       setStatus("needs_email");
       setMessage("Enter your email to verify this link.");
       return;

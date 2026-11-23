@@ -20,6 +20,8 @@ export function plainTxError(err: unknown): string {
     .replace(/\s*\(https?:\/\/[^)]+\)\s*/g, ' ')
     .trim();
   if (!cut) return 'Send failed.';
-  if (cut.length > 90) return 'Send failed. Check the amount and try again.';
+  if (cut.length > 90 || /err_|net::|rpc|exception|undefined/i.test(cut)) {
+    return 'Send failed. Check the amount and try again.';
+  }
   return cut;
 }

@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { type ReactNode } from 'react';
+import { V2Page } from '@/features/arxon-v2/design/Kit';
+import { Body, FrostPanel, GlassSheet, pc, ProfileHead } from '@/features/arxon-v2/design/ProfileChrome';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
 import LegalLinks from './LegalLinks';
 
 interface LegalPageLayoutProps {
@@ -11,34 +11,49 @@ interface LegalPageLayoutProps {
 }
 
 export default function LegalPageLayout({ title, lastUpdated, children }: LegalPageLayoutProps) {
-  const navigate = useNavigate();
-
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <div className="max-w-2xl mx-auto px-5 py-8 pb-16">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(-1)}
-          className="mb-6 -ml-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-
-        <header className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">{title}</h1>
-          <p className="text-sm text-muted-foreground mt-2">Last updated: {lastUpdated}</p>
-        </header>
-
-        <article className="prose prose-invert prose-sm max-w-none space-y-6 text-muted-foreground [&_h2]:text-foreground [&_h2]:text-lg [&_h2]:font-semibold [&_h2]:mt-8 [&_h2]:mb-3 [&_strong]:text-foreground [&_a]:text-primary [&_a]:hover:underline">
-          {children}
-        </article>
-
-        <footer className="mt-12 pt-6 border-t border-border/40 text-center text-xs text-muted-foreground">
-          See also: <LegalLinks linkClassName="text-primary hover:underline" />
-        </footer>
+    <V2Page>
+      <ProfileHead title={title} subtitle={`Updated ${lastUpdated}`} />
+      <div style={{ padding: '0 16px 20px' }}>
+        <FrostPanel>
+          <Body ink>
+            Please read this in full. It is part of using Arxon.
+          </Body>
+        </FrostPanel>
+        <GlassSheet title="Document" style={{ padding: '14px 14px 16px' }}>
+          <article
+            style={{
+              color: pc.soft,
+              fontSize: 13,
+              lineHeight: 1.55,
+              fontFamily: neon.font,
+              fontWeight: 500,
+            }}
+            className="arxon-legal"
+          >
+            {children}
+          </article>
+        </GlassSheet>
+        <p style={{ margin: '8px 2px 0', fontSize: 12, color: pc.soft, textAlign: 'center', fontFamily: neon.font }}>
+          Also see <LegalLinks linkClassName="text-[#accafe]" />
+        </p>
       </div>
-    </div>
+      <style>{`
+        .arxon-legal h2 {
+          color: #fff;
+          font-size: 15px;
+          font-weight: 700;
+          letter-spacing: -0.2px;
+          margin: 18px 0 8px;
+          line-height: 1.3;
+        }
+        .arxon-legal h2:first-child { margin-top: 0; }
+        .arxon-legal p { margin: 0 0 10px; color: #8c8f99; }
+        .arxon-legal ul { margin: 0 0 12px; padding-left: 18px; }
+        .arxon-legal li { margin: 0 0 6px; color: #8c8f99; }
+        .arxon-legal strong { color: #fff; font-weight: 650; }
+        .arxon-legal a { color: #accafe; text-decoration: none; }
+      `}</style>
+    </V2Page>
   );
 }

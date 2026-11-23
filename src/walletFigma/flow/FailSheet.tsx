@@ -4,7 +4,7 @@ import { font } from '@/walletFigma/tokens';
 const frostPanel: CSSProperties = {
   background: 'radial-gradient(120% 90% at 88% 0%, rgba(172,202,254,0.95) 0%, rgba(232,240,255,0.7) 38%, #ffffff 72%), linear-gradient(180deg, #ffffff 0%, #eef3ff 100%)',
   border: '1px solid rgba(61,109,255,0.32)',
-  borderRadius: 16,
+  borderRadius: 22,
   boxShadow: '0 8px 18px rgba(0,0,0,0.12)',
   boxSizing: 'border-box',
 };
@@ -16,6 +16,13 @@ function FrostLine({ label, value, tone }: { label: string; value: string; tone?
       <span style={{ fontSize: 13, fontWeight: 700, color: tone === 'bad' ? '#f25252' : '#0c1018', textAlign: 'right', minWidth: 0, wordBreak: 'break-all', lineHeight: 1.25 }}>{value}</span>
     </div>
   );
+}
+
+function showKicker(kicker?: string) {
+  const t = kicker?.trim();
+  if (!t) return false;
+  if (t.toLowerCase() === 'app') return false;
+  return true;
 }
 
 export function FailSheet({
@@ -31,7 +38,7 @@ export function FailSheet({
   onBack,
   extra,
 }: {
-  kicker: string;
+  kicker?: string;
   title: string;
   why: string;
   rows?: { label: string; value: string; tone?: 'bad' }[];
@@ -43,6 +50,7 @@ export function FailSheet({
   onBack?: () => void;
   extra?: ReactNode;
 }) {
+  const kickerOn = showKicker(kicker);
   return (
     <div style={{ position: 'absolute', inset: 0, background: '#050505' }}>
       {onBack ? (
@@ -52,22 +60,38 @@ export function FailSheet({
           </svg>
         </button>
       ) : null}
-      <div style={{ position: 'absolute', left: 24, right: 24, top: '50%', transform: 'translateY(-50%)', ...frostPanel, padding: '18px 16px 16px' }}>
-        <div style={{ ...mark, background: danger ? 'rgba(242,82,82,0.14)' : 'rgba(61,109,255,0.16)' }}>
-          {danger ? <FailMark /> : <InfoMark />}
-        </div>
-        <p style={kickerStyle}>{kicker}</p>
-        <p style={titleStyle}>{title}</p>
-        <p style={whyStyle}>{why}</p>
-        {rows && rows.length > 0 ? (
-          <div style={rowBox}>
-            {rows.map((row) => (
-              <FrostLine key={row.label} label={row.label} value={row.value} tone={row.tone} />
-            ))}
+      <div
+        style={{
+          position: 'absolute',
+          left: 32,
+          right: 32,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          ...frostPanel,
+          padding: '18px 18px 16px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div style={{ ...mark, background: danger ? 'rgba(242,82,82,0.14)' : 'rgba(61,109,255,0.16)' }}>
+            {danger ? <FailMark /> : <InfoMark />}
           </div>
-        ) : null}
-        {extra}
-        <div style={{ marginTop: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {kickerOn ? <p style={kickerStyle}>{kicker}</p> : null}
+          <p style={{ ...titleStyle, marginTop: kickerOn ? 6 : 10 }}>{title}</p>
+          <p style={whyStyle}>{why}</p>
+          {rows && rows.length > 0 ? (
+            <div style={rowBox}>
+              {rows.map((row) => (
+                <FrostLine key={row.label} label={row.label} value={row.value} tone={row.tone} />
+              ))}
+            </div>
+          ) : null}
+          {extra}
+        </div>
+        <div style={{ marginTop: 14, width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <button type="button" onClick={onPrimary} style={primaryBtn}>{primary}</button>
           {secondary && onSecondary ? (
             <button type="button" onClick={onSecondary} style={ghostBtn}>{secondary}</button>
@@ -112,17 +136,18 @@ const back: CSSProperties = {
 };
 
 const mark: CSSProperties = {
-  width: 40,
-  height: 40,
-  borderRadius: 20,
+  width: 36,
+  height: 36,
+  borderRadius: 18,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  margin: '0 auto 10px',
+  margin: 0,
+  flexShrink: 0,
 };
 
 const kickerStyle: CSSProperties = {
-  margin: 0,
+  margin: '14px 0 0',
   textAlign: 'center',
   fontFamily: font.sans,
   fontSize: 11,
@@ -133,41 +158,47 @@ const kickerStyle: CSSProperties = {
 };
 
 const titleStyle: CSSProperties = {
-  margin: '6px 0 0',
+  margin: 0,
   textAlign: 'center',
   fontFamily: font.sans,
-  fontSize: 20,
+  fontSize: 17,
   fontWeight: 800,
   color: '#0c1018',
-  lineHeight: 1.2,
+  lineHeight: 1.25,
+  letterSpacing: '-0.3px',
+  width: '100%',
 };
 
 const whyStyle: CSSProperties = {
-  margin: '8px 0 0',
+  margin: '6px 0 0',
   textAlign: 'center',
   fontFamily: font.sans,
-  fontSize: 13,
+  fontSize: 12,
   fontWeight: 500,
   color: '#3a4254',
-  lineHeight: 1.35,
+  lineHeight: 1.45,
+  width: '100%',
 };
 
 const rowBox: CSSProperties = {
-  marginTop: 12,
+  marginTop: 14,
+  width: '100%',
   background: 'rgba(255,255,255,0.55)',
   border: '1px solid rgba(61,109,255,0.18)',
   borderRadius: 12,
   padding: '4px 12px',
+  textAlign: 'left',
 };
 
 const primaryBtn: CSSProperties = {
-  height: 44,
+  height: 40,
+  width: '100%',
   border: 'none',
   borderRadius: 12,
   background: '#accafe',
   color: '#0c1018',
   fontFamily: font.sans,
-  fontSize: 14,
+  fontSize: 15,
   fontWeight: 700,
   cursor: 'pointer',
 };
@@ -188,12 +219,13 @@ export function Unavailable({ title, body, onBack }: { title: string; body: stri
 
 const ghostBtn: CSSProperties = {
   height: 40,
+  width: '100%',
   border: '1px solid rgba(12,16,24,0.16)',
   borderRadius: 12,
   background: 'transparent',
   color: '#0c1018',
   fontFamily: font.sans,
-  fontSize: 13,
+  fontSize: 14,
   fontWeight: 600,
   cursor: 'pointer',
 };

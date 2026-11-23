@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Settings2, LogOut, CalendarDays, Scale, Trophy,
   FileDown, Upload, History, Globe, ListChecks, Link2,
-  BarChart3, Megaphone, Coins, RotateCcw, BookOpen,
+  BarChart3, Megaphone, Coins, RotateCcw, BookOpen, Trash2,
 } from "lucide-react";
 
 export interface AdminNavItem {
@@ -30,6 +30,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
     title: "Users & Points",
     items: [
       { icon: Users, label: "Users & Miners", path: "/admin/users" },
+      { icon: Trash2, label: "Deletion requests", path: "/admin/deletions" },
       { icon: Scale, label: "Reconciliation", path: "/admin/reconciliation" },
       { icon: FileDown, label: "Export Filter", path: "/admin/export-filter" },
       { icon: Upload, label: "Import Users", path: "/admin/import-users" },
@@ -56,7 +57,7 @@ export const ADMIN_NAV_SECTIONS: AdminNavSection[] = [
   {
     title: "Resources",
     items: [
-      { icon: BookOpen, label: "Litepaper ↗", path: "/litepaper", external: true },
+      { icon: BookOpen, label: "Whitepaper", path: "/whitepaper" },
     ],
   },
 ];

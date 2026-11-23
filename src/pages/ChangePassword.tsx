@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { publicFacingMessage } from "@/lib/publicError";
 import { useAuth } from "@/contexts/AuthContext";
 import arxonLogo from "@/assets/arxon-icon.svg";
 
@@ -58,7 +59,7 @@ export default function ChangePassword() {
       setTimeout(() => navigate("/"), 2000);
     } catch (err: any) {
       console.error("ChangePassword error:", err.message);
-      setErrorMessage(err.message || "Failed to update password. Please try again.");
+      setErrorMessage(publicFacingMessage(err));
     } finally {
       setUpdating(false);
     }

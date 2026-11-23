@@ -1,4 +1,3 @@
-import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Lock, Zap, Gift } from 'lucide-react';
 import { COMMUNITY_LINKS } from '@/lib/communityLinks';
@@ -15,12 +14,10 @@ const FEATURES = [
 ];
 
 export default function WalletV2() {
-  const navigate = useNavigate();
-
   return (
     <V2Page>
       <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header eyebrow="Wallet" title="Web3 Connect" subtitle="Connect & manage your wallet" onBack={() => navigate(-1)} />
+        <V2Header eyebrow="Wallet" title="Web3 Connect" subtitle="Connect & manage your wallet" />
 
         <div style={{ padding: '0 16px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <motion.div variants={fadeUp} style={{ position: 'relative', width: 130, height: 130, margin: '16px 0 24px' }}>

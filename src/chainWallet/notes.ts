@@ -1,6 +1,7 @@
 import { formatEther, type Hex } from 'viem';
 
 import { fetchNoteLeafCount, fetchNoteLeaves, fetchNoteLeavesRange } from './chain';
+import { debugWalletLog } from './debugWalletIngest';
 import { storage } from './storage';
 
 export type StoredNote = {
@@ -24,6 +25,18 @@ async function loadJson<T>(read: () => Promise<string | null>, fallback: T): Pro
 }
 
 export async function loadNotes(): Promise<StoredNote[]> {
+  const { currentPassword, sessionStore } = await import('./session');
+  const { openSecret } = await import('./cryptoBox');
+  const pass = currentPassword();
+  const box = sessionStore.getNotesBox();
+  if (box && pass) {
+    try {
+      const parsed = JSON.parse(await openSecret(pass, box)) as StoredNote[];
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      /* fall through to plaintext */
+    }
+  }
   return loadJson(storage.getNotes, []);
 }
 
@@ -32,7 +45,33 @@ export async function loadLeaves(): Promise<Hex[]> {
 }
 
 export async function saveNotes(notes: StoredNote[]): Promise<void> {
-  await storage.setNotes(JSON.stringify(notes));
+  const { currentPassword, sessionStore } = await import('./session');
+  const { sealSecret } = await import('./cryptoBox');
+  const pass = currentPassword();
+  const payload = JSON.stringify(notes);
+  if (pass) {
+    sessionStore.setNotesBox(await sealSecret(pass, payload));
+    await storage.clearNotes();
+    // #region agent log
+    debugWalletLog('C', 'notes.ts:saveNotes', 'notes written encrypted', {
+      encrypted: true,
+      noteCount: notes.length,
+      unspent: notes.filter((n) => !n.spent).length,
+      plaintextNotesPresent: !!localStorage.getItem('arxon.notes'),
+      notesBoxPresent: !!localStorage.getItem('arxon.notesBox'),
+    }, 'post-fix');
+    // #endregion
+    return;
+  }
+  await storage.setNotes(payload);
+  // #region agent log
+  debugWalletLog('C', 'notes.ts:saveNotes', 'notes written plaintext', {
+    encrypted: false,
+    noteCount: notes.length,
+    unspent: notes.filter((n) => !n.spent).length,
+    notesWithRho: notes.filter((n) => typeof n.rho === 'string' && n.rho.length > 8).length,
+  }, 'post-fix');
+  // #endregion
 }
 
 export async function saveLeaves(leaves: Hex[]): Promise<void> {

@@ -57,6 +57,16 @@ export const VIEW_ABI = [
     inputs: [{ type: 'uint256', name: 'index' }],
     outputs: [{ type: 'bytes32' }],
   },
+  {
+    name: 'getEncryptedNote',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ type: 'uint256', name: 'index' }],
+    outputs: [
+      { type: 'bytes32', name: 'cv' },
+      { type: 'bytes', name: 'encryptedNote' },
+    ],
+  },
 ] as const;
 
 export const ARX20_VIEW_ABI = [
@@ -213,6 +223,46 @@ export async function fetchNoteLeaves(rpcUrl: string): Promise<Hex[] | null> {
   if (n == null) return null;
   if (n === 0) return [];
   return fetchNoteLeavesRange(rpcUrl, 0, n);
+}
+
+export type ChainEncryptedNote = {
+  index: number;
+  cm: Hex;
+  cv: Hex;
+  encryptedNote: Hex;
+};
+
+/** `null` = this runtime has no ciphertext getter yet. */
+export async function fetchEncryptedNotes(rpcUrl: string): Promise<ChainEncryptedNote[] | null> {
+  const n = await fetchNoteLeafCount(rpcUrl);
+  if (n == null || n === 0) return n === 0 ? [] : null;
+  const client = publicClient(rpcUrl);
+  try {
+    await client.readContract({
+      address: PRECOMPILE.view,
+      abi: VIEW_ABI,
+      functionName: 'getEncryptedNote',
+      args: [0n],
+    });
+  } catch {
+    return null;
+  }
+  const cms = await fetchNoteLeavesRange(rpcUrl, 0, n);
+  if (!cms) return null;
+  const out: ChainEncryptedNote[] = [];
+  for (let i = 0; i < n; i++) {
+    const row = await client.readContract({
+      address: PRECOMPILE.view,
+      abi: VIEW_ABI,
+      functionName: 'getEncryptedNote',
+      args: [BigInt(i)],
+    });
+    const cv = row[0];
+    const encryptedNote = row[1];
+    if (!encryptedNote || encryptedNote === '0x' || encryptedNote.length <= 2) continue;
+    out.push({ index: i, cm: cms[i], cv, encryptedNote });
+  }
+  return out;
 }
 
 export async function assertKnownAnchor(rpcUrl: string, anchor: Hex) {

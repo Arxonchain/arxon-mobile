@@ -1,5 +1,8 @@
 import { hashPassword, openSecret, sealSecret, verifyPassword, type PassRecord, type SecretBox } from './cryptoBox';
+import { debugWalletLog, storageLeakFlags } from './debugWalletIngest';
+import { loadNotes, saveNotes } from './notes';
 import { storage } from './storage';
+import { parseWalletSecret } from './walletEnvelope';
 
 const LOCK_MINUTES = [5, 10, 20, 30];
 
@@ -36,6 +39,10 @@ export const sessionStore = {
   getSkBox: () => parse<SecretBox | null>(localStorage.getItem('arxon.shieldedSkBox'), null),
   setSkBox: (box: SecretBox) => localStorage.setItem('arxon.shieldedSkBox', JSON.stringify(box)),
   clearSkBox: () => localStorage.removeItem('arxon.shieldedSkBox'),
+
+  getNotesBox: () => parse<SecretBox | null>(localStorage.getItem('arxon.notesBox'), null),
+  setNotesBox: (box: SecretBox) => localStorage.setItem('arxon.notesBox', JSON.stringify(box)),
+  clearNotesBox: () => localStorage.removeItem('arxon.notesBox'),
 
   getBackup: () => parse<SecretBox | null>(localStorage.getItem('arxon.deviceBackup'), null),
   setBackup: (box: SecretBox) => localStorage.setItem('arxon.deviceBackup', JSON.stringify(box)),
@@ -96,6 +103,12 @@ let lastActive = Date.now();
 export function rememberPassword(password: string | null) {
   sessionPassword = password;
   lastActive = Date.now();
+  // #region agent log
+  debugWalletLog('A', 'session.ts:rememberPassword', 'session password memory', {
+    hasSessionPassword: !!sessionPassword,
+    cleared: password == null,
+  });
+  // #endregion
 }
 
 export function currentPassword() {
@@ -113,12 +126,27 @@ export function autoLockDue() {
   return Date.now() - lastActive >= ms;
 }
 
+export async function walletBackupPlain(mnemonic: string) {
+  const sk = await readShieldedSk();
+  const notes = await loadNotes();
+  return JSON.stringify({
+    v: 2,
+    mnemonic,
+    ...(sk ? { sk } : {}),
+    ...(notes.length ? { notes } : {}),
+  });
+}
+
+export async function sealWalletEnvelope(password: string, mnemonic: string) {
+  sessionStore.setBox(await sealSecret(password, await walletBackupPlain(mnemonic)));
+}
+
 export async function setUnlockPassword(password: string) {
   sessionStore.setPass(await hashPassword(password));
   rememberPassword(password);
   const mnemonic = await storage.getMnemonic();
   if (mnemonic) {
-    sessionStore.setBox(await sealSecret(password, mnemonic));
+    await sealWalletEnvelope(password, mnemonic);
     await storage.clearMnemonic();
   }
   if (sessionStore.biometrics()) {
@@ -129,6 +157,12 @@ export async function setUnlockPassword(password: string) {
       /* keystore save is best-effort */
     }
   }
+  // #region agent log
+  debugWalletLog('B', 'session.ts:setUnlockPassword', 'password set storage flags', {
+    ...storageLeakFlags(),
+    hasSessionPassword: !!currentPassword(),
+  }, 'fresh-apk');
+  // #endregion
 }
 
 export async function checkUnlockPassword(password: string) {
@@ -138,18 +172,30 @@ export async function checkUnlockPassword(password: string) {
 }
 
 export async function sealMnemonic(password: string, mnemonic: string) {
-  sessionStore.setBox(await sealSecret(password, mnemonic));
+  await sealWalletEnvelope(password, mnemonic);
 }
 
 /** Encrypt with the session password when set. Never keep plaintext next to an encrypted box. */
 export async function persistWalletSecret(plain: string) {
   const pass = currentPassword();
   if (pass) {
-    await sealMnemonic(pass, plain);
+    await sealWalletEnvelope(pass, plain);
     await storage.clearMnemonic();
+    // #region agent log
+    debugWalletLog('B', 'session.ts:persistWalletSecret', 'secret persisted encrypted', {
+      encrypted: true,
+      ...storageLeakFlags(),
+    });
+    // #endregion
     return;
   }
   await storage.setMnemonic(plain);
+  // #region agent log
+  debugWalletLog('B', 'session.ts:persistWalletSecret', 'secret persisted plaintext', {
+    encrypted: false,
+    ...storageLeakFlags(),
+  });
+  // #endregion
 }
 
 export async function persistShieldedSk(sk: string) {
@@ -157,9 +203,15 @@ export async function persistShieldedSk(sk: string) {
   if (pass) {
     sessionStore.setSkBox(await sealSecret(pass, sk));
     await storage.clearShieldedSk();
+    // #region agent log
+    debugWalletLog('B', 'session.ts:persistShieldedSk', 'shielded sk persisted', { encrypted: true, ...storageLeakFlags() });
+    // #endregion
     return;
   }
   await storage.setShieldedSk(sk);
+  // #region agent log
+  debugWalletLog('B', 'session.ts:persistShieldedSk', 'shielded sk persisted', { encrypted: false, ...storageLeakFlags() });
+  // #endregion
 }
 
 export async function readShieldedSk(): Promise<string | null> {
@@ -186,11 +238,23 @@ export async function migratePlainSecrets(password: string, mnemonic?: string | 
     sessionStore.setSkBox(await sealSecret(password, sk));
     await storage.clearShieldedSk();
   }
+  const plainNotes = await storage.getNotes();
+  if (plainNotes) {
+    sessionStore.setNotesBox(await sealSecret(password, plainNotes));
+    await storage.clearNotes();
+  }
+  // #region agent log
+  debugWalletLog('C', 'session.ts:migratePlainSecrets', 'notes at rest after migrate', {
+    ...storageLeakFlags(),
+    migratedPlainNotes: !!plainNotes,
+  }, 'post-fix');
+  // #endregion
 }
 
 export async function dropPlainSecretsIfEncrypted() {
   if (sessionStore.getBox()) await storage.clearMnemonic();
   if (sessionStore.getSkBox()) await storage.clearShieldedSk();
+  if (sessionStore.getNotesBox()) await storage.clearNotes();
 }
 
 export async function unlockWithPassword(password: string): Promise<string | null> {
@@ -199,7 +263,10 @@ export async function unlockWithPassword(password: string): Promise<string | nul
   const box = sessionStore.getBox();
   if (box) {
     try {
-      return await openSecret(password, box);
+      const opened = parseWalletSecret(await openSecret(password, box));
+      if (opened.sk) await persistShieldedSk(opened.sk);
+      if (opened.notes?.length) await saveNotes(opened.notes);
+      return opened.mnemonic;
     } catch {
       return null;
     }
@@ -208,7 +275,7 @@ export async function unlockWithPassword(password: string): Promise<string | nul
 }
 
 export async function saveDeviceBackup(password: string, mnemonic: string) {
-  const box = await sealSecret(password, mnemonic);
+  const box = await sealSecret(password, await walletBackupPlain(mnemonic));
   sessionStore.setBackup(box);
   try {
     const blob = new Blob([JSON.stringify({ v: 1, kind: 'arxon-wallet-backup', box })], { type: 'application/json' });

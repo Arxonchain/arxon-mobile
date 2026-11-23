@@ -15,9 +15,8 @@ export default function PreviewBottomNav() {
 
   const activeId = (() => {
     const p = location.pathname;
-    if (p === `${base}/mining` || p.startsWith(`${base}/mining/`)) return 'mining';
+    if (p === `${base}/mining` || p.startsWith(`${base}/mining/`)) return 'home';
     if (p === `${base}/arena` || p.startsWith(`${base}/arena/`)) return 'arena';
-    if (p === `${base}/games` || p.startsWith(`${base}/games/`)) return 'games';
     if (p === `${base}/leaderboard` || p.startsWith(`${base}/leaderboard/`)) return 'leaderboard';
     if (p === `${base}/profile` || p.startsWith(`${base}/profile/`)) return 'profile';
     return 'home';

@@ -6,6 +6,7 @@ import {
   dismissVerificationPromptForToday,
   shouldShowVerificationPrompt,
 } from '@/lib/verification/dailyPrompt';
+import { readTestnetLink } from '@/lib/testnetWalletLink';
 
 export type VerificationStepId = 'email' | 'country' | 'age' | 'wallet';
 
@@ -35,6 +36,7 @@ export function useVerification() {
   const [profile, setProfile] = useState<VerificationProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [promptVisible, setPromptVisible] = useState(false);
+  const [walletLinked, setWalletLinked] = useState(false);
 
   const emailVerified = Boolean(user?.email_confirmed_at);
   const emailLocked = Boolean(profile?.email_locked_at) || (profile?.email_change_count ?? 0) >= MAX_EMAIL_CHANGES;
@@ -64,18 +66,37 @@ export function useVerification() {
     refresh();
   }, [refresh, user?.email_confirmed_at]);
 
+  useEffect(() => {
+    const sync = () => {
+      if (!user) {
+        setWalletLinked(false);
+        return;
+      }
+      setWalletLinked(!!readTestnetLink(user.id));
+    };
+    sync();
+    window.addEventListener('focus', sync);
+    window.addEventListener('storage', sync);
+    window.addEventListener('arxon-wallet-linked', sync);
+    return () => {
+      window.removeEventListener('focus', sync);
+      window.removeEventListener('storage', sync);
+      window.removeEventListener('arxon-wallet-linked', sync);
+    };
+  }, [user]);
+
   const countryDone = Boolean(profile?.country_code && profile.country_code !== 'XX');
   const ageDone = Boolean(profile?.age_confirmed_at);
-  const isComplete = emailVerified && countryDone && ageDone;
+  const isComplete = emailVerified && countryDone && ageDone && walletLinked;
 
   const steps: VerificationStep[] = useMemo(
     () => [
       { id: 'email', label: 'Email verified', done: emailVerified },
       { id: 'country', label: 'Country', done: countryDone },
       { id: 'age', label: 'Age 18+ confirmed', done: ageDone },
-      { id: 'wallet', label: 'Wallet connect', done: false, comingSoon: true },
+      { id: 'wallet', label: 'Connect wallet', done: walletLinked },
     ],
-    [emailVerified, countryDone, ageDone],
+    [emailVerified, countryDone, ageDone, walletLinked],
   );
 
   const requiredSteps = steps.filter((s) => !s.optional && !s.comingSoon);

@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 
 interface CheckinResult {
   success: boolean;
@@ -100,11 +101,7 @@ export const useCheckin = () => {
       setTodayCheckin(checkinData);
     } catch (error: any) {
       console.error('Error performing checkin:', error);
-      toast({
-        title: "Check-in Failed",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast(publicErrorToast(error, 'claim'));
     }
   };
 

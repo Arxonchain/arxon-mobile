@@ -4,7 +4,7 @@ import { NETWORKS, type WalletNetworkId } from '@/chainWallet/networks';
 export const HELP_URL = 'https://arxonchain.xyz';
 export const TERMS_URL = 'https://arxonchain.xyz/terms';
 export const PRIVACY_URL = 'https://arxonchain.xyz/privacy';
-export const SUPPORT_EMAIL = 'security@arxonchain.xyz';
+export const SUPPORT_EMAIL = 'team@arxonchain.org';
 export const WEB_VERSION = (import.meta.env.VITE_APP_VERSION as string | undefined)?.trim() || '1.0.0';
 
 export async function appVersion() {

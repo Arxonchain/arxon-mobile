@@ -6,6 +6,9 @@ import { ChevronLeft, Crown, Skull, User, X, Clock, Play, Copy } from 'lucide-re
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { useGoBack } from '@/lib/navBack';
+import { publicErrorToast } from '@/lib/publicError';
+import { ErrorCard } from '@/components/system/ErrorPopup';
 import { mobileTopPadding, mobileScrollPaddingNavHidden, mobilePageScrollRoot } from '@/lib/mobileLayout';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { toast } from '@/hooks/use-toast';
@@ -71,6 +74,7 @@ export default function DiceRumbleMatchV2() {
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+  const back = useGoBack('/arena/dice/rumble');
 
   useEffect(() => {
     if (typeof setHideNav === 'function') setHideNav(true);
@@ -90,7 +94,7 @@ export default function DiceRumbleMatchV2() {
     try {
       const { data, error: err } = await supabase.rpc('cancel_dice_rumble_lobby' as any, { p_match_id: matchId });
       if (err || !(data as any)?.success) {
-        toast({ title: 'Could not cancel', description: err?.message || (data as any)?.error, variant: 'destructive' });
+        toast(publicErrorToast(err || (data as any)?.error, 'play'));
         return;
       }
       go('/arena/dice/rumble');
@@ -145,7 +149,7 @@ export default function DiceRumbleMatchV2() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.9 }}
-            onClick={() => go('/arena/dice/rumble')}
+            onClick={back}
             style={{
               width: 36, height: 36, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
               background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -175,24 +179,7 @@ export default function DiceRumbleMatchV2() {
           )}
 
           {!loading && (error || !match) && (
-            <div style={{
-              textAlign: 'center', padding: '40px 20px', borderRadius: 18,
-              background: 'rgba(255,107,74,0.08)', border: '1px solid rgba(255,107,74,0.25)',
-            }}>
-              <X size={28} color={diceAccent.lose} style={{ marginBottom: 10 }} />
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: neon.text }}>{error ?? 'Lobby not found'}</p>
-              <button
-                type="button"
-                onClick={() => go('/arena/dice/rumble')}
-                style={{
-                  marginTop: 16, padding: '10px 20px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: `linear-gradient(135deg, ${neon.gold}, #ffb020)`, color: '#1a1400',
-                  fontFamily: neon.font, fontSize: 11, fontWeight: 800,
-                }}
-              >
-                Back to Rumble Lobby
-              </button>
-            </div>
+            <ErrorCard kind="play" actionLabel="Back to Rumble Lobby" onAction={() => go('/arena/dice/rumble')} />
           )}
 
           {!loading && match && (match.status === 'cancelled' || match.status === 'expired') && (

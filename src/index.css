@@ -44,6 +44,14 @@
     --gold:38 55% 52%;
     --danger:0 60% 56%;
     --purple:255 50% 60%;
+    --sidebar-background:225 28% 6%;
+    --sidebar-foreground:215 20% 93%;
+    --sidebar-primary:215 35% 62%;
+    --sidebar-primary-foreground:225 30% 3%;
+    --sidebar-accent:225 22% 11%;
+    --sidebar-accent-foreground:215 20% 93%;
+    --sidebar-border:225 20% 13%;
+    --sidebar-ring:215 35% 62%;
   }
 }
 

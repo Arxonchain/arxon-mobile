@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useChainWallet } from '@/chainWallet/ChainWalletContext';
 import { newMnemonic } from '@/chainWallet/keys';
 import { walletBtn, walletField, walletFont, walletGhost, walletPage } from '@/chainWallet/ui';
+import { publicFacingMessage } from '@/lib/publicError';
 
 export default function WalletOnboarding() {
   const { importWallet } = useChainWallet();
@@ -25,7 +26,7 @@ export default function WalletOnboarding() {
     try {
       await importWallet(phrase);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not save wallet');
+      setError(publicFacingMessage(e, 'Could not save wallet'));
     } finally {
       setBusy(false);
     }
@@ -37,7 +38,7 @@ export default function WalletOnboarding() {
     try {
       await importWallet(importText);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Invalid recovery phrase');
+      setError(publicFacingMessage(e, 'Invalid recovery phrase'));
     } finally {
       setBusy(false);
     }

@@ -5,21 +5,28 @@ import type { CSSProperties } from 'react';
  * home-indicator (excludes env(safe-area-inset-bottom) — that is added by
  * mobileScrollPadding()).
  *
- * Geometry (NeonBottomNav):
- *   card ≈ 58px (pad 10+10 + icon 22 + gap 3 + label 11)
- *   float gap ≈ 12px
+ * Geometry (NeonBottomNav expanding pill):
+ *   card ≈ 58px + float gap ≈ 12px, plus extra so last rows clear the pill.
  */
-export const MOBILE_NAV_OVERLAY_HEIGHT = 70;
+export const MOBILE_NAV_OVERLAY_HEIGHT = 96;
 
 /** Scroll padding so content clears the overlay nav + breathing room. */
-export const MOBILE_NAV_CLEARANCE = MOBILE_NAV_OVERLAY_HEIGHT + 16;
+export const MOBILE_NAV_CLEARANCE = MOBILE_NAV_OVERLAY_HEIGHT + 28;
 
-/** Clears preview dynamic island / native status notch (matches V2 headers). */
-export const MOBILE_TOP_CLEARANCE = 52;
+/** Clears Wallet/Mining IceToggle + status notch (mining homepage only). */
+export const MOBILE_TOP_CLEARANCE = 96;
 
-/** Safe-area aware top padding for scrollable mobile page headers. */
+/** Status notch only — inner mining pages have no Wallet/Mining toggle. */
+export const MOBILE_TOP_PAGE_CLEARANCE = 16;
+
+/** Safe-area aware top padding for the mining homepage (clears the mode toggle). */
 export function mobileTopPadding(): string {
-  return `max(${MOBILE_TOP_CLEARANCE}px, calc(env(safe-area-inset-top, 0px) + 16px))`;
+  return `max(${MOBILE_TOP_CLEARANCE}px, calc(env(safe-area-inset-top, 0px) + 64px))`;
+}
+
+/** Safe-area aware top padding for mining pages without the mode toggle. */
+export function mobileTopPaddingPage(): string {
+  return `max(${MOBILE_TOP_PAGE_CLEARANCE}px, env(safe-area-inset-top, 0px))`;
 }
 
 /** Safe-area aware bottom padding for scrollable mobile pages (clears overlay nav). */

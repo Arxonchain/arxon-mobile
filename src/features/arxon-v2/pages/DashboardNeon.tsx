@@ -1,9 +1,9 @@
 /**
  * Full neon dashboard — creamy mesh aesthetic with glass balance + staggered explore flow.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AnimatePresence, motion } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { Bell } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
@@ -11,13 +11,12 @@ import { useProfile } from '@/hooks/useProfile';
 import { useMining } from '@/hooks/useMining';
 import { useInAppNotifications } from '@/hooks/useInAppNotifications';
 import { supabase } from '@/integrations/supabase/client';
-import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { mobileTopPadding } from '@/lib/mobileLayout';
 import { formatPointsDisplay } from '@/lib/formatPoints';
 import { DashboardActivityCarousel } from '@/components/mobile/DashboardActivityCarousel';
 import MobileRewardAlerts from '@/components/mobile/MobileRewardAlerts';
 import {
-  NeonPage, NeonSectionTitle, NeonEyebrow,
+  NeonPage,
 } from '@/features/arxon-v2/design/NeonKit';
 import {
   NeonHeaderIconButton,
@@ -25,16 +24,18 @@ import {
   NeonHeaderActions,
 } from '@/features/arxon-v2/design/NeonSecondaryUI';
 import {
-  BalanceGlassCard, ExploreQuadGrid, MiningPillWidget, MiningLiveSessionCard,
-  LiveBattleStrip, RecentActivityFeed,
+  LiveBattleStrip,
+  RecentActivityFeed,
   buildWeekDaysFromAmounts, mockPreviewWeekDays, inferActivityKind, activityAccent,
   MIN_CLAIM_ARX,
-  type DayEarning, type ExploreBoxItem, type DashBattle, type ActivityFeedItem,
+  type DayEarning, type DashBattle, type ActivityFeedItem,
 } from '@/features/arxon-v2/components/DashboardWidgets';
+import { HomeHeroBalance, HomeRoundActions, MiningHistoryCard } from '@/features/arxon-v2/components/HomeHeroLayout';
+import { MineLoad } from '@/features/arxon-v2/components/MineLoad';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { toast } from '@/hooks/use-toast';
-import FourTxClaimCard from '@/features/arxon-v2/components/FourTxClaimCard';
+import { usePullRefresh } from '@/walletFigma/flow/pullRefresh';
 
 function relTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -70,8 +71,8 @@ export interface DashboardNeonProps {
 export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { points, rank } = usePoints();
-  const { profile } = useProfile();
+  const { points, rank, refreshPoints } = usePoints();
+  const { profile, refetchProfile } = useProfile();
   const mining = useMining({ tickMs: 1000 });
   const { unread: notifUnread } = useInAppNotifications();
 
@@ -97,14 +98,13 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
   const [pendingTasks, setPendingTasks] = useState(preview ? 3 : 0);
   const [dashBattles, setDashBattles] = useState<DashBattle[]>([]);
   const [weekDays, setWeekDays] = useState<DayEarning[]>(preview ? mockPreviewWeekDays() : buildWeekDaysFromAmounts([0, 0, 0, 0, 0, 0, 0]));
+  const [homeReady, setHomeReady] = useState(preview);
 
   const totalPts = preview ? 34766 : Math.round(points?.total_points ?? 0);
   const username = preview ? 'Arxon Miner' : (profile?.username || user?.email?.split('@')[0] || 'Miner');
   const streak = preview ? 12 : (points?.daily_streak ?? 0);
-  const userRank = preview ? 42 : rank;
-
-  const weekDelta = weekPts - prevWeekPts;
-  const weekDeltaPct = prevWeekPts > 0 ? (weekDelta / prevWeekPts) * 100 : weekPts > 0 ? 100 : 0;
+  void streak;
+  void rank;
 
   const go = (path: string) => {
     if (preview) navigate(toPreviewPath(path));
@@ -221,7 +221,27 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
     setDashBattles(live.slice(0, 6));
   }, []);
 
-  useEffect(() => { fetchActivityData(); fetchDashBattles(); }, [fetchActivityData, fetchDashBattles]);
+  const refreshHome = useCallback(async () => {
+    if (preview) return;
+    await Promise.all([
+      refreshPoints(),
+      refetchProfile(),
+      fetchActivityData(),
+      fetchDashBattles(),
+    ]);
+  }, [preview, refreshPoints, refetchProfile, fetchActivityData, fetchDashBattles]);
+
+  const pull = usePullRefresh(refreshHome, { threshold: 28 });
+
+  useEffect(() => {
+    let alive = true;
+    void Promise.all([fetchActivityData(), fetchDashBattles()]).then(() => {
+      if (alive) setHomeReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [fetchActivityData, fetchDashBattles]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -277,15 +297,18 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
 
   const handleMiningToggle = useCallback(async () => {
     if (preview) {
-      if (previewMining) return;
+      if (previewMining) {
+        setPreviewMining(false);
+        return;
+      }
       setPreviewMining(true);
       setPreviewEarn(0);
       setPreviewRemain(8 * 3600);
       return;
     }
     if (!user) return;
-    if (mining.isMining) return;
-    await mining.startMining();
+    if (mining.isMining) await mining.stopMining();
+    else await mining.startMining();
   }, [preview, previewMining, user, mining]);
 
   const handleClaim = useCallback(async () => {
@@ -298,6 +321,7 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
         });
         return;
       }
+      setPreviewMining(false);
       setPreviewEarn(0);
       setPreviewRemain(8 * 3600);
       toast({ title: 'Points Claimed! 🎉', description: `+${MIN_CLAIM_ARX}+ ARX-P added (preview)` });
@@ -308,91 +332,42 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
     void fetchActivityData();
   }, [preview, previewEarn, user, mining, fetchActivityData]);
 
-  const exploreItems = useMemo<ExploreBoxItem[]>(() => [
-    {
-      id: 'tasks',
-      eyebrow: 'Missions',
-      title: 'Daily Tasks',
-      cta: 'View Tasks',
-      badge: pendingTasks > 0 ? `${pendingTasks} new` : undefined,
-      variant: 'tasks',
-      onClick: () => go('/tasks'),
-    },
-    {
-      id: 'arena',
-      eyebrow: 'Battles',
-      title: 'Arena',
-      cta: 'Enter',
-      variant: 'leaderboard',
-      onClick: () => go('/arena'),
-    },
-    {
-      id: 'games',
-      eyebrow: 'Play',
-      title: 'Games',
-      cta: 'Play',
-      variant: 'referrals',
-      onClick: () => go('/games'),
-    },
-    {
-      id: 'leaderboard',
-      eyebrow: 'Rankings',
-      title: 'Leaderboard',
-      cta: 'View Ranks',
-      badge: userRank ? `#${userRank}` : undefined,
-      variant: 'leaderboard',
-      onClick: () => go('/leaderboard'),
-    },
-    {
-      id: 'referrals',
-      eyebrow: 'Community',
-      title: 'Referrals',
-      cta: 'Invite',
-      variant: 'referrals',
-      onClick: () => go('/referrals'),
-    },
-    {
-      id: 'nexus',
-      eyebrow: 'Transfer',
-      title: 'Nexus',
-      cta: 'Send ARX-P',
-      variant: 'nexus',
-      onClick: () => go('/nexus'),
-    },
-    {
-      id: 'settings',
-      eyebrow: 'Account',
-      title: 'Settings',
-      cta: 'Open',
-      variant: 'nexus',
-      onClick: () => go('/settings'),
-    },
-    {
-      id: 'mining',
-      eyebrow: 'Session',
-      title: 'Mining',
-      cta: 'Open',
-      variant: 'tasks',
-      onClick: () => go('/mining'),
-    },
-  ], [pendingTasks, userRank, go]);
-
   return (
-    <NeonPage>
+    <NeonPage pull={preview ? undefined : pull}>
       <motion.div variants={stagger} initial="hidden" animate="show">
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 6,
+            background: neon.deep,
+          }}
+        >
         <motion.div variants={fadeUp} style={{
           padding: `${mobileTopPadding()} 16px 0`,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
         }}>
-          <div style={{ minWidth: 0, flex: 1 }}>
-            <NeonEyebrow>Arxon Mining App</NeonEyebrow>
-            <p style={{
-              margin: '4px 0 0', fontSize: 22, fontWeight: 900, color: neon.text,
-              letterSpacing: '-0.4px', textShadow: `0 0 30px ${neon.cyanGlow}`,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            }}>
-              {username}
-            </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, flex: 1 }}>
+            <NeonHeaderAvatar
+              label="Profile"
+              username={username}
+              avatarUrl={profile?.avatar_url}
+              accent={neon.cyan}
+              size={40}
+              onClick={() => go('/profile')}
+            />
+            <div style={{ minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.55)', fontFamily: neon.font }}>
+                Hello,
+              </p>
+              <p style={{
+                margin: '1px 0 0', fontSize: 18, fontWeight: 650, color: neon.text,
+                letterSpacing: '-0.3px', fontFamily: neon.font,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                {username}
+              </p>
+            </div>
           </div>
           <NeonHeaderActions>
             <NeonHeaderIconButton
@@ -403,93 +378,66 @@ export default function DashboardNeon({ preview = false }: DashboardNeonProps) {
             >
               <Bell size={17} strokeWidth={2.2} />
             </NeonHeaderIconButton>
-            <NeonHeaderAvatar
-              label="Profile"
-              username={username}
-              avatarUrl={profile?.avatar_url}
-              accent={neon.teal}
-              onClick={() => go('/profile')}
-            />
           </NeonHeaderActions>
-        </motion.div>
-
-        <motion.div variants={fadeUp} style={{ padding: '16px 20px 0' }}>
-          <DashboardActivityCarousel forceShowWordForge={preview || WORD_FORGE_ENABLED} />
         </motion.div>
 
         {!preview && <MobileRewardAlerts />}
 
-        <motion.div variants={fadeUp} style={{ padding: '20px 20px 0' }}>
-          <BalanceGlassCard
-            balance={totalPts}
-            weekDelta={weekDelta}
-            weekDeltaPct={weekDeltaPct}
-            rank={userRank}
-            weekDays={weekDays}
-            todayPts={todayPts}
-            weekPts={weekPts}
-            streak={streak}
-            liveTodayBoost={preview ? (previewMining ? previewEarn % 1 : 0) : liveTodayBoost}
-            isMiningLive={isMiningLive}
-          />
+        <motion.div variants={fadeUp}>
+          <MineLoad waiting={!homeReady} extra={pull.busy} kind="copy">
+            <HomeHeroBalance balance={totalPts} />
+          </MineLoad>
         </motion.div>
 
-        <motion.div variants={fadeUp} style={{ padding: '10px 20px 0' }}>
-          <MiningPillWidget
-            isMining={isMiningLive}
-            earnedPoints={miningEarn}
-            remainingSeconds={miningRemain}
-            pointsPerHour={preview ? 11.5 : mining.pointsPerHour}
-            boostPercentage={preview ? 15 : mining.totalBoostPercentage}
-            onToggle={handleMiningToggle}
-            loading={preview ? false : mining.loading || mining.isClaiming}
-            sessionMaxed={preview ? false : mining.sessionMaxed}
-          />
-          <FourTxClaimCard preview={preview} />
-          <AnimatePresence>
-            {isMiningLive && (
-              <MiningLiveSessionCard
-                earnedPoints={miningEarn}
-                remainingSeconds={miningRemain}
-                pointsPerHour={preview ? 11.5 : mining.pointsPerHour}
-                boostPercentage={preview ? 15 : mining.totalBoostPercentage}
-                onClaim={handleClaim}
-                claiming={preview ? false : mining.isClaiming}
-                sessionMaxed={preview ? false : mining.sessionMaxed}
-              />
-            )}
-          </AnimatePresence>
+        <motion.div variants={fadeUp}>
+          <HomeRoundActions onOpen={go} taskBadge={pendingTasks} />
+        </motion.div>
+        </div>
+
+        <motion.div variants={fadeUp} style={{ margin: '0 16px' }}>
+          <MineLoad waiting={!homeReady} extra={pull.busy} frost kind="card" radius={32}>
+            <MiningHistoryCard
+              isMining={isMiningLive}
+              earnedPoints={miningEarn}
+              remainingSeconds={miningRemain}
+              pointsPerHour={preview ? 11.5 : mining.pointsPerHour}
+              boostPercentage={preview ? 15 : mining.totalBoostPercentage}
+              onMine={handleMiningToggle}
+              onClaim={handleClaim}
+              loading={preview ? false : mining.loading || mining.isClaiming}
+              claiming={preview ? false : mining.isClaiming}
+              sessionMaxed={preview ? false : mining.sessionMaxed}
+              preview={preview}
+            />
+          </MineLoad>
         </motion.div>
 
-        {/* Explore — 2×2 quad grid */}
-        <motion.div variants={fadeUp} style={{ padding: '20px 16px 0' }}>
-          <NeonSectionTitle title="Hub" />
-          <ExploreQuadGrid items={exploreItems} />
+        <motion.div variants={fadeUp} style={{ padding: '14px 20px 0' }}>
+          <MineLoad waiting={!homeReady} extra={pull.busy} kind="card" radius={20}>
+            <DashboardActivityCarousel />
+          </MineLoad>
         </motion.div>
 
-        <motion.div variants={fadeUp} style={{ padding: '22px 20px 0' }}>
-          <NeonSectionTitle
-            title="Live Battles"
-            action="All"
-            onAction={() => go('/arena/prediction-market')}
-            badge={dashBattles.length > 0 ? `${dashBattles.length} live` : undefined}
-          />
-          <LiveBattleStrip
-            battles={dashBattles}
-            onViewAll={() => go('/arena/prediction-market')}
-            onBattleClick={() => go('/arena/prediction-market')}
-          />
+        <motion.div variants={fadeUp} style={{ padding: '18px 20px 0' }}>
+          <MineLoad waiting={!homeReady} extra={pull.busy} kind="rows" rowCount={5} radius={22}>
+            <RecentActivityFeed
+              items={recentActivity}
+              isMiningLive={isMiningLive}
+              liveEarn={isMiningLive ? miningEarn : undefined}
+              onItemClick={() => go('/points-history')}
+              onEmptyAction={handleMiningToggle}
+            />
+          </MineLoad>
         </motion.div>
 
-        <motion.div variants={fadeUp} style={{ padding: '22px 20px 0' }}>
-          <NeonSectionTitle title="Recent Activity" action="History" onAction={() => go('/points-history')} />
-          <RecentActivityFeed
-            items={recentActivity}
-            isMiningLive={isMiningLive}
-            liveEarn={isMiningLive ? miningEarn : undefined}
-            onItemClick={() => go('/points-history')}
-            onEmptyAction={handleMiningToggle}
-          />
+        <motion.div variants={fadeUp} style={{ padding: '12px 20px 0' }}>
+          <MineLoad waiting={!homeReady} extra={pull.busy} kind="rows" rowCount={3} radius={22}>
+            <LiveBattleStrip
+              battles={dashBattles}
+              onViewAll={() => go('/arena/prediction-market')}
+              onBattleClick={() => go('/arena/prediction-market')}
+            />
+          </MineLoad>
         </motion.div>
 
         {preview && (

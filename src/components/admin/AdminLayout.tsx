@@ -4,19 +4,13 @@ import { useAdmin } from "@/hooks/useAdmin";
 import ErrorBoundary from "@/components/system/ErrorBoundary";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import PageSkeleton from "@/features/arxon-v2/components/PageSkeleton";
 
 const AdminLayout = () => {
   const { user, isAdmin, loading } = useAdmin();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-12 w-12 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-          <p className="text-muted-foreground text-sm">Verifying admin access...</p>
-        </div>
-      </div>
-    );
+    return <PageSkeleton delayMs={400} />;
   }
 
   if (!user) {
@@ -25,7 +19,7 @@ const AdminLayout = () => {
 
   if (!isAdmin) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-6">
+      <div className="min-h-full bg-background flex items-center justify-center p-6">
         <div className="text-center space-y-4 max-w-sm">
           <h1 className="text-2xl font-bold text-foreground">Access Denied</h1>
           <p className="text-muted-foreground text-sm">
@@ -33,7 +27,7 @@ const AdminLayout = () => {
           </p>
           <div className="flex flex-col sm:flex-row gap-2 justify-center pt-2">
             <Button asChild variant="outline">
-              <Link to="/">Back to App</Link>
+              <Link to="/mine">Back to App</Link>
             </Button>
             <Button
               variant="destructive"
@@ -51,9 +45,15 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col md:flex-row w-full">
+    <div
+      className="w-full bg-background text-foreground md:flex md:items-stretch"
+      style={{ minHeight: "100%", boxSizing: "border-box" }}
+    >
       <AdminSidebar />
-      <main className="flex-1 p-3 sm:p-4 md:p-6 overflow-auto pb-8 md:pb-6 max-w-full">
+      <main
+        className="min-w-0 flex-1 p-3 sm:p-4 md:p-6 pb-12 max-w-full"
+        style={{ overflow: "visible" }}
+      >
         <ErrorBoundary>
           <Outlet />
         </ErrorBoundary>

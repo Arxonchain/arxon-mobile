@@ -1,291 +1,274 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, X } from 'lucide-react';
-import { useAppTourOptional } from '@/contexts/AppTourContext';
+import { X } from 'lucide-react';
+import { useAppTour } from '@/contexts/AppTourContext';
+import { frostWash } from '@/walletFigma/flow/LiveScroll';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { tourTargetSelector } from '@/lib/tour/steps';
-import { v2 } from '@/features/arxon-v2/design/tokens';
-import arxonRobot from '@/assets/arxon-robot-guide.png';
+import robotGuide from '@/assets/arxon-robot-guide.png';
+
+const Z = 10060;
+const PAD = 6;
+const NAV_CLEAR = 100;
 
 type Rect = { top: number; left: number; width: number; height: number };
 
-const PAD = 10;
-const Z = 10060;
-
-function measureTarget(selector: string | null): Rect | null {
-  if (!selector) return null;
-  const el = document.querySelector(selector);
-  if (!el) return null;
+function readRect(el: Element): Rect {
   const r = el.getBoundingClientRect();
-  if (r.width < 2 || r.height < 2) return null;
-  return { top: r.top, left: r.left, width: r.width, height: r.height };
+  return {
+    top: Math.max(0, r.top - PAD),
+    left: Math.max(0, r.left - PAD),
+    width: r.width + PAD * 2,
+    height: r.height + PAD * 2,
+  };
 }
 
 export default function AppTourGuide() {
-  const tour = useAppTourOptional();
+  const { active, step, stepIndex, totalSteps, continueTour, skipTour } = useAppTour();
   const [targetRect, setTargetRect] = useState<Rect | null>(null);
 
-  const step = tour?.active ? tour.step : null;
   const selector = tourTargetSelector(step?.target);
 
   const remeasure = useCallback(() => {
-    setTargetRect(measureTarget(selector));
+    if (!selector) {
+      setTargetRect(null);
+      return;
+    }
+    const el = document.querySelector(selector);
+    setTargetRect(el ? readRect(el) : null);
   }, [selector]);
 
   useLayoutEffect(() => {
+    if (!active) return;
+    if (selector) {
+      const el = document.querySelector(selector);
+      el?.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    }
+    const t = window.setTimeout(remeasure, 280);
     remeasure();
-  }, [remeasure, step?.id, step?.target]);
+    return () => window.clearTimeout(t);
+  }, [active, step?.id, selector, remeasure]);
 
   useEffect(() => {
-    if (!tour?.active || !selector) return;
-    remeasure();
+    if (!active) return;
+    const onResize = () => remeasure();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('scroll', onResize, true);
     const id = window.setInterval(remeasure, 400);
-    window.addEventListener('resize', remeasure);
-    window.addEventListener('scroll', remeasure, true);
     return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onResize, true);
       window.clearInterval(id);
-      window.removeEventListener('resize', remeasure);
-      window.removeEventListener('scroll', remeasure, true);
     };
-  }, [tour?.active, selector, remeasure]);
+  }, [active, remeasure]);
 
-  if (!tour?.active || !step) return null;
+  if (!active || !step) return null;
 
-  const isWelcome = step.id === 'welcome';
-  const accent = step.accent;
-  const progress = tour.totalSteps > 0 ? (tour.stepIndex + 1) / tour.totalSteps : 0;
+  const last = stepIndex >= totalSteps - 1;
+  const preferTop =
+    step.card === 'top' ||
+    (step.card !== 'bottom' && targetRect && targetRect.top + targetRect.height > window.innerHeight * 0.48);
+  const cardAtTop = Boolean(preferTop);
 
-  const spotlight = targetRect && !isWelcome && (
-    <motion.div
-      key={`spot-${step.id}`}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      style={{
-        position: 'fixed',
-        top: targetRect.top - PAD,
-        left: targetRect.left - PAD,
-        width: targetRect.width + PAD * 2,
-        height: targetRect.height + PAD * 2,
-        borderRadius: 18,
-        boxShadow: '0 0 0 9999px rgba(2, 6, 14, 0.88)',
-        border: `2px solid ${accent}`,
-        pointerEvents: 'none',
-        zIndex: Z,
-        transition: 'top 0.35s ease, left 0.35s ease, width 0.35s ease, height 0.35s ease',
-      }}
-    />
-  );
+  const hole = targetRect;
 
   return (
-    <AnimatePresence>
-      <motion.div
-        key="tour-root"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        style={{ position: 'fixed', inset: 0, zIndex: Z - 1, pointerEvents: 'none' }}
-      >
-        {isWelcome && (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: Z,
+        pointerEvents: 'none',
+        fontFamily: neon.font,
+      }}
+    >
+      {hole ? (
+        <>
+          <DimPane top={0} left={0} width="100%" height={hole.top} />
+          <DimPane
+            top={hole.top}
+            left={0}
+            width={hole.left}
+            height={hole.height}
+          />
+          <DimPane
+            top={hole.top}
+            left={hole.left + hole.width}
+            width={`calc(100% - ${hole.left + hole.width}px)`}
+            height={hole.height}
+          />
+          <DimPane
+            top={hole.top + hole.height}
+            left={0}
+            width="100%"
+            height={`calc(100% - ${hole.top + hole.height}px)`}
+          />
           <div
+            aria-hidden
             style={{
-              position: 'fixed',
-              inset: 0,
-              background: 'rgba(2, 6, 14, 0.88)',
-              pointerEvents: 'auto',
-              zIndex: Z - 1,
+              position: 'absolute',
+              top: hole.top,
+              left: hole.left,
+              width: hole.width,
+              height: hole.height,
+              borderRadius: 14,
+              border: '1.5px solid rgba(172,202,254,0.85)',
+              boxShadow: '0 0 0 1px rgba(10,12,16,0.35)',
+              pointerEvents: 'none',
             }}
           />
-        )}
-
-        {spotlight}
-
-        <motion.div
-          initial={{ opacity: 0, y: 28 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ type: 'spring', stiffness: 380, damping: 32 }}
+        </>
+      ) : (
+        <div
           style={{
-            position: 'fixed',
-            left: 16,
-            right: 16,
-            bottom: 'max(96px, calc(env(safe-area-inset-bottom, 0px) + 88px))',
-            maxWidth: 440,
-            margin: '0 auto',
+            position: 'absolute',
+            inset: 0,
+            background: 'rgba(6,8,12,0.62)',
             pointerEvents: 'auto',
-            zIndex: Z + 1,
+          }}
+        />
+      )}
+
+      <div
+        role="dialog"
+        aria-labelledby="arxon-tour-title"
+        style={{
+          position: 'absolute',
+          left: 16,
+          right: 16,
+          ...(cardAtTop
+            ? { top: 'max(12px, env(safe-area-inset-top, 0px))' }
+            : { bottom: NAV_CLEAR }),
+          display: 'flex',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+        }}
+      >
+        <div
+          style={{
+            width: '100%',
+            maxWidth: 300,
+            pointerEvents: 'auto',
+            borderRadius: 18,
+            ...frostWash,
+            border: '1px solid rgba(61,109,255,0.28)',
+            boxShadow: '0 10px 28px rgba(0,0,0,0.28)',
+            padding: '12px 12px 12px',
           }}
         >
-          <div
-            style={{
-              borderRadius: 24,
-              overflow: 'hidden',
-              background: 'linear-gradient(165deg, rgba(14,30,52,0.97) 0%, rgba(6,12,24,0.98) 100%)',
-              border: `1px solid ${accent}44`,
-              boxShadow: `0 24px 60px rgba(0,0,0,0.55), 0 0 40px ${accent}18`,
-            }}
-          >
-            <div style={{ display: 'flex', gap: 14, padding: '16px 16px 14px', alignItems: 'flex-end' }}>
-              <div
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+            <img
+              src={robotGuide}
+              alt=""
+              width={40}
+              height={40}
+              style={{ width: 40, height: 40, objectFit: 'contain', flexShrink: 0 }}
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <p
+                id="arxon-tour-title"
                 style={{
-                  flexShrink: 0,
-                  width: 88,
-                  height: 88,
-                  borderRadius: 20,
-                  overflow: 'hidden',
-                  background: `linear-gradient(145deg, ${accent}22, rgba(255,255,255,0.04))`,
-                  border: `1px solid ${accent}33`,
-                  boxShadow: `0 8px 24px ${accent}22`,
+                  margin: 0,
+                  fontSize: 14,
+                  fontWeight: 750,
+                  color: '#0c1018',
+                  letterSpacing: '-0.2px',
+                  lineHeight: 1.25,
                 }}
               >
-                <img
-                  src={arxonRobot}
-                  alt="Arxon robot guide"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    display: 'block',
-                    transform: 'scaleX(-1)',
-                  }}
-                />
-              </div>
-
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 10,
-                      fontWeight: 800,
-                      letterSpacing: '0.14em',
-                      textTransform: 'uppercase',
-                      color: accent,
-                    }}
-                  >
-                    Arxon Guide · {tour.stepIndex + 1}/{tour.totalSteps}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={tour.skipTour}
-                    aria-label="Skip tour"
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: v2.brand.mutedSoft,
-                      cursor: 'pointer',
-                      padding: 4,
-                      display: 'flex',
-                    }}
-                  >
-                    <X size={16} />
-                  </button>
-                </div>
-                <h3
-                  style={{
-                    margin: '6px 0 0',
-                    fontSize: 18,
-                    fontWeight: 900,
-                    color: v2.brand.steelBright,
-                    letterSpacing: '-0.3px',
-                    lineHeight: 1.2,
-                  }}
-                >
-                  {step.title}
-                </h3>
-                <p style={{ margin: '8px 0 0', fontSize: 13, lineHeight: 1.45, color: v2.brand.mutedSoft }}>
-                  {step.message}
-                </p>
-              </div>
+                {step.title}
+              </p>
+              <p
+                style={{
+                  margin: '4px 0 0',
+                  fontSize: 12,
+                  lineHeight: 1.4,
+                  color: '#5c6370',
+                }}
+              >
+                {step.message}
+              </p>
             </div>
-
-            <div style={{ height: 3, background: 'rgba(255,255,255,0.06)' }}>
-              <motion.div
-                initial={false}
-                animate={{ width: `${progress * 100}%` }}
-                style={{ height: '100%', background: `linear-gradient(90deg, ${accent}, ${v2.accent.cyan})` }}
-              />
-            </div>
-
-            <div
+            <button
+              type="button"
+              onClick={skipTour}
+              aria-label="Skip guide"
               style={{
+                width: 28,
+                height: 28,
+                borderRadius: 10,
+                border: '1px solid rgba(12,16,24,0.12)',
+                background: 'rgba(12,16,24,0.04)',
+                color: '#5c6370',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'space-between',
-                gap: 10,
-                padding: '12px 16px 16px',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                flexShrink: 0,
               }}
             >
-              <button
-                type="button"
-                onClick={tour.skipTour}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: v2.brand.mutedSoft,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  padding: '8px 4px',
-                }}
-              >
-                Skip tour
-              </button>
-
-              {isWelcome ? (
-                <button
-                  type="button"
-                  onClick={tour.nextStep}
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '12px 20px',
-                    borderRadius: 99,
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: 14,
-                    fontWeight: 800,
-                    color: '#041018',
-                    background: `linear-gradient(135deg, ${v2.accent.cyan}, ${accent})`,
-                    boxShadow: `0 8px 24px ${accent}44`,
-                  }}
-                >
-                  Start
-                  <ChevronRight size={16} />
-                </button>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-                  {!tour.isReplay && (
-                    <p style={{ margin: 0, fontSize: 11, fontWeight: 700, color: accent, textAlign: 'right' }}>
-                      {step.id === 'verify' && 'Complete verification above ↑'}
-                      {step.id === 'tasks' && 'Check in or claim a task above ↑'}
-                      {step.id === 'mining' && 'Tap the mining orb ↑'}
-                    </p>
-                  )}
-                  <button
-                    type="button"
-                    onClick={tour.nextStep}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '10px 16px',
-                      borderRadius: 99,
-                      border: `1px solid ${accent}55`,
-                      cursor: 'pointer',
-                      fontSize: 12,
-                      fontWeight: 800,
-                      color: accent,
-                      background: `${accent}14`,
-                    }}
-                  >
-                    {step.id === 'mining' ? 'Finish' : 'Continue'}
-                    <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+              <X size={13} strokeWidth={2.2} />
+            </button>
           </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+
+          <div
+            style={{
+              marginTop: 10,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 8,
+            }}
+          >
+            <span style={{ fontSize: 11, fontWeight: 650, color: '#8c8f99' }}>
+              {stepIndex + 1} / {totalSteps}
+            </span>
+            <button
+              type="button"
+              onClick={continueTour}
+              style={{
+                height: 32,
+                padding: '0 14px',
+                borderRadius: 11,
+                border: 'none',
+                background: '#0c1018',
+                color: '#fff',
+                fontSize: 12,
+                fontWeight: 700,
+                fontFamily: neon.font,
+                cursor: 'pointer',
+              }}
+            >
+              {last ? 'Finish' : step.id === 'welcome' ? 'Start' : 'Next'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DimPane({
+  top,
+  left,
+  width,
+  height,
+}: {
+  top: number;
+  left: number;
+  width: number | string;
+  height: number | string;
+}) {
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top,
+        left,
+        width,
+        height,
+        background: 'rgba(6,8,12,0.58)',
+        pointerEvents: 'auto',
+      }}
+    />
   );
 }

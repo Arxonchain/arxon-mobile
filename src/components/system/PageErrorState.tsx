@@ -1,14 +1,19 @@
-import { RefreshCw, type LucideIcon } from 'lucide-react';
-import {
-  errorUi,
-  glassBadgeStyle,
-  glassPanelStyle,
-  glassSecondaryButtonStyle,
-} from './errorUiTokens';
+import { type LucideIcon } from 'lucide-react';
+import { ErrorCard } from './ErrorPopup';
 import {
   getFailureCopy,
   type FailureType,
 } from './failureCatalog';
+import type { PublicErrorKind } from '@/lib/publicError';
+
+const KIND_BY_FAILURE: Partial<Record<FailureType, PublicErrorKind>> = {
+  ota_load_failed: 'network',
+  offline: 'network',
+  backend_down: 'unknown',
+  session_expired: 'session',
+  timeout: 'timeout',
+  unknown: 'unknown',
+};
 
 interface Props {
   failureType?: FailureType;
@@ -18,106 +23,42 @@ interface Props {
   onRetry?: () => void;
   retryLabel?: string;
   compact?: boolean;
+  onClose?: () => void;
 }
 
-/** Inline page-level glass error card with retry — for route/query failures inside the app shell. */
+/** Inline white frost error card — same compact sheet as in-app error popups. */
 export default function PageErrorState({
   failureType = 'unknown',
-  icon,
   title,
   message,
   onRetry,
   retryLabel,
-  compact = false,
+  onClose,
 }: Props) {
   const preset = getFailureCopy(failureType);
-  const Icon = icon ?? preset.icon;
   const heading = title ?? preset.title;
   const body = message ?? preset.message;
   const label = retryLabel ?? preset.primaryLabel;
-
-  const badgeSize = compact ? 44 : 52;
-  const iconSize = compact ? 20 : 24;
+  const kind = KIND_BY_FAILURE[failureType] ?? 'unknown';
 
   return (
     <div
       role="alert"
       style={{
         display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
         justifyContent: 'center',
-        padding: compact ? '24px 16px' : '32px 20px',
-        minHeight: compact ? undefined : 'min(420px, 50vh)',
-        fontFamily: errorUi.font,
+        alignItems: 'center',
+        padding: '16px 12px',
       }}
     >
-      <div
-        style={{
-          ...glassPanelStyle({ compact, inline: true }),
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          textAlign: 'center',
-          padding: compact ? '28px 24px' : '36px 28px',
-          maxWidth: 360,
-          width: '100%',
-        }}
-      >
-        <div
-          style={{
-            ...glassBadgeStyle(errorUi.danger, errorUi.dangerGlow),
-            width: badgeSize,
-            height: badgeSize,
-            borderRadius: '50%',
-            marginBottom: 16,
-          }}
-        >
-          <Icon size={iconSize} color={errorUi.danger} />
-        </div>
-
-        <h2
-          style={{
-            margin: '0 0 8px',
-            fontSize: compact ? 16 : 18,
-            fontWeight: 800,
-            color: errorUi.text,
-            letterSpacing: '0.03em',
-          }}
-        >
-          {heading}
-        </h2>
-        <p
-          style={{
-            margin: '0 0 20px',
-            maxWidth: 320,
-            fontSize: compact ? 13 : 14,
-            lineHeight: 1.55,
-            color: errorUi.textMuted,
-          }}
-        >
-          {body}
-        </p>
-
-        {onRetry ? (
-          <button
-            type="button"
-            onClick={onRetry}
-            style={{
-              ...glassSecondaryButtonStyle(),
-              width: 'auto',
-              display: 'inline-flex',
-              padding: '12px 20px',
-              color: errorUi.cyan,
-              border: `1px solid ${errorUi.glass.panelBorderBright}`,
-              boxShadow: `${errorUi.glass.innerHighlight}, 0 4px 20px ${errorUi.cyan}22`,
-            }}
-          >
-            <RefreshCw size={14} />
-            {label}
-          </button>
-        ) : null}
-      </div>
+      <ErrorCard
+        kind={kind}
+        title={heading}
+        hint={body}
+        actionLabel={onRetry ? label : undefined}
+        onAction={onRetry}
+        onClose={onClose}
+      />
     </div>
   );
 }

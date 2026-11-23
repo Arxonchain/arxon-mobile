@@ -1,7 +1,7 @@
-import { type ReactNode } from 'react';
+import { type ReactNode, type TouchEvent } from 'react';
 import { motion } from 'framer-motion';
-import v2FlowBg from '@/assets/v2-flow-bg.jpg';
-import { neon, neonShadow } from './neonTokens';
+import { neon, sheetCard } from './neonTokens';
+
 import { useIsAppPreview } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import {
@@ -9,15 +9,28 @@ import {
   mobileScrollPadding,
   mobileScrollPaddingNavHidden,
 } from '@/lib/mobileLayout';
+import { PullHint } from '@/walletFigma/flow/LiveScroll';
+import { SkelCss } from '@/walletFigma/flow/ScreenSkeleton';
+
+export type PagePull = {
+  pull: number;
+  busy: boolean;
+  onTouchStart: (e: TouchEvent<HTMLElement>) => void;
+  onTouchMove: (e: TouchEvent<HTMLElement>) => void;
+  onTouchEnd: () => void;
+};
 
 /** Shared V2 page shell — flowing cyan lines on deep black */
 export function NeonPage({
   children,
   padBottom,
+  pull,
 }: {
   children: ReactNode;
   /** Override bottom scroll inset. Omit for auto nav clearance; pass 0 to disable. */
   padBottom?: number | string;
+  /** Wallet-style pull-to-refresh. Attach usePullRefresh() from the page. */
+  pull?: PagePull;
 }) {
   const contained = useIsAppPreview();
   const { hideNav } = useMobileNav();
@@ -28,36 +41,24 @@ export function NeonPage({
   })();
 
   return (
-    <div style={{
-      ...mobilePageScrollRoot(contained),
-      paddingBottom: resolvedPadBottom,
-      fontFamily: neon.font,
-      background: neon.deep,
-      boxSizing: 'border-box',
-    }}>
-      <div style={{
-        position: contained ? 'absolute' : 'fixed',
-        inset: 0,
-        zIndex: 0,
-        pointerEvents: 'none',
-      }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: `url(${v2FlowBg})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat',
-          backgroundAttachment: contained ? 'scroll' : 'fixed',
-          opacity: 0.92,
-        }} />
-        <div style={{
-          position: 'absolute', inset: 0,
-          background: `
-            radial-gradient(ellipse 90% 55% at 50% -8%, rgba(79,216,235,0.12), transparent 55%),
-            linear-gradient(180deg, rgba(2,6,14,0.15) 0%, rgba(2,6,14,0.55) 55%, rgba(2,6,14,0.88) 100%)
-          `,
-        }} />
-      </div>
+    <div
+      style={{
+        ...mobilePageScrollRoot(contained),
+        paddingBottom: resolvedPadBottom,
+        fontFamily: neon.font,
+        background: neon.deep,
+        boxSizing: 'border-box',
+      }}
+      onTouchStart={pull?.onTouchStart}
+      onTouchMove={pull?.onTouchMove}
+      onTouchEnd={pull?.onTouchEnd}
+    >
+      <SkelCss />
+      {pull ? (
+        <div style={{ position: 'sticky', top: 0, zIndex: 30 }}>
+          <PullHint pull={pull.pull} busy={pull.busy} />
+        </div>
+      ) : null}
       <div style={{ position: 'relative', zIndex: 1 }}>{children}</div>
     </div>
   );
@@ -66,30 +67,27 @@ export function NeonPage({
 export function NeonEyebrow({ children, color = neon.cyan }: { children: ReactNode; color?: string }) {
   return (
     <p style={{
-      margin: 0, fontSize: 9, fontWeight: 800, letterSpacing: '0.22em', textTransform: 'uppercase',
-      color, textShadow: `0 0 12px ${color}88`,
+      margin: 0, fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+      color,
     }}>{children}</p>
   );
 }
 
-export function NeonPanel({ children, glow = neon.cyan, onClick, style }: { children: ReactNode; glow?: string; onClick?: () => void; style?: React.CSSProperties }) {
+export function NeonPanel({ children, glow: _glow = neon.cyan, onClick, style }: { children: ReactNode; glow?: string; onClick?: () => void; style?: React.CSSProperties }) {
   return (
     <motion.div
       whileTap={onClick ? { scale: 0.98 } : undefined}
       onClick={onClick}
       style={{
         borderRadius: neon.radius.lg,
-        padding: '20px 18px',
-        background: neon.panel,
-        border: `2px solid ${glow}44`,
-        boxShadow: `0 6px 0 rgba(3,14,28,0.9), inset 0 1px 0 rgba(255,255,255,0.1), inset 0 0 40px ${glow}08, ${neonShadow(glow, 16)}`,
+        padding: '16px 14px',
+        ...sheetCard,
         cursor: onClick ? 'pointer' : 'default',
         position: 'relative',
         overflow: 'hidden',
         ...style,
       }}
     >
-      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: `linear-gradient(90deg, transparent, ${glow}55, transparent)` }} />
       {children}
     </motion.div>
   );
@@ -104,7 +102,7 @@ export function NeonChip({ label, value, accent = neon.cyan }: { label: string; 
       boxShadow: `inset 0 0 20px ${accent}08`,
     }}>
       <p style={{ margin: 0, fontSize: 7, fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: neon.textMuted }}>{label}</p>
-      <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 900, color: accent, textShadow: `0 0 10px ${accent}66` }}>{value}</p>
+      <p style={{ margin: '4px 0 0', fontSize: 14, fontWeight: 700, color: accent }}>{value}</p>
     </div>
   );
 }
@@ -122,8 +120,8 @@ export function NeonActionTile({
       onClick={onClick}
       style={{
         minWidth: 200, flexShrink: 0, borderRadius: neon.radius.md, overflow: 'hidden', cursor: 'pointer',
-        border: `1px solid ${accent}44`, boxShadow: neonShadow(accent, 14), padding: 0, textAlign: 'left',
-        background: neon.deep, position: 'relative',
+        ...sheetCard, padding: 0, textAlign: 'left',
+        position: 'relative',
       }}
     >
       {image && (
@@ -148,7 +146,7 @@ export function NeonSectionTitle({ title, action, onAction, badge }: { title: st
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <p style={{ margin: 0, fontSize: 13, fontWeight: 900, letterSpacing: '0.14em', textTransform: 'uppercase', color: neon.text, textShadow: `0 0 20px ${neon.cyanGlow}` }}>{title}</p>
+        <p style={{ margin: 0, fontSize: 13, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: neon.text }}>{title}</p>
         {badge && (
           <span style={{
             fontSize: 8, fontWeight: 800, padding: '2px 8px', borderRadius: 8,
@@ -168,15 +166,15 @@ export function NeonSectionTitle({ title, action, onAction, badge }: { title: st
 export function NeonActivityRow({ title, sub, value, accent = neon.teal }: { title: string; sub: string; value: string; accent?: string }) {
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', marginBottom: 10, borderRadius: neon.radius.md,
-      background: 'rgba(9,26,48,0.75)', border: `1px solid ${accent}33`, boxShadow: `inset 0 0 24px ${accent}06`,
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', marginBottom: 8, borderRadius: neon.radius.md,
+      ...sheetCard,
     }}>
       <div style={{ width: 40, height: 40, borderRadius: 12, background: `${accent}18`, border: `1px solid ${accent}44`, boxShadow: `0 0 16px ${accent}22` }} />
       <div style={{ flex: 1 }}>
         <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: neon.text }}>{title}</p>
         <p style={{ margin: '2px 0 0', fontSize: 10, color: neon.textMuted }}>{sub}</p>
       </div>
-      <p style={{ margin: 0, fontSize: 14, fontWeight: 900, color: accent, textShadow: `0 0 8px ${accent}66` }}>{value}</p>
+      <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: accent }}>{value}</p>
     </div>
   );
 }

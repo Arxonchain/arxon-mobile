@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useAdmin } from "@/hooks/useAdmin";
 import { ADMIN_NAV_SECTIONS, getAdminPageTitle } from "@/lib/adminNav";
+import { goBack } from "@/lib/navBack";
 import { AdminMobileHeader } from "./AdminMobileMenu";
 
 const SidebarContent = ({
@@ -100,7 +101,7 @@ const SidebarContent = ({
 
       <div className="px-3 space-y-1 mt-auto border-t border-border/50 pt-4">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => goBack(navigate)}
           className={cn(
             "flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-colors mb-1",
             "text-muted-foreground hover:text-primary hover:bg-primary/10",

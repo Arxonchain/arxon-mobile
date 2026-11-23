@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Gift, Trophy, ChevronLeft, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { useInAppNotifications, type AppNotification } from '@/hooks/useInAppNotifications';
 
 const CSS = `@keyframes spin{to{transform:rotate(360deg)}}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}`;
@@ -91,7 +92,7 @@ export default function Notifications() {
       <style>{CSS}</style>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'52px 20px 0',marginBottom:20}}>
         <div style={{display:'flex',alignItems:'center',gap:12}}>
-          <button onClick={()=>navigate(-1)} style={{width:40,height:40,borderRadius:14,
+          <button onClick={()=>goBack(navigate)} style={{width:40,height:40,borderRadius:14,
             background:'hsl(215 25% 11%)',border:'1px solid hsl(215 22% 18%)',
             display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',outline:'none'}}>
             <ChevronLeft size={20} color="hsl(215 25% 55%)"/>

@@ -1,5 +1,6 @@
  import { Copy, ArrowLeft, Play, Square, Clock, Zap, RefreshCw } from "lucide-react";
  import { useNavigate } from "react-router-dom";
+ import { goBack } from "@/lib/navBack";
  import { motion } from "framer-motion";
  import { toast } from "@/hooks/use-toast";
  import { useMining } from "@/hooks/useMining";
@@ -177,7 +178,7 @@
  
        {/* Back Button */}
        <motion.button 
-         onClick={() => navigate('/')}
+         onClick={() => goBack(navigate)}
          className="absolute top-4 left-4 md:top-6 md:left-6 flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors z-20"
          whileHover={{ x: -3 }}
          whileTap={{ scale: 0.95 }}

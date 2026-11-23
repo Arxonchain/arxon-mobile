@@ -7,15 +7,16 @@ class FlowGuard extends Component<{ children: ReactNode }, { error: string | nul
   state = { error: null as string | null };
 
   static getDerivedStateFromError(error: Error) {
-    return { error: error.message || 'This screen failed to draw.' };
+    console.error(error);
+    return { error: 'Something went wrong. Close and reopen.' };
   }
 
   render() {
     if (this.state.error) {
       return (
-        <pre style={{ margin: 0, padding: 24, color: '#fff', background: '#07080c', whiteSpace: 'pre-wrap' }}>
+        <p style={{ margin: 0, padding: 24, color: '#fff', background: '#07080c', fontFamily: 'system-ui, sans-serif', fontSize: 14 }}>
           {this.state.error}
-        </pre>
+        </p>
       );
     }
     return this.props.children;

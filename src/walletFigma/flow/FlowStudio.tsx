@@ -196,6 +196,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
   const stageRef = useRef<HTMLDivElement>(null);
   const jumpRef = useRef<string | null>(null);
   const backRef = useRef<() => void>(() => {});
+  const goRef = useRef<(next: string, remember?: boolean) => void>(() => {});
   const netSynced = useRef(false);
   const [fit, setFit] = useState(1);
 
@@ -297,6 +298,23 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     if (!app) return;
     setShowToggle(!isOnboardingScreen(id) && !live?.locked && showsModeToggle(id));
   }, [app, id, live?.locked, setShowToggle]);
+
+  useEffect(() => {
+    if (!app) return;
+    const ready = Boolean(live?.ready && !live.locked && !isOnboardingScreen(id) && !isWelcomeScreen(id));
+    window.dispatchEvent(new Event(ready ? 'arxon-wallet-ready' : 'arxon-wallet-busy'));
+  }, [app, id, live?.locked, live?.ready]);
+
+  useEffect(() => {
+    if (!app) return;
+    const onGo = (e: Event) => {
+      const dest = (e as CustomEvent<{ dest?: string }>).detail?.dest;
+      if (!dest) return;
+      goRef.current(dest, false);
+    };
+    window.addEventListener('arxon-tour-wallet-go', onGo);
+    return () => window.removeEventListener('arxon-tour-wallet-go', onGo);
+  }, [app]);
 
   useEffect(() => {
     if (!app || !live?.app || !live.ready) return;
@@ -521,6 +539,7 @@ export default function FlowStudio({ app = false }: { app?: boolean }) {
     }
   }
   backRef.current = back;
+  goRef.current = go;
 
   useEffect(() => {
     if (!app || !Capacitor.isNativePlatform()) return;

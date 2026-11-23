@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { motion } from 'framer-motion';
 import { ChevronLeft, Trophy, Zap, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -60,7 +61,7 @@ export default function PublicProfile() {
 
       {/* Header */}
       <div style={{display:'flex', alignItems:'center', padding:'52px 20px 0', gap:12}}>
-        <button onClick={() => navigate(-1)}
+        <button onClick={() => goBack(navigate)}
           style={{width:40,height:40,borderRadius:14,background:'hsl(215 25% 11%)',
             border:'1px solid hsl(215 22% 18%)',display:'flex',alignItems:'center',
             justifyContent:'center',cursor:'pointer',outline:'none',flexShrink:0}}>

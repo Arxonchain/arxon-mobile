@@ -2,7 +2,7 @@ import { motion, type HTMLMotionProps } from 'framer-motion';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { type CSSProperties, type ReactNode } from 'react';
 import { v2 } from './tokens';
-import { NeonPage } from './NeonKit';
+import { NeonPage, type PagePull } from './NeonKit';
 import { neon } from './neonTokens';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { mobileScrollPadding, mobileScrollPaddingNavHidden } from '@/lib/mobileLayout';
@@ -49,11 +49,13 @@ export function V2Page({
   children,
   padBottom,
   style,
+  pull,
 }: {
   children: ReactNode;
   /** Omit for auto bottom nav clearance; pass 0 to disable. */
   padBottom?: number | string;
   style?: CSSProperties;
+  pull?: PagePull;
 }) {
   const { hideNav } = useMobileNav();
   const bottomInset = (() => {
@@ -62,15 +64,15 @@ export function V2Page({
   })();
 
   return (
-    <NeonPage padBottom={0}>
+    <NeonPage padBottom={0} pull={pull}>
       <div
         style={{
           fontFamily: neon.font,
-          paddingBottom: bottomInset,
           boxSizing: 'border-box',
           // NeonPage owns the scrollport; keep pan-y so nested tappables don't steal swipes.
           touchAction: 'pan-y',
           ...style,
+          paddingBottom: style?.paddingBottom ?? bottomInset,
         }}
       >
         {children}
@@ -217,7 +219,7 @@ export function V2Button({
   const fs = size === 'sm' ? 13 : size === 'lg' ? 15 : 14;
   return (
     <motion.button type="button" whileTap={disabled ? undefined : { scale: 0.97 }} onClick={disabled ? undefined : onClick} disabled={disabled}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: pad, borderRadius: v2.radius.sm, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, background: `linear-gradient(135deg, ${accent}, hsl(38 80% 45%))`, color: v2.brand.deep, fontSize: fs, fontWeight: 800, fontFamily: v2.font, boxShadow: `0 6px 20px ${accent}44`, width: fullWidth ? '100%' : undefined, ...style }} {...rest}>
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: pad, borderRadius: 12, border: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.45 : 1, background: accent === v2.accent.gold ? '#accafe' : accent, color: '#0c1018', fontSize: fs, fontWeight: 700, fontFamily: neon.font, width: fullWidth ? '100%' : undefined, ...style }} {...rest}>
       {children}
       {!disabled && <ChevronRight size={size === 'sm' ? 16 : 18} strokeWidth={3} />}
     </motion.button>
@@ -227,7 +229,7 @@ export function V2Button({
 export function V2ButtonGhost({ children, onClick, accent = v2.brand.steel, fullWidth }: { children: ReactNode; onClick?: () => void; accent?: string; fullWidth?: boolean }) {
   return (
     <motion.button type="button" whileTap={{ scale: 0.97 }} onClick={onClick}
-      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', borderRadius: v2.radius.sm, border: `1px solid ${accent}44`, background: `${accent}12`, color: accent, fontSize: 13, fontWeight: 700, fontFamily: v2.font, cursor: 'pointer', width: fullWidth ? '100%' : undefined }}>
+      style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 20px', borderRadius: 12, border: '1px solid rgba(255,255,255,0.14)', background: 'transparent', color: '#ffffff', fontSize: 13, fontWeight: 600, fontFamily: neon.font, cursor: 'pointer', width: fullWidth ? '100%' : undefined }}>
       {children}
     </motion.button>
   );

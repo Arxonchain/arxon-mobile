@@ -1,6 +1,7 @@
 import * as React from "react";
 
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
+import { sanitizeToastCopy, type PublicErrorKind } from "@/lib/publicError";
 
 const TOAST_LIMIT = 1;
 const TOAST_REMOVE_DELAY = 1000000;
@@ -10,6 +11,7 @@ type ToasterToast = ToastProps & {
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
+  errorKind?: PublicErrorKind;
 };
 
 const actionTypes = {
@@ -136,6 +138,12 @@ type Toast = Omit<ToasterToast, "id">;
 
 function toast({ ...props }: Toast) {
   const id = genId();
+  const safe = sanitizeToastCopy({
+    title: props.title,
+    description: props.description,
+    variant: props.variant,
+    errorKind: props.errorKind,
+  });
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -148,6 +156,9 @@ function toast({ ...props }: Toast) {
     type: "ADD_TOAST",
     toast: {
       ...props,
+      title: safe.title ?? props.title,
+      description: safe.description ?? props.description,
+      errorKind: safe.errorKind ?? props.errorKind,
       id,
       open: true,
       onOpenChange: (open) => {

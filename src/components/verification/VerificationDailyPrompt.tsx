@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ShieldCheck, X, Mail, Globe, Sparkles } from 'lucide-react';
+import { ShieldCheck, X, Mail, Globe, Sparkles, Wallet, CheckCircle2 } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVerification } from '@/hooks/useVerification';
@@ -30,7 +30,7 @@ export default function VerificationDailyPrompt() {
     !isAppTourBlockingOverlays(),
   );
 
-  const remaining = steps.filter((s) => !s.done && !s.comingSoon && !s.optional);
+  const listed = steps.filter((s) => !s.comingSoon).slice(0, 4);
 
   const goVerify = () => {
     dismissDailyPrompt();
@@ -129,17 +129,18 @@ export default function VerificationDailyPrompt() {
               </p>
 
               <ul style={{ listStyle: 'none', margin: '0 0 20px', padding: 0 }}>
-                {remaining.slice(0, 3).map((s, i) => (
+                {listed.map((s, i) => (
                   <li key={s.id} style={{
                     display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8,
-                    fontSize: 13, color: v2.brand.steelLight,
+                    fontSize: 13, color: s.done ? v2.brand.muted : v2.brand.steelLight,
                   }}>
                     <span style={{
                       width: 22, height: 22, borderRadius: 8, flexShrink: 0,
-                      background: `${v2.accent.mining}18`, border: `1px solid ${v2.accent.mining}44`,
+                      background: s.done ? 'rgba(61,220,132,0.16)' : `${v2.accent.mining}18`,
+                      border: `1px solid ${s.done ? 'rgba(61,220,132,0.4)' : `${v2.accent.mining}44`}`,
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 11, fontWeight: 800, color: v2.accent.mining,
-                    }}>{i + 1}</span>
+                      fontSize: 11, fontWeight: 800, color: s.done ? 'rgb(61,220,132)' : v2.accent.mining,
+                    }}>{s.done ? <CheckCircle2 size={12} /> : i + 1}</span>
                     {s.label}
                   </li>
                 ))}
@@ -152,6 +153,8 @@ export default function VerificationDailyPrompt() {
               }}>
                 <Mail size={16} color={v2.brand.steel} />
                 <Globe size={16} color={v2.brand.steel} />
+                <ShieldCheck size={16} color={v2.brand.steel} />
+                <Wallet size={16} color={v2.brand.steel} />
                 <span style={{ fontSize: 11, color: v2.brand.muted, marginLeft: 4 }}>
                   {completedCount}/{requiredCount} required steps done
                 </span>

@@ -2,11 +2,10 @@ import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { PointsProvider } from "@/hooks/usePoints";
 import { Capacitor } from "@capacitor/core";
-import { lobbyPathForDiceInvite, type DiceInviteMode } from "@/features/dice/diceInviteUrl";
 
 // Critical-path sync (auth + splash + home shell). Everything else is lazy so OTA main JS stays smaller.
 import AuthPage from "@/pages/AuthPage";
@@ -24,43 +23,29 @@ import NetworkOfflineBanner from "@/components/system/NetworkOfflineBanner";
 import AppUpdateOverlay from "@/components/system/AppUpdateOverlay";
 import AppFailureScreen from "@/components/system/AppFailureScreen";
 import SlowLoadOverlay from "@/components/system/SlowLoadOverlay";
-import BrandedSpinner from "@/components/system/BrandedSpinner";
+import PageSkeleton from "@/features/arxon-v2/components/PageSkeleton";
 import { markBootOk } from "@/lib/bootState";
 import { isDevPublicPath } from "@/lib/devPublicRoutes";
-import { errorUi } from "@/components/system/errorUiTokens";
 import WebBundleRefreshInit from "@/components/system/WebBundleRefreshInit";
 import SentryUserSync from "@/components/system/SentryUserSync";
 import { Sentry } from "@/lib/sentry";
 import { MobileNavProvider } from "@/contexts/MobileNavContext";
-import AppPreviewShell, { PreviewSpinner } from "@/features/arxon-v2/preview/AppPreviewShell";
+import AppPreviewShell from "@/features/arxon-v2/preview/AppPreviewShell";
 const FailureUiPreview = lazy(() => import("@/pages/dev/FailureUiPreview"));
-import {
-  PreviewWordForgePage,
-  PreviewForgeStatsPage,
-  PreviewSectorMapPage,
-  PreviewWordForgeLeaderboardPage,
-} from "@/features/arxon-v2/preview/previewLazyPages";
 import { ARXON_UI_V2_ENABLED } from "@/lib/uiFeature";
-import { WORD_FORGE_ENABLED } from "@/lib/wordForgeFeature";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
-import { useForgeDailyReminder } from "@/features/word-forge/hooks/useForgeDailyReminder";
 import V2NotificationPopup from "@/features/arxon-v2/components/V2NotificationPopup";
 import VerificationDailyPrompt from "@/components/verification/VerificationDailyPrompt";
 import { AppTourProvider } from "@/contexts/AppTourContext";
 import AppTourGuide from "@/components/tour/AppTourGuide";
-import { gamesRouteContent as g } from "@/components/system/gamesRoute";
-import GamesMaintenanceScreen from "@/components/system/GamesMaintenanceScreen";
-import { GAMES_MAINTENANCE_MODE } from "@/lib/gamesMaintenance";
 import { APP_MAINTENANCE_MODE } from "@/lib/appMaintenance";
 import AppMaintenanceScreen from "@/components/system/AppMaintenanceScreen";
 import { ChainWalletProvider, useChainWallet } from "@/chainWallet/ChainWalletContext";
 import { OfficialSplash } from "@/walletFigma/flow/WelcomeScreens";
 import ModeShell from "@/walletFigma/flow/ModeShell";
 
-function DiceShortInviteRedirect({ mode }: { mode: DiceInviteMode }) {
-  const { code = '' } = useParams<{ code: string }>();
-  if (GAMES_MAINTENANCE_MODE) return <GamesMaintenanceScreen />;
-  return <Navigate to={lobbyPathForDiceInvite(mode, code)} replace />;
+function GamesGoneRedirect({ to = '/mine' }: { to?: string }) {
+  return <Navigate to={to} replace />;
 }
 
 const Landing = lazy(() => import("@/pages/Landing"));
@@ -99,6 +84,7 @@ const AdminReferralRecovery = lazy(() => import("@/pages/admin/AdminReferralReco
 const AdminAnalytics = lazy(() => import("@/pages/admin/AdminAnalytics"));
 const AdminAnnouncements = lazy(() => import("@/pages/admin/AdminAnnouncements"));
 const AdminClaims = lazy(() => import("@/pages/admin/AdminClaims"));
+const AdminDeletions = lazy(() => import("@/pages/admin/AdminDeletions"));
 
 const MobileDashboard = lazy(() => import("@/components/mobile/MobileDashboard"));
 const MobileMining = lazy(() => import("@/components/mobile/MobileMining"));
@@ -134,35 +120,8 @@ const SettingsV2 = lazy(() => import("@/features/arxon-v2/pages/SettingsV2"));
 const MiningV2 = lazy(() => import("@/features/arxon-v2/pages/MiningV2"));
 const NotificationsV2 = lazy(() => import("@/features/arxon-v2/pages/NotificationsV2"));
 const PointsHistoryV2 = lazy(() => import("@/features/arxon-v2/pages/PointsHistoryV2"));
-const DiceHubV2 = lazy(() => import("@/features/arxon-v2/pages/DiceHubV2"));
-const DiceMatchV2 = lazy(() => import("@/features/arxon-v2/pages/DiceMatchV2"));
-const DiceDuelLobbyV2 = lazy(() => import("@/features/arxon-v2/pages/DiceDuelLobbyV2"));
-const DiceDuelMatchV2 = lazy(() => import("@/features/arxon-v2/pages/DiceDuelMatchV2"));
-const DiceRumbleLobbyV2 = lazy(() => import("@/features/arxon-v2/pages/DiceRumbleLobbyV2"));
-const DiceRumbleMatchV2 = lazy(() => import("@/features/arxon-v2/pages/DiceRumbleMatchV2"));
 const DashboardNeon = lazy(() => import("@/features/arxon-v2/pages/DashboardNeon"));
-
-const GamingHubPage = WORD_FORGE_ENABLED
-  ? lazy(() => import("@/components/mobile/GamingHubPage"))
-  : null;
-
-const WordForgePreviewPage = lazy(() => import("@/features/word-forge/preview/WordForgePreviewPage"));
-
-const WordForgePage = WORD_FORGE_ENABLED
-  ? lazy(() => import("@/features/word-forge/WordForgePage"))
-  : null;
-
-const ForgeStatsPage = WORD_FORGE_ENABLED
-  ? lazy(() => import("@/features/word-forge/pages/ForgeStatsPage"))
-  : null;
-
-const SectorMapPage = WORD_FORGE_ENABLED
-  ? lazy(() => import("@/features/word-forge/pages/SectorMapPage"))
-  : null;
-
-const WordForgeLeaderboardPage = WORD_FORGE_ENABLED
-  ? lazy(() => import("@/features/word-forge/pages/WordForgeLeaderboardPage"))
-  : null;
+const TestnetConnectV2 = lazy(() => import("@/features/arxon-v2/pages/TestnetConnectV2"));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 2, staleTime: 5000, refetchOnWindowFocus: false } },
@@ -180,11 +139,23 @@ const walletTestSplash =
   typeof window !== 'undefined' &&
   (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-const Spinner = () => (
-  <div style={{ minHeight: '100vh', background: errorUi.bg, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <BrandedSpinner label="Loading…" />
-  </div>
-);
+const Spinner = () => <PageSkeleton delayMs={800} />;
+
+function prefetchMiningChunks() {
+  void import("@/features/arxon-v2/pages/ArenaV2");
+  void import("@/features/arxon-v2/pages/LeaderboardV2");
+  void import("@/features/arxon-v2/pages/ProfileV2");
+  void import("@/features/arxon-v2/pages/SettingsV2");
+  void import("@/features/arxon-v2/pages/TasksV2");
+  void import("@/features/arxon-v2/pages/ReferralsV2");
+  void import("@/features/arxon-v2/pages/NexusV2");
+  void import("@/features/arxon-v2/pages/NotificationsV2");
+  void import("@/features/arxon-v2/pages/PointsHistoryV2");
+  void import("@/features/arxon-v2/pages/PredictionMarketV2");
+  void import("@/pages/Litepaper");
+  void import("@/pages/legal/TermsOfService");
+  void import("@/pages/legal/PrivacyPolicy");
+}
 
 class AppErrorBoundary extends React.Component<
   { children: React.ReactNode },
@@ -219,8 +190,7 @@ class AppErrorBoundary extends React.Component<
 
 function PushNotificationInit() {
   // listen:true — only this mount owns FCM + realtime push side-effects
-  const { preferences } = usePushNotifications({ listen: true });
-  useForgeDailyReminder(preferences.wordForgeDaily && !GAMES_MAINTENANCE_MODE);
+  usePushNotifications({ listen: true });
   return ARXON_UI_V2_ENABLED ? <V2NotificationPopup /> : null;
 }
 
@@ -281,6 +251,12 @@ function AppRoutes() {
   const { user, loading } = useAuth();
   const [splashDone, setSplashDone] = useState(walletShell || (!isNative && !walletTestSplash));
 
+  useEffect(() => {
+    if (loading) return;
+    const t = window.setTimeout(prefetchMiningChunks, 500);
+    return () => window.clearTimeout(t);
+  }, [loading]);
+
   if (isDevPublicPath(location.pathname)) {
     return <DevPublicRoutes />;
   }
@@ -313,7 +289,6 @@ function AppRoutes() {
       <SessionRecovery />
       <PushNotificationInit />
       <VerificationDailyPrompt />
-      <AppTourGuide />
       <WebBundleRefreshInit />
       <Suspense fallback={<Spinner />}>
       <Routes>
@@ -321,7 +296,8 @@ function AppRoutes() {
         <Route path="/auth/confirm"   element={<AuthConfirm />} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
         <Route path="/change-password" element={<ChangePassword />} />
-        <Route path="/litepaper"      element={<Litepaper />} />
+        <Route path="/litepaper"      element={<Navigate to="/whitepaper" replace />} />
+        <Route path="/whitepaper"     element={<Litepaper />} />
         <Route path="/terms"          element={<TermsOfService />} />
         <Route path="/privacy"        element={<PrivacyPolicy />} />
         <Route path="/admin/login"    element={<AdminLogin />} />
@@ -335,12 +311,7 @@ function AppRoutes() {
           <Route path="portfolio" element={<Navigate to="/ui-preview/mine" replace />} />
           <Route path="mining" element={<MiningV2 preview />} />
           <Route path="arena/prediction-market" element={<PredictionMarketV2 />} />
-          <Route path="arena/dice" element={g(<DiceHubV2 />)} />
-          <Route path="arena/dice/house" element={g(<DiceMatchV2 />)} />
-          <Route path="arena/dice/duel" element={g(<DiceDuelLobbyV2 />)} />
-          <Route path="arena/dice/duel/:matchId" element={g(<DiceDuelMatchV2 />)} />
-          <Route path="arena/dice/rumble" element={g(<DiceRumbleLobbyV2 />)} />
-          <Route path="arena/dice/rumble/:matchId" element={g(<DiceRumbleMatchV2 />)} />
+          <Route path="arena/dice/*" element={<GamesGoneRedirect to="/ui-preview/arena" />} />
           <Route path="arena" element={<ArenaV2 />} />
           <Route path="leaderboard" element={<LeaderboardV2 />} />
           <Route path="profile" element={<ProfileV2 />} />
@@ -351,50 +322,11 @@ function AppRoutes() {
           <Route path="settings" element={<SettingsV2 />} />
           <Route path="notifications" element={<NotificationsV2 />} />
           <Route path="points-history" element={<PointsHistoryV2 />} />
-          {WORD_FORGE_ENABLED && GamingHubPage && (
-            <Route path="games" element={
-              <Suspense fallback={<PreviewSpinner />}>
-                {g(<GamingHubPage />)}
-              </Suspense>
-            } />
-          )}
-          {WORD_FORGE_ENABLED && PreviewWordForgePage && (
-            <>
-              <Route path="word-forge" element={
-                <Suspense fallback={<PreviewSpinner />}>
-                  {g(<PreviewWordForgePage />)}
-                </Suspense>
-              } />
-              {PreviewForgeStatsPage && (
-                <Route path="word-forge/stats" element={
-                  <Suspense fallback={<PreviewSpinner />}>
-                    {g(<PreviewForgeStatsPage />)}
-                  </Suspense>
-                } />
-              )}
-              {PreviewSectorMapPage && (
-                <Route path="word-forge/map" element={
-                  <Suspense fallback={<PreviewSpinner />}>
-                    {g(<PreviewSectorMapPage />)}
-                  </Suspense>
-                } />
-              )}
-              {PreviewWordForgeLeaderboardPage && (
-                <Route path="word-forge/leaderboard" element={
-                  <Suspense fallback={<PreviewSpinner />}>
-                    {g(<PreviewWordForgeLeaderboardPage />)}
-                  </Suspense>
-                } />
-              )}
-            </>
-          )}
+          <Route path="games" element={<GamesGoneRedirect to="/ui-preview/mine" />} />
+          <Route path="word-forge/*" element={<GamesGoneRedirect to="/ui-preview/mine" />} />
           <Route path="dashboard" element={<Navigate to="/ui-preview" replace />} />
         </Route>
-        <Route path="/word-forge-preview" element={
-          <Suspense fallback={<Spinner />}>
-            {g(<WordForgePreviewPage />)}
-          </Suspense>
-        } />
+        <Route path="/word-forge-preview" element={<GamesGoneRedirect />} />
         <Route path="/admin" element={<AdminLayout />}>
           <Route index                  element={<AdminDashboard />} />
           <Route path="users"           element={<AdminUsers />} />
@@ -408,6 +340,7 @@ function AppRoutes() {
           <Route path="analytics"       element={<AdminAnalytics />} />
           <Route path="announcements"   element={<AdminAnnouncements />} />
           <Route path="claims"          element={<AdminClaims />} />
+          <Route path="deletions"       element={<AdminDeletions />} />
           <Route path="reconciliation"  element={<AdminReconciliation />} />
           <Route path="export-filter"   element={<AdminExportFilter />} />
           <Route path="import-users"    element={<AdminImportUsers />} />
@@ -433,28 +366,16 @@ function AppRoutes() {
             <Route path="/tx/:hash" element={<WalletTx />} />
             <Route path="/token/:address" element={<WalletToken />} />
             <Route path="/wallet" element={<Navigate to="/balances" replace />} />
+            <Route path="/mine/connect" element={<ProtectedRoute><TestnetConnectV2 /></ProtectedRoute>} />
             <Route path="/mine" element={<WalletMine />} />
-            {WORD_FORGE_ENABLED && GamingHubPage && (
-              <Route path="/games" element={
-                <ProtectedRoute>
-                  <Suspense fallback={<Spinner />}>
-                    {g(<GamingHubPage />)}
-                  </Suspense>
-                </ProtectedRoute>
-              } />
-            )}
+            <Route path="/games" element={<GamesGoneRedirect />} />
+            <Route path="/word-forge/*" element={<GamesGoneRedirect />} />
             {/* Dedicated mining session stays inside the Mine hub. */}
             <Route path="/mining" element={<ProtectedRoute><MobileMining /></ProtectedRoute>} />
             <Route path="/arena/prediction-market" element={ARXON_UI_V2_ENABLED ? <PredictionMarketV2 /> : <MobileArena />} />
-            <Route path="/arena/dice" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceHubV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/house" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/duel" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceDuelLobbyV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/duel/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceDuelMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/rumble" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceRumbleLobbyV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            <Route path="/arena/dice/rumble/:matchId" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? g(<DiceRumbleMatchV2 />) : <Navigate to="/arena" replace />}</ProtectedRoute>} />
-            {/* Short brand invite paths → existing ?code= join UX (if Capacitor/HashRouter ever receives them) */}
-            <Route path="/d/:code" element={<DiceShortInviteRedirect mode="duel" />} />
-            <Route path="/r/:code" element={<DiceShortInviteRedirect mode="rumble" />} />
+            <Route path="/arena/dice/*" element={<GamesGoneRedirect to="/arena" />} />
+            <Route path="/d/:code" element={<GamesGoneRedirect />} />
+            <Route path="/r/:code" element={<GamesGoneRedirect />} />
             <Route path="/arena"        element={ARXON_UI_V2_ENABLED ? <ArenaV2 /> : <MobileArena />} />
             <Route path="/leaderboard"  element={ARXON_UI_V2_ENABLED ? <LeaderboardV2 /> : <MobileLeaderboard />} />
             <Route path="/nexus"        element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NexusV2 /> : <MobileNexus />}</ProtectedRoute>} />
@@ -465,44 +386,6 @@ function AppRoutes() {
             <Route path="/settings"     element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <SettingsV2 /> : <MobileSettings />}</ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <NotificationsV2 /> : <Notifications />}</ProtectedRoute>} />
             <Route path="/points-history" element={<ProtectedRoute>{ARXON_UI_V2_ENABLED ? <PointsHistoryV2 /> : <MobilePage><PointsHistory /></MobilePage>}</ProtectedRoute>} />
-            {WORD_FORGE_ENABLED && WordForgePage && (
-              <>
-                <Route path="/word-forge" element={
-                  <ProtectedRoute>
-                    <Suspense fallback={<Spinner />}>
-                      {g(<WordForgePage />)}
-                    </Suspense>
-                  </ProtectedRoute>
-                } />
-                {ForgeStatsPage && (
-                  <Route path="/word-forge/stats" element={
-                    <ProtectedRoute>
-                      <Suspense fallback={<Spinner />}>
-                        {g(<ForgeStatsPage />)}
-                      </Suspense>
-                    </ProtectedRoute>
-                  } />
-                )}
-                {SectorMapPage && (
-                  <Route path="/word-forge/map" element={
-                    <ProtectedRoute>
-                      <Suspense fallback={<Spinner />}>
-                        {g(<SectorMapPage />)}
-                      </Suspense>
-                    </ProtectedRoute>
-                  } />
-                )}
-                {WordForgeLeaderboardPage && (
-                  <Route path="/word-forge/leaderboard" element={
-                    <ProtectedRoute>
-                      <Suspense fallback={<Spinner />}>
-                        {g(<WordForgeLeaderboardPage />)}
-                      </Suspense>
-                    </ProtectedRoute>
-                  } />
-                )}
-              </>
-            )}
           </>
         ) : (
           <>
@@ -517,61 +400,8 @@ function AppRoutes() {
             <Route path="/settings"     element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
             <Route path="/notifications" element={<ProtectedRoute><Notifications /></ProtectedRoute>} />
             <Route path="/points-history" element={<ProtectedRoute><DashboardLayout><PointsHistory /></DashboardLayout></ProtectedRoute>} />
-            {WORD_FORGE_ENABLED && GamingHubPage && (
-              <Route path="/games" element={
-                <ProtectedRoute>
-                  <DashboardLayout>
-                    <Suspense fallback={<Spinner />}>
-                      {g(<GamingHubPage />)}
-                    </Suspense>
-                  </DashboardLayout>
-                </ProtectedRoute>
-              } />
-            )}
-            {WORD_FORGE_ENABLED && WordForgePage && (
-              <>
-                <Route path="/word-forge" element={
-                  <ProtectedRoute>
-                    <Suspense fallback={<Spinner />}>
-                      {g(<WordForgePage />)}
-                    </Suspense>
-                  </ProtectedRoute>
-                } />
-                {ForgeStatsPage && (
-                  <Route path="/word-forge/stats" element={
-                    <ProtectedRoute>
-                      <DashboardLayout>
-                        <Suspense fallback={<Spinner />}>
-                          {g(<ForgeStatsPage />)}
-                        </Suspense>
-                      </DashboardLayout>
-                    </ProtectedRoute>
-                  } />
-                )}
-                {SectorMapPage && (
-                  <Route path="/word-forge/map" element={
-                    <ProtectedRoute>
-                      <DashboardLayout>
-                        <Suspense fallback={<Spinner />}>
-                          {g(<SectorMapPage />)}
-                        </Suspense>
-                      </DashboardLayout>
-                    </ProtectedRoute>
-                  } />
-                )}
-                {WordForgeLeaderboardPage && (
-                  <Route path="/word-forge/leaderboard" element={
-                    <ProtectedRoute>
-                      <DashboardLayout>
-                        <Suspense fallback={<Spinner />}>
-                          {g(<WordForgeLeaderboardPage />)}
-                        </Suspense>
-                      </DashboardLayout>
-                    </ProtectedRoute>
-                  } />
-                )}
-              </>
-            )}
+            <Route path="/games" element={<GamesGoneRedirect to="/" />} />
+            <Route path="/word-forge/*" element={<GamesGoneRedirect to="/" />} />
           </>
         )}
 
@@ -582,8 +412,38 @@ function AppRoutes() {
       {walletShell && <MobileBottomNavV2 />}
     </>
   );
-  if (walletShell) return <ModeShell>{shell}</ModeShell>;
-  return shell;
+
+  const adminPath = location.pathname.startsWith("/admin");
+  if (walletShell && adminPath) {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          overflow: "auto",
+          WebkitOverflowScrolling: "touch",
+          background: "#0a0c10",
+          color: "#f0f2f5",
+        }}
+      >
+        {shell}
+      </div>
+    );
+  }
+  if (walletShell) {
+    return (
+      <>
+        <ModeShell>{shell}</ModeShell>
+        <AppTourGuide />
+      </>
+    );
+  }
+  return (
+    <>
+      {shell}
+      <AppTourGuide />
+    </>
+  );
 }
 
 function RouterShell({ children }: { children: React.ReactNode }) {

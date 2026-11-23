@@ -4,214 +4,293 @@ import {
   useContext,
   useEffect,
   useMemo,
-  useRef,
   useState,
   type ReactNode,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Capacitor } from '@capacitor/core';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useMining } from '@/hooks/useMining';
 import { useVerification } from '@/hooks/useVerification';
 import { useCheckin } from '@/hooks/useCheckin';
-import { useMining } from '@/hooks/useMining';
-import { TOUR_STEPS, nextTourStepId, type TourStepConfig } from '@/lib/tour/steps';
+import { readTestnetLink } from '@/lib/testnetWalletLink';
+import { sessionStore } from '@/chainWallet/session';
+import { nextTourStepId, TOUR_STEPS, type TourStepConfig } from '@/lib/tour/steps';
+import { nextWalletTourStepId, WALLET_TOUR_STEPS } from '@/lib/tour/walletSteps';
 import {
   isTourFinished,
   markTourFinished,
   markTourSkipped,
+  resetTourProgress,
   setAppTourActive,
   type TourStepId,
 } from '@/lib/tour/tourStorage';
+import {
+  isWalletTourFinished,
+  markWalletTourFinished,
+  markWalletTourSkipped,
+  resetWalletTourProgress,
+  type WalletTourStepId,
+} from '@/lib/tour/walletTourStorage';
 
-const SKIP_PATHS = ['/auth', '/admin', '/reset-password', '/change-password', '/auth/confirm'];
+type AppMode = 'wallet' | 'mining';
 
-type StartTourOptions = { replay?: boolean };
+function readAppMode(): AppMode {
+  try {
+    return sessionStorage.getItem('arxon-app-mode') === 'mining' ? 'mining' : 'wallet';
+  } catch {
+    return 'wallet';
+  }
+}
 
 type AppTourContextValue = {
   active: boolean;
-  isReplay: boolean;
+  kind: AppMode;
   step: TourStepConfig | null;
   stepIndex: number;
   totalSteps: number;
-  startTour: (options?: StartTourOptions) => void;
+  continueTour: () => void;
   skipTour: () => void;
-  nextStep: () => void;
+  restartTour: () => void;
+  startTour: (opts?: { replay?: boolean; kind?: AppMode }) => void;
 };
 
 const AppTourContext = createContext<AppTourContextValue | null>(null);
 
-function pathBlocked(pathname: string) {
-  return SKIP_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
-function routeMatches(stepRoute: string, pathname: string, search: string) {
-  if (stepRoute.includes('?')) {
-    const [path, query] = stepRoute.split('?');
-    return pathname === path && search.includes(query);
-  }
-  return pathname === stepRoute;
-}
-
 export function AppTourProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const verification = useVerification();
-  const { canCheckin, loading: checkinLoading } = useCheckin();
-  const mining = useMining({ tickMs: 2000 });
+  const { isMining } = useMining();
+  const { isComplete } = useVerification();
+  const { canCheckin } = useCheckin();
 
-  const [active, setActive] = useState(false);
-  const [isReplay, setIsReplay] = useState(false);
-  const [currentStepId, setCurrentStepId] = useState<TourStepId>('welcome');
-  const [booted, setBooted] = useState(false);
-  const replayModeRef = useRef(false);
+  const [mode, setMode] = useState<AppMode>(readAppMode);
+  const [walletReady, setWalletReady] = useState(false);
+  const [miningActive, setMiningActive] = useState(false);
+  const [walletActive, setWalletActive] = useState(false);
+  const [miningStepId, setMiningStepId] = useState<TourStepId>('welcome');
+  const [walletStepId, setWalletStepId] = useState<WalletTourStepId>('welcome');
 
-  const verifyDone = verification.isComplete;
-  const tasksDone = !canCheckin && !checkinLoading;
-  const miningDone = mining.isMining;
+  const tourUser = user?.id ?? 'wallet';
+  const kind: AppMode = mode;
+  const active = kind === 'wallet' ? walletActive : miningActive;
 
-  const shouldSkipStep = useCallback(
+  const shouldSkipMining = useCallback(
     (id: TourStepId) => {
-      if (replayModeRef.current || id === 'welcome') return false;
-      if (id === 'verify' && verifyDone) return true;
-      if (id === 'tasks' && tasksDone) return true;
-      if (id === 'mining' && miningDone) return true;
+      if (id === 'mining' && isMining) return true;
+      if (id === 'tasks' && !canCheckin) return true;
+      if ((id === 'verify' || id === 'verify-steps') && isComplete) return true;
+      if ((id === 'wallet' || id === 'mine-testnet') && user && readTestnetLink(user.id)) return true;
       return false;
     },
-    [verifyDone, tasksDone, miningDone],
+    [canCheckin, isComplete, isMining, user],
   );
 
-  const visibleSteps = useMemo(
-    () => (isReplay ? TOUR_STEPS : TOUR_STEPS.filter((s) => !shouldSkipStep(s.id))),
-    [shouldSkipStep, isReplay],
-  );
-
-  const step = TOUR_STEPS.find((s) => s.id === currentStepId) ?? null;
-  const stepIndex = Math.max(0, visibleSteps.findIndex((s) => s.id === currentStepId));
-  const totalSteps = visibleSteps.length;
-
-  const endTour = useCallback(() => {
-    replayModeRef.current = false;
-    setIsReplay(false);
-    setAppTourActive(false);
+  const shouldSkipWallet = useCallback((id: WalletTourStepId) => {
+    const added = sessionStore.testnetAdded();
+    if (id === 'testnet-add' && added) return true;
+    if (id === 'testnet-history' && !added) return true;
+    return false;
   }, []);
 
-  const finishTour = useCallback(
-    (last: TourStepId) => {
-      if (user) markTourFinished(user.id, last);
-      setActive(false);
-      endTour();
-    },
-    [user, endTour],
+  useEffect(() => {
+    const onMode = (e: Event) => {
+      const next = (e as CustomEvent<AppMode>).detail;
+      if (next === 'wallet' || next === 'mining') setMode(next);
+    };
+    const onReady = () => setWalletReady(true);
+    const onBusy = () => setWalletReady(false);
+    window.addEventListener('arxon-app-mode', onMode);
+    window.addEventListener('arxon-wallet-ready', onReady);
+    window.addEventListener('arxon-wallet-busy', onBusy);
+    setMode(readAppMode());
+    return () => {
+      window.removeEventListener('arxon-app-mode', onMode);
+      window.removeEventListener('arxon-wallet-ready', onReady);
+      window.removeEventListener('arxon-wallet-busy', onBusy);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (mode !== 'mining') {
+      setMiningActive(false);
+      return;
+    }
+    if (!user) return;
+    if (isTourFinished(user.id)) return;
+    setMiningActive(true);
+  }, [mode, user]);
+
+  useEffect(() => {
+    if (mode !== 'wallet') {
+      setWalletActive(false);
+      return;
+    }
+    if (!walletReady) return;
+    if (isWalletTourFinished(tourUser)) return;
+    setWalletActive(true);
+  }, [mode, tourUser, walletReady]);
+
+  useEffect(() => {
+    setAppTourActive(active);
+  }, [active]);
+
+  const miningStep = useMemo(
+    () => TOUR_STEPS.find((s) => s.id === miningStepId) ?? null,
+    [miningStepId],
   );
+  const walletStep = useMemo(
+    () => WALLET_TOUR_STEPS.find((s) => s.id === walletStepId) ?? null,
+    [walletStepId],
+  );
+  const step = kind === 'wallet' ? walletStep : miningStep;
+  const stepIndex =
+    kind === 'wallet'
+      ? Math.max(0, WALLET_TOUR_STEPS.findIndex((s) => s.id === walletStepId))
+      : Math.max(0, TOUR_STEPS.findIndex((s) => s.id === miningStepId));
+  const totalSteps = kind === 'wallet' ? WALLET_TOUR_STEPS.length : TOUR_STEPS.length;
+
+  useEffect(() => {
+    if (!miningActive || !miningStep?.route) return;
+    const here = `${location.pathname}${location.search || ''}`;
+    if (here !== miningStep.route) navigate(miningStep.route);
+  }, [miningActive, miningStep?.route, miningStepId, navigate, location.pathname, location.search]);
+
+  useEffect(() => {
+    if (!walletActive) return;
+    const dest = walletStep?.walletScreen;
+    if (!dest) return;
+    window.dispatchEvent(new CustomEvent('arxon-tour-wallet-go', { detail: { dest } }));
+  }, [walletActive, walletStep?.walletScreen, walletStepId]);
+
+  useEffect(() => {
+    if (!miningActive || miningStepId !== 'wallet') return;
+    const ping = () => window.dispatchEvent(new Event('arxon-tour-show-testnet'));
+    ping();
+    const id = window.setInterval(ping, 280);
+    const stop = window.setTimeout(() => window.clearInterval(id), 2400);
+    return () => {
+      window.clearInterval(id);
+      window.clearTimeout(stop);
+    };
+  }, [miningActive, miningStepId]);
+
+  const finishMining = useCallback(() => {
+    if (user) markTourFinished(user.id, miningStepId);
+    setMiningActive(false);
+  }, [miningStepId, user]);
+
+  const finishWallet = useCallback(() => {
+    markWalletTourFinished(tourUser, walletStepId);
+    setWalletActive(false);
+  }, [tourUser, walletStepId]);
+
+  const continueTour = useCallback(() => {
+    if (kind === 'wallet') {
+      const next = nextWalletTourStepId(walletStepId, shouldSkipWallet);
+      if (!next) {
+        finishWallet();
+        return;
+      }
+      setWalletStepId(next);
+      return;
+    }
+    const next = nextTourStepId(miningStepId, shouldSkipMining);
+    if (!next) {
+      finishMining();
+      return;
+    }
+    setMiningStepId(next);
+  }, [finishMining, finishWallet, kind, miningStepId, shouldSkipMining, shouldSkipWallet, walletStepId]);
 
   const skipTour = useCallback(() => {
-    if (user) markTourSkipped(user.id, step?.id ?? null);
-    setActive(false);
-    endTour();
-  }, [user, step?.id, endTour]);
-
-  const nextStep = useCallback(() => {
-    const nextId = nextTourStepId(currentStepId, shouldSkipStep);
-    if (!nextId) {
-      finishTour(currentStepId);
+    if (kind === 'wallet') {
+      markWalletTourSkipped(tourUser, walletStepId);
+      setWalletActive(false);
       return;
     }
-    setCurrentStepId(nextId);
-  }, [currentStepId, shouldSkipStep, finishTour]);
+    if (user) markTourSkipped(user.id, miningStepId);
+    setMiningActive(false);
+  }, [kind, miningStepId, tourUser, user, walletStepId]);
 
   const startTour = useCallback(
-    (options?: StartTourOptions) => {
-      if (!user || pathBlocked(location.pathname)) return;
-      const replay = Boolean(options?.replay);
-      replayModeRef.current = replay;
-      setIsReplay(replay);
-      setCurrentStepId('welcome');
-      setActive(true);
+    (opts?: { replay?: boolean; kind?: AppMode }) => {
+      const which = opts?.kind ?? kind;
+      if (which === 'wallet') {
+        if (opts?.replay) resetWalletTourProgress(tourUser);
+        setWalletStepId('welcome');
+        setWalletActive(true);
+        setAppTourActive(true);
+        return;
+      }
+      if (!user) return;
+      if (opts?.replay) resetTourProgress(user.id);
+      setMiningStepId('welcome');
+      setMiningActive(true);
       setAppTourActive(true);
     },
-    [user, location.pathname],
+    [kind, tourUser, user],
   );
 
-  useEffect(() => {
-    if (authLoading || !user || booted) return;
-    if (pathBlocked(location.pathname)) return;
-    if (isTourFinished(user.id)) {
-      setBooted(true);
-      return;
-    }
-    const bootDelay = Capacitor.isNativePlatform() ? 3200 : 1400;
-    const timer = window.setTimeout(() => {
-      replayModeRef.current = false;
-      setIsReplay(false);
-      setCurrentStepId('welcome');
-      setActive(true);
-      setAppTourActive(true);
-      setBooted(true);
-    }, bootDelay);
-    return () => window.clearTimeout(timer);
-  }, [authLoading, user, booted, location.pathname]);
+  const restartTour = useCallback(() => {
+    startTour({ replay: true, kind });
+  }, [kind, startTour]);
 
   useEffect(() => {
-    if (!active || !step?.route) return;
-    if (!routeMatches(step.route, location.pathname, location.search)) {
-      navigate(step.route);
-    }
-  }, [active, step, location.pathname, location.search, navigate]);
+    const onMined = () => {
+      if (!miningActive || miningStepId !== 'mining') return;
+      continueTour();
+    };
+    const onClaimed = () => {
+      if (!miningActive || miningStepId !== 'tasks') return;
+      continueTour();
+    };
+    window.addEventListener('arxon-tour-mining-started', onMined);
+    window.addEventListener('arxon-tour-task-claimed', onClaimed);
+    return () => {
+      window.removeEventListener('arxon-tour-mining-started', onMined);
+      window.removeEventListener('arxon-tour-task-claimed', onClaimed);
+    };
+  }, [continueTour, miningActive, miningStepId]);
 
   useEffect(() => {
-    if (!active || !step || step.id === 'welcome' || isReplay) return;
+    if (!miningActive) return;
+    if (miningStepId !== 'verify' && miningStepId !== 'verify-steps') return;
+    if (isComplete) finishMining();
+  }, [finishMining, isComplete, miningActive, miningStepId]);
 
-    if (step.id === 'verify' && verifyDone) {
-      nextStep();
-      return;
-    }
-
-    if (step.id === 'tasks' && tasksDone) {
-      nextStep();
-      return;
-    }
-
-    if (step.id === 'mining' && miningDone) {
-      finishTour('mining');
-    }
-  }, [active, step, isReplay, verifyDone, tasksDone, miningDone, nextStep, finishTour]);
-
-  useEffect(() => {
-    if (!active || step?.id !== 'tasks') return;
-    const onTaskClaimed = () => nextStep();
-    window.addEventListener('arxon-tour-task-claimed', onTaskClaimed);
-    return () => window.removeEventListener('arxon-tour-task-claimed', onTaskClaimed);
-  }, [active, step?.id, nextStep]);
-
-  useEffect(() => {
-    if (!active || step?.id !== 'mining') return;
-    const onMiningStarted = () => finishTour('mining');
-    window.addEventListener('arxon-tour-mining-started', onMiningStarted);
-    return () => window.removeEventListener('arxon-tour-mining-started', onMiningStarted);
-  }, [active, step?.id, finishTour]);
-
-  const value = useMemo(
+  const value = useMemo<AppTourContextValue>(
     () => ({
       active,
-      isReplay,
+      kind,
       step,
       stepIndex,
       totalSteps,
-      startTour,
+      continueTour,
       skipTour,
-      nextStep,
+      restartTour,
+      startTour,
     }),
-    [active, isReplay, step, stepIndex, totalSteps, startTour, skipTour, nextStep],
+    [active, continueTour, kind, restartTour, skipTour, startTour, step, stepIndex, totalSteps],
   );
 
   return <AppTourContext.Provider value={value}>{children}</AppTourContext.Provider>;
 }
 
+const EMPTY: AppTourContextValue = {
+  active: false,
+  kind: 'mining',
+  step: null,
+  stepIndex: 0,
+  totalSteps: TOUR_STEPS.length,
+  continueTour: () => undefined,
+  skipTour: () => undefined,
+  restartTour: () => undefined,
+  startTour: () => undefined,
+};
+
 export function useAppTour() {
-  const ctx = useContext(AppTourContext);
-  if (!ctx) throw new Error('useAppTour must be used within AppTourProvider');
-  return ctx;
+  return useContext(AppTourContext) ?? EMPTY;
 }
 
 export function useAppTourOptional() {

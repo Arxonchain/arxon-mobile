@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { User, Wallet, Zap, Clock, Calendar, Trophy, History, Edit2, Check, Copy, ArrowLeftRight, ArrowLeft, FileText, Shield } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
+import { goBack } from "@/lib/navBack";
 import { useAuth } from "@/contexts/AuthContext";
 import { usePoints } from "@/hooks/usePoints";
 import { useWallet } from "@/hooks/useWallet";
@@ -10,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import AuthDialog from "@/components/auth/AuthDialog";
 import { toast } from "@/hooks/use-toast";
+import { publicErrorToast } from "@/lib/publicError";
 import { cacheGet, cacheSet } from "@/lib/localCache";
 import { withTimeout } from "@/lib/utils";
 
@@ -182,11 +184,7 @@ const Profile = () => {
       });
       setEditingUsername(false);
     } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
+      toast(publicErrorToast(error, 'verify'));
     } finally {
       setSavingUsername(false);
     }
@@ -227,7 +225,7 @@ const Profile = () => {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => goBack(navigate)}
             className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-5 w-5" />

@@ -225,9 +225,6 @@ function Explore({ go, onBack }: { go: Go; onBack?: () => void }) {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
             {onBack ? <BackChip onBack={onBack} /> : null}
             <p style={{ margin: 0, flex: 1, fontSize: onBack ? 22 : 26, fontWeight: 700 }}>Explore</p>
-            <button type="button" aria-label="Refresh" onClick={() => void refresh()} style={iconRound}>
-              <RefreshMark spinning={pull.busy} />
-            </button>
           </div>
           <form onSubmit={submit} style={searchStyle}>
             <FigmaImg src={art('apps.svg')} width={18} height={18} style={app ? frostIcon : undefined} />
@@ -278,9 +275,6 @@ function Explore({ go, onBack }: { go: Go; onBack?: () => void }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
           {app && onBack ? <BackChip onBack={onBack} /> : null}
           <p style={{ margin: 0, flex: 1, fontSize: app && onBack ? 22 : 26, fontWeight: 700 }}>Explore</p>
-          <button type="button" aria-label="Refresh" onClick={() => void refresh()} style={iconRound}>
-            <RefreshMark spinning={pull.busy} />
-          </button>
         </div>
         <form onSubmit={submit} style={searchStyle}>
           <FigmaImg src={art('apps.svg')} width={18} height={18} />
@@ -454,15 +448,6 @@ function SiteLogo({ name, url, letter, color = '#2a3447' }: { name: string; url:
   );
 }
 
-function RefreshMark({ spinning }: { spinning: boolean }) {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" style={{ transform: spinning ? 'rotate(180deg)' : undefined, transition: 'transform 0.3s linear' }}>
-      <path d="M14.5 9A5.5 5.5 0 1 1 9 3.5" fill="none" stroke="#accafe" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M9 1.5v4h3.4" fill="none" stroke="#accafe" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
 function NoteStatus() {
   const hide = useAppHidesFigmaChrome();
   if (hide) return null;
@@ -496,6 +481,5 @@ const openMark: CSSProperties = { color: '#accafe', fontSize: 13, fontWeight: 60
 const searchBox: CSSProperties = { height: 48, boxSizing: 'border-box', background: '#1c2025', border: '1px solid #2a3447', borderRadius: 14, display: 'flex', alignItems: 'center', gap: 10, padding: '0 8px 0 14px', width: '100%', maxWidth: '100%', minWidth: 0, margin: 0 };
 const searchInput: CSSProperties = { flex: 1, minWidth: 0, border: 'none', outline: 'none', background: 'transparent', color: '#fff', fontFamily: font.sans, fontSize: 15 };
 const goBtn: CSSProperties = { minHeight: 36, minWidth: 56, border: 'none', borderRadius: 10, background: '#2a3447', color: '#accafe', fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer', flexShrink: 0 };
-const iconRound: CSSProperties = { width: 40, height: 40, border: 'none', borderRadius: 20, background: '#1c2025', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0, flexShrink: 0 };
 const seeAll: CSSProperties = { border: 'none', background: 'none', color: '#accafe', fontFamily: font.sans, fontSize: 12, fontWeight: 500, cursor: 'pointer', minHeight: 28, padding: '0 4px' };
 const chip: CSSProperties = { flexShrink: 0, height: 36, minHeight: 36, padding: '0 14px', border: 'none', borderRadius: 18, fontFamily: font.sans, fontSize: 13, fontWeight: 600, cursor: 'pointer' };

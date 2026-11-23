@@ -61,3 +61,6 @@ verify_jwt = false
 
 [functions.backfill-uncredited-sessions]
 verify_jwt = false
+
+[functions.account-deletion]
+verify_jwt = false

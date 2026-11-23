@@ -99,12 +99,48 @@ export function ReceiveScreens({ id, go, back }: { id: string; go: Go; back?: ()
 
 function receiveCopy(current: Net, liveApp: boolean) {
   const arxon = !liveApp || current.scope === 'testnet' || current.asset === 'ARX' || current.asset === 'ARXt' || current.asset === 'tARX';
-  const letter = arxon ? 'A' : (current.asset.replace(/t$/i, '').slice(0, 1) || 'A');
   const caption = arxon ? 'Your Arxon address' : `Your ${current.name} address`;
   const warn = arxon
     ? 'Only send ARX and Arxon-network assets to this address. Other assets may be lost.'
     : `Only send ${current.asset} on ${current.name} to this address. Other assets may be lost.`;
-  return { letter, caption, warn, privacy: arxon };
+  return { caption, warn, privacy: arxon };
+}
+
+function QrTokenMark({
+  asset,
+  arxon,
+  stablecoin,
+}: {
+  asset: string;
+  arxon: boolean;
+  stablecoin: 'USDT' | 'USDC' | null;
+}) {
+  const symbol = (stablecoin || asset).toUpperCase();
+  const kind = !stablecoin && arxon ? 'ARX' : symbol;
+  if (kind === 'BTC') {
+    return <img src="/wallet-figma/home/btc.svg" alt="" width={36} height={36} style={{ width: 36, height: 36, objectFit: 'contain', display: 'block' }} />;
+  }
+  if (kind === 'SOL') {
+    return <img src="/wallet-figma/welcome/sol.png" alt="" width={36} height={36} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover', display: 'block' }} />;
+  }
+  if (kind === 'USDT') {
+    return <img src="/wallet-figma/home/usdt.png" alt="" width={36} height={36} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover', display: 'block' }} />;
+  }
+  if (kind === 'ETH') {
+    return (
+      <span style={{ width: 36, height: 36, borderRadius: 18, background: '#627eeb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <img src="/wallet-figma/home/eth.svg" alt="" width={14} height={22} style={{ display: 'block' }} />
+      </span>
+    );
+  }
+  if (kind === 'USDC') {
+    return (
+      <span style={{ width: 36, height: 36, borderRadius: 18, background: '#2775ca', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <img src="/wallet-figma/home/usdc.svg" alt="" width={11} height={20} style={{ display: 'block' }} />
+      </span>
+    );
+  }
+  return <img src="/wallet-figma/home/arx-mask.png" alt="" width={36} height={36} style={{ width: 36, height: 36, borderRadius: 18, objectFit: 'cover', display: 'block' }} />;
 }
 
 function Receive({ current, shielded, setShielded, go, leave, address, qrSrc, stablecoin, stableChain, setStableChain }: {
@@ -221,7 +257,9 @@ function Receive({ current, shielded, setShielded, go, leave, address, qrSrc, st
         {((showingKey && shieldQr) || chainQr || qrSrc) ? (
         <div style={{ position: 'relative', width: 264, height: 264, margin: '22px auto 0', borderRadius: 24, background: '#fff', overflow: 'hidden' }}>
           <img src={showingKey && shieldQr ? shieldQr : chainQr || qrSrc} alt="" width={200} height={200} style={{ position: 'absolute', left: 32, top: 32, width: 200, height: 200, objectFit: 'contain' }} />
-          <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#accafe', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0c1018', fontSize: 20, fontWeight: 700 }}>{copy.letter}</div>
+          <div style={{ position: 'absolute', left: 110, top: 110, width: 44, height: 44, boxSizing: 'border-box', borderRadius: 22, background: '#fff', border: '4px solid #fff', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+            <QrTokenMark asset={current.asset} arxon={copy.privacy} stablecoin={stablecoin} />
+          </div>
         </div>
         ) : (
           <div style={{ width: 264, height: 264, margin: '22px auto 0' }}><SkelBone h={264} r={24} frost /></div>

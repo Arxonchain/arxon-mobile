@@ -4,7 +4,7 @@ import type { ActivityItem } from './activity';
 import { PRECOMPILE } from './chain';
 import type { InspectedTx } from './inspect';
 
-export const FOUR_TX_ARX_P = 2500;
+export const FOUR_TX_ARX_P = 5000;
 
 export type FourTxSlot = 'shield' | 'private' | 'unshield_self' | 'unshield_other';
 

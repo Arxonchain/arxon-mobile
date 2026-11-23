@@ -1,24 +1,26 @@
 import { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Bell, Gift, Trophy, CheckCheck } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { useInAppNotifications, type AppNotification } from '@/hooks/useInAppNotifications';
 import { displayNotificationMessage, displayNotificationTitle } from '@/lib/notificationDisplay';
+import { usePullRefresh } from '@/walletFigma/flow/pullRefresh';
+import { MineLoad } from '../components/MineLoad';
+import { V2Page } from '../design/Kit';
+import { neon } from '../design/neonTokens';
 import {
-  V2Page, V2Header, V2Card, V2Eyebrow, fadeUp, stagger,
-} from '../design/Kit';
-import { v2 } from '../design/tokens';
+  Body,
+  EmptyCopy,
+  FrostPanel,
+  GlassSheet,
+  pc,
+  ProfileHead,
+  TokenRow,
+} from '../design/ProfileChrome';
 
-function getIconInfo(type: string) {
+function getIcon(type: string) {
   if (type === 'arena_win' || type === 'rumble_reward' || type === 'arena' || type.includes('arena_win'))
-    return { icon: <Trophy size={18} color={v2.accent.gold} />, accent: v2.accent.gold };
-  if (type === 'arena_loss')
-    return { icon: <Trophy size={18} color={v2.brand.mutedSoft} />, accent: v2.brand.mutedSoft };
-  if (type === 'arena_new_battle' || type === 'arena_battle_end' || type === 'arena_resolved' || type === 'arena_battle_resolved')
-    return { icon: <Bell size={18} color={v2.accent.cyan} />, accent: v2.accent.cyan };
-  if (type === 'new_tasks')
-    return { icon: <Bell size={18} color={v2.accent.cyan} />, accent: v2.accent.cyan };
-  return { icon: <Gift size={18} color={v2.brand.steel} />, accent: v2.brand.steel };
+    return <Trophy size={14} />;
+  if (type === 'arena_loss') return <Trophy size={14} />;
+  return type.startsWith('arena') || type === 'new_tasks' ? <Bell size={14} /> : <Gift size={14} />;
 }
 
 function formatDate(dateStr: string) {
@@ -34,167 +36,96 @@ function formatDate(dateStr: string) {
 }
 
 export default function NotificationsV2() {
-  const navigate = useNavigate();
-  const { notifications, loading, markRead } = useInAppNotifications();
-  const [selectedNotif, setSelectedNotif] = useState<AppNotification | null>(null);
-
-  const markAllRead = () => markRead();
-  const markOneRead = (id: string) => markRead(id);
+  const { notifications, loading, markRead, reload } = useInAppNotifications();
+  const [selected, setSelected] = useState<AppNotification | null>(null);
+  const pull = usePullRefresh(() => reload(), { threshold: 28 });
   const hasUnread = notifications.some((n) => !n.read);
 
-  if (selectedNotif) {
-    const { icon, accent } = getIconInfo(selectedNotif.type);
+  if (selected) {
     return (
       <V2Page>
-        <V2Header eyebrow="Inbox" title="Notification" onBack={() => setSelectedNotif(null)} />
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} style={{ padding: '0 16px' }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: v2.radius.md,
-            background: `${accent}18`, border: `1.5px solid ${accent}44`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16,
-          }}>
-            {icon}
-          </div>
-          <h2 style={{ fontSize: 18, fontWeight: 800, color: v2.brand.steelBright, marginBottom: 8, lineHeight: 1.3 }}>
-            {displayNotificationTitle(selectedNotif.title)}
-          </h2>
-          {selectedNotif.amount != null && selectedNotif.amount !== 0 && (
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
-              borderRadius: 20, marginBottom: 14, background: `${accent}18`, border: `1px solid ${accent}44`,
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: selectedNotif.amount > 0 ? v2.accent.mining : v2.accent.danger }}>
-                {selectedNotif.amount > 0 ? '+' : ''}{selectedNotif.amount.toLocaleString()} ARX-P
-              </span>
+        <ProfileHead title="Notification" subtitle={formatDate(selected.created_at)} onBack={() => setSelected(null)} />
+        <div style={{ padding: '0 16px 12px' }}>
+          <FrostPanel>
+            <p style={{ margin: 0, fontSize: 18, fontWeight: 750, color: pc.ink, letterSpacing: '-0.3px', fontFamily: neon.font, lineHeight: 1.25 }}>
+              {displayNotificationTitle(selected.title)}
+            </p>
+            {selected.amount != null && selected.amount !== 0 ? (
+              <p style={{
+                margin: '10px 0 0',
+                fontSize: 15,
+                fontWeight: 750,
+                color: selected.amount > 0 ? '#1a7a45' : pc.danger,
+                fontFamily: neon.font,
+              }}>
+                {selected.amount > 0 ? '+' : ''}{selected.amount.toLocaleString()} ARX-P
+              </p>
+            ) : null}
+            <div style={{ marginTop: 10 }}>
+              <Body ink>{displayNotificationMessage(selected.message)}</Body>
             </div>
-          )}
-          {selectedNotif.amount && selectedNotif.amount < 0 && (
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 14px',
-              borderRadius: 20, marginBottom: 14, background: `${v2.brand.muted}18`, border: `1px solid ${v2.brand.muted}44`,
-            }}>
-              <span style={{ fontSize: 14, fontWeight: 800, color: v2.brand.mutedSoft }}>
-                {selectedNotif.amount.toLocaleString()} ARX-P stake
-              </span>
-            </div>
-          )}
-          <p style={{ fontSize: 13, color: v2.brand.steelLight, lineHeight: 1.55, marginBottom: 16 }}>
-            {displayNotificationMessage(selectedNotif.message)}
-          </p>
-          <V2Eyebrow accent={v2.brand.muted}>{formatDate(selectedNotif.created_at)}</V2Eyebrow>
-        </motion.div>
+          </FrostPanel>
+        </div>
       </V2Page>
     );
   }
 
   return (
-    <V2Page>
-      <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header
-          eyebrow="Inbox"
-          title="Notifications"
-          subtitle="Arena, rewards & updates"
-          onBack={() => navigate(-1)}
-          right={hasUnread ? (
-            <motion.button
-              type="button"
-              whileTap={{ scale: 0.9 }}
-              onClick={markAllRead}
-              style={{
-                width: 40, height: 40, borderRadius: 14, cursor: 'pointer', border: 'none',
-                background: `${v2.brand.steel}18`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
-              <CheckCheck size={16} color={v2.brand.steel} />
-            </motion.button>
-          ) : undefined}
-        />
-
+    <V2Page pull={pull}>
+      <ProfileHead
+        title="Notifications"
+        subtitle="Arena, rewards and updates"
+        right={hasUnread ? (
+          <button
+            type="button"
+            aria-label="Mark all read"
+            onClick={() => markRead()}
+            style={{
+              width: 38, height: 38, borderRadius: 19, border: '1px solid rgba(255,255,255,0.14)',
+              background: 'rgba(255,255,255,0.06)', color: '#fff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+            }}
+          >
+            <CheckCheck size={15} />
+          </button>
+        ) : undefined}
+      />
+      <div style={{ padding: '0 16px 12px' }}>
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 60 }}>
-            <div style={{
-              width: 36, height: 36, borderRadius: '50%',
-              border: `3px solid ${v2.brand.steel}33`, borderTopColor: v2.brand.steel,
-              animation: 'spin 1s linear infinite',
-            }} />
-          </div>
+          <MineLoad waiting extra={pull.busy} kind="rows" rowCount={6} radius={22}>
+            <div style={{ height: 240 }} />
+          </MineLoad>
         ) : notifications.length === 0 ? (
-          <motion.div variants={fadeUp} style={{ textAlign: 'center', padding: '60px 32px' }}>
-            <Bell size={40} color={v2.brand.muted} style={{ marginBottom: 16 }} />
-            <p style={{ fontSize: 15, fontWeight: 700, color: v2.brand.mutedSoft }}>No notifications yet</p>
-            <p style={{ fontSize: 12, color: v2.brand.muted, marginTop: 6 }}>Rewards and updates will appear here</p>
-          </motion.div>
+          <GlassSheet>
+            <EmptyCopy title="Nothing yet" body="Rewards and updates will show here." />
+          </GlassSheet>
         ) : (
-          <div style={{ padding: '0 16px' }}>
-            <AnimatePresence>
-              {notifications.map((n, i) => {
-                const { icon, accent } = getIconInfo(n.type);
-                const title = displayNotificationTitle(n.title);
-                const message = displayNotificationMessage(n.message);
-                return (
-                  <motion.div
-                    key={n.id}
-                    variants={fadeUp}
-                    initial="hidden"
-                    animate="show"
-                    transition={{ delay: i * 0.03 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => { if (!n.read) markOneRead(n.id); setSelectedNotif(n); }}
-                    style={{ marginBottom: 8, cursor: 'pointer' }}
-                  >
-                    <V2Card
-                      accent={!n.read ? accent : undefined}
-                      padding="12px 14px"
-                      style={n.read ? { opacity: 0.72 } : undefined}
-                    >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{
-                          width: 38, height: 38, borderRadius: v2.radius.sm, flexShrink: 0,
-                          background: `${accent}18`, border: `1px solid ${accent}44`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {icon}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-                            <p style={{
-                              fontSize: 12, fontWeight: 700, color: v2.brand.steelBright, margin: 0,
-                              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                            }}>
-                              {title}
-                            </p>
-                            {!n.read && (
-                              <div style={{ width: 5, height: 5, borderRadius: '50%', background: v2.brand.glow, flexShrink: 0 }} />
-                            )}
-                          </div>
-                          <p style={{
-                            fontSize: 11, color: v2.brand.mutedSoft, lineHeight: 1.35, margin: 0,
-                            overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical',
-                          }}>
-                            {message}
-                          </p>
-                          <p style={{ fontSize: 10, color: v2.brand.muted, margin: '4px 0 0' }}>{formatDate(n.created_at)}</p>
-                        </div>
-                        {n.amount != null && n.amount > 0 && (
-                          <span style={{ fontSize: 11, fontWeight: 800, color: v2.accent.mining, flexShrink: 0 }}>
-                            +{n.amount.toLocaleString()}
-                          </span>
-                        )}
-                        {n.amount != null && n.amount < 0 && (
-                          <span style={{ fontSize: 11, fontWeight: 800, color: v2.brand.mutedSoft, flexShrink: 0 }}>
-                            {n.amount.toLocaleString()}
-                          </span>
-                        )}
-                      </div>
-                    </V2Card>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
+          <GlassSheet title={`${notifications.length} items`}>
+            <MineLoad extra={pull.busy} kind="rows" rowCount={4} radius={0}>
+              {notifications.map((n) => (
+                <TokenRow
+                  key={n.id}
+                  wrap
+                  icon={getIcon(n.type)}
+                  title={displayNotificationTitle(n.title)}
+                  sub={`${displayNotificationMessage(n.message)} · ${formatDate(n.created_at)}`}
+                  onClick={() => { if (!n.read) markRead(n.id); setSelected(n); }}
+                  trailing={
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                      {n.amount != null && n.amount !== 0 ? (
+                        <span style={{ fontSize: 12, fontWeight: 700, color: n.amount > 0 ? pc.good : pc.soft }}>
+                          {n.amount > 0 ? '+' : ''}{n.amount.toLocaleString()}
+                        </span>
+                      ) : null}
+                      {!n.read ? <span style={{ width: 6, height: 6, borderRadius: 3, background: pc.cream }} /> : null}
+                    </span>
+                  }
+                />
+              ))}
+            </MineLoad>
+          </GlassSheet>
         )}
-      </motion.div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      </div>
     </V2Page>
   );
 }

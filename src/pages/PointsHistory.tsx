@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ChevronLeft, TrendingDown, TrendingUp } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -131,7 +132,7 @@ export default function PointsHistory() {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '52px 20px 0' }}>
           <button
-            onClick={() => navigate(-1)}
+            onClick={() => goBack(navigate)}
             style={{
               width: 40, height: 40, borderRadius: 14,
               background: 'hsl(215 25% 11%)', border: '1px solid hsl(215 22% 18%)',

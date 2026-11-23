@@ -6,6 +6,7 @@ import { Users2, Clock, X, Crown, UsersRound, Copy, Link2 } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { V2Page, fadeUp, stagger } from '../design/Kit';
 import { neon } from '../design/neonTokens';
@@ -14,6 +15,7 @@ import { useDiceRumbleLobby, type RumbleLobby } from '@/features/dice/hooks/useD
 import { DICE_STAKE_TIERS, DICE_RUMBLE_LOBBY_SIZES, diceAccent, diceRumblePot, diceRumblePayout } from '@/features/dice/diceTokens';
 import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
 import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { useGoBack } from '@/lib/navBack';
 import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 
 function formatCountdown(expiresAt?: string | null) {
@@ -136,6 +138,7 @@ export default function DiceRumbleLobbyV2() {
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+  const back = useGoBack('/arena/dice');
 
   useEffect(() => {
     setCountdown(formatCountdown(myMatch?.expiresAt));
@@ -159,7 +162,7 @@ export default function DiceRumbleLobbyV2() {
       next.delete('code');
       setSearchParams(next, { replace: true });
       if (!res.success) {
-        toast({ title: 'Could not join invite', description: res.error, variant: 'destructive' });
+        toast(publicErrorToast(res.error, 'play'));
         return;
       }
       go(`/arena/dice/rumble/${res.matchId}`);
@@ -186,7 +189,7 @@ export default function DiceRumbleLobbyV2() {
       void (async () => {
         const res = await createLobby(stake, size);
         if (!res.success) {
-          toast({ title: 'Could not create lobby', description: res.error, variant: 'destructive' });
+          toast(publicErrorToast(res.error, 'play'));
           return;
         }
         go(`/arena/dice/rumble/${res.matchId}`);
@@ -197,7 +200,7 @@ export default function DiceRumbleLobbyV2() {
   const handleClearStuck = useCallback(async () => {
     const res = await cancelMyOpenMatches();
     if (!res.success) {
-      toast({ title: 'Could not clear matches', description: res.error, variant: 'destructive' });
+      toast(publicErrorToast(res.error, 'play'));
       return;
     }
     toast({ title: 'Matches cleared', description: 'Open lobbies cancelled and stakes refunded.' });
@@ -212,7 +215,7 @@ export default function DiceRumbleLobbyV2() {
       void (async () => {
         const res = await joinLobby(lobby.id);
         if (!res.success) {
-          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          toast(publicErrorToast(res.error, 'play'));
           return;
         }
         go(`/arena/dice/rumble/${res.matchId ?? lobby.id}`);
@@ -226,7 +229,7 @@ export default function DiceRumbleLobbyV2() {
       void (async () => {
         const res = await joinByCode(joinCode);
         if (!res.success) {
-          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          toast(publicErrorToast(res.error, 'play'));
           return;
         }
         go(`/arena/dice/rumble/${res.matchId}`);
@@ -241,11 +244,7 @@ export default function DiceRumbleLobbyV2() {
     if (!myMatch) return;
     const res = isHost ? await cancelLobby(myMatch.id) : await leaveLobby(myMatch.id);
     if (!res.success) {
-      toast({
-        title: isHost ? 'Could not cancel' : 'Could not leave',
-        description: res.error,
-        variant: 'destructive',
-      });
+      toast(publicErrorToast(res.error, 'play'));
     }
   }, [myMatch, cancelLobby, leaveLobby, isHost]);
 
@@ -256,7 +255,7 @@ export default function DiceRumbleLobbyV2() {
         eyebrow="Dice Roll · PvP"
         title="Rumble"
         subtitle="Multiplayer elimination. Lowest roll each round is out."
-        onBack={() => go('/arena/dice')}
+        onBack={back}
         right={
           <div style={{
             width: 38, height: 38, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',

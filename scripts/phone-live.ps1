@@ -23,6 +23,9 @@ function Reverse-Port {
   & $adb -s $Udid reverse tcp:8080 tcp:8080
   if ($LASTEXITCODE -ne 0) { throw 'adb reverse failed. Plug in the phone and allow USB debugging.' }
   Write-Host "adb reverse tcp:8080 tcp:8080 ($Udid)"
+  & $adb -s $Udid reverse tcp:7917 tcp:7917
+  if ($LASTEXITCODE -ne 0) { Write-Host 'adb reverse tcp:7917 failed (debug ingest).' }
+  else { Write-Host "adb reverse tcp:7917 tcp:7917 ($Udid)" }
 }
 
 function Keep-Reverse {
@@ -32,7 +35,10 @@ function Keep-Reverse {
   Start-Job -Name 'arxon-adb-reverse' -ScriptBlock {
     param($adbPath, $serial)
     while ($true) {
-      try { & $adbPath -s $serial reverse tcp:8080 tcp:8080 | Out-Null } catch {}
+      try {
+        & $adbPath -s $serial reverse tcp:8080 tcp:8080 | Out-Null
+        & $adbPath -s $serial reverse tcp:7917 tcp:7917 | Out-Null
+      } catch {}
       Start-Sleep -Seconds 8
     }
   } -ArgumentList $adbPath, $serial | Out-Null

@@ -1,17 +1,33 @@
-const STORAGE_KEY = 'arxon_app_tour_v1';
+const STORAGE_KEY = 'arxon_app_tour_v2';
 const ACTIVE_KEY = 'arxon_app_tour_active';
 
-export type TourStepId = 'welcome' | 'verify' | 'tasks' | 'mining';
+export type TourStepId =
+  | 'welcome'
+  | 'home-balance'
+  | 'mining'
+  | 'home-actions'
+  | 'nav-bar'
+  | 'tasks'
+  | 'tasks-list'
+  | 'mine-testnet'
+  | 'wallet'
+  | 'arena'
+  | 'ranks'
+  | 'refer'
+  | 'nexus'
+  | 'profile'
+  | 'verify'
+  | 'verify-steps';
 
 export type TourProgress = {
-  version: 1;
+  version: 2;
   finishedAt: string | null;
   skippedAt: string | null;
   lastStep: TourStepId | null;
 };
 
 function emptyProgress(): TourProgress {
-  return { version: 1, finishedAt: null, skippedAt: null, lastStep: null };
+  return { version: 2, finishedAt: null, skippedAt: null, lastStep: null };
 }
 
 export function loadTourProgress(userId: string): TourProgress {
@@ -19,7 +35,7 @@ export function loadTourProgress(userId: string): TourProgress {
     const raw = localStorage.getItem(`${STORAGE_KEY}:${userId}`);
     if (!raw) return emptyProgress();
     const parsed = JSON.parse(raw) as TourProgress;
-    if (parsed.version !== 1) return emptyProgress();
+    if (parsed.version !== 2) return emptyProgress();
     return parsed;
   } catch {
     return emptyProgress();
@@ -49,7 +65,7 @@ export function isTourFinished(userId: string): boolean {
 
 export function markTourFinished(userId: string, lastStep: TourStepId) {
   saveTourProgress(userId, {
-    version: 1,
+    version: 2,
     finishedAt: new Date().toISOString(),
     skippedAt: null,
     lastStep,
@@ -59,7 +75,7 @@ export function markTourFinished(userId: string, lastStep: TourStepId) {
 
 export function markTourSkipped(userId: string, lastStep: TourStepId | null) {
   saveTourProgress(userId, {
-    version: 1,
+    version: 2,
     finishedAt: null,
     skippedAt: new Date().toISOString(),
     lastStep,

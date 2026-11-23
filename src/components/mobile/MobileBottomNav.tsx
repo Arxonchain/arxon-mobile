@@ -2,7 +2,6 @@ import { NavLink, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useMobileNav } from '@/contexts/MobileNavContext';
-import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 
 const HomeIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -40,15 +39,6 @@ const ArenaIcon = (a: boolean) => (
   </svg>
 );
 
-const PlayIcon = (a: boolean) => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-    <rect x="4" y="5" width="16" height="14" rx="2"
-      fill={a?'hsl(190 85% 55%/0.15)':'none'}
-      stroke={a?'hsl(190 85% 55%)':'hsl(215 14% 38%)'} strokeWidth="1.7"/>
-    <path d="M10 9l5 3-5 3V9z" fill={a?'hsl(190 85% 55%)':'hsl(215 14% 38%)'}/>
-  </svg>
-);
-
 const LeaderboardIcon = (a: boolean) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z"
@@ -66,7 +56,7 @@ const ProfileIcon = (a: boolean) => (
 /**
  * Classic bottom nav (VITE_ARXON_UI_V2 unset).
  * Mining stays here for Play Store OTA users. Wallet-shell builds use MobileBottomNavV2
- * with the mining-only tabs (Home, Mining, Arena, Play/Ranks, Profile).
+ * with the mining-only tabs (Home, Mining, Arena, Ranks, Profile).
  */
 const BASE_TABS = [
   { to:'/',           id:'home',        label:'Home',        icon:HomeIcon,        col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
@@ -76,21 +66,8 @@ const BASE_TABS = [
   { to:'/profile',    id:'profile',     label:'Profile',     icon:ProfileIcon,     col:'hsl(215 35% 62%)', dot:'hsl(215 55% 62%)' },
 ];
 
-const PLAY_TAB = {
-  to:'/games', id:'games', label:'Play', icon:PlayIcon,
-  col:'hsl(190 85% 55%)', dot:'hsl(190 90% 60%)',
-};
-
 function buildTabs() {
-  if (!WORD_FORGE_ENABLED) return BASE_TABS;
-  // Replace Ranks with Play — ranks still on dashboard
-  return [
-    BASE_TABS[0],
-    BASE_TABS[1],
-    BASE_TABS[2],
-    PLAY_TAB,
-    BASE_TABS[4],
-  ];
+  return BASE_TABS;
 }
 
 export default function MobileBottomNav() {

@@ -478,7 +478,7 @@ export default function MobileDashboard() {
           </div>
         </motion.div>
 
-        {/* ── Activity carousel (Word Forge, Arena, Tasks) ── */}
+        {/* ── Activity carousel (Arena, Tasks) ── */}
         <div style={{padding:'14px 20px 0'}}>
           <DashboardActivityCarousel />
         </div>

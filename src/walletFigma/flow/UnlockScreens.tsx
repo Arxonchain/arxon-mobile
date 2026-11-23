@@ -4,7 +4,8 @@ import { bioVerb, biometricsCaps, enableBiometrics } from '@/chainWallet/biometr
 import { sessionStore } from '@/chainWallet/session';
 import { useLiveFrame } from './liveFrame';
 import { useAppHidesFigmaChrome } from './appChrome';
-import { FingerprintMark } from './BioMark';
+import { FaceScanMark } from './BioMark';
+import { frostWash } from './LiveScroll';
 
 const art = (name: string) => `/wallet-figma/unlock/${name}`;
 type Go = (id: string, remember?: boolean) => void;
@@ -122,13 +123,13 @@ function Unlock({ wrong, password, go }: { wrong: boolean; password: string; go:
         <div style={{ position: 'absolute', left: 18, top: wrong ? 508 : 486, width: 354, display: 'flex', gap: 10 }}>
           {finger ? (
             <button type="button" onClick={bioUnlock} style={{ ...bioChip, flex: 1 }}>
-              <FingerprintMark />
+              <img src={art('fingerprint.png')} alt="" width={20} height={20} style={{ display: 'block', objectFit: 'contain' }} />
               {bioVerb('fingerprint')}
             </button>
           ) : null}
           {face ? (
             <button type="button" onClick={bioUnlock} style={{ ...bioChip, flex: 1 }}>
-              <img src={art('face.svg')} alt="" width={18} height={18} />
+              <FaceScanMark />
               Use Face ID
             </button>
           ) : null}
@@ -371,5 +372,21 @@ function Screen({ children, clock = 'flow' }: { children: ReactNode; clock?: 'fl
 const center: CSSProperties = { position: 'absolute', margin: 0, textAlign: 'center', fontWeight: 400, lineHeight: 'normal' };
 const iconBtn: CSSProperties = { width: 40, height: 40, margin: -10, padding: 0, border: 'none', background: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const unlockBtn: CSSProperties = { position: 'absolute', left: 19, width: 353, height: 55, borderRadius: 8, fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: 'pointer' };
-const bioChip: CSSProperties = { height: 48, borderRadius: 12, border: '1.5px solid #2a3447', background: 'transparent', color: '#accafe', fontFamily: font.sans, fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 0 };
+const bioChip: CSSProperties = {
+  height: 48,
+  borderRadius: 16,
+  border: '1px solid rgba(61,109,255,0.32)',
+  ...frostWash,
+  color: '#0c1018',
+  fontFamily: font.sans,
+  fontWeight: 650,
+  fontSize: 13,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: 8,
+  padding: '0 10px',
+  boxShadow: '0 10px 28px rgba(0,0,0,0.18)',
+};
 const pair: CSSProperties = { position: 'absolute', top: 463, width: 171, height: 55, borderRadius: 8, fontFamily: font.sans, fontWeight: 600, fontSize: 16, cursor: 'pointer' };

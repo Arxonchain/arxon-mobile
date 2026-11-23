@@ -206,10 +206,7 @@ export function TurnstileWidget({
           if (cancelled) return;
           scriptLoadPromise = null;
           setFailed(true);
-          const networkMsg = turnstileErrorMessage('script_load_failed');
-          setFailReason(
-            err instanceof Error ? `${err.message}. ${networkMsg}` : networkMsg,
-          );
+          setFailReason(turnstileErrorMessage('script_load_failed'));
           onErrorRef.current?.('script_load_failed');
         });
     }, 50);

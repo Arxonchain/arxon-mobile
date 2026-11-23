@@ -1,23 +1,94 @@
 /**
  * V2-only auth landing (ARXON_UI_V2). Classic builds use pages/AuthPage.tsx.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, type CSSProperties, type InputHTMLAttributes, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { Eye, EyeOff, Mail, Lock, ArrowLeft, Users } from 'lucide-react';
 import arxonLogo from '@/assets/arxon-icon.svg';
-import authCrystal from '@/assets/v2-auth-crystal.jpg';
-import authEarth from '@/assets/v2-auth-earth-cyan.png';
 import { applyPendingReferralCode } from '@/lib/referral/applyPendingReferral';
 import { TurnstileWidget, isTurnstileConfigured } from '@/components/auth/TurnstileWidget';
 import LegalLinks from '@/components/legal/LegalLinks';
 import { captchaStaleMessage, isCaptchaTokenStale } from '@/lib/auth/captchaToken';
 import { Capacitor } from '@capacitor/core';
+import { font, ink } from '@/walletFigma/tokens';
+import { livePrimary, sheetGlass } from '@/walletFigma/flow/LiveScroll';
+
 type AuthMode = 'signin' | 'signup' | 'forgot';
+
+const PRESS_CSS = `
+.arxon-auth-v2 button {
+  -webkit-tap-highlight-color: transparent;
+  transition: scale 90ms ease, translate 90ms ease, filter 90ms ease;
+}
+.arxon-auth-v2 button:active:not(:disabled) {
+  scale: 0.97;
+  translate: 0 1px;
+  filter: brightness(0.9);
+}
+.arxon-auth-v2 input::placeholder {
+  color: #8c8f99;
+  opacity: 1;
+}
+.arxon-auth-v2 a {
+  color: #accafe;
+  text-decoration: none;
+}
+.arxon-auth-v2 input:-webkit-autofill,
+.arxon-auth-v2 input:-webkit-autofill:hover,
+.arxon-auth-v2 input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff;
+  caret-color: #accafe;
+  box-shadow: 0 0 0 1000px #0a0c10 inset;
+  transition: background-color 9999s ease-out;
+}
+`;
+
+const fieldRow: CSSProperties = {
+  width: '100%',
+  height: 48,
+  minHeight: 48,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  padding: '0 12px',
+  borderRadius: 14,
+  border: '1px solid rgba(255,255,255,0.08)',
+  background: 'rgba(10,12,16,0.55)',
+  boxSizing: 'border-box',
+};
+
+const fieldInput: CSSProperties = {
+  flex: 1,
+  minWidth: 0,
+  height: 48,
+  border: 'none',
+  outline: 'none',
+  background: 'transparent',
+  color: ink.text,
+  caretColor: ink.accent,
+  fontFamily: font.sans,
+  fontSize: 14,
+  fontWeight: 500,
+};
+
+const iconMute: CSSProperties = { color: ink.secondary, flexShrink: 0 };
+
+function Field({
+  icon,
+  trailing,
+  ...input
+}: InputHTMLAttributes<HTMLInputElement> & { icon: ReactNode; trailing?: ReactNode }) {
+  return (
+    <div style={fieldRow}>
+      {icon}
+      <input {...input} style={{ ...fieldInput, ...input.style }} />
+      {trailing}
+    </div>
+  );
+}
 
 function isAlreadyRegisteredError(message?: string) {
   const m = (message || '').toLowerCase();
@@ -184,11 +255,7 @@ export default function AuthLandingV2() {
         });
         setMode('signin');
       } else {
-        toast({
-          title: 'Error',
-          description: err.message || 'Something went wrong. Please try again.',
-          variant: 'destructive',
-        });
+        toast(publicErrorToast(err, 'auth'));
       }
     } finally {
       setLoading(false);
@@ -196,193 +263,193 @@ export default function AuthLandingV2() {
     }
   };
 
+  const submitDisabled =
+    loading ||
+    (mode === 'signup' && !!confirmPassword && password !== confirmPassword) ||
+    (captchaRequired && !captchaToken);
+
   return (
-    <div className="relative min-h-screen overflow-hidden flex items-center justify-center p-4 pt-20">
-      <style>{`
-        @keyframes arxonEarthRoll {
-          0% { transform: translate(-50%, -46%) rotate(0deg) scale(1.05); }
-          50% { transform: translate(-48%, -48%) rotate(180deg) scale(1.12); }
-          100% { transform: translate(-50%, -46%) rotate(360deg) scale(1.05); }
-        }
-        @keyframes arxonEarthDrift {
-          0%, 100% { opacity: 0.78; filter: drop-shadow(0 0 40px rgba(79,216,235,0.35)); }
-          50% { opacity: 0.95; filter: drop-shadow(0 0 70px rgba(79,216,235,0.55)); }
-        }
-      `}</style>
+    <div
+      className="arxon-auth-v2"
+      style={{
+        position: 'relative',
+        minHeight: '100%',
+        overflow: 'auto',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        padding: '16px 16px 24px',
+        paddingTop: 'max(72px, calc(env(safe-area-inset-top, 0px) + 52px))',
+        background: '#0a0c10',
+        color: ink.text,
+        fontFamily: font.sans,
+      }}
+    >
+      <style>{PRESS_CSS}</style>
 
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          backgroundImage: `url(${authCrystal})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          filter: 'blur(14px) brightness(0.55) saturate(1.15)',
-          transform: 'scale(1.12)',
-        }}
-      />
-      <div
-        aria-hidden
-        className="absolute inset-0"
-        style={{
-          background: `
-            radial-gradient(ellipse 80% 55% at 50% 20%, rgba(79,216,235,0.18), transparent 55%),
-            linear-gradient(180deg, rgba(2,6,14,0.35) 0%, rgba(2,6,14,0.82) 100%)
-          `,
-        }}
-      />
-
-      <div
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[18%] z-[1] w-[min(92vw,420px)] aspect-square"
-        style={{ animation: 'arxonEarthDrift 6s ease-in-out infinite' }}
-      >
-        <img
-          src={authEarth}
-          alt=""
-          className="absolute left-1/2 top-1/2 w-[130%] max-w-none select-none"
-          style={{
-            mixBlendMode: 'screen',
-            animation: 'arxonEarthRoll 28s linear infinite',
-          }}
-        />
-      </div>
-
-      <div className="relative z-10 w-full max-w-md">
+      <div style={{ position: 'relative', zIndex: 1, width: '100%', maxWidth: 360 }}>
         <div
-          className="p-8 rounded-3xl border border-cyan-400/25 shadow-2xl"
           style={{
-            background: 'linear-gradient(165deg, #0a1c30 0%, #050e1c 100%)',
-            boxShadow: '0 24px 60px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.08), 0 0 40px rgba(79,216,235,0.1)',
+            ...sheetGlass,
+            borderRadius: 22,
+            padding: '16px 14px 14px',
+            boxSizing: 'border-box',
           }}
         >
-          <div className="flex justify-center mb-6">
-            <img src={arxonLogo} alt="Arxon" className="h-16 w-16 rounded-xl shadow-[0_0_28px_rgba(79,216,235,0.35)]" />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+            <img
+              src={arxonLogo}
+              alt="Arxon"
+              style={{ width: 40, height: 40, borderRadius: 12 }}
+            />
           </div>
 
-          <h1 className="text-2xl font-bold text-center mb-2 text-cyan-50">
+          <h1
+            style={{
+              margin: 0,
+              textAlign: 'center',
+              fontSize: 20,
+              fontWeight: 650,
+              letterSpacing: -0.4,
+              color: ink.text,
+              fontFamily: font.sans,
+            }}
+          >
             {mode === 'signin' && 'Welcome Back'}
             {mode === 'signup' && 'Create Account'}
             {mode === 'forgot' && 'Reset Password'}
           </h1>
-          <p className="text-cyan-100/60 text-center mb-8 text-sm">
+          <p
+            style={{
+              margin: '4px 0 14px',
+              textAlign: 'center',
+              fontSize: 12,
+              fontWeight: 400,
+              color: ink.secondary,
+            }}
+          >
             {mode === 'signin' && 'Log in with your existing mining account'}
             {mode === 'signup' && 'Join Arxon and start earning'}
             {mode === 'forgot' && 'Enter your email to reset password'}
           </p>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-black/20 border-cyan-400/20"
-                  required
-                  autoComplete="email"
-                />
-              </div>
-            </div>
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <Field
+              id="email"
+              type="email"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+              icon={<Mail size={16} style={iconMute} />}
+            />
 
             {mode !== 'forgot' && (
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="pl-10 pr-10 bg-black/20 border-cyan-400/20"
-                    required
-                    autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
-                  />
+              <Field
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
+                icon={<Lock size={16} style={iconMute} />}
+                trailing={
                   <button
                     type="button"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
+                    style={{
+                      display: 'flex',
+                      border: 'none',
+                      background: 'none',
+                      padding: 4,
+                      color: ink.secondary,
+                      cursor: 'pointer',
+                    }}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
-                </div>
-              </div>
+                }
+              />
             )}
 
             {mode === 'signup' && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="confirmPassword"
-                      type={showPassword ? 'text' : 'password'}
-                      placeholder="••••••••"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="pl-10 bg-black/20 border-cyan-400/20"
-                      required
-                      autoComplete="new-password"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="referral" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Referral Code (optional)
-                  </Label>
-                  <Input
-                    id="referral"
-                    type="text"
-                    placeholder="FRIEND123"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    className="uppercase bg-black/20 border-cyan-400/20"
-                    autoComplete="off"
-                  />
-                </div>
+                <Field
+                  id="confirmPassword"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Confirm password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  autoComplete="new-password"
+                  icon={<Lock size={16} style={iconMute} />}
+                />
+                <Field
+                  id="referral"
+                  type="text"
+                  placeholder="Referral code (optional)"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  autoComplete="off"
+                  icon={<Users size={16} style={iconMute} />}
+                  style={{ textTransform: 'uppercase' }}
+                />
               </>
             )}
 
             {captchaRequired ? (
-            <TurnstileWidget
-              key={mode}
-              action={mode}
-              resetKey={captchaResetKey}
-              onVerify={handleCaptchaVerify}
-              onExpire={() => {
-                setCaptchaToken(null);
-                setCaptchaVerifiedAt(null);
-              }}
-              onError={() => {
-                setCaptchaToken(null);
-                setCaptchaVerifiedAt(null);
-              }}
-            />
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '2px 0' }}>
+                <TurnstileWidget
+                  key={mode}
+                  action={mode}
+                  resetKey={captchaResetKey}
+                  onVerify={handleCaptchaVerify}
+                  onExpire={() => {
+                    setCaptchaToken(null);
+                    setCaptchaVerifiedAt(null);
+                  }}
+                  onError={() => {
+                    setCaptchaToken(null);
+                    setCaptchaVerifiedAt(null);
+                  }}
+                />
+              </div>
             ) : null}
 
             {mode === 'signin' && (
-              <button type="button" onClick={() => setMode('forgot')} className="text-sm text-accent hover:text-accent/80">
+              <button
+                type="button"
+                onClick={() => setMode('forgot')}
+                style={{
+                  alignSelf: 'flex-start',
+                  border: 'none',
+                  background: 'none',
+                  padding: 0,
+                  color: ink.accent,
+                  fontFamily: font.sans,
+                  fontSize: 12,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
                 Forgot password?
               </button>
             )}
 
-            <Button
+            <button
               type="submit"
-              className="w-full btn-mining btn-glow"
-              disabled={
-                loading ||
-                (mode === 'signup' && !!confirmPassword && password !== confirmPassword) ||
-                (captchaRequired && !captchaToken)
-              }
+              disabled={submitDisabled}
+              style={{
+                ...livePrimary,
+                height: 48,
+                marginTop: 4,
+                opacity: submitDisabled ? 0.45 : 1,
+                cursor: submitDisabled ? 'default' : 'pointer',
+              }}
             >
               {loading
                 ? 'Please wait...'
@@ -393,31 +460,60 @@ export default function AuthLandingV2() {
                 : mode === 'signup'
                 ? 'Create Account'
                 : 'Send Reset Link'}
-            </Button>
+            </button>
 
             {(mode === 'signin' || mode === 'signup') && (
-              <p className="text-xs text-center text-muted-foreground pt-1">
+              <p
+                style={{
+                  margin: 0,
+                  textAlign: 'center',
+                  fontSize: 11,
+                  lineHeight: 1.4,
+                  color: ink.muted,
+                }}
+              >
                 By continuing, you agree to our{' '}
-                <LegalLinks linkClassName="text-accent hover:underline" separator=" and " />
+                <LegalLinks linkClassName="hover:underline" separator=" and " />
               </p>
             )}
           </form>
 
-          <div className="mt-6 text-center">
+          <div style={{ marginTop: 12, textAlign: 'center' }}>
             {mode === 'forgot' ? (
               <button
+                type="button"
                 onClick={() => setMode('signin')}
-                className="text-sm text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 mx-auto"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 4,
+                  border: 'none',
+                  background: 'none',
+                  color: ink.secondary,
+                  fontFamily: font.sans,
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
               >
-                <ArrowLeft className="h-4 w-4" />
+                <ArrowLeft size={14} />
                 Back to sign in
               </button>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p style={{ margin: 0, fontSize: 13, color: ink.secondary }}>
                 {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
                 <button
+                  type="button"
                   onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-                  className="text-accent hover:text-accent/80"
+                  style={{
+                    border: 'none',
+                    background: 'none',
+                    padding: 0,
+                    color: ink.accent,
+                    fontFamily: font.sans,
+                    fontSize: 13,
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                  }}
                 >
                   {mode === 'signin' ? 'Sign up' : 'Sign in'}
                 </button>
@@ -425,7 +521,16 @@ export default function AuthLandingV2() {
             )}
           </div>
         </div>
-        <p className="mt-5 text-center text-[10px] tracking-[0.22em] uppercase text-cyan-200/45">
+        <p
+          style={{
+            margin: '12px 0 0',
+            textAlign: 'center',
+            fontSize: 10,
+            letterSpacing: '0.22em',
+            textTransform: 'uppercase',
+            color: 'rgba(140,143,153,0.7)',
+          }}
+        >
           Privacy for the people
         </p>
       </div>

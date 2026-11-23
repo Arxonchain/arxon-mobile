@@ -20,6 +20,7 @@ import { briefAddr } from './briefAddr';
 import { useTokenPrices } from '@/hooks/useTokenPrices';
 import { hiddenCount, privacyPill as pillText, readDefaultPrivacy, writeDefaultPrivacy } from '@/walletFigma/privacyPrefs';
 import { verifyBiometrics } from '@/chainWallet/biometrics';
+import { debugWalletLog, storageLeakFlags } from '@/chainWallet/debugWalletIngest';
 import {
   addHdAccount,
   autoLockDue,
@@ -428,7 +429,20 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onVis = () => {
-      if (document.visibilityState === 'hidden') touchSession();
+      // #region agent log
+      debugWalletLog('A', 'liveFrame.tsx:visibility', 'visibility change', {
+        visibility: document.visibilityState,
+        autoLockDue: autoLockDue(),
+        hasSessionPassword: !!currentPassword(),
+        mnemonicInMemory: !!wallet.mnemonic,
+        walletLocked: wallet.locked,
+        hiddenTouchesSession: false,
+        ...storageLeakFlags(),
+      });
+      // #endregion
+      if (document.visibilityState === 'hidden' && autoLockDue()) {
+        void wallet.lockSession();
+      }
       if (document.visibilityState === 'visible') {
         void wallet.refreshBalance();
         void refreshPrices();
@@ -439,7 +453,21 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
     const onMove = () => touchSession();
     document.addEventListener('visibilitychange', onVis);
     window.addEventListener('pointerdown', onMove);
-    const t = window.setInterval(() => setTick((n) => n + 1), 15_000);
+    const t = window.setInterval(() => {
+      // #region agent log
+      debugWalletLog('A', 'liveFrame.tsx:autolockTick', 'autolock tick', {
+        autoLockDue: autoLockDue(),
+        hasSessionPassword: !!currentPassword(),
+        mnemonicInMemory: !!wallet.mnemonic,
+        walletLocked: wallet.locked,
+        needsUnlockWouldFire: wallet.locked || (sessionStore.hasPassword() && !currentPassword() && autoLockDue()),
+        autoLockSetting: sessionStore.autoLock(),
+        sessionPasswordOnLiveFrame: !!currentPassword(),
+      });
+      // #endregion
+      if (autoLockDue()) void wallet.lockSession();
+      setTick((n) => n + 1);
+    }, 15_000);
     let appHandle: { remove: () => Promise<void> } | undefined;
     if (Capacitor.isNativePlatform()) {
       void import('@capacitor/app').then(({ App }) =>
@@ -674,6 +702,19 @@ export function LiveFrameProvider({ children }: { children: ReactNode }) {
   const send = useCallback(
     async (symbol: string, to: string, amount: string, testnet: boolean, mode: LiveSendMode = 'home', paymentFlags?: PrivacyFlags, chain?: 'ethereum' | 'solana') => {
       const flags = (testnet ? paymentFlags : undefined) ?? readDefaultPrivacy();
+      // #region agent log
+      debugWalletLog('D', 'liveFrame.tsx:send', 'send invoked', {
+        symbol,
+        testnet,
+        mode,
+        chain: chain || null,
+        destLen: to.trim().length,
+        destLooksEvm: /^0x[0-9a-fA-F]{40}$/.test(to.trim()),
+        walletNetwork: wallet.network,
+        mnemonicInMemory: !!wallet.mnemonic,
+        hasSessionPassword: !!currentPassword(),
+      });
+      // #endregion
       if (!testnet && (mode !== 'home' || isArxonSymbol(symbol))) {
         throw new Error('Arxon, Vault and private sends are on Arxon Testnet only.');
       }

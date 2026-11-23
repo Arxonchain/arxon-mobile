@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useCallback, type CSSProperties } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight } from 'lucide-react';
+import { ChevronLeft } from 'lucide-react';
+import { mobileTopPaddingPage } from '@/lib/mobileLayout';
+import { frostWash, sheetGlass, IceToggle } from '@/walletFigma/flow/LiveScroll';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { useAuth } from '@/contexts/AuthContext';
 import { useArena, type ArenaBattle, type BattleHistoryEntry } from '@/hooks/useArena';
 import { useArenaMarkets } from '@/hooks/useArenaMarkets';
@@ -16,22 +18,18 @@ import { getOptionName, type ArenaSideId } from '@/lib/arenaOptions';
 import MobileAIPredictionBadge from '@/components/mobile/MobileAIPredictionBadge';
 import { useStakeCompliance } from '@/hooks/useStakeCompliance';
 import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
-import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { useGoBack } from '@/lib/navBack';
 import {
   V2Page,
-  V2Header,
-  V2HeroCard,
   V2Card,
   V2Button,
-  V2ButtonGhost,
-  V2Tabs,
-  V2Pills,
-  V2SectionHeader,
   V2Eyebrow,
   V2StatGrid,
-  fadeUp,
 } from '../design/Kit';
 import { v2 } from '../design/tokens';
+import { MinerAvatar } from '../components/MinerAvatar';
+import { MineLoad } from '../components/MineLoad';
+import { usePullRefresh } from '@/walletFigma/flow/pullRefresh';
 
 const CSS = `
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}
@@ -43,9 +41,213 @@ type ArenaSide = ArenaSideId;
 type Tab = 'battles' | 'leaderboard' | 'my-stakes';
 type BattleFilter = 'live' | 'upcoming' | 'ended';
 
-const ARENA = v2.accent.arena;
-const ALPHA = 'hsl(195 80% 50%)';
-const OMEGA = 'hsl(255 60% 65%)';
+const ARENA = '#accafe';
+const INK = '#0c1018';
+const MUTED = '#5c6370';
+const SOFT = '#8c8f99';
+
+const frostCard: CSSProperties = {
+  ...frostWash,
+  borderRadius: 16,
+  border: '1px solid rgba(61,109,255,0.32)',
+  boxShadow: '0 10px 28px rgba(0,0,0,0.18)',
+  boxSizing: 'border-box',
+};
+
+const tokenSheet: CSSProperties = {
+  borderRadius: 22,
+  padding: '8px 12px 10px',
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+  ...sheetGlass,
+};
+
+const tokenRow: CSSProperties = {
+  width: '100%',
+  height: 40,
+  minHeight: 40,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  border: 'none',
+  background: 'none',
+  color: '#fff',
+  padding: 0,
+  cursor: 'pointer',
+  fontFamily: neon.font,
+  textAlign: 'left',
+};
+
+const tokenGlyph: CSSProperties = {
+  width: 32,
+  height: 32,
+  borderRadius: 16,
+  flexShrink: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  background: '#1c2025',
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: 700,
+};
+
+function MarketHeader({ title, onBack }: { title: string; onBack: () => void }) {
+  return (
+    <div style={{ padding: `${mobileTopPaddingPage()} 16px 14px` }}>
+      <button
+        type="button"
+        onClick={onBack}
+        aria-label="Back"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 12,
+          border: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(255,255,255,0.04)',
+          color: '#fff',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+        }}
+      >
+        <ChevronLeft size={18} strokeWidth={2.2} />
+      </button>
+      <h1
+        style={{
+          margin: '12px 0 0',
+          fontSize: 22,
+          fontWeight: 750,
+          color: '#fff',
+          letterSpacing: '-0.5px',
+          lineHeight: 1.15,
+          fontFamily: neon.font,
+        }}
+      >
+        {title}
+      </h1>
+    </div>
+  );
+}
+
+function FrostEarnCard({ amount }: { amount: number }) {
+  return (
+    <div style={{ ...frostCard, padding: '18px 16px', textAlign: 'center' }}>
+      <p style={{ margin: 0, fontSize: 12, fontWeight: 600, color: MUTED }}>Arena earned</p>
+      <p
+        style={{
+          margin: '6px 0 0',
+          fontSize: 28,
+          fontWeight: 750,
+          color: INK,
+          letterSpacing: '-0.8px',
+          fontVariantNumeric: 'tabular-nums',
+          fontFamily: neon.font,
+        }}
+      >
+        {amount.toLocaleString()}
+        <span style={{ marginLeft: 6, fontSize: 13, fontWeight: 600, color: MUTED }}>ARX-P</span>
+      </p>
+    </div>
+  );
+}
+
+function SegmentTabs<T extends string>({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: { id: T; label: string }[];
+  active: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 4,
+        padding: 4,
+        borderRadius: 18,
+        background: '#eef0f4',
+      }}
+    >
+      {tabs.map((tab) => {
+        const on = tab.id === active;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            style={{
+              flex: 1,
+              height: 30,
+              border: 'none',
+              borderRadius: 15,
+              background: on ? '#fff' : 'transparent',
+              color: on ? INK : SOFT,
+              fontSize: 11,
+              fontWeight: 650,
+              cursor: 'pointer',
+              fontFamily: neon.font,
+              boxShadow: on ? '0 2px 8px rgba(12,16,24,0.10)' : 'none',
+            }}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DarkPills<T extends string>({
+  items,
+  active,
+  onChange,
+}: {
+  items: { id: T; label: string; count?: number }[];
+  active: T;
+  onChange: (id: T) => void;
+}) {
+  return (
+    <div style={{ display: 'flex', gap: 6, margin: '4px 0 6px' }}>
+      {items.map((item) => {
+        const on = item.id === active;
+        return (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onChange(item.id)}
+            style={{
+              height: 28,
+              padding: '0 12px',
+              border: 'none',
+              borderRadius: 14,
+              background: on ? '#fff' : 'rgba(255,255,255,0.06)',
+              color: on ? INK : SOFT,
+              fontSize: 11,
+              fontWeight: 650,
+              cursor: 'pointer',
+              fontFamily: neon.font,
+            }}
+          >
+            {item.label}
+            {item.count != null ? ` ${item.count}` : ''}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function SheetEmpty({ title }: { title: string }) {
+  return (
+    <p style={{ margin: '16px 0 12px', fontSize: 13, color: SOFT, textAlign: 'center', fontFamily: neon.font }}>
+      {title}
+    </p>
+  );
+}
 
 function getPoolStats(battle: Parameters<typeof getArenaPoolStats>[0]) {
   return getArenaPoolStats(battle);
@@ -76,159 +278,28 @@ function useTimer(endsAt: string | null, active: boolean) {
   return str;
 }
 
-function StatusBadge({
-  isActive,
-  isEnded,
-  concluded,
-  userVoted,
-  userWon,
-  timer,
-}: {
-  isActive?: boolean;
-  isEnded?: boolean;
-  concluded: boolean;
-  userVoted?: boolean;
-  userWon?: boolean;
-  timer: string;
-}) {
-  if (isActive) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 4,
-          background: `${v2.accent.danger}18`,
-          border: `1px solid ${v2.accent.danger}38`,
-          borderRadius: 20,
-          padding: '3px 9px',
-        }}
-      >
-        <div className="pulse" style={{ width: 5, height: 5, borderRadius: '50%', background: v2.accent.danger }} />
-        <span style={{ fontSize: 9, fontWeight: 700, color: v2.accent.danger }}>LIVE · {timer}</span>
-      </div>
-    );
-  }
-  if (concluded) {
-    const label = userVoted ? (userWon ? '🏆 Won' : '💧 Lost') : 'Resolved';
-    return (
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          padding: '3px 9px',
-          borderRadius: 20,
-          color: userVoted ? (userWon ? v2.accent.success : v2.brand.mutedSoft) : v2.accent.gold,
-          background: userVoted
-            ? userWon
-              ? `${v2.accent.success}18`
-              : v2.brand.raised
-            : `${v2.accent.gold}18`,
-          border: `1px solid ${
-            userVoted
-              ? userWon
-                ? `${v2.accent.success}38`
-                : v2.brand.border
-              : `${v2.accent.gold}44`
-          }`,
-        }}
-      >
-        {label}
-      </div>
-    );
-  }
-  if (!isEnded) {
-    return (
-      <div
-        style={{
-          fontSize: 9,
-          fontWeight: 700,
-          padding: '3px 9px',
-          borderRadius: 20,
-          color: v2.brand.steel,
-          background: `${v2.brand.steel}12`,
-          border: `1px solid ${v2.brand.steel}33`,
-        }}
-      >
-        Upcoming
-      </div>
-    );
-  }
-  return (
-    <div
-      style={{
-        fontSize: 9,
-        fontWeight: 700,
-        padding: '3px 9px',
-        borderRadius: 20,
-        color: v2.brand.mutedSoft,
-        background: v2.brand.raised,
-        border: `1px solid ${v2.brand.border}`,
-      }}
-    >
-      Awaiting results
-    </div>
-  );
+function battleArt(battle: ArenaBattle | BattleHistoryEntry) {
+  const row = battle as ArenaBattle & {
+    banner_image?: string | null;
+    side_a_image?: string | null;
+    side_b_image?: string | null;
+  };
+  return {
+    banner: row.banner_image || null,
+    left: row.side_a_image || null,
+    right: row.side_b_image || null,
+  };
 }
 
-function SidePool({
-  name,
-  pct,
-  isWinner,
-  align = 'left',
-}: {
-  name: string;
-  pct: number;
-  isWinner: boolean;
-  align?: 'left' | 'center';
-}) {
-  return (
-    <div
-      style={{
-        padding: '10px 12px',
-        borderRadius: v2.radius.sm,
-        background: isWinner ? `${v2.accent.gold}14` : `${v2.brand.raised}88`,
-        border: `1.5px solid ${isWinner ? `${v2.accent.gold}55` : `${v2.brand.steel}22`}`,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 3,
-        alignItems: align === 'center' ? 'center' : 'stretch',
-      }}
-    >
-      <p
-        style={{
-          fontSize: 11,
-          fontWeight: 700,
-          color: v2.brand.steelLight,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
-          lineHeight: 1.3,
-          textAlign: align,
-        }}
-      >
-        {name}
-      </p>
-      <p
-        style={{
-          fontSize: 15,
-          fontWeight: 900,
-          color: isWinner ? v2.accent.gold : v2.brand.steelLight,
-          lineHeight: 1,
-        }}
-      >
-        {pct}%
-      </p>
-      {isWinner && <span style={{ fontSize: 9, fontWeight: 700, color: v2.accent.gold }}>👑 Winner</span>}
-    </div>
-  );
+function compactPts(n: number) {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
+  if (n >= 10_000) return `${Math.round(n / 1000)}K`;
+  return n.toLocaleString();
 }
 
 function BattleCard({
   battle,
   isActive,
-  isEnded,
-  userVoted,
   userWon,
   onClick,
 }: {
@@ -239,181 +310,90 @@ function BattleCard({
   userWon?: boolean;
   onClick: () => void;
 }) {
-  const timer = useTimer(battle.ends_at, !!isActive);
-  const { total: totalPow, pctA, pctB, pctC, hasSideC } = getPoolStats(battle);
-  const concluded = (isEnded || !isActive) && battle.winner_side;
-  const totalVoters = (battle as ArenaBattle & { total_participants?: number }).total_participants ?? 0;
-  const banner = (battle as ArenaBattle & { banner_image?: string }).banner_image;
-
-  const accent = concluded && userWon ? v2.accent.success : isActive ? ARENA : v2.brand.steel;
+  const { total: totalPow } = getPoolStats(battle);
+  const { banner, left, right } = battleArt(battle);
 
   return (
-    <V2Card
-      accent={accent}
+    <button
+      type="button"
       onClick={onClick}
-      padding="0"
       style={{
-        marginBottom: 12,
-        background: concluded && userWon ? `linear-gradient(160deg, ${v2.accent.success}10, hsl(225 30% 6% / 0.56))` : undefined,
-        boxShadow: isActive ? v2.shadow(ARENA, 0.18) : accent ? v2.shadow(accent, 0.1) : undefined,
+        position: 'relative',
+        width: '100%',
+        height: 128,
+        border: 'none',
+        borderRadius: 16,
+        overflow: 'hidden',
+        padding: 0,
+        cursor: 'pointer',
+        textAlign: 'left',
+        fontFamily: neon.font,
+        background: '#12151c',
       }}
     >
-      {isActive && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 2,
-            background: `linear-gradient(90deg, transparent, ${ARENA}88, transparent)`,
-            zIndex: 2,
-          }}
+      {banner ? (
+        <img
+          src={banner}
+          alt=""
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }}
         />
-      )}
-
-      {banner && (
-        <div style={{ height: 90, overflow: 'hidden', position: 'relative' }}>
-          <img
-            src={banner}
-            alt=""
-            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
-            onError={(e) => {
-              (e.target as HTMLImageElement).parentElement!.style.display = 'none';
-            }}
-          />
-          <div
-            style={{
-              position: 'absolute',
-              inset: 0,
-              background: `linear-gradient(to bottom, transparent 35%, ${v2.brand.deep}bb)`,
-            }}
-          />
-        </div>
-      )}
-
-      <div style={{ padding: '14px 16px 14px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-          <div style={{ flex: 1, minWidth: 0, paddingRight: 8 }}>
-            <p
-              style={{
-                fontSize: 13,
-                fontWeight: 800,
-                color: v2.brand.steelBright,
-                letterSpacing: '-0.2px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                margin: 0,
-              }}
-            >
-              {battle.title}
-            </p>
-            {battle.description && (
-              <p
-                style={{
-                  fontSize: 10,
-                  color: v2.brand.muted,
-                  marginTop: 3,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {battle.description}
-              </p>
-            )}
-            <MobileAIPredictionBadge
-              sideAProbability={(battle as ArenaBattle & { ai_side_a_probability?: number }).ai_side_a_probability}
-              sideBProbability={(battle as ArenaBattle & { ai_side_b_probability?: number }).ai_side_b_probability}
-              sideAName={battle.side_a_name}
-              sideBName={battle.side_b_name}
-              confidence={(battle as ArenaBattle & { ai_confidence?: number }).ai_confidence}
-            />
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
-            <StatusBadge
-              isActive={isActive}
-              isEnded={isEnded}
-              concluded={!!concluded}
-              userVoted={userVoted}
-              userWon={userWon}
-              timer={timer}
-            />
-            <ChevronRight size={14} color={v2.brand.muted} style={{ marginLeft: 6 }} />
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: hasSideC ? '1fr 1fr 1fr' : '1fr 32px 1fr',
-            gap: 8,
-            alignItems: 'stretch',
-            marginBottom: 10,
-          }}
-        >
-          <SidePool name={battle.side_a_name} pct={pctA} isWinner={battle.winner_side === 'a'} />
-          {hasSideC ? (
-            <SidePool
-              name={battle.side_c_name || 'Draw'}
-              pct={pctC}
-              isWinner={battle.winner_side === 'c'}
-              align="center"
-            />
+      ) : left || right ? (
+        <div style={{ position: 'absolute', inset: 0, display: 'flex' }}>
+          {left ? (
+            <img src={left} alt="" style={{ flex: 1, minWidth: 0, height: '100%', objectFit: 'cover' }} />
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <div
-                style={{
-                  width: 28,
-                  height: 28,
-                  borderRadius: 9,
-                  background: `${ARENA}14`,
-                  border: `1px solid ${ARENA}33`,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <span style={{ fontSize: 8, fontWeight: 900, color: ARENA }}>VS</span>
-              </div>
-            </div>
+            <div style={{ flex: 1, background: '#1c2025' }} />
           )}
-          <SidePool name={battle.side_b_name} pct={pctB} isWinner={battle.winner_side === 'b'} />
+          {right ? (
+            <img src={right} alt="" style={{ flex: 1, minWidth: 0, height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <div style={{ flex: 1, background: '#1c2025' }} />
+          )}
         </div>
+      ) : null}
 
-        <div
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'linear-gradient(180deg, rgba(0,0,0,0.08) 20%, rgba(0,0,0,0.78) 100%)',
+        }}
+      />
+
+      <div
+        style={{
+          position: 'relative',
+          zIndex: 1,
+          height: '100%',
+          display: 'flex',
+          alignItems: 'flex-end',
+          justifyContent: 'space-between',
+          gap: 10,
+          padding: '12px 12px 10px',
+          boxSizing: 'border-box',
+        }}
+      >
+        <span
           style={{
-            height: 4,
-            borderRadius: 2,
-            background: v2.brand.raised,
+            minWidth: 0,
+            fontSize: 14,
+            fontWeight: 700,
+            color: '#fff',
+            lineHeight: 1.25,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
             overflow: 'hidden',
-            marginBottom: 8,
           }}
         >
-          <div
-            style={{
-              height: '100%',
-              borderRadius: 2,
-              width: `${pctA}%`,
-              background: `linear-gradient(90deg, ${v2.brand.steel}, ${ARENA})`,
-              transition: 'width 0.5s ease',
-            }}
-          />
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: 9, color: v2.brand.muted }}>
-            {totalPow.toLocaleString()} ARX-P · {totalVoters} voter{totalVoters !== 1 ? 's' : ''}
-          </span>
-          <span style={{ fontSize: 9, color: concluded ? v2.accent.gold : v2.brand.muted, fontWeight: concluded ? 700 : 400 }}>
-            {concluded
-              ? `Resolved · ${sideName(battle, battle.winner_side as ArenaSide)}`
-              : new Date(isActive ? battle.ends_at : battle.starts_at).toLocaleDateString()}
-          </span>
-        </div>
+          {battle.title}
+        </span>
+        <span style={{ flexShrink: 0, display: 'flex', alignItems: 'baseline', gap: 4, whiteSpace: 'nowrap', color: isActive || userWon ? ARENA : '#fff' }}>
+          <span style={{ fontSize: 13, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{compactPts(totalPow)}</span>
+          <span style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.7)' }}>ARX-P</span>
+        </span>
       </div>
-    </V2Card>
+    </button>
   );
 }
 
@@ -441,13 +421,6 @@ function BattleDetailSide({
   const selected = activeSide === side;
   const won = winnerSide === side;
   const pressable = !!(isActive && !existingVote);
-  const borderColor = selected
-    ? `${ARENA}aa`
-    : won
-      ? `${v2.accent.gold}88`
-      : pressable
-        ? `${v2.brand.steel}55`
-        : `${v2.brand.steel}28`;
   return (
     <motion.div
       whileTap={pressable ? { scale: 0.96, y: 1 } : undefined}
@@ -472,14 +445,11 @@ function BattleDetailSide({
         gap: 8,
         cursor: pressable ? 'pointer' : 'default',
         touchAction: 'manipulation',
-        // Solid “portable card” sitting on the big battle panel — not flat text.
-        background: selected
-          ? `linear-gradient(165deg, hsl(255 45% 22%) 0%, hsl(225 28% 9%) 55%, hsl(225 30% 6%) 100%)`
-          : `linear-gradient(165deg, hsl(225 26% 14%) 0%, hsl(225 28% 8%) 60%, hsl(225 30% 5%) 100%)`,
-        border: `1.5px solid ${borderColor}`,
+        ...frostWash,
+        border: selected ? '1.5px solid #0c1018' : '1px solid rgba(61,109,255,0.32)',
         boxShadow: selected
-          ? `0 14px 32px rgba(0,0,0,0.55), 0 0 28px ${ARENA}40, inset 0 1px 0 rgba(255,255,255,0.12)`
-          : `0 12px 28px rgba(0,0,0,0.5), 0 2px 0 rgba(255,255,255,0.04), inset 0 1px 0 rgba(255,255,255,0.08)`,
+          ? '0 10px 24px rgba(0,0,0,0.22)'
+          : '0 8px 18px rgba(0,0,0,0.12)',
         transform: selected ? 'translateY(-3px)' : 'translateY(0)',
         transition: 'box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
       }}
@@ -494,27 +464,26 @@ function BattleDetailSide({
             fontWeight: 800,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
-            color: `${v2.brand.steel}99`,
+            color: MUTED,
           }}
         >
           Tap
         </div>
       )}
-      <p style={{ fontSize: 12, fontWeight: 700, color: v2.brand.steelLight, textAlign: 'center', margin: 0, lineHeight: 1.25 }}>
+      <p style={{ fontSize: 12, fontWeight: 700, color: INK, textAlign: 'center', margin: 0, lineHeight: 1.25 }}>
         {name}
       </p>
       <div
         style={{
           fontSize: 26,
-          fontWeight: 800,
+          fontWeight: 750,
           letterSpacing: '-0.02em',
-          color: won ? v2.accent.gold : selected ? ARENA : v2.brand.steelBright,
-          textShadow: selected ? `0 0 18px ${ARENA}66` : undefined,
+          color: won ? '#3d6dff' : INK,
         }}
       >
         {pct}%
       </div>
-      <p style={{ fontSize: 10, color: v2.brand.muted, textAlign: 'center', margin: 0 }}>
+      <p style={{ fontSize: 11, color: MUTED, textAlign: 'center', margin: 0 }}>
         {power.toLocaleString()} ARX-P
       </p>
       {won && (
@@ -641,18 +610,18 @@ function BattleDetail({
       }}
     >
       <style>{CSS}</style>
-      <V2Page style={{ minHeight: '100%', background: v2.gradient.mesh }}>
-        <V2Header
+      <V2Page style={{ minHeight: '100%' }}>
+        <MarketHeader
           title={battle.title}
-          subtitle={
-            isResolved
-              ? `Resolved · ${winnerLabel} won`
-              : isActive
-                ? `⏱ ${timer} remaining`
-                : 'Awaiting results'
-          }
           onBack={onClose}
         />
+        <p style={{ margin: '-6px 16px 14px', fontSize: 13, color: SOFT, fontFamily: neon.font }}>
+          {isResolved
+            ? `${winnerLabel} won`
+            : isActive
+              ? timer
+              : 'Awaiting results'}
+        </p>
 
         <div style={{ padding: '8px 20px 0' }}>
           {isResolved && (
@@ -1079,61 +1048,32 @@ function BattleDetail({
             </V2Card>
           )}
 
-          {loadingParticipants && (
-            <>
-              <V2SectionHeader title={isResolved ? 'Stakers' : 'Live Stakers'} />
-              {[0, 1, 2].map((i) => (
-                <div
-                  key={i}
-                  style={{
-                    height: 52,
-                    borderRadius: v2.radius.sm,
-                    marginBottom: 8,
-                    background: v2.brand.raised,
-                    opacity: 1 - i * 0.2,
-                  }}
-                />
-              ))}
-            </>
-          )}
-
-          {!loadingParticipants && battleParticipants.length > 0 && (
-            <>
-              <V2SectionHeader title={`${isResolved ? 'Stakers' : 'Live Stakers'} (${battleParticipants.length})`} />
-              {battleParticipants.slice(0, 8).map((p) => (
-                <V2Card key={p.user_id} accent={v2.brand.steel} padding="10px 14px" style={{ marginBottom: 8 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <div
-                      style={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: 10,
-                        background: v2.brand.raised,
-                        border: `1px solid ${v2.brand.border}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 12,
-                        fontWeight: 700,
-                        color: v2.brand.steel,
-                        flexShrink: 0,
-                        overflow: 'hidden',
-                      }}
-                    >
-                      {p.avatar_url ? (
-                        <img src={p.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        p.username?.[0]?.toUpperCase() || '?'
-                      )}
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <p style={{ fontSize: 12, fontWeight: 600, color: v2.brand.steelLight, margin: 0 }}>{p.username || 'Miner'}</p>
-                    </div>
-                    <span style={{ fontSize: 11, fontWeight: 700, color: ARENA }}>{p.power_spent.toLocaleString()} ARX-P</span>
+          {(loadingParticipants || battleParticipants.length > 0) && (
+            <div style={tokenSheet}>
+              <p style={{ margin: '6px 0 4px', fontSize: 13, fontWeight: 650, color: '#fff', fontFamily: neon.font }}>
+                {isResolved ? 'Stakers' : 'Live stakers'}
+              </p>
+              {loadingParticipants ? (
+                <SheetEmpty title="Loading" />
+              ) : (
+                battleParticipants.slice(0, 8).map((p) => (
+                  <div key={p.user_id} style={{ ...tokenRow, cursor: 'default' }}>
+                    <span style={tokenGlyph}>
+                      {p.username?.[0]?.toUpperCase() || '?'}
+                    </span>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {p.username || 'Miner'}
+                    </span>
+                    <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexShrink: 0, whiteSpace: 'nowrap' }}>
+                      <span style={{ fontSize: 13, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>
+                        {p.power_spent.toLocaleString()}
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: 600, color: SOFT }}>ARX-P</span>
+                    </span>
                   </div>
-                </V2Card>
-              ))}
-            </>
+                ))
+              )}
+            </div>
           )}
         </div>
       </V2Page>
@@ -1145,9 +1085,7 @@ function BattleDetail({
 function PlayerRow({
   entry,
   rank,
-  color,
   isMe,
-  fmt,
 }: {
   entry: {
     user_id: string;
@@ -1155,96 +1093,43 @@ function PlayerRow({
     avatar_url?: string;
     total_staked?: number;
     total_power_staked?: number;
+    total_earned?: number;
     total_wins?: number;
     total_battles?: number;
   };
   rank: number;
-  color: string;
   isMe: boolean;
-  fmt: (n: number) => string;
 }) {
-  const medals = ['🥇', '🥈', '🥉'];
   const wins = Number(entry.total_wins) || 0;
   const battles = Number(entry.total_battles) || 0;
   const losses = Math.max(0, battles - wins);
+  const earned = Number(entry.total_earned || entry.total_staked || entry.total_power_staked) || 0;
+  const medals = ['1', '2', '3'];
 
   return (
-    <V2Card accent={color} padding="10px 14px" style={{ marginBottom: 8, background: isMe ? `${color}10` : undefined }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div
-          style={{
-            width: 28,
-            height: 28,
-            borderRadius: 9,
-            flexShrink: 0,
-            background: `${color}18`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: rank <= 3 ? 14 : 10,
-            fontWeight: 800,
-            color,
-          }}
-        >
-          {rank <= 3 ? medals[rank - 1] : rank}
-        </div>
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: '50%',
-            overflow: 'hidden',
-            flexShrink: 0,
-            background: `${color}18`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 12,
-            fontWeight: 700,
-            color,
-            border: `1.5px solid ${color}40`,
-          }}
-        >
-          {entry.avatar_url ? (
-            <img
-              src={entry.avatar_url}
-              alt=""
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          ) : (
-            entry.username?.[0]?.toUpperCase() || '?'
-          )}
-        </div>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <p
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: isMe ? color : v2.brand.steelLight,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              margin: 0,
-            }}
-          >
-            {entry.username || 'Miner'}
-            {isMe ? ' (You)' : ''}
-          </p>
-          <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 1, marginBottom: 0 }}>
-            <span style={{ color: v2.accent.success }}>{wins}W</span> / <span style={{ color: v2.accent.danger }}>{losses}L</span>
-          </p>
-        </div>
-        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-          <p style={{ fontSize: 13, fontWeight: 800, color, margin: 0 }}>
-            {fmt(Number(entry.total_staked || entry.total_power_staked) || 0)}
-          </p>
-          <p style={{ fontSize: 9, color: v2.brand.muted, margin: '2px 0 0' }}>ARX-P Staked</p>
-        </div>
-      </div>
-    </V2Card>
+    <div style={{ ...tokenRow, height: 48, minHeight: 48, cursor: 'default' }}>
+      <span
+        style={{
+          ...tokenGlyph,
+          fontSize: 11,
+          color: rank <= 3 || isMe ? INK : '#fff',
+          background: rank <= 3 || isMe ? ARENA : '#1c2025',
+        }}
+      >
+        {rank <= 3 ? medals[rank - 1] : rank}
+      </span>
+      <MinerAvatar url={entry.avatar_url} size={32} />
+      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {isMe ? 'You' : (entry.username || 'Miner')}
+        </span>
+        <span style={{ fontSize: 11, color: SOFT }}>{wins}W {losses}L</span>
+      </span>
+      <span style={{ display: 'flex', alignItems: 'baseline', gap: 4, flexShrink: 0, whiteSpace: 'nowrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 650, fontVariantNumeric: 'tabular-nums' }}>{compactPts(earned)}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: SOFT }}>ARX-P</span>
+      </span>
+    </div>
   );
 }
 
@@ -1260,6 +1145,7 @@ function LeaderboardTab({
     avatar_url?: string;
     total_staked?: number;
     total_power_staked?: number;
+    total_earned?: number;
     total_wins?: number;
     total_battles?: number;
   }[];
@@ -1268,171 +1154,92 @@ function LeaderboardTab({
 }) {
   const [activeTeam, setActiveTeam] = useState<'alpha' | 'omega'>('alpha');
 
-  const fmt = (n: number) => {
-    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
-    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`;
-    return n.toLocaleString();
-  };
-
-  const getScore = (e: (typeof leaderboard)[0]) => Number(e.total_staked || e.total_power_staked || 0);
+  const getScore = (e: (typeof leaderboard)[0]) =>
+    Number(e.total_earned || e.total_staked || e.total_power_staked || 0);
 
   const alphaTeam = leaderboard.filter((e) => e.club === 'alpha').sort((a, b) => getScore(b) - getScore(a));
   const omegaTeam = leaderboard.filter((e) => e.club === 'omega').sort((a, b) => getScore(b) - getScore(a));
   const hasClubData = leaderboard.some((e) => e.club === 'alpha' || e.club === 'omega');
   const allPlayers = [...leaderboard].sort((a, b) => getScore(b) - getScore(a));
-
-  const alphaStaked = alphaTeam.reduce((s, e) => s + getScore(e), 0);
-  const omegaStaked = omegaTeam.reduce((s, e) => s + getScore(e), 0);
+  const alphaScore = alphaTeam.reduce((s, e) => s + getScore(e), 0);
+  const omegaScore = omegaTeam.reduce((s, e) => s + getScore(e), 0);
   const alphaWins = alphaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0);
   const omegaWins = omegaTeam.reduce((s, e) => s + (Number(e.total_wins) || 0), 0);
+  const rows = hasClubData ? (activeTeam === 'alpha' ? alphaTeam : omegaTeam) : allPlayers;
 
   if (loading) {
     return (
-      <div style={{ padding: '12px 0' }}>
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={i}
-            style={{
-              height: 60,
-              borderRadius: v2.radius.lg,
-              background: v2.brand.raised,
-              marginBottom: 8,
-              opacity: 1 - i * 0.15,
-            }}
-          />
-        ))}
-      </div>
-    );
-  }
-
-  if (!hasClubData) {
-    return (
-      <div>
-        <p style={{ fontSize: 11, color: v2.brand.muted, marginBottom: 12, textAlign: 'center' }}>Overall Rankings</p>
-        {allPlayers.length === 0 ? (
-          <V2Card padding="40px 20px">
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
-              <p style={{ fontSize: 14, fontWeight: 700, color: v2.brand.mutedSoft, marginBottom: 4 }}>No rankings yet</p>
-              <p style={{ fontSize: 12, color: v2.brand.muted }}>Participate in battles to appear here</p>
-            </div>
-          </V2Card>
-        ) : (
-          allPlayers.map((e, i) => (
-            <PlayerRow key={e.user_id} entry={e} rank={i + 1} color={ALPHA} isMe={e.user_id === currentUserId} fmt={fmt} />
-          ))
-        )}
-      </div>
+      <MineLoad waiting kind="rows" rowCount={6} radius={22}>
+        <div style={{ ...tokenSheet, minHeight: 240 }} />
+      </MineLoad>
     );
   }
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
-        {(
-          [
-            { label: 'Team Alpha', count: alphaTeam.length, staked: alphaStaked, wins: alphaWins, col: ALPHA, team: 'alpha' as const },
-            { label: 'Team Omega', count: omegaTeam.length, staked: omegaStaked, wins: omegaWins, col: OMEGA, team: 'omega' as const },
-          ] as const
-        ).map((t) => (
-          <button
-            key={t.team}
-            type="button"
-            onClick={() => setActiveTeam(t.team)}
+      {hasClubData && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }}>
+            <IceToggle
+              label="Team Alpha or Omega"
+              left="Alpha"
+              right="Omega"
+              onRight={activeTeam === 'omega'}
+              onLeft={() => setActiveTeam('alpha')}
+              onRightPick={() => setActiveTeam('omega')}
+              width={156}
+            />
+          </div>
+
+          <div
             style={{
-              flex: 1,
-              padding: '12px 14px',
-              borderRadius: v2.radius.lg,
-              border: 'none',
-              cursor: 'pointer',
-              textAlign: 'left',
-              fontFamily: v2.font,
-              background: activeTeam === t.team ? `${t.col}15` : v2.brand.surface,
-              boxShadow: activeTeam === t.team ? `0 0 0 1.5px ${t.col}50` : `0 0 0 1px ${v2.brand.border}`,
-              transition: 'all 0.18s',
+              padding: '16px 16px 14px',
+              marginBottom: 10,
+              textAlign: 'center',
+              borderRadius: 16,
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.14)',
+              boxSizing: 'border-box',
             }}
           >
-            <p style={{ fontSize: 11, fontWeight: 800, color: t.col, marginBottom: 4, marginTop: 0 }}>{t.label}</p>
-            <p style={{ fontSize: 16, fontWeight: 900, color: v2.brand.steelBright, margin: 0 }}>{fmt(t.staked)}</p>
-            <p style={{ fontSize: 10, color: v2.brand.muted, marginTop: 2, marginBottom: 0 }}>
-              {t.count} members · {t.wins}W
+            <p style={{ margin: 0, fontSize: 12, fontWeight: 650, color: 'rgba(255,255,255,0.72)' }}>
+              {activeTeam === 'alpha' ? 'Team Alpha' : 'Team Omega'}
             </p>
-          </button>
-        ))}
-      </div>
-      {(activeTeam === 'alpha' ? alphaTeam : omegaTeam).length === 0 ? (
-        <V2Card padding="32px 20px">
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: v2.brand.mutedSoft, margin: 0 }}>No {activeTeam} members yet</p>
-            <p style={{ fontSize: 12, color: v2.brand.muted, marginTop: 4, marginBottom: 0 }}>
-              Join {activeTeam} team in Arena to appear here
+            <p style={{
+              margin: '6px 0 0',
+              fontSize: 26,
+              fontWeight: 750,
+              color: '#fff',
+              letterSpacing: '-0.6px',
+              fontVariantNumeric: 'tabular-nums',
+            }}>
+              {compactPts(activeTeam === 'alpha' ? alphaScore : omegaScore)}
+              <span style={{ marginLeft: 6, fontSize: 13, fontWeight: 600, color: 'rgba(255,255,255,0.72)' }}>ARX-P</span>
+            </p>
+            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'rgba(255,255,255,0.72)' }}>
+              {activeTeam === 'alpha' ? alphaTeam.length : omegaTeam.length} members · {activeTeam === 'alpha' ? alphaWins : omegaWins}W
             </p>
           </div>
-        </V2Card>
-      ) : (
-        (activeTeam === 'alpha' ? alphaTeam : omegaTeam).map((e, i) => (
-          <PlayerRow
-            key={e.user_id}
-            entry={e}
-            rank={i + 1}
-            color={activeTeam === 'alpha' ? ALPHA : OMEGA}
-            isMe={e.user_id === currentUserId}
-            fmt={fmt}
-          />
-        ))
-      )}
-    </div>
-  );
-}
-
-function EmptyState({ emoji, title, subtitle }: { emoji: string; title: string; subtitle: string }) {
-  return (
-    <V2Card accent={ARENA} padding="40px 20px">
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 12 }}>{emoji}</div>
-        <p style={{ fontSize: 15, fontWeight: 800, color: v2.brand.steelLight, marginBottom: 6 }}>{title}</p>
-        <p style={{ fontSize: 12, color: v2.brand.muted, margin: 0 }}>{subtitle}</p>
-      </div>
-    </V2Card>
-  );
-}
-
-function LiveIndicator({ liveCt, upcomingCt }: { liveCt: number; upcomingCt: number }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 5,
-        background: liveCt > 0 ? `${v2.accent.danger}18` : v2.brand.raised,
-        border: liveCt > 0 ? `1px solid ${v2.accent.danger}38` : `1px solid ${v2.brand.border}`,
-        borderRadius: 20,
-        padding: '6px 12px',
-        minWidth: 40,
-        justifyContent: 'center',
-      }}
-    >
-      {liveCt > 0 ? (
-        <>
-          <div className="pulse" style={{ width: 6, height: 6, borderRadius: '50%', background: v2.accent.danger }} />
-          <span style={{ fontSize: 10, fontWeight: 700, color: v2.accent.danger }}>LIVE</span>
         </>
-      ) : (
-        <span style={{ fontSize: 10, fontWeight: 600, color: v2.brand.muted }}>
-          {upcomingCt > 0 ? `${upcomingCt} soon` : '—'}
-        </span>
       )}
+      <div style={tokenSheet}>
+        {rows.length === 0 ? (
+          <SheetEmpty title="No rankings yet" />
+        ) : (
+          rows.map((e, i) => (
+            <PlayerRow key={e.user_id} entry={e} rank={i + 1} isMe={e.user_id === currentUserId} />
+          ))
+        )}
+      </div>
     </div>
   );
 }
 
 export default function PredictionMarketV2() {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const preview = useIsAppPreview();
-  const goArena = () => navigate(preview ? toPreviewPath('/arena') : '/arena');
+  const goArena = useGoBack('/arena');
   const { points } = usePoints();
-  const { leaderboard, battleHistory, loading } = useArena();
+  const { leaderboard, battleHistory, loading, refreshLeaderboard: refreshArenaLb } = useArena();
   const {
     earningsLeaderboard,
     liveMarkets,
@@ -1442,6 +1249,9 @@ export default function PredictionMarketV2() {
     loading: lbLoading,
     voting: marketsVoting,
     placeVote,
+    myArenaEarned,
+    refreshMarkets,
+    refreshLeaderboard: refreshEarnLb,
   } = useArenaMarkets();
   const { membership, loading: memLoading, registering, registerMembership } = useArenaMembership();
 
@@ -1515,46 +1325,43 @@ export default function PredictionMarketV2() {
     [placeVote],
   );
 
+  const pull = usePullRefresh(async () => {
+    await Promise.all([refreshMarkets(), refreshEarnLb(), refreshArenaLb()]);
+  }, { threshold: 28 });
+  const pageWait = memLoading || loading;
+
   if (!user) {
     return (
-      <V2Page style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px' }}>
-        <style>{CSS}</style>
-        <motion.div variants={fadeUp} initial="hidden" animate="show" style={{ width: '100%', maxWidth: 360 }}>
-          <V2HeroCard
-            eyebrow="Arxon Prediction Market"
-            title="Stake. Predict. Earn."
-            subtitle="Stake ARX-P on battle outcomes and earn from the winning pool"
-            cta="Sign In to Enter"
-            onCta={() => setShowAuth(true)}
-            accent={ARENA}
-            gradient={v2.gradient.arena}
-            icon={<span style={{ fontSize: 12 }}>⚔️</span>}
-          />
-        </motion.div>
+      <V2Page>
+        <MarketHeader title="Prediction Market" onBack={goArena} />
+        <div style={{ ...frostCard, margin: '0 16px', padding: '22px 18px', textAlign: 'center' }}>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: MUTED }}>Predict · Stake · Earn</p>
+          <button
+            type="button"
+            onClick={() => setShowAuth(true)}
+            style={{
+              height: 44,
+              marginTop: 16,
+              padding: '0 22px',
+              border: 'none',
+              borderRadius: 14,
+              background: INK,
+              color: '#fff',
+              fontFamily: neon.font,
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Sign in
+          </button>
+        </div>
         <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
       </V2Page>
     );
   }
 
-  if (memLoading || loading) {
-    return (
-      <V2Page style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <style>{CSS}</style>
-        <div
-          style={{
-            width: 44,
-            height: 44,
-            borderRadius: '50%',
-            border: `3px solid ${ARENA}33`,
-            borderTopColor: ARENA,
-            animation: 'spin 1s linear infinite',
-          }}
-        />
-      </V2Page>
-    );
-  }
-
-  if (!membership) {
+  if (!memLoading && !membership) {
     return (
       <V2Page>
         <style>{CSS}</style>
@@ -1595,10 +1402,10 @@ export default function PredictionMarketV2() {
     return Array.from(byId.values());
   })();
 
-  const featuredLive = liveList[0];
+  const arenaEarned = myArenaEarned;
 
   return (
-    <V2Page>
+    <V2Page pull={pull}>
       <style>{CSS}</style>
 
       <AnimatePresence>
@@ -1621,109 +1428,120 @@ export default function PredictionMarketV2() {
         )}
       </AnimatePresence>
 
-      <V2Header
-        title="Prediction Market"
-        subtitle={`Team ${membership.club.toUpperCase()} · ${available.toLocaleString()} ARX-P`}
-        onBack={goArena}
-        right={<LiveIndicator liveCt={liveCt} upcomingCt={upcomingCt} />}
-        large
-      />
-
-      <div style={{ padding: '0 20px' }}>
-        {featuredLive && tab === 'battles' && battleFilter === 'live' && (
-          <motion.div variants={fadeUp} initial="hidden" animate="show" style={{ marginBottom: 18 }}>
-            <V2HeroCard
-              eyebrow="Live Battle"
-              title={featuredLive.title}
-              subtitle={`${featuredLive.side_a_name} vs ${featuredLive.side_b_name}`}
-              cta="Enter Battle"
-              onCta={() => openBattle(featuredLive, true)}
-              accent={ARENA}
-              gradient={v2.gradient.arena}
-              image={(featuredLive as ArenaBattle & { banner_image?: string }).banner_image}
-              compact
-            />
-          </motion.div>
-        )}
-
-        <V2Tabs
-          tabs={[
-            { id: 'battles' as Tab, label: 'Battles' },
-            { id: 'leaderboard' as Tab, label: 'Leaderboard' },
-            { id: 'my-stakes' as Tab, label: 'My Stakes', count: myStakes.length || undefined },
-          ]}
-          active={tab}
-          onChange={setTab}
-        />
+      <MarketHeader title="Prediction Market" onBack={goArena} />
+      <div style={{ margin: '0 16px 16px' }}>
+        <MineLoad waiting={pageWait} extra={pull.busy} frost kind="card" radius={16}>
+          <FrostEarnCard amount={arenaEarned} />
+        </MineLoad>
       </div>
 
-      <div style={{ padding: '16px 20px 0' }}>
+      <div style={{ padding: '0 16px' }}>
+        <div style={{ ...frostCard, padding: '12px 12px 14px' }}>
+          <SegmentTabs
+            tabs={[
+              { id: 'battles' as Tab, label: 'Battles' },
+              { id: 'leaderboard' as Tab, label: 'Leaderboard' },
+              { id: 'my-stakes' as Tab, label: 'My Stakes' },
+            ]}
+            active={tab}
+            onChange={setTab}
+          />
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 16px 0' }}>
         {tab === 'battles' && (
           <>
-            <V2Pills
+            <DarkPills
               items={[
-                { id: 'live' as BattleFilter, label: 'Live', count: liveCt, dot: true, accent: v2.accent.danger },
-                { id: 'upcoming' as BattleFilter, label: 'Upcoming', count: upcomingCt, accent: v2.brand.steel },
-                { id: 'ended' as BattleFilter, label: 'Resolved', count: endedCt, accent: v2.accent.gold },
+                { id: 'live' as BattleFilter, label: 'Live', count: liveCt },
+                { id: 'upcoming' as BattleFilter, label: 'Upcoming', count: upcomingCt },
+                { id: 'ended' as BattleFilter, label: 'Resolved', count: endedCt },
               ]}
               active={battleFilter}
               onChange={setBattleFilter}
             />
-
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {pageWait && liveCt === 0 && upcomingCt === 0 && endedCt === 0 ? (
+              [0, 1, 2].map((i) => (
+                <MineLoad key={i} waiting extra={pull.busy} kind="card" radius={16}>
+                  <div style={{ height: 128 }} />
+                </MineLoad>
+              ))
+            ) : null}
             {battleFilter === 'live' &&
-              (liveCt === 0 ? (
-                <EmptyState emoji="🔴" title="No live battles right now" subtitle="Check Upcoming for battles starting soon" />
+              (liveCt === 0 && !pageWait ? (
+                <SheetEmpty title="No live battles" />
               ) : (
                 liveList.map((b) => (
+                  <MineLoad key={b.id} waiting={false} extra={pull.busy} kind="card" radius={16}>
                   <BattleCard
-                    key={b.id}
                     battle={b}
                     isActive
                     userVoted={!!userPositions.get(b.id)}
                     userWon={false}
                     onClick={() => openBattle(b, true)}
                   />
+                  </MineLoad>
                 ))
               ))}
 
             {battleFilter === 'upcoming' &&
-              (upcomingCt === 0 ? (
-                <EmptyState emoji="🕐" title="No upcoming battles scheduled" subtitle="New battles will appear here when scheduled" />
+              (upcomingCt === 0 && !pageWait ? (
+                <SheetEmpty title="No upcoming battles" />
               ) : (
                 upcomingList.map((b) => (
+                  <MineLoad key={b.id} extra={pull.busy} kind="card" radius={16}>
                   <BattleCard
-                    key={b.id}
                     battle={b}
                     isActive={false}
                     userVoted={!!userPositions.get(b.id)}
                     userWon={false}
                     onClick={() => openBattle(b, false)}
                   />
+                  </MineLoad>
                 ))
               ))}
 
             {battleFilter === 'ended' &&
-              (endedCt === 0 ? (
-                <EmptyState emoji="🏁" title="No resolved battles yet" subtitle="Results will appear here once battles conclude" />
+              (endedCt === 0 && !pageWait ? (
+                <SheetEmpty title="No resolved battles" />
               ) : (
                 <>
                   {endedList.slice(0, endedVisible).map((b) => (
+                    <MineLoad key={b.id} extra={pull.busy} kind="card" radius={16}>
                     <BattleCard
-                      key={b.id}
                       battle={b}
                       isEnded
                       userVoted={!!userPositions.get(b.id)}
                       userWon={userPositions.get(b.id)?.side === b.winner_side}
                       onClick={() => openBattle(b, false)}
                     />
+                    </MineLoad>
                   ))}
                   {endedCt > endedVisible && (
-                    <V2ButtonGhost fullWidth accent={ARENA} onClick={() => setEndedVisible((v) => v + 10)}>
-                      Load more ({endedCt - endedVisible} remaining)
-                    </V2ButtonGhost>
+                    <button
+                      type="button"
+                      onClick={() => setEndedVisible((v) => v + 10)}
+                      style={{
+                        width: '100%',
+                        height: 36,
+                        border: 'none',
+                        borderRadius: 12,
+                        background: 'rgba(255,255,255,0.06)',
+                        color: '#fff',
+                        fontFamily: neon.font,
+                        fontSize: 12,
+                        fontWeight: 650,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Load more
+                    </button>
                   )}
                 </>
               ))}
+            </div>
           </>
         )}
 
@@ -1732,18 +1550,27 @@ export default function PredictionMarketV2() {
         )}
 
         {tab === 'my-stakes' &&
-          (myStakes.length === 0 ? (
-            <EmptyState emoji="🎯" title="No stakes yet" subtitle="Stake ARX-P on a battle to see your history" />
+          (pageWait && myStakes.length === 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[0, 1].map((i) => (
+                <MineLoad key={i} waiting extra={pull.busy} kind="card" radius={16}>
+                  <div style={{ height: 128 }} />
+                </MineLoad>
+              ))}
+            </div>
+          ) : myStakes.length === 0 ? (
+            <div style={tokenSheet}><SheetEmpty title="No stakes yet" /></div>
           ) : (
-            myStakes.map((b) => {
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {myStakes.map((b) => {
               const starts = new Date(b.starts_at);
               const ends = new Date(b.ends_at);
               const active =
                 starts <= now && ends > now && (b.is_active ?? true) && !b.winner_side;
               const ended = !!b.winner_side || ends <= now;
               return (
+                <MineLoad key={b.id} extra={pull.busy} kind="card" radius={16}>
                 <BattleCard
-                  key={b.id}
                   battle={b}
                   isActive={active}
                   isEnded={ended}
@@ -1751,8 +1578,10 @@ export default function PredictionMarketV2() {
                   userWon={userPositions.get(b.id)?.side === b.winner_side}
                   onClick={() => openBattle(b, active)}
                 />
+                </MineLoad>
               );
-            })
+            })}
+            </div>
           ))}
       </div>
 

@@ -1,20 +1,50 @@
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { ArrowDownLeft, ArrowUpRight, Copy, Send } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from '@/hooks/usePoints';
 import { useProfile } from '@/hooks/useProfile';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { useState, useEffect } from 'react';
-import AuthDialog from '@/components/auth/AuthDialog';
-import { Copy, Check, Send, TrendingUp, Globe } from 'lucide-react';
+import { publicErrorToast } from '@/lib/publicError';
+import { copyAddress } from '@/walletFigma/flow/copyFlash';
+import { usePullRefresh } from '@/walletFigma/flow/pullRefresh';
+import { neon } from '../design/neonTokens';
+import { V2Page } from '../design/Kit';
+import { MineLoad } from '../components/MineLoad';
 import {
-  V2Page, V2Header, V2Card, V2Tabs, V2Button, V2ButtonGhost,
-  V2SectionHeader, V2Eyebrow, fadeUp, stagger,
-} from '../design/Kit';
-import { v2 } from '../design/tokens';
+  Body,
+  EmptyCopy,
+  Field,
+  FrostPanel,
+  GlassSheet,
+  pc,
+  PrimaryBtn,
+  ProfileHead,
+  SegmentTabs,
+  TokenRow,
+} from '../design/ProfileChrome';
 
-function relativeTime(iso: string): string {
+type Tab = 'send' | 'history' | 'explorer';
+
+type NexusTx = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  sender_address: string | null;
+  receiver_address: string | null;
+  amount: number;
+  created_at: string;
+  hide_usernames?: boolean | null;
+  hide_amount?: boolean | null;
+};
+
+function shortUid(value?: string | null) {
+  if (!value) return '';
+  if (value.length <= 18) return value;
+  return `${value.slice(0, 10)}…${value.slice(-6)}`;
+}
+
+function relativeTime(iso: string) {
   const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
   if (diff < 60) return 'Just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
@@ -23,312 +53,330 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-function exactTime(iso: string): string {
-  return new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
-
 export default function NexusV2() {
-  const navigate = useNavigate();
   const { user } = useAuth();
   const { points, refreshPoints } = usePoints();
   const { profile, loading: profileLoading } = useProfile();
-  const [tab, setTab] = useState<'send' | 'history' | 'explorer'>('send');
+  const [tab, setTab] = useState<Tab>('send');
   const [amount, setAmount] = useState('');
   const [receiver, setReceiver] = useState('');
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
-  const [txList, setTxList] = useState<any[]>([]);
-  const [allTx, setAllTx] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [showAuth, setShowAuth] = useState(false);
+  const [txList, setTxList] = useState<NexusTx[]>([]);
+  const [allTx, setAllTx] = useState<NexusTx[]>([]);
+  const [historyWait, setHistoryWait] = useState(true);
+  const [explorerWait, setExplorerWait] = useState(true);
 
   const balance = points?.total_points ?? 0;
-  const nexusAddr = profile?.nexus_address;
+  const nexusAddr = profile?.nexus_address ?? '';
 
-  const fetchTx = async () => {
+  const fetchTx = useCallback(async () => {
     if (!user) return;
-    setLoading(true);
+    setHistoryWait(true);
     try {
-      const { data, error } = await supabase.from('nexus_transactions').select('*')
+      const { data, error } = await supabase
+        .from('nexus_transactions')
+        .select('*')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false }).limit(20);
+        .order('created_at', { ascending: false })
+        .limit(20);
       if (error) throw error;
-      setTxList(data || []);
-    } catch (e: any) {
-      toast({ title: 'Could not load transactions', description: e?.message || 'Try again', variant: 'destructive' });
+      setTxList((data as NexusTx[]) || []);
+    } catch (e: unknown) {
+      toast(publicErrorToast(e, 'transfer'));
     } finally {
-      setLoading(false);
+      setHistoryWait(false);
     }
-  };
+  }, [user]);
 
-  const fetchAllTx = async () => {
+  const fetchAllTx = useCallback(async () => {
+    setExplorerWait(true);
     try {
-      const { data, error } = await supabase.from('nexus_transactions').select('*')
-        .eq('private_mode', false).order('created_at', { ascending: false }).limit(30);
+      const { data, error } = await supabase
+        .from('nexus_transactions')
+        .select('*')
+        .eq('private_mode', false)
+        .order('created_at', { ascending: false })
+        .limit(30);
       if (error) throw error;
-      setAllTx(data || []);
-    } catch (e: any) {
-      toast({ title: 'Could not load explorer', description: e?.message || 'Try again', variant: 'destructive' });
+      setAllTx((data as NexusTx[]) || []);
+    } catch (e: unknown) {
+      toast(publicErrorToast(e, 'transfer'));
+    } finally {
+      setExplorerWait(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { if (user) { fetchTx(); fetchAllTx(); } }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    void fetchTx();
+    void fetchAllTx();
+  }, [user, fetchTx, fetchAllTx]);
 
-  const copyAddr = async () => {
+  const pull = usePullRefresh(async () => {
+    await Promise.all([refreshPoints(), fetchTx(), fetchAllTx()]);
+  }, { threshold: 28 });
+
+  const copyUid = async () => {
     if (!nexusAddr) return;
-    await navigator.clipboard.writeText(nexusAddr);
-    setCopied(true);
-    toast({ title: 'Copied!', description: 'Nexus UID copied' });
-    setTimeout(() => setCopied(false), 2000);
+    await copyAddress(nexusAddr, 'Nexus UID copied');
   };
+
+  const setAmountSafe = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (!digits) {
+      setAmount('');
+      return;
+    }
+    const num = parseInt(digits, 10);
+    if (num >= 1 && num <= 10) setAmount(String(num));
+  };
+
+  const canSend = receiver.trim().length > 0;
 
   const handleSend = async () => {
-    if (!user) { setShowAuth(true); return; }
-    if (!receiver.trim()) { toast({ title: 'Error', description: 'Enter receiver UID', variant: 'destructive' }); return; }
+    if (!user) return;
+    if (!receiver.trim()) {
+      toast({ title: 'Receiver needed', description: 'Enter a Nexus UID.', variant: 'destructive' });
+      return;
+    }
     const num = Number(amount);
-    if (!Number.isInteger(num) || num < 1 || num > 10) { toast({ title: 'Error', description: 'Amount must be 1–10 ARX-P', variant: 'destructive' }); return; }
-    if (balance < num) { toast({ title: 'Insufficient', description: 'Not enough ARX-P', variant: 'destructive' }); return; }
+    if (!Number.isInteger(num) || num < 1 || num > 10) {
+      toast({ title: 'Amount', description: 'Send 1–10 ARX-P.', variant: 'destructive' });
+      return;
+    }
+    if (balance < num) {
+      toast({ title: 'Not enough ARX-P', description: 'Lower the amount or mine more first.', variant: 'destructive' });
+      return;
+    }
     setSending(true);
     try {
       const { data, error } = await supabase.rpc('send_nexus_transfer' as any, {
-        p_sender_id: user.id, p_receiver_address: receiver.trim(), p_amount: num,
+        p_sender_id: user.id,
+        p_receiver_address: receiver.trim(),
+        p_amount: num,
       });
       if (error) throw error;
-      const res = data as any;
-      if (!res?.success) { toast({ title: 'Failed', description: res?.error || 'Unknown error', variant: 'destructive' }); return; }
-      toast({ title: 'Sent! 🎉', description: `${num} ARX-P sent. +20% mining boost!` });
-      setSent(true); setAmount(''); setReceiver('');
-      await refreshPoints(); await fetchTx(); await fetchAllTx();
-      setTimeout(() => setSent(false), 3000);
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message, variant: 'destructive' });
+      const res = data as { success?: boolean; error?: string };
+      if (!res?.success) {
+        toast(publicErrorToast(res?.error, 'transfer'));
+        return;
+      }
+      toast({ title: 'Sent', description: `${num} ARX-P sent. +20% mining boost.` });
+      setSent(true);
+      setAmount('');
+      setReceiver('');
+      await refreshPoints();
+      await fetchTx();
+      await fetchAllTx();
+      window.setTimeout(() => setSent(false), 2800);
+    } catch (e: unknown) {
+      toast(publicErrorToast(e, 'transfer'));
     } finally {
       setSending(false);
     }
   };
 
-  if (!user) {
-    return (
-      <V2Page style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px' }}>
-        <V2Header onBack={() => navigate(-1)} />
-        <div style={{ position: 'relative', width: 130, height: 130, marginBottom: 32 }}>
-          <svg style={{ position: 'absolute', inset: 0, animation: 'spin 8s linear infinite' }} width="130" height="130" viewBox="0 0 130 130">
-            <circle cx="65" cy="65" r="60" fill="none" stroke={`${v2.accent.mining}14`} strokeWidth="1" />
-            <circle cx="65" cy="65" r="60" fill="none" stroke={`${v2.accent.mining}55`} strokeWidth="1.5" strokeDasharray="35 342" strokeLinecap="round" />
-          </svg>
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{
-              width: 78, height: 78, borderRadius: 24, background: v2.gradient.mining,
-              border: `1.5px solid ${v2.accent.mining}44`, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: v2.shadow(v2.accent.mining, 0.15),
-            }}>
-              <Send size={32} color={v2.accent.mining} />
-            </div>
-          </div>
-        </div>
-        <h2 style={{ fontSize: 28, fontWeight: 900, color: v2.brand.steelBright, letterSpacing: '-0.5px', marginBottom: 10, textAlign: 'center' }}>Nexus Transfer</h2>
-        <p style={{ fontSize: 14, color: v2.brand.mutedSoft, marginBottom: 36, textAlign: 'center', lineHeight: 1.6 }}>
-          Send ARX-P to other miners and earn 20% mining boosts
-        </p>
-        <V2Button accent={v2.accent.mining} fullWidth onClick={() => setShowAuth(true)}>Sign In</V2Button>
-        <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
-        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-      </V2Page>
-    );
-  }
-
   return (
-    <V2Page>
-      <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header eyebrow="Transfer" title="Nexus" subtitle="Send & receive ARX-P" onBack={() => navigate(-1)} />
+    <V2Page pull={pull}>
+      <ProfileHead
+        title="Nexus"
+        subtitle="Send ARX-P to miners. Earn a 20% boost."
+      />
+      <div style={{ padding: '0 16px 12px' }}>
+        <MineLoad waiting={profileLoading} extra={pull.busy} frost kind="card" radius={22}>
+          <FrostPanel>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 650, color: pc.muted, fontFamily: neon.font }}>
+              Available
+            </p>
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 32,
+                fontWeight: 750,
+                letterSpacing: '-0.8px',
+                color: pc.ink,
+                fontFamily: neon.font,
+                lineHeight: 1,
+              }}
+            >
+              {Math.floor(balance).toLocaleString()}
+              <span style={{ marginLeft: 6, fontSize: 13, fontWeight: 650, letterSpacing: 0 }}>ARX-P</span>
+            </p>
+            <p style={{ margin: '14px 0 0', fontSize: 11, fontWeight: 650, color: pc.muted, fontFamily: neon.font }}>
+              Your UID
+            </p>
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 13,
+                fontWeight: 650,
+                color: pc.ink,
+                fontFamily: neon.font,
+                wordBreak: 'break-all',
+              }}
+            >
+              {profileLoading ? 'Loading…' : shortUid(nexusAddr) || 'Generating…'}
+            </p>
+            <button
+              type="button"
+              onClick={() => void copyUid()}
+              disabled={!nexusAddr}
+              style={{
+                marginTop: 14,
+                width: '100%',
+                height: 40,
+                borderRadius: 12,
+                border: 'none',
+                background: pc.ink,
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                fontFamily: neon.font,
+                cursor: nexusAddr ? 'pointer' : 'default',
+                opacity: nexusAddr ? 1 : 0.45,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <Copy size={14} />
+              Copy full UID
+            </button>
+          </FrostPanel>
+        </MineLoad>
 
-        <div style={{ padding: '0 16px 0' }}>
-          <motion.div variants={fadeUp} style={{ marginBottom: 14 }}>
-            <V2Card accent={v2.accent.mining} padding="20px">
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <V2Eyebrow accent={v2.brand.mutedSoft}>Your Nexus UID</V2Eyebrow>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelLight, fontFamily: 'monospace', letterSpacing: '0.3px', wordBreak: 'break-all', margin: '4px 0 0' }}>
-                    {profileLoading ? 'Loading...' : nexusAddr || 'Generating...'}
-                  </p>
-                </div>
-                <V2ButtonGhost onClick={copyAddr} accent={copied ? v2.accent.mining : v2.brand.steel}>
-                  {copied ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy</>}
-                </V2ButtonGhost>
-              </div>
-              <div style={{ borderTop: `1px solid ${v2.brand.border}`, paddingTop: 12, display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 32, fontWeight: 900, color: v2.brand.steelBright, letterSpacing: '-1px' }}>{Math.floor(balance).toLocaleString()}</span>
-                <span style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steel }}>ARX-P available</span>
-              </div>
-            </V2Card>
-          </motion.div>
+        <SegmentTabs
+          tabs={[
+            { id: 'send' as Tab, label: 'Send' },
+            { id: 'history' as Tab, label: 'History' },
+            { id: 'explorer' as Tab, label: 'Explorer' },
+          ]}
+          active={tab}
+          onChange={setTab}
+        />
 
-          <motion.div variants={fadeUp} style={{ marginBottom: 16 }}>
-            <V2Tabs
-              tabs={[
-                { id: 'send' as const, label: 'Send' },
-                { id: 'history' as const, label: 'History' },
-                { id: 'explorer' as const, label: 'Explorer' },
-              ]}
-              active={tab}
-              onChange={setTab}
-            />
-          </motion.div>
-
-          {tab === 'send' && (
-            <motion.div variants={fadeUp}>
-              <V2Card accent={v2.accent.mining} padding="24px 20px" style={{ marginBottom: 12, textAlign: 'center' }}>
-                <V2Eyebrow accent={v2.brand.mutedSoft}>Amount to Send</V2Eyebrow>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'center', gap: 4, margin: '12px 0 6px' }}>
-                  <span style={{ fontSize: 56, fontWeight: 900, letterSpacing: '-3px', color: v2.brand.steelBright, lineHeight: 1 }}>{amount || '0'}</span>
-                  <span style={{ fontSize: 18, fontWeight: 700, color: v2.brand.muted, marginTop: 10 }}>.00</span>
-                </div>
-                <p style={{ fontSize: 11, color: v2.brand.muted, margin: 0 }}>Max 10 ARX-P · Earn 20% mining boost</p>
-              </V2Card>
-
-              <V2Card padding="14px 16px" style={{ marginBottom: 12 }}>
-                <input
-                  value={receiver}
-                  onChange={(e) => setReceiver(e.target.value)}
-                  placeholder="Receiver Nexus UID"
-                  style={{
-                    width: '100%', background: 'none', border: 'none', outline: 'none',
-                    fontSize: 14, fontWeight: 600, color: v2.brand.steelBright, fontFamily: v2.font,
-                  }}
-                />
-              </V2Card>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginBottom: 14 }}>
-                {['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'].map((k) => (
-                  <motion.button
-                    key={k || 'sp'}
-                    type="button"
-                    whileTap={{ scale: 0.9 }}
-                    disabled={!k}
-                    onClick={() => {
-                      if (!k) return;
-                      if (k === 'del') { setAmount((a) => a.slice(0, -1)); return; }
-                      const next = amount + k;
-                      const num = parseInt(next, 10);
-                      if (!isNaN(num) && num >= 1 && num <= 10) setAmount(next);
-                    }}
-                    style={{
-                      background: v2.brand.raised, border: `1px solid ${v2.brand.border}`,
-                      borderRadius: v2.radius.md, padding: '17px 0', fontSize: 24, fontWeight: 700,
-                      color: v2.brand.steelBright, cursor: k ? 'pointer' : 'default', outline: 'none',
-                      fontFamily: v2.font,
-                    }}
-                  >
-                    {k === 'del' ? '⌫' : k}
-                  </motion.button>
-                ))}
-              </div>
-
-              <V2Button
-                accent={sent ? v2.accent.mining : v2.accent.mining}
-                fullWidth
-                onClick={handleSend}
-                disabled={sending}
-                style={sent ? { background: `${v2.accent.mining}22`, color: v2.accent.mining } : undefined}
+        {tab === 'send' && (
+          <div data-tour="nexus-send">
+            <FrostPanel>
+              <p style={{ margin: 0, fontSize: 11, fontWeight: 650, color: pc.muted, fontFamily: neon.font }}>
+                Amount
+              </p>
+              <p
+                style={{
+                  margin: '8px 0 0',
+                  fontSize: 36,
+                  fontWeight: 750,
+                  letterSpacing: '-1px',
+                  color: pc.ink,
+                  fontFamily: neon.font,
+                  lineHeight: 1,
+                }}
               >
-                {sent ? '✓ Sent! Boost activated' : sending ? 'Sending...' : 'Send ARX-P'}
-              </V2Button>
+                {amount || '0'}
+                <span style={{ marginLeft: 6, fontSize: 14, fontWeight: 650, letterSpacing: 0 }}>ARX-P</span>
+              </p>
+              <Body ink>1–10 ARX-P per send. Max 5 sends a day.</Body>
+            </FrostPanel>
 
-              <V2Card accent={v2.accent.mining} padding="12px 16px" style={{ marginTop: 12 }}>
-                <p style={{ fontSize: 11, color: `${v2.accent.mining}99`, lineHeight: 1.6, margin: 0 }}>
-                  Each transfer earns a <strong style={{ color: v2.accent.mining }}>20% mining boost</strong> for 3 days. Max 5 sends/day. 1–10 ARX-P per send.
-                </p>
-              </V2Card>
-            </motion.div>
-          )}
+            <Field
+              value={amount}
+              onChange={setAmountSafe}
+              placeholder="Amount 1–10 ARX-P"
+              type="tel"
+            />
+            <Field
+              value={receiver}
+              onChange={setReceiver}
+              placeholder="Receiver Nexus UID"
+            />
 
-          {tab === 'history' && (
-            <motion.div variants={fadeUp}>
-              <V2SectionHeader title="Your Transactions" action="Refresh" onAction={fetchTx} />
-              {loading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} style={{ height: 60, borderRadius: v2.radius.lg, marginBottom: 8, background: v2.brand.raised, animation: 'pulse 1.5s ease-in-out infinite' }} />
-                ))
-              ) : txList.length === 0 ? (
-                <V2Card padding="48px 20px" style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 40, marginBottom: 12 }}>📭</div>
-                  <p style={{ fontSize: 15, fontWeight: 700, color: v2.brand.mutedSoft, margin: 0 }}>No transactions yet</p>
-                  <p style={{ fontSize: 12, color: v2.brand.muted, marginTop: 6 }}>Send your first ARX-P</p>
-                </V2Card>
-              ) : (
-                txList.map((tx) => {
+            {canSend ? (
+              <PrimaryBtn
+                label={sent ? 'Sent — boost on' : sending ? 'Sending…' : 'Send ARX-P'}
+                onClick={() => void handleSend()}
+                disabled={sending}
+              />
+            ) : null}
+
+            <GlassSheet title="Boost" style={{ marginTop: 12 }}>
+              <div style={{ padding: '10px 2px 12px' }}>
+                <Body>
+                  Each transfer earns a <span style={{ color: '#fff', fontWeight: 650 }}>20% mining boost</span> for 3 days.
+                </Body>
+              </div>
+            </GlassSheet>
+          </div>
+        )}
+
+        {tab === 'history' && (
+          <MineLoad waiting={historyWait && txList.length === 0} extra={pull.busy} kind="rows" rowCount={5} radius={22}>
+            {txList.length === 0 && !historyWait ? (
+              <GlassSheet>
+                <EmptyCopy title="No transfers yet" body="Send ARX-P to another miner. Your history will show here." />
+              </GlassSheet>
+            ) : (
+              <GlassSheet title="Your transfers">
+                {txList.map((tx) => {
                   const isSender = tx.sender_id === user?.id;
-                  const col = isSender ? v2.accent.danger : v2.accent.mining;
+                  const peer = isSender ? tx.receiver_address : tx.sender_address;
                   return (
-                    <V2Card key={tx.id} accent={col} padding="14px 16px" style={{ marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                        <div style={{
-                          width: 42, height: 42, borderRadius: v2.radius.sm, flexShrink: 0,
-                          background: `${col}14`, border: `1px solid ${col}33`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        }}>
-                          {isSender ? <Send size={17} color={col} /> : <TrendingUp size={17} color={col} />}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>{isSender ? 'Sent to' : 'Received from'}</p>
-                          <p style={{ fontSize: 10, color: v2.brand.muted, margin: '2px 0 0', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {isSender ? tx.receiver_address?.slice(0, 20) + '...' : tx.sender_address?.slice(0, 20) + '...'}
-                          </p>
-                          <p style={{ fontSize: 9, color: v2.brand.muted, margin: '3px 0 0' }}>{exactTime(tx.created_at)}</p>
-                        </div>
-                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                          <p style={{ fontSize: 14, fontWeight: 800, color: col, margin: 0 }}>{isSender ? '-' : '+'}{tx.amount} ARX-P</p>
-                          <p style={{ fontSize: 9, color: `${col}88`, margin: '3px 0 0' }}>{relativeTime(tx.created_at)}</p>
-                        </div>
-                      </div>
-                    </V2Card>
+                    <TokenRow
+                      key={tx.id}
+                      wrap
+                      icon={isSender ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+                      glyphBg={isSender ? pc.danger : pc.good}
+                      title={isSender ? 'Sent' : 'Received'}
+                      sub={`${shortUid(peer)} · ${relativeTime(tx.created_at)}`}
+                      trailing={
+                        <span
+                          style={{
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: isSender ? pc.danger : pc.good,
+                            fontFamily: neon.font,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {isSender ? '−' : '+'}{tx.amount} ARX-P
+                        </span>
+                      }
+                    />
                   );
-                })
-              )}
-            </motion.div>
-          )}
+                })}
+              </GlassSheet>
+            )}
+          </MineLoad>
+        )}
 
-          {tab === 'explorer' && (
-            <motion.div variants={fadeUp}>
-              <V2SectionHeader title="Public Feed" action="Refresh" onAction={fetchAllTx} />
-              {allTx.length === 0 ? (
-                <V2Card padding="48px 20px" style={{ textAlign: 'center' }}>
-                  <Globe size={40} color={v2.brand.muted} style={{ marginBottom: 12 }} />
-                  <p style={{ fontSize: 15, fontWeight: 700, color: v2.brand.mutedSoft, margin: 0 }}>No public transactions</p>
-                </V2Card>
-              ) : (
-                allTx.map((tx) => (
-                  <V2Card key={tx.id} accent={v2.brand.steel} padding="14px 16px" style={{ marginBottom: 8 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 13 }}>
-                      <div style={{
-                        width: 42, height: 42, borderRadius: v2.radius.sm, flexShrink: 0,
-                        background: `${v2.brand.steel}14`, border: `1px solid ${v2.brand.steel}33`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      }}>
-                        <Send size={16} color={v2.brand.steel} />
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <p style={{ fontSize: 10, color: v2.brand.muted, fontFamily: 'monospace', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {tx.hide_usernames ? '***' : tx.sender_address?.slice(0, 14) + '...'} →
-                        </p>
-                        <p style={{ fontSize: 10, color: v2.brand.muted, fontFamily: 'monospace', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {tx.hide_usernames ? '***' : tx.receiver_address?.slice(0, 14) + '...'}
-                        </p>
-                      </div>
-                      <p style={{ fontSize: 14, fontWeight: 800, color: v2.brand.steelLight, flexShrink: 0, margin: 0 }}>
-                        {tx.hide_amount ? '***' : tx.amount} ARX-P
-                      </p>
-                    </div>
-                  </V2Card>
-                ))
-              )}
-            </motion.div>
-          )}
-        </div>
-      </motion.div>
-      <AuthDialog open={showAuth} onOpenChange={setShowAuth} />
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
+        {tab === 'explorer' && (
+          <MineLoad waiting={explorerWait && allTx.length === 0} extra={pull.busy} kind="rows" rowCount={5} radius={22}>
+            {allTx.length === 0 && !explorerWait ? (
+              <GlassSheet>
+                <EmptyCopy title="No public transfers" body="Public Nexus sends will appear in this feed." />
+              </GlassSheet>
+            ) : (
+              <GlassSheet title="Public feed">
+                {allTx.map((tx) => (
+                  <TokenRow
+                    key={tx.id}
+                    wrap
+                    icon={<Send size={14} />}
+                    title={tx.hide_usernames ? 'Hidden · Hidden' : `${shortUid(tx.sender_address)} → ${shortUid(tx.receiver_address)}`}
+                    sub={relativeTime(tx.created_at)}
+                    trailing={
+                      <span style={{ fontSize: 13, fontWeight: 700, color: '#fff', fontFamily: neon.font, flexShrink: 0 }}>
+                        {tx.hide_amount ? '•••' : `${tx.amount} ARX-P`}
+                      </span>
+                    }
+                  />
+                ))}
+              </GlassSheet>
+            )}
+          </MineLoad>
+        )}
+      </div>
     </V2Page>
   );
 }

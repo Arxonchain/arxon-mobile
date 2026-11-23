@@ -6,6 +6,7 @@
  */
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Copy, Share2, Users, Activity, UserX, Gift, Zap } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -74,7 +75,7 @@ const Referrals = () => {
       {/* Header */}
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
         padding:'52px 20px 0',marginBottom:4}}>
-        <motion.button onClick={()=>navigate('/')} whileTap={{scale:0.92}}
+        <motion.button onClick={()=>goBack(navigate)} whileTap={{scale:0.92}}
           style={{width:40,height:40,borderRadius:14,background:'hsl(215 25% 11%)',
             border:'1px solid hsl(215 22% 18%)',display:'flex',alignItems:'center',
             justifyContent:'center',cursor:'pointer',outline:'none'}}>

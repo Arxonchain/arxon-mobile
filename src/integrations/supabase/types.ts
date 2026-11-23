@@ -14,6 +14,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_deletion_requests: {
+        Row: {
+          admin_note: string | null
+          approved_at: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          confirmation: string | null
+          denied_at: string | null
+          email: string | null
+          id: string
+          requested_at: string
+          reviewed_by: string | null
+          scheduled_for: string
+          status: string
+          user_id: string
+          username: string | null
+        }
+        Insert: {
+          admin_note?: string | null
+          approved_at?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmation?: string | null
+          denied_at?: string | null
+          email?: string | null
+          id?: string
+          requested_at?: string
+          reviewed_by?: string | null
+          scheduled_for?: string
+          status?: string
+          user_id: string
+          username?: string | null
+        }
+        Update: {
+          admin_note?: string | null
+          approved_at?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          confirmation?: string | null
+          denied_at?: string | null
+          email?: string | null
+          id?: string
+          requested_at?: string
+          reviewed_by?: string | null
+          scheduled_for?: string
+          status?: string
+          user_id?: string
+          username?: string | null
+        }
+        Relationships: []
+      }
       announcements: {
         Row: {
           created_at: string

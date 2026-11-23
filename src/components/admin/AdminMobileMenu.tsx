@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { ADMIN_NAV_SECTIONS, AdminNavItem } from "@/lib/adminNav";
+import { goBack } from "@/lib/navBack";
 
 const SECTION_META: Record<string, { icon: typeof LayoutDashboard; accent: string; bg: string }> = {
   Overview: { icon: LayoutDashboard, accent: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20" },
@@ -169,7 +170,7 @@ function AdminMobileMenuPanel({
           </div>
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" className="h-10" onClick={() => { onClose(); navigate("/"); }}>
+          <Button variant="outline" size="sm" className="h-10" onClick={() => { onClose(); goBack(navigate); }}>
             Back to App
           </Button>
           <Button variant="outline" size="sm" className="h-10 text-destructive hover:text-destructive" onClick={handleLogout}>

@@ -1,5 +1,4 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { WORD_FORGE_ENABLED } from '@/lib/wordForgeFeature';
 import { neon } from '@/features/arxon-v2/design/neonTokens';
 import { APP_PREVIEW_BASE } from './AppPreviewContext';
 
@@ -25,17 +24,6 @@ const sections: { title: string; pages: { path: string; label: string }[] }[] = 
       { path: `${APP_PREVIEW_BASE}/points-history`, label: 'Points history' },
     ],
   },
-  ...(WORD_FORGE_ENABLED
-    ? [{
-        title: 'Word Forge',
-        pages: [
-          { path: `${APP_PREVIEW_BASE}/word-forge`, label: 'Word Forge game' },
-          { path: `${APP_PREVIEW_BASE}/word-forge/stats`, label: 'Forge stats' },
-          { path: `${APP_PREVIEW_BASE}/word-forge/map`, label: 'Sector map' },
-          { path: `${APP_PREVIEW_BASE}/word-forge/leaderboard`, label: 'Forge leaderboard' },
-        ],
-      }]
-    : []),
 ];
 
 function isActive(pathname: string, path: string) {

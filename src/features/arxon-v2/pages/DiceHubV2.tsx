@@ -7,7 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronRight, Dices, Gift, Swords, Users2, Sparkles, TrendingUp } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { useGoBack } from '@/lib/navBack';
 import { V2Page, fadeUp, stagger } from '../design/Kit';
 import { neon } from '../design/neonTokens';
 import { NeonScreenHeader, NeonGlassCard, NeonSectionLabel } from '../design/NeonSecondaryUI';
@@ -62,13 +64,13 @@ function FreeRollCard({
       setRolling(false);
       setBusy(false);
       const needsAuth = /sign in|not authenticated/i.test(res.error);
-      toast({
-        title: needsAuth ? 'Sign in required' : 'No luck',
-        description: needsAuth
-          ? 'Open /auth (or the real app) and sign in, then try again.'
-          : res.error,
-        variant: 'destructive',
-      });
+      toast(needsAuth
+        ? {
+            title: 'Sign in required',
+            description: 'Sign in, then try again.',
+            variant: 'destructive',
+          }
+        : publicErrorToast(res.error, 'play'));
       return;
     }
 
@@ -326,6 +328,7 @@ export default function DiceHubV2() {
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+  const back = useGoBack('/arena');
 
   const handleEnterMatch = useCallback((stake: number) => {
     gateStakeAction(() => go(`/arena/dice/house?stake=${stake}`));
@@ -340,7 +343,7 @@ export default function DiceHubV2() {
         eyebrow="Arena · Game 03"
         title="Dice Roll"
         subtitle="Roll for ARX-P. Beat the house, then the miners."
-        onBack={() => go('/arena')}
+        onBack={back}
         right={
           <div style={{
             width: 38, height: 38, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',

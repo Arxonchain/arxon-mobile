@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, ChevronLeft, Crown, SkipForward, User, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
+import { useGoBack } from '@/lib/navBack';
+import { ErrorCard } from '@/components/system/ErrorPopup';
 import { mobileTopPadding, mobileScrollPaddingNavHidden, mobilePageScrollRoot } from '@/lib/mobileLayout';
 import { useMobileNav } from '@/contexts/MobileNavContext';
 import { neon } from '../design/neonTokens';
@@ -75,9 +77,9 @@ export default function DiceMatchV2() {
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+  const back = useGoBack('/arena/dice');
 
   const [phase, setPhase] = useState<'rolling' | 'playing' | 'finished' | 'error'>('rolling');
-  const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<DiceHouseMatchResult | null>(null);
   const [roundIndex, setRoundIndex] = useState(0);
   const [rolling, setRolling] = useState(true);
@@ -87,7 +89,6 @@ export default function DiceMatchV2() {
   const startMatch = useCallback(async () => {
     const myRun = ++runIdRef.current;
     setPhase('rolling');
-    setError(null);
     setResult(null);
     setRoundIndex(0);
     setRolling(true);
@@ -98,7 +99,6 @@ export default function DiceMatchV2() {
 
     if (!res.success) {
       setPhase('error');
-      setError(res.error);
       return;
     }
     setResult(res.result);
@@ -169,7 +169,7 @@ export default function DiceMatchV2() {
           <motion.button
             type="button"
             whileTap={{ scale: 0.9 }}
-            onClick={() => go('/arena/dice')}
+            onClick={back}
             style={{
               width: 36, height: 36, borderRadius: 12, border: '1px solid rgba(255,255,255,0.08)',
               background: 'rgba(255,255,255,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -206,24 +206,7 @@ export default function DiceMatchV2() {
 
         <div style={{ padding: '28px 16px 0' }}>
           {phase === 'error' && (
-            <div style={{
-              textAlign: 'center', padding: '40px 20px', borderRadius: 18,
-              background: 'rgba(255,107,74,0.08)', border: '1px solid rgba(255,107,74,0.25)',
-            }}>
-              <X size={28} color={diceAccent.lose} style={{ marginBottom: 10 }} />
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 700, color: neon.text }}>{error}</p>
-              <button
-                type="button"
-                onClick={() => go('/arena/dice')}
-                style={{
-                  marginTop: 16, padding: '10px 20px', borderRadius: 12, border: 'none', cursor: 'pointer',
-                  background: `linear-gradient(135deg, ${neon.cyan}, ${neon.teal})`, color: '#02060e',
-                  fontFamily: neon.font, fontSize: 11, fontWeight: 800,
-                }}
-              >
-                Back to Dice Hub
-              </button>
-            </div>
+            <ErrorCard kind="play" actionLabel="Back to Dice Hub" onAction={() => go('/arena/dice')} />
           )}
 
           {(phase === 'rolling' || phase === 'playing') && (

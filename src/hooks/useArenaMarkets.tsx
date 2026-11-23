@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from 'sonner';
+import { PUBLIC_ERROR_HINT } from '@/lib/publicError';
 import { getBattleOptions, type ArenaSideId } from '@/lib/arenaOptions';
 
 export interface ArenaMarket {
@@ -30,6 +31,7 @@ export interface ArenaMarket {
   prize_pool: number;
   bonus_percentage: number;
   category: string;
+  banner_image?: string | null;
   resolution_source: string | null;
   total_participants: number;
   vote_options?: unknown;
@@ -88,6 +90,7 @@ export const useArenaMarkets = () => {
   const [endedMarkets, setEndedMarkets] = useState<ArenaMarket[]>([]);
   const [userPositions, setUserPositions] = useState<Map<string, MarketVote>>(new Map());
   const [earningsLeaderboard, setEarningsLeaderboard] = useState<EarningsLeaderboardEntry[]>([]);
+  const [myArenaEarned, setMyArenaEarned] = useState(0);
   const [loading, setLoading] = useState(true);
   const [voting, setVoting] = useState(false);
   const [selectedMarket, setSelectedMarket] = useState<ArenaMarket | null>(null);
@@ -230,6 +233,37 @@ export const useArenaMarkets = () => {
     }
   }, []);
 
+  const fetchMyArenaEarned = useCallback(async () => {
+    if (!user) {
+      setMyArenaEarned(0);
+      return;
+    }
+    try {
+      const [{ data: earnings }, { data: ledger }] = await Promise.all([
+        supabase
+          .from('arena_earnings')
+          .select('total_earned, points_credited_amount')
+          .eq('user_id', user.id),
+        supabase
+          .from('points_ledger' as never)
+          .select('amount, category')
+          .eq('user_id', user.id)
+          .in('category', ['arena', 'arena_reward']),
+      ]);
+      const fromEarnings = (earnings || []).reduce(
+        (sum, row) => sum + Number(row.points_credited_amount || row.total_earned || 0),
+        0,
+      );
+      const fromLedger = (ledger || []).reduce((sum, row) => {
+        const amt = Number((row as { amount?: number }).amount || 0);
+        return sum + (amt > 0 ? amt : 0);
+      }, 0);
+      setMyArenaEarned(Math.max(0, Math.floor(Math.max(fromEarnings, fromLedger))));
+    } catch (error) {
+      console.error('Error fetching arena earnings:', error);
+    }
+  }, [user]);
+
   // Calculate potential returns for a stake
   // Matches actual payout logic in resolve-arena-battle:
   // Winners get: stake back + proportional share of loser pool + proportional share of prize pool
@@ -364,8 +398,8 @@ export const useArenaMarkets = () => {
 
       return true;
     } catch (error: unknown) {
-      const msg = error instanceof Error ? error.message : 'Failed to cast vote';
-      toast.error(msg);
+      console.error(error);
+      toast.error(PUBLIC_ERROR_HINT);
       return false;
     } finally {
       setVoting(false);
@@ -380,12 +414,13 @@ export const useArenaMarkets = () => {
         fetchMarkets(),
         fetchUserPositions(),
         fetchEarningsLeaderboard(),
+        fetchMyArenaEarned(),
       ]);
       setLoading(false);
     };
 
     init();
-  }, [fetchMarkets, fetchUserPositions, fetchEarningsLeaderboard]);
+  }, [fetchMarkets, fetchUserPositions, fetchEarningsLeaderboard, fetchMyArenaEarned]);
 
   // Timer to check for upcoming markets transitioning to live
   useEffect(() => {
@@ -410,11 +445,14 @@ export const useArenaMarkets = () => {
       checkMarketTransitions();
       fetchMarkets();
       fetchEarningsLeaderboard();
-      if (user) fetchUserPositions();
+      if (user) {
+        fetchUserPositions();
+        fetchMyArenaEarned();
+      }
     }, 30_000);
 
     return () => clearInterval(interval);
-  }, [upcomingMarkets, fetchMarkets, fetchEarningsLeaderboard, fetchUserPositions, user]);
+  }, [upcomingMarkets, fetchMarkets, fetchEarningsLeaderboard, fetchUserPositions, fetchMyArenaEarned, user]);
 
   return {
     liveMarkets,
@@ -422,6 +460,7 @@ export const useArenaMarkets = () => {
     endedMarkets,
     userPositions,
     earningsLeaderboard,
+    myArenaEarned,
     loading,
     voting,
     selectedMarket,

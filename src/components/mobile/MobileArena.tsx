@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { useAuth } from '@/contexts/AuthContext';
 import { useArena, type ArenaBattle, type BattleHistoryEntry } from '@/hooks/useArena';
 import { useArenaMarkets } from '@/hooks/useArenaMarkets';
@@ -921,7 +922,7 @@ export default function MobileArena() {
 
       {/* Header */}
       <div style={{padding:'52px 20px 0',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <button onClick={()=>navigate(-1)} className="press"
+        <button onClick={()=>goBack(navigate)} className="press"
           style={{width:40,height:40,borderRadius:14,background:'hsl(215 25% 11%)',
             border:'1px solid hsl(215 22% 18%)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}>
           <ChevronLeft size={20} color="hsl(215 25% 55%)"/>

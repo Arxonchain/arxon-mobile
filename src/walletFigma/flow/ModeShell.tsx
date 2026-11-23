@@ -37,10 +37,19 @@ const MINE_PREFIXES = [
   '/notifications',
   '/points-history',
   '/word-forge',
+  '/terms',
+  '/privacy',
+  '/litepaper',
+  '/whitepaper',
+  '/admin',
 ];
 
 function isMiningPath(path: string) {
   return MINE_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`));
+}
+
+function isMiningHomePath(path: string) {
+  return path === '/mine' || path === '/ui-preview/mine';
 }
 
 /** One app, two modes. Wallet is the real chain wallet. Mining is the existing V2 miner. */
@@ -60,8 +69,12 @@ export default function ModeShell({ children }: { children: ReactNode }) {
   const locRef = useRef(location);
   locRef.current = location;
   const lastMiningPath = useRef(isMiningPath(location.pathname) ? `${location.pathname}${location.search}` : '/mine');
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('arxon-app-mode', { detail: modeRef.current }));
+  }, []);
+
   const chrome = useMemo(() => ({ showToggle, setShowToggle }), [showToggle]);
-  const showBar = mode === 'mining' || showToggle;
+  const showBar = mode === 'mining' ? isMiningHomePath(location.pathname) : showToggle;
 
   const choose = useCallback((next: Mode) => {
     const prev = modeRef.current;
@@ -75,6 +88,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     } catch {
       /* ignore */
     }
+    window.dispatchEvent(new CustomEvent('arxon-app-mode', { detail: next }));
     if (next === 'mining') {
       const dest = isMiningPath(lastMiningPath.current.split('?')[0]) ? lastMiningPath.current : '/mine';
       if (`${loc.pathname}${loc.search}` !== dest) navigate(dest);
@@ -95,6 +109,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
       } catch {
         /* ignore */
       }
+      window.dispatchEvent(new CustomEvent('arxon-app-mode', { detail: 'mining' }));
     }
   }, [location.pathname]);
 
@@ -120,7 +135,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
     <AppModeContext.Provider value={mode}>
       <WalletModeActionsContext.Provider value={actions}>
       <ModeChromeContext.Provider value={chrome}>
-      <div style={{ height: '100%', width: '100%', background: '#050505', position: 'relative', overflow: 'hidden' }}>
+      <div style={{ height: '100%', width: '100%', background: '#0a0c10', position: 'relative', overflow: 'hidden' }}>
         <div
           aria-hidden={mode !== 'wallet'}
           style={{ position: 'absolute', inset: 0, overflow: 'hidden', display: mode === 'wallet' ? 'flex' : 'none', flexDirection: 'column' }}
@@ -134,7 +149,7 @@ export default function ModeShell({ children }: { children: ReactNode }) {
         <div
           aria-hidden={mode !== 'mining'}
           className="arxon-mode-scroll"
-          style={{ position: 'absolute', inset: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none' }}
+          style={{ position: 'absolute', inset: 0, overflow: 'auto', display: mode === 'mining' ? 'block' : 'none', background: '#0a0c10' }}
         >
           {mode === 'mining' ? <ErrorBoundary soft>{children}</ErrorBoundary> : null}
         </div>
@@ -151,10 +166,10 @@ export default function ModeShell({ children }: { children: ReactNode }) {
             display: 'flex',
             justifyContent: 'center',
             pointerEvents: 'none',
-            background: 'linear-gradient(180deg, rgba(33,62,115,0.38) 0%, rgba(22,40,78,0.16) 48%, rgba(5,5,5,0) 100%)',
+            background: 'linear-gradient(180deg, rgba(10,12,16,0.92) 0%, rgba(10,12,16,0.55) 48%, rgba(10,12,16,0) 100%)',
           }}
         >
-          <div style={{ pointerEvents: 'auto' }}>
+          <div data-tour="mode-toggle" style={{ pointerEvents: 'auto' }}>
             <ModeToggle mode={mode} onChoose={choose} />
           </div>
         </div>

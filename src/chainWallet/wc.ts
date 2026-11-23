@@ -13,6 +13,7 @@ import {
 import { mnemonicToAccount } from 'viem/accounts';
 
 import { ARXON, ARXON_CAIP, walletClient } from './chain';
+import { debugWalletLog } from './debugWalletIngest';
 import { pushActivity } from './activity';
 
 export type WcProposal = WalletKitTypes.SessionProposal;
@@ -29,7 +30,6 @@ const WC_METHODS = [
   'eth_requestAccounts',
   'eth_sendTransaction',
   'eth_signTransaction',
-  'eth_sign',
   'personal_sign',
   'eth_signTypedData',
   'eth_signTypedData_v3',
@@ -93,6 +93,13 @@ type ProposalStruct = {
 };
 
 export function supportedNamespaces(address: Address) {
+  // #region agent log
+  debugWalletLog('D', 'wc.ts:supportedNamespaces', 'wc methods advertised', {
+    methods: WC_METHODS,
+    includesEthSign: WC_METHODS.includes('eth_sign'),
+    chain: ARXON_CAIP,
+  }, 'fresh-apk');
+  // #endregion
   return {
     eip155: {
       chains: [ARXON_CAIP],
@@ -248,6 +255,15 @@ export async function executeWcRequest(
 ): Promise<unknown> {
   const { method, params } = req.params.request;
   const chainId = req.params.chainId;
+  // #region agent log
+  debugWalletLog('D', 'wc.ts:executeWcRequest', 'wc request', {
+    method,
+    chainId: chainId || null,
+    chainOk: chainId ? chainOk(chainId) : null,
+    isSigning: ['eth_sign', 'personal_sign', 'eth_signTypedData', 'eth_signTypedData_v3', 'eth_signTypedData_v4', 'eth_signTransaction'].includes(method),
+    isSendTx: method === 'eth_sendTransaction',
+  });
+  // #endregion
   if (chainId && !chainOk(chainId) && method !== 'wallet_switchEthereumChain' && method !== 'wallet_addEthereumChain') {
     throw new Error(`Dapp asked for ${chainId}. This wallet is chain 7171.`);
   }
@@ -264,7 +280,7 @@ export async function executeWcRequest(
     case 'personal_sign':
       return signPersonal(account, paramAt(params, 0));
     case 'eth_sign':
-      return signHash(account, paramAt(params, 1));
+      throw new Error('eth_sign is not supported. Ask the dapp to use personal_sign.');
     case 'eth_signTypedData':
     case 'eth_signTypedData_v3':
     case 'eth_signTypedData_v4':
@@ -305,6 +321,16 @@ function signTyped(account: ReturnType<typeof mnemonicToAccount>, raw: unknown) 
     message: Record<string, unknown>;
   };
   if (!typed.primaryType) throw new Error('typed data missing primaryType');
+  const chainId = typed.domain?.chainId;
+  const n =
+    typeof chainId === 'string'
+      ? Number(chainId.startsWith('0x') ? BigInt(chainId) : chainId)
+      : typeof chainId === 'number'
+        ? chainId
+        : NaN;
+  if (Number.isFinite(n) && n !== ARXON.id) {
+    throw new Error(`Dapp typed data is chain ${n}. This wallet is chain ${ARXON.id}.`);
+  }
   return account.signTypedData(
     typed as unknown as Parameters<typeof account.signTypedData>[0]
   );

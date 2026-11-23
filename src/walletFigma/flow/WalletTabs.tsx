@@ -68,7 +68,9 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName | null;
         ? { top: 'auto', bottom: 0, paddingBottom: 'max(8px, env(safe-area-inset-bottom, 0px))' }
         : { top: 728, paddingBottom: 0 }),
     }}>
-      <div style={{
+      <div
+        data-tour="wallet-tabs"
+        style={{
         pointerEvents: 'auto',
         margin: live?.app ? '0 16px 6px' : '0 22px',
         display: 'flex',
@@ -89,6 +91,7 @@ export function WalletTabs({ active, onSelect }: { active: WalletTabName | null;
             <button
               key={tab.name}
               type="button"
+              data-tour={`wallet-tab-${tab.name}`}
               aria-current={on ? 'page' : undefined}
               onClick={() => onSelect(tab.name)}
               style={tabBtn(on)}

@@ -10,6 +10,7 @@ import {
   GamePanel, GlossyBackButton, GlossyButton, RibbonBanner, TreasureBackdrop,
 } from '@/features/word-forge/components/GlossyKit';
 import { forgeBackPath } from '@/features/word-forge/lib/forgeNavigation';
+import { useGoBack } from '@/lib/navBack';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 
 interface ForgeLeaderRow {
@@ -26,6 +27,7 @@ const RANK_COLORS = ['#ffd93d', '#cfd8e3', '#e8a367'];
 
 export default function WordForgeLeaderboardPage() {
   const navigate = useNavigate();
+  const back = useGoBack(forgeBackPath());
   const { user } = useAuth();
   const { setHideNav } = useMobileNav();
   const [rows, setRows] = useState<ForgeLeaderRow[]>([]);
@@ -67,7 +69,7 @@ export default function WordForgeLeaderboardPage() {
         maxWidth: 400, margin: '0 auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <GlossyBackButton onClick={() => navigate(forgeBackPath())} />
+          <GlossyBackButton onClick={back} />
           <img src={FORGE_UI.forgeLogo} alt="Arxon Word Forge" style={{
             width: 128, height: 'auto',
             filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.65))',

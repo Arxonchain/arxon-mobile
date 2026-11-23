@@ -44,6 +44,9 @@ export default function AppFailureScreen({
   const secondary = secondaryLabel ?? preset.secondaryLabel;
   const [busy, setBusy] = useState(false);
 
+  if (detail) console.error('[Arxon]', detail);
+  if (devError) console.error(devError);
+
   const handlePrimary = async () => {
     setBusy(true);
     try {
@@ -68,21 +71,13 @@ export default function AppFailureScreen({
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: '#050505' }}>
       <FailSheet
-        kicker="App"
         title={heading}
-        why={detail ? `${body} ${detail}` : body}
+        why={body}
         primary={busy ? 'Retrying…' : primary}
         secondary={showSecondary ? secondary : undefined}
         onPrimary={() => void handlePrimary()}
         onSecondary={showSecondary ? handleSecondary : undefined}
-        extra={
-          <>
-            {children}
-            {import.meta.env.DEV && devError ? (
-              <p style={{ margin: '10px 0 0', fontSize: 11, color: '#5c6578', wordBreak: 'break-word' }}>{devError.message}</p>
-            ) : null}
-          </>
-        }
+        extra={children}
       />
     </div>
   );

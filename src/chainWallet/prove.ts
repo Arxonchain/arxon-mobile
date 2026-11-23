@@ -1,4 +1,4 @@
-import { Capacitor } from '@capacitor/core';
+import { debugWalletLog } from './debugWalletIngest';
 
 export const PROVE_URL = 'http://127.0.0.1:17871';
 const WASM_JS_REMOTE = 'https://rpc-test.arxonchain.xyz/prove/arxon_prove.js';
@@ -162,6 +162,19 @@ async function loadWasm(): Promise<WasmBindgen | null> {
         }
         const js = local ? localJs : WASM_JS_REMOTE;
         const bin = local ? localBin : WASM_BIN_REMOTE;
+        // #region agent log
+        let jsHost = 'bad';
+        try {
+          jsHost = new URL(js, window.location.href).host;
+        } catch {
+          jsHost = 'bad';
+        }
+        debugWalletLog('E', 'prove.ts:loadWasm', 'prover script source', {
+          source: local ? 'local' : 'remote',
+          jsHost,
+          bodyHasSkHex: true,
+        });
+        // #endregion
         const existing = document.querySelector(`script[data-arxon-prove="1"]`);
         if (!existing && !windowBindgen()) {
           await new Promise<void>((resolve, reject) => {
@@ -189,35 +202,6 @@ async function loadWasm(): Promise<WasmBindgen | null> {
   return wasmLoad;
 }
 
-async function postHttp<T>(path: string, body: unknown): Promise<T> {
-  let res: Response;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 180_000);
-  try {
-    res = await fetch(`${PROVE_URL}${path}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message.toLowerCase() : '';
-    if (msg.includes('abort')) {
-      throw new Error('Prover timed out.');
-    }
-    throw new Error(
-      'No in-app Halo2 prover. Wait for the first wasm load, or keep arxon-prove on 127.0.0.1:17871.'
-    );
-  } finally {
-    clearTimeout(timer);
-  }
-  const json = (await res.json()) as T & { error?: string };
-  if (!res.ok) {
-    throw new Error(json.error || `prover HTTP ${res.status}`);
-  }
-  return json;
-}
-
 async function call<T>(
   method: 'keys' | 'shield' | 'transfer' | 'unshield',
   body: unknown
@@ -242,13 +226,18 @@ async function call<T>(
         return JSON.parse(api[method](JSON.stringify(body))) as T;
       }
     } catch {
-      /* sidecar HTTP below */
+      /* fall through to the in-app error below */
     }
   }
-  if (Capacitor.isNativePlatform()) {
-    throw new Error('In-app prover is not ready yet. Open Send again in a moment.');
-  }
-  return postHttp(`/v1/${method}`, body);
+  // #region agent log
+  debugWalletLog('E', 'prove.ts:call', 'prover call fallback', {
+    method,
+    sidecarAttempted: false,
+    sidecarUrlUsed: false,
+    workerBroken,
+  }, 'fresh-apk');
+  // #endregion
+  throw new Error('In-app prover is not ready yet. Open Send again in a moment.');
 }
 
 /** Warm Halo2 in the worker after Home is on screen. Never run this on the UI thread. */

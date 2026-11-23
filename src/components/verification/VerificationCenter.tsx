@@ -1,13 +1,20 @@
-import { useState } from 'react';
+import { useState, type CSSProperties, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Mail, Globe, ShieldCheck, Wallet, CheckCircle2, Lock, Loader2, Send, ChevronDown,
+  Mail, Globe, ShieldCheck, Wallet, CheckCircle2, Lock, ChevronDown,
 } from 'lucide-react';
 import { useVerification } from '@/hooks/useVerification';
-import { COUNTRIES, countryByCode } from '@/lib/verification/countries';
+import { COUNTRIES } from '@/lib/verification/countries';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { v2 } from '@/features/arxon-v2/design/tokens';
-import { V2Card, V2Button, fadeUp } from '@/features/arxon-v2/design/Kit';
+import { fadeUp } from '@/features/arxon-v2/design/Kit';
+import { Field, FrostPanel, GlassSheet, pc, PrimaryBtn, TokenRow } from '@/features/arxon-v2/design/ProfileChrome';
+import { neon } from '@/features/arxon-v2/design/neonTokens';
+import { useNavigate } from 'react-router-dom';
+import { startTestnetConnect } from '@/lib/testnetConnectSession';
+import { useFourTxClaim } from '@/hooks/useFourTxClaim';
+import { shortAddress } from '@/lib/testnetWalletLink';
 
 type Props = { variant?: 'v2' | 'mobile' | 'web' };
 
@@ -20,6 +27,8 @@ const STEP_ICONS = {
 
 export default function VerificationCenter({ variant = 'v2' }: Props) {
   const v = useVerification();
+  const navigate = useNavigate();
+  const { linkedAddress } = useFourTxClaim(true);
   const [newEmail, setNewEmail] = useState('');
   const [countryCode, setCountryCode] = useState(v.profile?.country_code ?? '');
   const [ageChecked, setAgeChecked] = useState(false);
@@ -44,8 +53,7 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
       await fn();
       toast({ title: 'Success', description: okMsg });
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Something went wrong';
-      toast({ title: 'Error', description: msg, variant: 'destructive' });
+      toast(publicErrorToast(e, 'verify'));
     } finally {
       setBusy(null);
     }
@@ -53,69 +61,52 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
 
   const progressPct = v.requiredCount > 0 ? Math.round((v.completedCount / v.requiredCount) * 100) : 0;
 
-  const inputStyle: React.CSSProperties = {
+  const inputStyle: CSSProperties = {
     width: '100%',
     padding: '12px 14px',
-    borderRadius: v2.radius.sm,
+    borderRadius: 14,
     boxSizing: 'border-box',
-    background: v2.brand.raised,
-    border: `1px solid ${v2.brand.border}`,
+    background: isMobileStyle ? v2.brand.raised : pc.glyph,
+    border: `1px solid ${isMobileStyle ? v2.brand.border : 'rgba(255,255,255,0.08)'}`,
     outline: 'none',
     fontSize: 14,
-    color: v2.brand.steelBright,
-    fontFamily: v2.font,
+    color: '#fff',
+    fontFamily: neon.font,
   };
 
   const StepShell = ({ id, title, desc, children, done }: {
     id: keyof typeof STEP_ICONS;
     title: string;
     desc: string;
-    children?: React.ReactNode;
+    children?: ReactNode;
     done: boolean;
   }) => {
     const Icon = STEP_ICONS[id];
     const inner = (
       <>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: children ? 14 : 0 }}>
-          <div style={{
-            width: 44, height: 44, borderRadius: 14, flexShrink: 0,
-            background: done ? `${accent}22` : `${v2.brand.steel}12`,
-            border: `1px solid ${done ? `${accent}55` : `${v2.brand.steel}33`}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: done ? accent : v2.brand.steel,
-          }}>
-            {done ? <CheckCircle2 size={20} /> : <Icon size={20} />}
-          </div>
-          <div style={{ flex: 1 }}>
-            <p style={{ fontSize: 14, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>{title}</p>
-            <p style={{ fontSize: 11, color: v2.brand.muted, margin: '4px 0 0', lineHeight: 1.45 }}>{desc}</p>
-          </div>
-          {done && (
-            <span style={{
-              fontSize: 10, fontWeight: 700, color: accent, padding: '4px 8px',
-              borderRadius: 99, background: `${accent}18`, border: `1px solid ${accent}44`,
-            }}>Done</span>
-          )}
-        </div>
-        {!done && children}
+        <TokenRow
+          wrap
+          icon={done ? <CheckCircle2 size={14} /> : <Icon size={14} />}
+          glyphBg={done ? 'rgba(61,220,132,0.22)' : undefined}
+          title={title}
+          sub={desc}
+          trailing={done ? <span style={{ fontSize: 11, fontWeight: 700, color: pc.good }}>Done</span> : null}
+        />
+        {!done && children ? <div style={{ padding: '0 0 10px' }}>{children}</div> : null}
       </>
     );
 
     if (isMobileStyle) {
       return <div style={cardStyle}>{inner}</div>;
     }
-    return (
-      <V2Card padding="16px" accent={done ? accent : undefined} style={{ marginBottom: 12 }}>
-        {inner}
-      </V2Card>
-    );
+    return <GlassSheet>{inner}</GlassSheet>;
   };
 
   return (
-    <div data-tour="verify-panel">
+    <div>
       <motion.div variants={fadeUp} initial="hidden" animate="show" style={{ marginBottom: 16 }}>
         {isMobileStyle ? (
-          <div style={{ ...cardStyle, marginBottom: 16 }}>
+          <div data-tour="verify-panel" style={{ ...cardStyle, marginBottom: 16 }}>
             <p style={{ fontSize: 12, color: v2.brand.muted, margin: '0 0 8px' }}>Verification progress</p>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
               <span style={{ fontSize: 22, fontWeight: 800, color: v2.brand.steelBright }}>{progressPct}%</span>
@@ -124,26 +115,35 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
             <div style={{ height: 8, borderRadius: 99, background: v2.brand.border, overflow: 'hidden' }}>
               <div style={{ width: `${progressPct}%`, height: '100%', background: accent, borderRadius: 99, transition: 'width 0.4s' }} />
             </div>
+            <p style={{ fontSize: 11, color: v2.brand.muted, margin: '10px 0 0' }}>
+              Email · Country · Age 18+ · Wallet
+            </p>
           </div>
         ) : (
-          <V2Card padding="16px" accent={accent}>
-            <p style={{ fontSize: 12, color: v2.brand.muted, margin: '0 0 8px' }}>Verification progress</p>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 10 }}>
-              <span style={{ fontSize: 24, fontWeight: 800, color: v2.brand.steelBright }}>{progressPct}%</span>
-              <span style={{ fontSize: 11, color: v2.brand.muted }}>{v.completedCount} of {v.requiredCount} required steps</span>
+          <div data-tour="verify-panel">
+          <FrostPanel>
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 650, color: pc.muted, fontFamily: neon.font }}>Verification</p>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 6 }}>
+              <span style={{ fontSize: 26, fontWeight: 750, color: pc.ink, fontFamily: neon.font }}>{progressPct}%</span>
+              <span style={{ fontSize: 12, color: pc.muted, fontFamily: neon.font }}>{v.completedCount} of {v.requiredCount} required</span>
             </div>
-            <div style={{ height: 8, borderRadius: 99, background: v2.brand.border, overflow: 'hidden' }}>
-              <div style={{ width: `${progressPct}%`, height: '100%', background: accent, borderRadius: 99, transition: 'width 0.4s' }} />
+            <div style={{ height: 6, borderRadius: 99, background: 'rgba(12,16,24,0.12)', overflow: 'hidden', marginTop: 10 }}>
+              <div style={{ width: `${progressPct}%`, height: '100%', background: pc.ink, borderRadius: 99, transition: 'width 0.4s' }} />
             </div>
-            {v.isComplete && (
-              <p style={{ fontSize: 11, color: accent, margin: '10px 0 0', fontWeight: 600 }}>
-                Account verification complete. You will no longer see daily reminders.
+            <p style={{ fontSize: 11, color: pc.muted, margin: '10px 0 0', fontFamily: neon.font }}>
+              Email · Country · Age 18+ · Wallet
+            </p>
+            {v.isComplete ? (
+              <p style={{ fontSize: 12, color: pc.muted, margin: '8px 0 0', fontFamily: neon.font }}>
+                Verification complete. Daily reminders stop.
               </p>
-            )}
-          </V2Card>
+            ) : null}
+          </FrostPanel>
+          </div>
         )}
       </motion.div>
 
+      <div data-tour="verify-steps">
       {/* Email */}
       <StepShell
         id="email"
@@ -156,32 +156,20 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
         done={v.emailVerified}
       >
         {!v.emailVerified && (
-          <V2Button
-            accent={v2.brand.steel}
-            fullWidth
+          <PrimaryBtn
+            label={busy === 'email-resend' ? 'Sending…' : 'Resend verification email'}
             disabled={busy === 'email-resend'}
-            onClick={() => run('email-resend', v.resendEmailVerification, 'Verification email sent. Check your inbox.')}
-          >
-            {busy === 'email-resend' ? <Loader2 size={16} className="animate-spin" /> : <><Send size={16} /> Resend verification email</>}
-          </V2Button>
+            onClick={() => void run('email-resend', v.resendEmailVerification, 'Verification email sent. Check your inbox.')}
+          />
         )}
         {v.emailVerified && !v.emailLocked && v.remainingEmailChanges > 0 && (
           <div style={{ marginTop: v.emailVerified ? 0 : 12 }}>
-            <input
-              type="email"
-              value={newEmail}
-              onChange={(e) => setNewEmail(e.target.value)}
-              placeholder="New email address"
-              style={{ ...inputStyle, marginBottom: 10 }}
-            />
-            <V2Button
-              accent={v2.brand.steel}
-              fullWidth
+            <Field value={newEmail} onChange={setNewEmail} placeholder="New email address" type="email" />
+            <PrimaryBtn
+              label={busy === 'email-change' ? 'Updating…' : 'Change email'}
               disabled={busy === 'email-change' || !newEmail.trim()}
-              onClick={() => run('email-change', () => v.changeEmail(newEmail), 'Check both inboxes to confirm the new email.')}
-            >
-              {busy === 'email-change' ? 'Updating…' : 'Change email'}
-            </V2Button>
+              onClick={() => void run('email-change', () => v.changeEmail(newEmail), 'Check both inboxes to confirm the new email.')}
+            />
             <p style={{ fontSize: 10, color: v2.brand.muted, margin: '8px 0 0' }}>
               After {v.remainingEmailChanges} more change{v.remainingEmailChanges === 1 ? '' : 's'}, email will be locked forever.
             </p>
@@ -215,14 +203,11 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
           <ChevronDown size={16} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: v2.brand.muted, pointerEvents: 'none' }} />
         </div>
         <div style={{ marginTop: 10 }}>
-          <V2Button
-            accent={accent}
-            fullWidth
+          <PrimaryBtn
+            label={busy === 'country' ? 'Saving…' : 'Save country'}
             disabled={!countryCode || busy === 'country'}
-            onClick={() => run('country', () => v.saveCountry(countryCode), 'Country saved.')}
-          >
-            {busy === 'country' ? 'Saving…' : 'Save country'}
-          </V2Button>
+            onClick={() => void run('country', () => v.saveCountry(countryCode), 'Country saved.')}
+          />
         </div>
       </StepShell>
 
@@ -244,29 +229,30 @@ export default function VerificationCenter({ variant = 'v2' }: Props) {
             I confirm that I am at least 18 years old and agree to use Arxon in compliance with local laws.
           </span>
         </label>
-        <V2Button
-          accent={accent}
-          fullWidth
+        <PrimaryBtn
+          label={busy === 'age' ? 'Saving…' : 'Confirm age'}
           disabled={!ageChecked || busy === 'age'}
-          onClick={() => run('age', v.confirmAge, 'Age confirmation saved.')}
-        >
-          {busy === 'age' ? 'Saving…' : 'Confirm age'}
-        </V2Button>
+          onClick={() => void run('age', v.confirmAge, 'Age confirmation saved.')}
+        />
       </StepShell>
 
-      {/* Wallet coming soon */}
       <StepShell
         id="wallet"
-        title="Wallet connect"
-        desc="Required for future airdrop claims — coming soon"
-        done={false}
+        title="Connect wallet"
+        desc={linkedAddress
+          ? `Linked ${shortAddress(linkedAddress)}. Same Arxon testnet wallet as mining tasks.`
+          : 'Connect your Arxon testnet wallet. Same flow as Testnet Tasks.'}
+        done={Boolean(v.steps.find((s) => s.id === 'wallet')?.done || linkedAddress)}
       >
-        <span style={{
-          display: 'inline-block', fontSize: 10, fontWeight: 700, padding: '6px 12px',
-          borderRadius: 99, background: `${v2.brand.steel}14`, color: v2.brand.mutedSoft,
-          border: `1px solid ${v2.brand.border}`,
-        }}>Coming soon</span>
+        <PrimaryBtn
+          label="Connect wallet"
+          onClick={() => {
+            startTestnetConnect('/settings?tab=verification');
+            navigate('/mine/connect');
+          }}
+        />
       </StepShell>
+      </div>
     </div>
   );
 }

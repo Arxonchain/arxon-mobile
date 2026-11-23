@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { User, Bell, Shield, ShieldCheck, ChevronRight, ArrowLeft } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { goBack } from "@/lib/navBack";
 import VerificationCenter from "@/components/verification/VerificationCenter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ProfileSettings from "@/components/settings/ProfileSettings";
@@ -145,7 +146,7 @@ const Settings = () => {
     <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
       <div className="flex items-center gap-3">
         <button 
-          onClick={() => navigate('/')}
+          onClick={() => goBack(navigate)}
           className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="h-5 w-5" />

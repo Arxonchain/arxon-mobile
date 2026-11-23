@@ -12,6 +12,7 @@ import {
   GlossyBackButton, GlossyButton, TreasureBackdrop,
 } from '@/features/word-forge/components/GlossyKit';
 import { forgeBackPath } from '@/features/word-forge/lib/forgeNavigation';
+import { useGoBack } from '@/lib/navBack';
 import { mobileScrollPadding } from '@/lib/mobileLayout';
 
 const MAX_SECTORS = 50;
@@ -33,6 +34,7 @@ const NODE_STYLE: Record<SectorMapState, { grad: string; ridge: string; border: 
 
 export default function SectorMapPage() {
   const navigate = useNavigate();
+  const back = useGoBack(forgeBackPath());
   const { setHideNav } = useMobileNav();
   const progress = loadForgeProgress();
   const unlocked = maxUnlockedLevel(progress.bestLevel);
@@ -69,7 +71,7 @@ export default function SectorMapPage() {
         maxWidth: 400, margin: '0 auto',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <GlossyBackButton onClick={() => navigate(forgeBackPath())} />
+          <GlossyBackButton onClick={back} />
           <img src={FORGE_UI.forgeLogo} alt="Arxon Word Forge" style={{
             width: 128, height: 'auto',
             filter: 'drop-shadow(0 6px 16px rgba(0,0,0,0.65))',

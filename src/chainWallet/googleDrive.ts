@@ -1,5 +1,8 @@
 import { Capacitor } from '@capacitor/core';
+import { debugWalletLog } from './debugWalletIngest';
 import { openSecret, sealSecret, type SecretBox } from './cryptoBox';
+import { walletBackupPlain } from './session';
+import { parseWalletSecret } from './walletEnvelope';
 
 const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
 const FILE = 'arxon-wallet-backup.json';
@@ -150,6 +153,20 @@ async function tokenViaRedirect(clientId: string): Promise<string> {
     const popup = window.open(url, 'arxon-google', 'width=480,height=720');
     const onMsg = (event: MessageEvent) => {
       const data = event.data as { type?: string; token?: string; err?: string };
+      // #region agent log
+      let originHost = String(event.origin || '');
+      try {
+        originHost = new URL(event.origin).host;
+      } catch {
+        /* keep raw */
+      }
+      debugWalletLog('E', 'googleDrive.ts:onMsg', 'oauth postMessage', {
+        originHost,
+        originAllowed: event.origin === window.location.origin,
+        hasToken: !!data?.token,
+        type: data?.type || null,
+      });
+      // #endregion
       if (data?.type !== 'arxon-google-oauth') return;
       window.removeEventListener('message', onMsg);
       popup?.close();
@@ -206,8 +223,19 @@ async function findBackupId(token: string) {
 
 export async function uploadDriveBackup(password: string, mnemonic: string) {
   const token = await connectGoogleDrive();
-  const box = await sealSecret(password, mnemonic);
+  const plain = await walletBackupPlain(mnemonic);
+  const opened = parseWalletSecret(plain);
+  const box = await sealSecret(password, plain);
   const payload: DriveBackupFile = { v: 1, kind: 'arxon-wallet-backup', box };
+  // #region agent log
+  debugWalletLog('H', 'googleDrive.ts:uploadDriveBackup', 'drive backup payload fields', {
+    version: payload.v,
+    hasMnemonicBox: !!payload.box,
+    hasSkBox: !!opened.sk,
+    hasNotes: !!(opened.notes && opened.notes.length > 0),
+    noteCount: opened.notes?.length ?? 0,
+  }, 'post-fix');
+  // #endregion
   const meta = { name: FILE, parents: ['appDataFolder'] };
   const existing = await findBackupId(token);
   const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });

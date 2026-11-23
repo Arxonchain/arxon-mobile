@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import arxonLogo from '@/assets/arxon-icon.svg';
 
@@ -41,7 +42,7 @@ export default function ResetPasswordPage() {
       toast({ title: 'Success', description: 'Your password has been updated' });
       setTimeout(() => navigate('/'), 2000);
     } catch (err: any) {
-      toast({ title: 'Error', description: err.message || 'Failed to update password', variant: 'destructive' });
+      toast(publicErrorToast(err, 'auth'));
     } finally {
       setLoading(false);
     }

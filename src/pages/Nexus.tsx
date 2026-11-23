@@ -1,12 +1,14 @@
  import { useState, useEffect } from 'react';
  import { ArrowLeft, Send, Users, Zap, Shield, Gift, ArrowUpRight, ArrowDownLeft, Copy, Check, Sparkles, History, RefreshCw } from 'lucide-react';
  import { useNavigate } from 'react-router-dom';
+ import { goBack } from '@/lib/navBack';
  import { motion } from 'framer-motion';
  import { useAuth } from '@/contexts/AuthContext';
  import { usePoints } from '@/hooks/usePoints';
  import { useProfile } from '@/hooks/useProfile';
  import { supabase } from '@/integrations/supabase/client';
  import { toast } from '@/hooks/use-toast';
+ import { publicErrorToast } from '@/lib/publicError';
  import { Button } from '@/components/ui/button';
  import { Input } from '@/components/ui/input';
  import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -124,7 +126,7 @@
         if (error) throw error;
        const result = data as any;
        if (!result?.success) {
-         toast({ title: 'Transfer Failed', description: result?.error || 'Unknown error', variant: 'destructive' });
+         toast(publicErrorToast(result?.error, 'transfer'));
          return;
        }
        toast({ title: 'Transfer Sent! 🎉', description: `Sent ${numAmount} ARX-P. You earned a 20% mining boost!` });
@@ -134,7 +136,7 @@
        await fetchTransactions();
        await fetchAllTransactions();
      } catch (err: any) {
-       toast({ title: 'Error', description: err.message, variant: 'destructive' });
+       toast(publicErrorToast(err, 'transfer'));
      } finally {
        setSending(false);
      }
@@ -162,7 +164,7 @@
        <ResendBackground variant="subtle" />
        
        <header className="relative z-20 flex items-center justify-between px-4 py-4 border-b border-border/50 bg-background/80 backdrop-blur-xl">
-         <motion.button onClick={() => navigate('/')} className="p-2 -ml-2 text-muted-foreground hover:text-foreground" whileHover={{ x: -3 }}>
+         <motion.button onClick={() => goBack(navigate)} className="p-2 -ml-2 text-muted-foreground hover:text-foreground" whileHover={{ x: -3 }}>
            <ArrowLeft className="w-6 h-6" />
          </motion.button>
          <h1 className="font-bold text-foreground text-lg">Nexus</h1>

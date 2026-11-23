@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { publicErrorToast } from "@/lib/publicError";
 import { supabase } from "@/integrations/supabase/client";
 import PrivacyDataSettings from "@/components/settings/PrivacyDataSettings";
 
@@ -52,11 +53,7 @@ const SecuritySettings = () => {
       setPasswords({ newPassword: "", confirmPassword: "" });
     } catch (error: any) {
       console.error("Error updating password:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to update password",
-        variant: "destructive",
-      });
+      toast(publicErrorToast(error, 'auth'));
     } finally {
       setLoading(false);
     }

@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useToast } from "@/hooks/use-toast";
+import { publicErrorToast } from "@/lib/publicError";
 import { supabase } from "@/integrations/supabase/client";
 
 interface ProfileData {
@@ -129,11 +130,7 @@ const ProfileSettings = () => {
       });
     } catch (error: any) {
       console.error("Error uploading avatar:", error);
-      toast({
-        title: "Upload Failed",
-        description: error.message || "Failed to upload avatar",
-        variant: "destructive",
-      });
+      toast(publicErrorToast(error, 'upload'));
     } finally {
       setUploading(false);
       // Reset file input

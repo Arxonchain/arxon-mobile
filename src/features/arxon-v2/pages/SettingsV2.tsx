@@ -1,8 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import {
-  Bell, Shield, Zap, Gift, Trophy, AlertCircle, Swords, Flame, Eye, EyeOff, Loader2,
+  Bell, Gift, Trophy, AlertCircle, Swords, Eye, EyeOff, Zap, Trash2,
 } from 'lucide-react';
 import VerificationCenter from '@/components/verification/VerificationCenter';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,12 +9,20 @@ import { useAppTourOptional } from '@/contexts/AppTourContext';
 import { resetTourProgress } from '@/lib/tour/tourStorage';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { supabase } from '@/integrations/supabase/client';
+import { V2Page } from '../design/Kit';
 import {
-  V2Page, V2Header, V2Tabs, V2Card, V2Button, V2ButtonGhost, fadeUp, stagger,
-} from '../design/Kit';
-import { v2 } from '../design/tokens';
-import LegalLinks from '@/components/legal/LegalLinks';
+  Field,
+  GhostBtn,
+  GlassSheet,
+  NeonToggle,
+  pc,
+  PrimaryBtn,
+  ProfileHead,
+  SegmentTabs,
+  TokenRow,
+} from '../design/ProfileChrome';
 import PrivacyDataSettings from '@/components/settings/PrivacyDataSettings';
 
 type Tab = 'notifications' | 'security' | 'verification';
@@ -26,17 +33,15 @@ const NOTIF_OPTIONS: {
   title: string;
   description: string;
 }[] = [
-  { key: 'miningAlerts', icon: Zap, title: 'Mining Alerts', description: '10 minutes before session ends' },
-  { key: 'claimNotifications', icon: Gift, title: 'Claim Reminders', description: 'When your 8-hour session is ready' },
-  { key: 'arenaLive', icon: Swords, title: 'Arena Live', description: 'New prediction battles go live' },
-  { key: 'arenaResults', icon: Trophy, title: 'Arena Results', description: 'Win or loss on battles you joined' },
-  { key: 'rewardUpdates', icon: Gift, title: 'Reward Updates', description: 'Significant ARX-P rewards earned' },
-  { key: 'wordForgeDaily', icon: Flame, title: 'Word Forge Daily', description: 'Daily challenge and streak reminders' },
+  { key: 'miningAlerts', icon: Zap, title: 'Mining alerts', description: '10 minutes before a session ends' },
+  { key: 'claimNotifications', icon: Gift, title: 'Claim reminders', description: 'When your 8-hour session is ready' },
+  { key: 'arenaLive', icon: Swords, title: 'Arena live', description: 'New prediction battles go live' },
+  { key: 'arenaResults', icon: Trophy, title: 'Arena results', description: 'Win or loss on battles you joined' },
+  { key: 'rewardUpdates', icon: Gift, title: 'Reward updates', description: 'Significant ARX-P rewards' },
   { key: 'adminAnnouncements', icon: AlertCircle, title: 'Announcements', description: 'Updates from the Arxon team' },
 ];
 
 export default function SettingsV2() {
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
   const initialTab: Tab =
@@ -50,32 +55,22 @@ export default function SettingsV2() {
 
   return (
     <V2Page>
-      <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header eyebrow="Settings" title="Preferences" subtitle="Notifications, security & verification" onBack={() => navigate(-1)} />
-
-        <div style={{ padding: '0 16px' }}>
-          <motion.div variants={fadeUp} style={{ marginBottom: 18 }}>
-            <V2Tabs
-              tabs={[
-                { id: 'notifications' as Tab, label: 'Alerts' },
-                { id: 'verification' as Tab, label: 'Verify' },
-                { id: 'security' as Tab, label: 'Security' },
-              ]}
-              active={tab}
-              onChange={setTab}
-            />
-          </motion.div>
-
-          {tab === 'notifications' ? <NotificationsPanel /> : tab === 'verification' ? <VerificationPanel /> : <SecurityPanel />}
-        </div>
-
-        <p style={{ textAlign: 'center', padding: '24px 0 8px', color: v2.brand.muted, fontSize: 10 }}>
-          ARXON · v{(import.meta as any).env?.VITE_APP_VERSION || '1.0.0'}
-        </p>
-        <p style={{ textAlign: 'center', padding: '0 16px 16px', color: v2.brand.muted, fontSize: 10, lineHeight: 1.6 }}>
-          <LegalLinks linkClassName="text-[hsl(215_35%_62%)] hover:underline" />
-        </p>
-      </motion.div>
+      <ProfileHead
+        title={tab === 'security' ? 'Security' : tab === 'verification' ? 'Verification' : 'App settings'}
+        subtitle={tab === 'security' ? 'Password and account' : tab === 'verification' ? 'Email, country, age and wallet' : 'Notifications and display'}
+      />
+      <div style={{ padding: '0 16px 12px' }}>
+        <SegmentTabs
+          tabs={[
+            { id: 'notifications' as Tab, label: 'Alerts' },
+            { id: 'verification' as Tab, label: 'Verify' },
+            { id: 'security' as Tab, label: 'Security' },
+          ]}
+          active={tab}
+          onChange={setTab}
+        />
+        {tab === 'notifications' ? <NotificationsPanel /> : tab === 'verification' ? <VerificationPanel /> : <SecurityPanel />}
+      </div>
     </V2Page>
   );
 }
@@ -115,76 +110,54 @@ function NotificationsPanel() {
   }, [reRegisterToken]);
 
   return (
-    <div>
-      {!isSupported && (
-        <V2Card accent={v2.accent.danger} padding="14px" style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 12, color: v2.accent.danger, margin: 0 }}>Push notifications are not supported on this device.</p>
-        </V2Card>
-      )}
+    <>
+      {!isSupported ? (
+        <GlassSheet title="Device" danger>
+          <TokenRow wrap danger icon={<Bell size={14} />} title="Not supported" sub="Push notifications are not available on this device." />
+        </GlassSheet>
+      ) : null}
 
-      {isSupported && permission === 'denied' && (
-        <V2Card padding="14px" style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 12, color: v2.accent.danger, marginBottom: 12, lineHeight: 1.5 }}>
-            Notifications are blocked. Enable them in system settings, then re-check.
-          </p>
-          {isNative && (
-            <div style={{ display: 'flex', gap: 8 }}>
-              <V2ButtonGhost onClick={openNotificationSettings} accent={v2.brand.steel}>Open Settings</V2ButtonGhost>
-              <V2ButtonGhost onClick={handleRecheck} accent={v2.brand.steel}>{checking ? 'Checking…' : 'Re-check'}</V2ButtonGhost>
+      {isSupported && permission === 'denied' ? (
+        <GlassSheet title="Permission" danger>
+          <TokenRow wrap danger icon={<Bell size={14} />} title="Notifications blocked" sub="Enable them in system settings, then re-check." />
+          {isNative ? (
+            <div style={{ display: 'flex', gap: 8, padding: '4px 0 10px' }}>
+              <GhostBtn label="Open settings" onClick={openNotificationSettings} />
             </div>
-          )}
-        </V2Card>
-      )}
+          ) : null}
+          {isNative ? (
+            <div style={{ padding: '0 0 10px' }}>
+              <PrimaryBtn label={checking ? 'Checking…' : 'Re-check'} onClick={() => void handleRecheck()} />
+            </div>
+          ) : null}
+        </GlassSheet>
+      ) : null}
 
-      {isSupported && permission === 'default' && (
-        <V2Card padding="14px" style={{ marginBottom: 14 }}>
-          <p style={{ fontSize: 12, color: v2.brand.mutedSoft, marginBottom: 10 }}>
-            Enable alerts for mining, arena, and rewards.
-          </p>
-          <V2Button accent={v2.brand.steel} onClick={requestPermission}>Enable Notifications</V2Button>
-        </V2Card>
-      )}
+      {isSupported && permission === 'default' ? (
+        <GlassSheet title="Permission">
+          <TokenRow wrap icon={<Bell size={14} />} title="Enable alerts" sub="Mining, arena, and rewards." />
+          <div style={{ padding: '4px 0 10px' }}>
+            <PrimaryBtn label="Enable notifications" onClick={() => void requestPermission()} />
+          </div>
+        </GlassSheet>
+      ) : null}
 
-      {NOTIF_OPTIONS.map((opt, i) => {
-        const Icon = opt.icon;
-        const on = preferences[opt.key];
-        return (
-          <motion.div key={opt.key} variants={fadeUp} initial="hidden" animate="show" transition={{ delay: i * 0.04 }}>
-            <V2Card accent={on ? v2.accent.mining : undefined} padding="14px 16px" style={{ marginBottom: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{
-                  width: 42, height: 42, borderRadius: v2.radius.sm, flexShrink: 0,
-                  background: `${v2.brand.steel}14`, border: `1px solid ${v2.brand.steel}33`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', color: v2.brand.steel,
-                }}>
-                  <Icon size={18} />
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0 }}>{opt.title}</p>
-                  <p style={{ fontSize: 10, color: v2.brand.muted, margin: '2px 0 0' }}>{opt.description}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleToggle(opt.key)}
-                  aria-pressed={on}
-                  style={{
-                    width: 48, height: 28, borderRadius: 14, flexShrink: 0, cursor: 'pointer',
-                    border: 'none', outline: 'none', transition: 'background 0.2s',
-                    background: on ? v2.accent.mining : v2.brand.border, position: 'relative',
-                  }}
-                >
-                  <span style={{
-                    position: 'absolute', top: 3, left: on ? 23 : 3, width: 22, height: 22,
-                    borderRadius: '50%', background: 'white', transition: 'left 0.2s',
-                    boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
-                  }} />
-                </button>
-              </div>
-            </V2Card>
-          </motion.div>
-        );
-      })}
-    </div>
+      <GlassSheet title="Alerts">
+        {NOTIF_OPTIONS.map((opt) => {
+          const Icon = opt.icon;
+          const on = preferences[opt.key];
+          return (
+            <TokenRow
+              key={opt.key}
+              icon={<Icon size={14} />}
+              title={opt.title}
+              sub={opt.description}
+              trailing={<NeonToggle on={on} onToggle={() => void handleToggle(opt.key)} />}
+            />
+          );
+        })}
+      </GlassSheet>
+    </>
   );
 }
 
@@ -199,18 +172,17 @@ function VerificationPanel() {
   };
 
   return (
-    <motion.div variants={fadeUp} initial="hidden" animate="show">
+    <>
       <VerificationCenter variant="v2" />
-      {tour && (
-        <V2ButtonGhost onClick={replayGuide} style={{ width: '100%', marginTop: 12, fontSize: 12 }}>
-          Replay Arxon setup guide
-        </V2ButtonGhost>
-      )}
-    </motion.div>
+      {tour ? (
+        <GhostBtn label="Replay Arxon setup guide" onClick={replayGuide} />
+      ) : null}
+    </>
   );
 }
 
 function SecurityPanel() {
+  const navigate = useNavigate();
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [passwords, setPasswords] = useState({ newPassword: '', confirmPassword: '' });
@@ -231,8 +203,8 @@ function SecurityPanel() {
       if (error) throw error;
       toast({ title: 'Password updated', description: 'Your password has been changed.' });
       setPasswords({ newPassword: '', confirmPassword: '' });
-    } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Failed to update password', variant: 'destructive' });
+    } catch (e: unknown) {
+      toast(publicErrorToast(e, 'auth'));
     } finally {
       setSaving(false);
     }
@@ -240,45 +212,53 @@ function SecurityPanel() {
 
   return (
     <>
-      <V2Card padding="16px">
-        <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, marginBottom: 14 }}>Change Password</p>
+      <GlassSheet title="Password">
+        <div style={{ padding: '8px 0 4px' }}>
+          <Field
+            type={showPw ? 'text' : 'password'}
+            value={passwords.newPassword}
+            onChange={(v) => setPasswords((p) => ({ ...p, newPassword: v }))}
+            placeholder="New password"
+            trailing={(
+              <button type="button" onClick={() => setShowPw((v) => !v)} style={eyeBtn}>
+                {showPw ? <EyeOff size={16} color={pc.soft} /> : <Eye size={16} color={pc.soft} />}
+              </button>
+            )}
+          />
+          <Field
+            type={showConfirm ? 'text' : 'password'}
+            value={passwords.confirmPassword}
+            onChange={(v) => setPasswords((p) => ({ ...p, confirmPassword: v }))}
+            placeholder="Confirm password"
+            trailing={(
+              <button type="button" onClick={() => setShowConfirm((v) => !v)} style={eyeBtn}>
+                {showConfirm ? <EyeOff size={16} color={pc.soft} /> : <Eye size={16} color={pc.soft} />}
+              </button>
+            )}
+          />
+          <PrimaryBtn label={saving ? 'Updating…' : 'Update password'} onClick={() => void handlePasswordChange()} disabled={saving} />
+        </div>
+      </GlassSheet>
 
-        {(['newPassword', 'confirmPassword'] as const).map((field, idx) => (
-          <div key={field} style={{ marginBottom: 12, position: 'relative' }}>
-            <input
-              type={(idx === 0 ? showPw : showConfirm) ? 'text' : 'password'}
-              value={passwords[field]}
-              onChange={(e) => setPasswords((p) => ({ ...p, [field]: e.target.value }))}
-              placeholder={idx === 0 ? 'New password' : 'Confirm password'}
-              style={{
-                width: '100%', padding: '14px 44px 14px 16px', borderRadius: v2.radius.sm, boxSizing: 'border-box',
-                background: v2.brand.raised, border: `1px solid ${v2.brand.border}`, outline: 'none',
-                fontSize: 14, color: v2.brand.steelBright, fontFamily: v2.font,
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => (idx === 0 ? setShowPw : setShowConfirm)((v) => !v)}
-              style={{
-                position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
-                background: 'none', border: 'none', cursor: 'pointer', color: v2.brand.mutedSoft,
-              }}
-            >
-              {(idx === 0 ? showPw : showConfirm) ? <EyeOff size={16} /> : <Eye size={16} />}
-            </button>
-          </div>
-        ))}
+      <PrivacyDataSettings />
 
-        <V2Button accent={v2.brand.steel} fullWidth onClick={handlePasswordChange} disabled={saving}>
-          {saving ? <><Loader2 size={16} className="animate-spin" /> Updating…</> : 'Update Password'}
-        </V2Button>
-      </V2Card>
-
-      <div style={{ marginTop: 14 }}>
-        <V2Card padding="16px">
-          <PrivacyDataSettings />
-        </V2Card>
-      </div>
+      <GlassSheet title="Danger zone" danger>
+        <TokenRow
+          danger
+          icon={<Trash2 size={14} />}
+          title="Delete account"
+          sub="30-day request · team review"
+          onClick={() => navigate('/profile?delete=1')}
+        />
+      </GlassSheet>
     </>
   );
 }
+
+const eyeBtn = {
+  background: 'none',
+  border: 'none',
+  cursor: 'pointer',
+  display: 'flex',
+  padding: 4,
+} as const;

@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { FLAG_COPY, type PrivacyFlags } from '@/chainWallet/privacy';
 import { hiddenCount, privacyPill, readDefaultPrivacy, writeDefaultPrivacy } from './privacyPrefs';
 import { font, ink, page } from './tokens';
@@ -14,7 +15,7 @@ export default function DefaultPrivacy() {
 
   return (
     <div style={page}>
-      <button type="button" onClick={() => navigate(-1)} style={back}>Back</button>
+      <button type="button" onClick={() => goBack(navigate)} style={back}>Back</button>
       <h1 style={{ margin: '18px 0 0', fontSize: 26, fontWeight: 700 }}>Default privacy</h1>
       <p style={{ color: '#8b9097', fontSize: 14, lineHeight: 1.45 }}>
         Privacy is a toggle. These four choices are the starting point for each payment. You can still change them on a single send.
@@ -48,7 +49,7 @@ export default function DefaultPrivacy() {
         style={cta}
         onClick={() => {
           writeDefaultPrivacy(flags);
-          navigate(-1);
+          goBack(navigate);
         }}
       >
         Save defaults

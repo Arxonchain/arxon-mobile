@@ -1,6 +1,7 @@
  import { memo } from "react";
 import { Zap, Trophy, ArrowLeft, Medal, Crown, Award } from "lucide-react";
  import { useNavigate } from "react-router-dom";
+ import { goBack } from "@/lib/navBack";
  import { motion } from "framer-motion";
  import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
  import { useLeaderboard } from "@/hooks/useLeaderboard";
@@ -98,7 +99,7 @@ const MinerEntry = memo(({ user, index }: { user: any; index: number }) => {
        {/* Header */}
        <header className="relative z-20 flex items-center justify-between px-4 py-4 border-b border-border/50 bg-background/80 backdrop-blur-xl">
          <motion.button 
-           onClick={() => navigate('/')} 
+           onClick={() => goBack(navigate)} 
            className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors"
            whileHover={{ x: -3 }}
          >

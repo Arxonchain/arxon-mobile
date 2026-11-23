@@ -16,14 +16,12 @@ export default function MobileBottomNavV2() {
   const mode = useAppMode();
 
   if (mode !== 'mining' || !user || hideNav) return null;
-  if (['/auth', '/admin'].some((p) => location.pathname.startsWith(p))) return null;
-  if (location.pathname === '/word-forge' || location.pathname.startsWith('/word-forge/')) return null;
+  if (['/auth', '/admin', '/terms', '/privacy', '/litepaper', '/whitepaper'].some((p) => location.pathname.startsWith(p))) return null;
 
   const activeId = (() => {
     const path = location.pathname;
-    if (path === '/mining' || path.startsWith('/mining/')) return 'mining';
+    if (path === '/mining' || path.startsWith('/mining/')) return 'home';
     if (path === '/arena' || path.startsWith('/arena/')) return 'arena';
-    if (path === '/games' || path.startsWith('/games/')) return 'games';
     if (path === '/leaderboard' || path.startsWith('/leaderboard/')) return 'leaderboard';
     if (path === '/profile' || path.startsWith('/profile/')) return 'profile';
     if (HOME_PREFIXES.some((p) => path === p || path.startsWith(`${p}/`))) return 'home';

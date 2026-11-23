@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { motion } from 'framer-motion';
 import {
   ChevronLeft, Bell, Shield, ShieldCheck, Zap, Gift, Trophy, AlertCircle, Swords, Flame,
@@ -8,6 +9,7 @@ import {
 import VerificationCenter from '@/components/verification/VerificationCenter';
 import { usePushNotifications, type NotificationPreferences } from '@/hooks/usePushNotifications';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { supabase } from '@/integrations/supabase/client';
 import LegalLinks from '@/components/legal/LegalLinks';
 
@@ -47,7 +49,7 @@ export default function MobileSettings() {
       fontFamily: "'Creato Display',-apple-system,system-ui,sans-serif",
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '52px 20px 0', marginBottom: 20 }}>
-        <button onClick={() => navigate(-1)} className="press"
+        <button onClick={() => goBack(navigate)} className="press"
           style={{ width: 40, height: 40, borderRadius: 14, background: 'hsl(215 25% 11%)',
             border: '1px solid hsl(215 22% 18%)', display: 'flex', alignItems: 'center',
             justifyContent: 'center', cursor: 'pointer', outline: 'none' }}>
@@ -226,7 +228,7 @@ function SecurityPanel() {
       toast({ title: 'Password updated', description: 'Your password has been changed.' });
       setPasswords({ newPassword: '', confirmPassword: '' });
     } catch (e: any) {
-      toast({ title: 'Error', description: e.message || 'Failed to update password', variant: 'destructive' });
+      toast(publicErrorToast(e, 'auth'));
     } finally {
       setSaving(false);
     }

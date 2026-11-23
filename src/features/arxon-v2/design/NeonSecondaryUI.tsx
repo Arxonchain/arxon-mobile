@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { ChevronRight, type LucideIcon } from 'lucide-react';
 import { neon } from './neonTokens';
 import { NeonEyebrow } from './NeonKit';
-import { mobileTopPadding } from '@/lib/mobileLayout';
+import { mobileTopPaddingPage } from '@/lib/mobileLayout';
+import { useGoBack } from '@/lib/navBack';
 
 export const neonFadeUp = {
   hidden: { opacity: 0, y: 16 },
@@ -18,11 +19,11 @@ export const neonStagger = {
 };
 
 const GLASS = {
-  bg: 'linear-gradient(155deg, rgba(12,28,48,0.88) 0%, rgba(6,12,24,0.92) 100%)',
-  border: 'rgba(79,216,235,0.18)',
+  bg: 'rgba(10,12,16,0.88)',
+  border: 'rgba(255,255,255,0.08)',
 };
 
-const ACTIVITY_TEXT = '#b8eff8';
+const ACTIVITY_TEXT = '#8c8f99';
 
 export function NeonScreenHeader({
   eyebrow,
@@ -37,20 +38,23 @@ export function NeonScreenHeader({
   onBack?: () => void;
   right?: ReactNode;
 }) {
+  const historyBack = useGoBack();
+  const handleBack = onBack ?? historyBack;
   return (
     <div style={{
       display: 'flex',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      padding: `${mobileTopPadding()} 16px 12px`,
+      padding: `${mobileTopPaddingPage()} 16px 12px`,
       gap: 10,
     }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, flex: 1, minWidth: 0 }}>
-        {onBack && (
+        {handleBack && (
           <motion.button
             type="button"
+            aria-label="Back"
             whileTap={{ scale: 0.9 }}
-            onClick={onBack}
+            onClick={handleBack}
             style={{
               width: 36, height: 36, borderRadius: 12, flexShrink: 0, marginTop: 2,
               background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
@@ -67,7 +71,7 @@ export function NeonScreenHeader({
           <h1 style={{
             margin: eyebrow ? '6px 0 0' : 0,
             fontSize: 22, fontWeight: 900, color: neon.text, letterSpacing: '-0.4px', lineHeight: 1.1,
-            textShadow: '0 0 24px rgba(79,216,235,0.2)',
+            fontFamily: neon.font,
           }}>
             {title}
           </h1>
@@ -108,8 +112,10 @@ export function NeonGlassCard({
         cursor: onClick ? 'pointer' : 'default',
         touchAction: 'manipulation',
         background: GLASS.bg,
-        border: `1px solid ${accent}28`,
-        boxShadow: `0 10px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06), 0 0 24px ${accent}08`,
+        border: `1px solid ${GLASS.border}`,
+        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(22px)',
+        WebkitBackdropFilter: 'blur(22px)',
         ...style,
       }}
     >
@@ -530,7 +536,7 @@ export function NeonHeaderAvatar({
         position: 'relative',
         width: size,
         height: size,
-        borderRadius: 12,
+        borderRadius: size / 2,
         flexShrink: 0,
         padding: 0,
         cursor: 'pointer',

@@ -22,6 +22,7 @@ import { copyAddress } from './copyFlash';
 import { CardLoad } from './useCardLoad';
 import { HeroSpark } from './LivePriceChart';
 import { useMarketChart } from '@/hooks/useMarketChart';
+import { isAppTourBlockingOverlays } from '@/lib/tour/tourStorage';
 
 const art = (name: string) => `/wallet-figma/home/${name}`;
 
@@ -365,7 +366,7 @@ function LiveMainnetHome({
 
         <div style={{ marginTop: 12 }}>
         <CardLoad extra={pull.busy} kind="hero">
-        <div style={{ ...walletHero, minHeight: 176, padding: '18px 18px 14px', display: 'flex', flexDirection: 'column' }}>
+        <div data-tour="wallet-balance" style={{ ...walletHero, minHeight: 176, padding: '18px 18px 14px', display: 'flex', flexDirection: 'column' }}>
           <span style={{ fontSize: 13, fontWeight: 600, color: '#3a4254' }}>Total balance</span>
           <div style={{ marginTop: 14, display: 'flex', alignItems: 'baseline', gap: 2 }}>
             <span style={{ fontSize: 22, fontWeight: 600, letterSpacing: -0.4, color: '#0c1018', lineHeight: 1 }}>{shown.sign}</span>
@@ -397,7 +398,7 @@ function LiveMainnetHome({
         </CardLoad>
         </div>
 
-        <div style={{ ...actionRow, marginTop: 10, marginBottom: 4 }}>
+        <div data-tour="wallet-actions" style={{ ...actionRow, marginTop: 10, marginBottom: 4 }}>
           <NotchedPill label="Send" onClick={() => go(sendTo)}>
             <FigmaImg src={art('send.svg')} width={14} height={14} />
           </NotchedPill>
@@ -417,7 +418,7 @@ function LiveMainnetHome({
         className="arxon-token-scroll"
         style={{ flex: 1, minHeight: 0, zIndex: 1, overflowY: 'auto', overflowX: 'hidden', WebkitOverflowScrolling: 'touch', touchAction: 'pan-y', boxSizing: 'border-box', padding: '8px 20px 0', paddingBottom: WALLET_TAB_CLEAR }}
       >
-        <div style={{ borderRadius: 22, padding: '2px 12px 8px', ...sheetGlass }}>
+        <div data-tour="wallet-tokens" style={{ borderRadius: 22, padding: '2px 12px 8px', ...sheetGlass }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 }}>
             <span style={{ fontSize: 16, fontWeight: 700 }}>Tokens</span>
             <button type="button" onClick={() => go('manage')} style={{ ...plain, color: '#accafe', fontSize: 13, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>Manage</button>
@@ -609,7 +610,7 @@ function TestnetHome({ id, go, back }: { id: string; go: Go; back?: () => void; 
 
         {!on ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button type="button" onClick={() => void addNetwork()} style={ctaCard}>
+            <button type="button" data-tour="testnet-add" onClick={() => void addNetwork()} style={ctaCard}>
               <FigmaImg src={art('plus.svg')} width={18} height={18} />
               <span style={{ fontSize: 16, fontWeight: 700, textAlign: 'left' }}>Add Arxon Testnet</span>
               <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.4 }}>Chain 7171 · rpc-test.arxonchain.xyz. Tokens stay hidden until you add this network.</span>
@@ -660,7 +661,7 @@ function TestnetHome({ id, go, back }: { id: string; go: Go; back?: () => void; 
       />
       {network.sheet}
       <AccountSheet mode={accountsMode} setMode={setAccountsMode} go={go} />
-      {intro ? <TestnetIntro onDone={dismissIntro} /> : null}
+      {intro && !isAppTourBlockingOverlays() ? <TestnetIntro onDone={dismissIntro} /> : null}
     </div>
   );
 }
@@ -758,7 +759,7 @@ function LiveTestnetHome({
           </div>
         </header>
 
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingTop: 18 }}>
+        <div data-tour="testnet-portfolio" style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', paddingTop: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             <span style={{ fontSize: 13, fontWeight: 400, letterSpacing: 0.16, color: 'rgba(255,255,255,0.48)', whiteSpace: 'nowrap' }}>Total ARX portfolio</span>
             <button type="button" aria-label={hidden ? 'Show balance' : 'Hide balance'} onClick={() => live?.toggleHide()} style={{ ...iconBtn, width: 22, height: 22, margin: 0 }}>
@@ -774,7 +775,7 @@ function LiveTestnetHome({
             )}
           </div>
         </div>
-        <div style={{ ...slimRow, marginTop: 6 }}>
+        <div data-tour="testnet-privacy" style={{ ...slimRow, marginTop: 6 }}>
           <NotchedPill light label="Shield" onClick={() => openVaultFlow('vault-pick-in')}>
             <FigmaImg src={art('shield.svg')} width={14} height={14} />
           </NotchedPill>
@@ -787,7 +788,7 @@ function LiveTestnetHome({
         </div>
         <div style={{ width: '100%', marginTop: 28 }}>
           <CardLoad extra={pull.busy} kind="banners">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
+            <div data-tour="testnet-wallets" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, width: '100%' }}>
               <LiveWalletBanner
                 title="Public ARX wallet"
                 amount={hidden ? '••••' : publicAmt}
@@ -805,7 +806,7 @@ function LiveTestnetHome({
             </div>
           </CardLoad>
         </div>
-        <div style={{ ...actionRow, marginTop: 8, marginBottom: 4 }}>
+        <div data-tour="testnet-actions" style={{ ...actionRow, marginTop: 8, marginBottom: 4 }}>
           <NotchedPill label="Send" onClick={() => go(on ? 'send-token' : 'add-network')}>
             <FigmaImg src={art('send.svg')} width={14} height={14} />
           </NotchedPill>
@@ -831,7 +832,7 @@ function LiveTestnetHome({
       >
         {!on ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <button type="button" onClick={() => void addNetwork()} style={ctaCard}>
+            <button type="button" data-tour="testnet-add" onClick={() => void addNetwork()} style={ctaCard}>
               <FigmaImg src={art('plus.svg')} width={18} height={18} />
               <span style={{ fontSize: 16, fontWeight: 700, textAlign: 'left' }}>Add Arxon Testnet</span>
               <span style={{ fontSize: 13, fontWeight: 400, color: '#8c8f99', textAlign: 'left', lineHeight: 1.4 }}>Chain 7171 · rpc-test.arxonchain.xyz. Tokens stay hidden until you add this network.</span>
@@ -840,7 +841,7 @@ function LiveTestnetHome({
           </div>
         ) : (
           <>
-            <div style={{ borderRadius: 22, padding: '2px 12px 10px', ...sheetGlass }}>
+            <div data-tour="testnet-history" style={{ borderRadius: 22, padding: '2px 12px 10px', ...sheetGlass }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', minHeight: 44 }}>
                 <span style={{ fontSize: 16, fontWeight: 700 }}>History</span>
                 <button type="button" onClick={() => go('activity')} style={{ ...plain, color: '#accafe', fontSize: 13, fontWeight: 500, minHeight: 40, padding: '8px 4px' }}>See all</button>
@@ -863,7 +864,7 @@ function LiveTestnetHome({
         }}
       />
       <AccountSheet mode={accountsMode} setMode={setAccountsMode} go={go} />
-      {intro ? <TestnetIntro onDone={dismissIntro} /> : null}
+      {intro && !isAppTourBlockingOverlays() ? <TestnetIntro onDone={dismissIntro} /> : null}
       {keyOpen && (
         <>
           <button type="button" aria-label="Close shielded key" onClick={() => setKeyOpen(false)} style={{ position: 'absolute', inset: 0, border: 'none', background: 'rgba(0,0,0,0.6)', zIndex: 20 }} />

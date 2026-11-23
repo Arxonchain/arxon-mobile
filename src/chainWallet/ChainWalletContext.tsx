@@ -41,6 +41,7 @@ import {
   notifyTx,
   walletReceivesCopy,
 } from './txNotify';
+import { debugWalletLog, storageLeakFlags } from './debugWalletIngest';
 import { assertWalletSecret, newMnemonic, resolveAccount } from './keys';
 import {
   currentPassword,
@@ -49,6 +50,8 @@ import {
   persistShieldedSk,
   persistWalletSecret,
   readShieldedSk,
+  rememberPassword,
+  sealWalletEnvelope,
   sessionStore,
   unlockWithPassword,
 } from './session';
@@ -61,10 +64,13 @@ import {
   markSpent,
   notesOnChain,
   pickNote,
+  saveNotes,
   shieldedTotal,
   type StoredNote,
 } from './notes';
 import { scanIncomingNotes } from './scanNotes';
+import { deriveShieldedSkHex } from './shieldedDerive';
+import { parseWalletSecret } from './walletEnvelope';
 import { asBits, type PrivacyFlags } from './privacy';
 import { proveKeys, proveShield, proveTransfer, proveUnshield, warmProver, type NoteSecrets } from './prove';
 import { storage } from './storage';
@@ -238,29 +244,59 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     const leaves = await loadLeaves();
     setNotes(notesOnChain(await loadNotes(), leaves));
     if (!shieldedPk) return;
-    try {
-      const added = await scanIncomingNotes(rpcUrl, shieldedPk, (msg) => setNotesStatus(msg));
-      setNotesStatus(null);
-      if (added > 0) {
-        setNotes(notesOnChain(await loadNotes(), await loadLeaves()));
-      }
-    } catch {
-      setNotesStatus(null);
-    }
+    void scanIncomingNotes(rpcUrl, shieldedPk, (msg) => setNotesStatus(msg))
+      .then(async (added) => {
+        setNotesStatus(null);
+        if (added > 0) {
+          setNotes(notesOnChain(await loadNotes(), await loadLeaves()));
+        }
+      })
+      .catch(() => {
+        setNotesStatus(null);
+      });
   }, [rpcUrl, shieldedPk]);
 
   const ensureKeys = useCallback(async () => {
     const saved = await readShieldedSk();
+    const localNotes = await loadNotes();
+    let skHex = saved;
+    let derivedFromMnemonic = false;
+    let discardedUnusedRandom = false;
+    if (mnemonic && (localNotes.length === 0 || !saved)) {
+      try {
+        const derived = deriveShieldedSkHex(mnemonic, accountIndex);
+        derivedFromMnemonic = true;
+        discardedUnusedRandom = !!saved && localNotes.length === 0 && saved.toLowerCase() !== derived.toLowerCase();
+        skHex = derived;
+      } catch {
+        derivedFromMnemonic = false;
+      }
+    }
     try {
-      const keys = await proveKeys(saved);
+      const keys = await proveKeys(skHex);
       await persistShieldedSk(keys.sk_hex);
       setShieldedPk(keys.pk_hex);
       setKeysError(null);
+      const pass = currentPassword();
+      if (pass && mnemonic) {
+        await sealWalletEnvelope(pass, mnemonic);
+      }
+      // #region agent log
+      debugWalletLog('F', 'ChainWalletContext.tsx:ensureKeys', 'shielded keys resolved', {
+        hadSavedSk: !!saved,
+        mintedFresh: false,
+        derivedFromMnemonic,
+        discardedUnusedRandom,
+        pkLen: keys.pk_hex?.length ?? 0,
+        localNotes: localNotes.length,
+        ...storageLeakFlags(),
+      }, 'post-fix');
+      // #endregion
     } catch (e) {
       setKeysError(e instanceof Error ? e.message : String(e));
       if (saved) setShieldedPk(null);
     }
-  }, []);
+  }, [mnemonic, accountIndex]);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,12 +313,40 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
       const needsLock = sessionStore.hasPassword() && (!!plain || !!sessionStore.getBox());
       setLocked(needsLock);
       if (plain && !needsLock) setMnemonic(plain);
+      // #region agent log
+      debugWalletLog('B', 'ChainWalletContext.tsx:boot', 'wallet boot storage', {
+        needsLock,
+        loadedPlainIntoMemory: !!(plain && !needsLock),
+        mnemonicInMemoryAfterBoot: !!(plain && !needsLock),
+        ...storageLeakFlags(),
+      });
+      // #endregion
       if (isWalletNetworkId(storedNetwork)) setNetworkState(storedNetwork);
       let rpc = liveRpcUrl(storedRpc);
       if (rpc !== storedRpc) await storage.setRpc(rpc);
       if (rpc) setRpc(rpc);
-      setNotes(await loadNotes());
+      const loadedNotes = await loadNotes();
+      const pass = currentPassword();
+      if (pass && loadedNotes.length) {
+        await saveNotes(loadedNotes);
+        await dropPlainSecretsIfEncrypted();
+      }
+      setNotes(loadedNotes);
+      // #region agent log
+      debugWalletLog('C', 'ChainWalletContext.tsx:boot', 'notes at rest after boot load', {
+        ...storageLeakFlags(),
+        loadedNoteCount: loadedNotes.length,
+        hadSessionPassword: !!pass,
+      }, 'post-fix');
+      // #endregion
       setReady(true);
+      // #region agent log
+      debugWalletLog('H', 'ChainWalletContext.tsx:boot', 'fresh apk boot complete', {
+        needsLock,
+        ready: true,
+        ...storageLeakFlags(),
+      }, 'fresh-apk');
+      // #endregion
     })();
     return () => {
       cancelled = true;
@@ -377,13 +441,27 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const importWallet = useCallback(async (phrase: string) => {
-    const trimmed = phrase.trim().split(/\s+/).join(' ');
-    assertWalletSecret(trimmed, 'phrase');
-    resolveAccount(trimmed, 0);
+    const opened = parseWalletSecret(phrase);
+    assertWalletSecret(opened.mnemonic, 'phrase');
+    resolveAccount(opened.mnemonic, 0);
     sessionStore.markImported();
-    await persistWalletSecret(trimmed);
-    setMnemonic(trimmed);
+    if (opened.sk) await persistShieldedSk(opened.sk);
+    if (opened.notes?.length) {
+      await saveNotes(opened.notes);
+      setNotes(opened.notes);
+    }
+    await persistWalletSecret(opened.mnemonic);
+    setMnemonic(opened.mnemonic);
     setLocked(false);
+    // #region agent log
+    debugWalletLog('H', 'ChainWalletContext.tsx:importWallet', 'seed import vault restore', {
+      localNotes: (await loadNotes()).length,
+      hadSavedSk: !!(await readShieldedSk()),
+      restoredNotes: opened.notes?.length ?? 0,
+      restoredSk: !!opened.sk,
+      ...storageLeakFlags(),
+    }, 'post-fix');
+    // #endregion
   }, []);
 
   const importPrivateKey = useCallback(async (key: string) => {
@@ -404,15 +482,30 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     const secret = await unlockWithPassword(password);
     if (!secret) return false;
     await migratePlainSecrets(password, secret);
+    const restored = await loadNotes();
+    setNotes(restored);
     setMnemonic(secret);
     setLocked(false);
+    // #region agent log
+    debugWalletLog('C', 'ChainWalletContext.tsx:unlockSession', 'notes restored after unlock', {
+      restoredNoteCount: restored.length,
+      ...storageLeakFlags(),
+    }, 'post-fix');
+    // #endregion
     return true;
   }, []);
 
   const lockSession = useCallback(async () => {
+    // #region agent log
+    debugWalletLog('A', 'ChainWalletContext.tsx:lockSession', 'lockSession invoked', {
+      hasPassword: sessionStore.hasPassword(),
+    }, 'post-fix');
+    // #endregion
     if (sessionStore.hasPassword()) {
+      rememberPassword(null);
       await dropPlainSecretsIfEncrypted();
       setMnemonic(null);
+      setNotes([]);
       setLocked(true);
     }
   }, []);
@@ -422,6 +515,7 @@ export function ChainWalletProvider({ children }: { children: ReactNode }) {
     await storage.clearShieldedSk();
     await storage.clearActivity();
     await storage.clearNotes();
+    sessionStore.clearNotesBox();
     await storage.clearLeaves();
     await storage.clearLeafScanAt();
     setMnemonic(null);

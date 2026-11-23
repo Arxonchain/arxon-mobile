@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Gift, X, Smartphone, Download, CheckCircle, Clock } from 'lucide-react';
 import { useNewUserCampaign } from '@/hooks/useNewUserCampaign';
 import { useToast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 
 const APP_DOWNLOAD_URL = 'https://t.co/N5qAMjQBUK';
 
@@ -82,7 +83,7 @@ function ClaimModal({ onClose, campaign }: {
         description: `Day ${campaign.daysClaimed + 1} of 7 complete.`,
       });
     } else {
-      toast({ title: 'Claim failed', description: res.error, variant: 'destructive' });
+      toast(publicErrorToast(res.error, 'claim'));
     }
   };
 

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { Swords, Users, X, Clock, Crown, Copy, Link2 } from 'lucide-react';
 import { usePoints } from '@/hooks/usePoints';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { useIsAppPreview, toPreviewPath } from '@/features/arxon-v2/preview/AppPreviewContext';
 import { V2Page, fadeUp, stagger } from '../design/Kit';
 import { neon } from '../design/neonTokens';
@@ -13,6 +14,7 @@ import { useDiceDuelLobby, type DuelChallenge } from '@/features/dice/hooks/useD
 import { DICE_STAKE_TIERS, diceAccent, diceDuelPot } from '@/features/dice/diceTokens';
 import { buildDiceInviteUrl } from '@/features/dice/diceInviteUrl';
 import { useStakeCompliance } from '@/hooks/useStakeCompliance';
+import { useGoBack } from '@/lib/navBack';
 import { STAKING_DISCLAIMER_TEXT } from '@/components/legal/StakingDisclaimer';
 
 function formatCountdown(expiresAt?: string | null) {
@@ -130,6 +132,7 @@ export default function DiceDuelLobbyV2() {
   const go = useCallback((path: string) => {
     navigate(preview ? toPreviewPath(path) : path);
   }, [navigate, preview]);
+  const back = useGoBack('/arena/dice');
 
   useEffect(() => {
     const code = (searchParams.get('code') || '').trim().toUpperCase();
@@ -146,7 +149,7 @@ export default function DiceDuelLobbyV2() {
       next.delete('code');
       setSearchParams(next, { replace: true });
       if (!res.success) {
-        toast({ title: 'Could not join invite', description: res.error, variant: 'destructive' });
+        toast(publicErrorToast(res.error, 'play'));
         return;
       }
       go(`/arena/dice/duel/${res.matchId}`);
@@ -173,7 +176,7 @@ export default function DiceDuelLobbyV2() {
       void (async () => {
         const res = await createChallenge(stake);
         if (!res.success) {
-          toast({ title: 'Could not create challenge', description: res.error, variant: 'destructive' });
+          toast(publicErrorToast(res.error, 'play'));
           return;
         }
         go(`/arena/dice/duel/${res.matchId}`);
@@ -184,7 +187,7 @@ export default function DiceDuelLobbyV2() {
   const handleClearStuck = useCallback(async () => {
     const res = await cancelMyOpenMatches();
     if (!res.success) {
-      toast({ title: 'Could not clear matches', description: res.error, variant: 'destructive' });
+      toast(publicErrorToast(res.error, 'play'));
       return;
     }
     toast({ title: 'Matches cleared', description: 'Open lobbies cancelled and stakes refunded.' });
@@ -199,7 +202,7 @@ export default function DiceDuelLobbyV2() {
       void (async () => {
         const res = await joinChallenge(challenge.id);
         if (!res.success) {
-          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          toast(publicErrorToast(res.error, 'play'));
           return;
         }
         go(`/arena/dice/duel/${res.matchId ?? challenge.id}`);
@@ -213,7 +216,7 @@ export default function DiceDuelLobbyV2() {
       void (async () => {
         const res = await joinByCode(joinCode);
         if (!res.success) {
-          toast({ title: 'Could not join', description: res.error, variant: 'destructive' });
+          toast(publicErrorToast(res.error, 'play'));
           return;
         }
         go(`/arena/dice/duel/${res.matchId}`);
@@ -224,7 +227,7 @@ export default function DiceDuelLobbyV2() {
   const handleCancel = useCallback(async () => {
     if (!myMatch) return;
     const res = await cancelChallenge(myMatch.id);
-    if (!res.success) toast({ title: 'Could not cancel', description: res.error, variant: 'destructive' });
+    if (!res.success) toast(publicErrorToast(res.error, 'play'));
   }, [myMatch, cancelChallenge]);
 
   return (
@@ -234,7 +237,7 @@ export default function DiceDuelLobbyV2() {
         eyebrow="Dice Roll · Duel"
         title="1v1 Duel"
         subtitle="Open a lobby for 15 minutes. Share your code — winner takes the pot."
-        onBack={() => go('/arena/dice')}
+        onBack={back}
         right={
           <div style={{
             width: 38, height: 38, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center',

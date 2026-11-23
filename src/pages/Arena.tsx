@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RefreshCw, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { goBack } from '@/lib/navBack';
 import { useAuth } from '@/contexts/AuthContext';
 import { useArena } from '@/hooks/useArena';
 import { usePoints } from '@/hooks/usePoints';
@@ -174,7 +175,7 @@ const Arena = () => {
 
       {/* Header */}
       <header className="relative z-20 flex items-center justify-between px-4 py-3 border-b border-primary/20 bg-background/90 backdrop-blur-xl">
-        <button onClick={() => navigate('/')} className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors">
+        <button onClick={() => goBack(navigate)} className="p-2 -ml-2 text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft className="w-6 h-6" />
         </button>
         <h1 className="font-black text-foreground">ARENA</h1>

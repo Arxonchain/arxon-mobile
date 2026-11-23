@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { cacheGet, cacheSet } from '@/lib/localCache';
-import { BackendUnavailableError } from '@/lib/backendHealth';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePoints } from './usePoints';
 import { toast } from '@/hooks/use-toast';
+import { publicErrorToast } from '@/lib/publicError';
 import { scheduleMiningEndNotification, cancelMiningNotification } from '@/hooks/useMiningNotification';
 
 const MAX_MINING_HOURS = 8;
@@ -92,6 +92,7 @@ export const useMining = (options?: UseMiningOptions) => {
   const endingRef = useRef(false);
   const claimInProgressRef = useRef(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [sessionMaxed, setSessionMaxed] = useState(false);
 
   // Fetch X profile boost
   const fetchXProfileBoost = useCallback(async () => {
@@ -265,11 +266,7 @@ export const useMining = (options?: UseMiningOptions) => {
           if (endError) {
             console.error('Failed to end mining session:', endError);
             endingRef.current = false;
-            toast({
-              title: 'Could not stop mining',
-              description: endError.message || 'Please try again.',
-              variant: 'destructive',
-            });
+            toast(publicErrorToast(endError, 'mining'));
             return;
           }
 
@@ -297,6 +294,7 @@ export const useMining = (options?: UseMiningOptions) => {
         await refreshPoints();
 
         setIsMining(false);
+        setSessionMaxed(false);
         setSessionId(null);
         setElapsedTime(0);
         setEarnedPoints(0);
@@ -481,6 +479,7 @@ export const useMining = (options?: UseMiningOptions) => {
 
     setSessionId(pendingId);
     setIsMining(true);
+    setSessionMaxed(false);
     window.dispatchEvent(new CustomEvent('arxon-tour-mining-started'));
     setElapsedTime(0);
     setEarnedPoints(0);
@@ -585,14 +584,7 @@ export const useMining = (options?: UseMiningOptions) => {
       sessionStartTimeRef.current = null;
       endingRef.current = false;
 
-      const description =
-        error instanceof BackendUnavailableError ? error.message : 'Failed to start mining session';
-
-      toast({
-        title: error instanceof BackendUnavailableError ? 'Service Unavailable' : 'Error',
-        description,
-        variant: 'destructive',
-      });
+      toast(publicErrorToast(error, 'mining'));
     }
   };
 
@@ -652,7 +644,7 @@ export const useMining = (options?: UseMiningOptions) => {
     await endSession(sessionId, pointsToClaim);
   };
 
-  // Claim current earned points without stopping mining
+  // Claim earned points, credit balance, and stop mining until started again.
   const claimPoints = async () => {
     if (!sessionId || !user) return;
 
@@ -700,11 +692,7 @@ export const useMining = (options?: UseMiningOptions) => {
 
       if (rpcError || !credited) {
         console.error('end_and_credit_mining_session failed for claim:', rpcError || rpcData);
-        toast({
-          title: 'Claim Failed',
-          description: rpcError?.message || rpcData?.error || 'Could not process session. Please try again.',
-          variant: 'destructive',
-        });
+        toast(publicErrorToast(rpcError || rpcData?.error, 'claim'));
         return;
       }
 
@@ -724,62 +712,26 @@ export const useMining = (options?: UseMiningOptions) => {
 
       await refreshPoints();
 
-      // CRITICAL: Create a NEW session instead of reusing the old one
-      const { data: newSession, error: newSessionError } = await supabase
-        .from('mining_sessions')
-        .insert({
-          user_id: user.id,
-          is_active: true,
-          arx_mined: 0,
-        })
-        .select('id, started_at')
-        .single();
-
-      if (newSessionError || !newSession) {
-        console.error('Failed to create new session after claim:', newSessionError);
-        setIsMining(false);
-        setSessionId(null);
-        setElapsedTime(0);
-        setEarnedPoints(0);
-        lastDbPointsRef.current = 0;
-        lastDbWriteAtRef.current = 0;
-        sessionStartTimeRef.current = null;
-        clearActiveSessionCache(user.id);
-        return;
-      }
-
-      // Update local state with new session
-      const startTime = new Date(newSession.started_at).getTime();
-      setSessionId(newSession.id);
+      setIsMining(false);
+      setSessionMaxed(false);
+      setSessionId(null);
       setElapsedTime(0);
       setEarnedPoints(0);
       lastDbPointsRef.current = 0;
       lastDbWriteAtRef.current = 0;
-      sessionStartTimeRef.current = startTime;
-
-      setActiveSessionCache(user.id, {
-        id: newSession.id,
-        started_at: newSession.started_at,
-        arx_mined: 0,
-        is_active: true,
-      });
-      scheduleMiningEndNotification();
+      sessionStartTimeRef.current = null;
+      endingRef.current = false;
+      clearActiveSessionCache(user.id);
+      cancelMiningNotification();
 
     } catch (error) {
       console.error('Error claiming points:', error);
-      toast({
-        title: error instanceof BackendUnavailableError ? 'Service Unavailable' : 'Claim Failed',
-        description: error instanceof BackendUnavailableError ? error.message : 'Please try again',
-        variant: 'destructive',
-      });
+      toast(publicErrorToast(error, 'claim'));
     } finally {
       claimInProgressRef.current = false;
       setIsClaiming(false);
     }
   };
-
-  // Track if session has reached max time (waiting for manual claim)
-  const [sessionMaxed, setSessionMaxed] = useState(false);
 
   // Timer and points calculation - computed from server start time for accuracy.
   const recomputeFromStartTime = useCallback(() => {

@@ -1,7 +1,7 @@
 /** localStorage key — once confirmed per device, skip age gate on future stakes */
 export const AGE_GATE_STORAGE_KEY = 'arxon_age_confirmed_v1';
 
-export const LEGAL_CONTACT_EMAIL = 'security@arxonchain.xyz';
+export const LEGAL_CONTACT_EMAIL = 'team@arxonchain.org';
 
 export function hasConfirmedStakeCompliance(): boolean {
   try {

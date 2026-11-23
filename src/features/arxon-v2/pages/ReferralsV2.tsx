@@ -1,211 +1,195 @@
-import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Copy, Share2, Users, Activity, UserX, Gift, Zap } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
+import { Copy, Share2, Users, Activity, UserX, Gift } from 'lucide-react';
 import { format } from 'date-fns';
-import { toast } from '@/hooks/use-toast';
+import { shareText, copyAddress } from '@/walletFigma/flow/copyFlash';
 import { useReferrals } from '@/hooks/useReferrals';
 import { useAuth } from '@/contexts/AuthContext';
+import { usePullRefresh } from '@/walletFigma/flow/pullRefresh';
+import { displayReferralLink } from '@/lib/publicSite';
+import { MineLoad } from '../components/MineLoad';
+import { MinerAvatar } from '../components/MinerAvatar';
+import { V2Page } from '../design/Kit';
+import { neon } from '../design/neonTokens';
 import {
-  V2Page, V2Header, V2HeroCard, V2Card, V2Button, V2ButtonGhost,
-  V2SectionHeader, V2Eyebrow, fadeUp, stagger,
-} from '../design/Kit';
-import { v2 } from '../design/tokens';
+  Body,
+  EmptyCopy,
+  FrostPanel,
+  GhostBtn,
+  GlassSheet,
+  pc,
+  PrimaryBtn,
+  ProfileHead,
+  TokenRow,
+} from '../design/ProfileChrome';
 
 export default function ReferralsV2() {
-  const navigate = useNavigate();
   const { user } = useAuth();
-  const { referralCode, referrals, stats, loading, getReferralLink } = useReferrals(user);
+  const { referralCode, referrals, stats, loading, getReferralLink, refreshReferrals } = useReferrals(user);
+  const pull = usePullRefresh(() => refreshReferrals(), { threshold: 28 });
+  const [copied, setCopied] = useState(false);
 
   const { activeReferrals, inactiveReferrals } = useMemo(() => ({
     activeReferrals: referrals.filter((r) => r.is_active === true),
     inactiveReferrals: referrals.filter((r) => r.is_active !== true),
   }), [referrals]);
 
-  const copyReferralCode = () => {
+  const link = getReferralLink();
+  const short = link ? displayReferralLink(link) : '';
+
+  const copyCode = async () => {
     if (!referralCode) return;
-    navigator.clipboard.writeText(referralCode);
-    toast({ title: '✓ Code Copied!', description: `Referral code ${referralCode} copied` });
+    await copyAddress(referralCode, 'Referral code copied');
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
   };
 
-  const shareReferralLink = async () => {
-    const link = referralCode
-      ? `https://arxonchain.xyz/?ref=${referralCode}`
-      : getReferralLink();
+  const share = async () => {
     if (!link) return;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: 'Join ARXON',
-          text: `Join me on ARXON and start mining ARX-P! Use my referral code: ${referralCode}`,
-          url: link,
-        });
-      } catch (err) {
-        if ((err as Error).name !== 'AbortError') {
-          navigator.clipboard.writeText(link);
-          toast({ title: '✓ Link Copied!', description: 'Referral link copied to clipboard' });
-        }
-      }
-    } else {
-      navigator.clipboard.writeText(link);
-      toast({ title: '✓ Link Copied!', description: 'Referral link copied to clipboard' });
-    }
+    await shareText('Join ARXON', `Join me on ARXON and start mining ARX-P. Use my referral: ${referralCode}\n${link}`);
   };
-
-  const statCards = [
-    { icon: Users, label: 'Total Referrals', value: stats.totalReferrals, accent: v2.brand.steel },
-    { icon: Activity, label: 'Active Miners', value: stats.activeMiners, accent: v2.accent.mining },
-    { icon: UserX, label: 'Inactive', value: stats.inactiveMiners, accent: v2.brand.mutedSoft },
-    { icon: Gift, label: 'ARX-P Earned', value: stats.totalEarnings, accent: v2.accent.gold },
-  ];
 
   return (
-    <V2Page>
-      <motion.div variants={stagger} initial="hidden" animate="show">
-        <V2Header eyebrow="Earn" title="Referrals" subtitle="Invite friends, earn ARX-P" onBack={() => navigate('/')} />
-
-        <div style={{ padding: '0 16px 0' }}>
-          <motion.div variants={fadeUp} style={{ marginBottom: 16 }}>
-            <V2HeroCard
-              eyebrow="Refer & Earn"
-              title="Invite Friends & Earn"
-              subtitle="Share your code and earn 100 ARX-P when friends join and mine"
-              accent={v2.brand.steel}
-              gradient={v2.gradient.steel}
-              icon={<Zap size={10} />}
-              compact
-            />
-          </motion.div>
-
-          {user && (
-            <motion.div variants={fadeUp} style={{ marginBottom: 16 }}>
-              <V2Card accent={v2.brand.steel} padding="20px">
-                <V2Eyebrow accent={v2.brand.mutedSoft}>Your Referral Code</V2Eyebrow>
-                <div style={{ textAlign: 'center', margin: '12px 0 16px' }}>
-                  {loading && !referralCode ? (
-                    <div style={{ height: 36, width: 160, borderRadius: 10, margin: '0 auto', background: v2.brand.raised, animation: 'pulse 1.5s ease-in-out infinite' }} />
-                  ) : (
-                    <span style={{ fontSize: 30, fontWeight: 900, letterSpacing: 6, color: v2.brand.steelLight, fontFamily: 'monospace' }}>
-                      {referralCode || '...'}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                  <V2ButtonGhost onClick={copyReferralCode} accent={v2.brand.steel}>
-                    <Copy size={14} /> Copy Code
-                  </V2ButtonGhost>
-                  <V2Button accent={v2.brand.steel} onClick={shareReferralLink} disabled={!referralCode}>
-                    <Share2 size={14} /> Share Link
-                  </V2Button>
-                </div>
-              </V2Card>
-            </motion.div>
-          )}
-
-          <motion.div variants={fadeUp} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-            {statCards.map((s) => {
-              const Icon = s.icon;
-              return (
-                <V2Card key={s.label} accent={s.accent} padding="14px" style={{ textAlign: 'center' }}>
-                  <div style={{ color: s.accent, display: 'flex', justifyContent: 'center', marginBottom: 6 }}>
-                    <Icon size={18} />
-                  </div>
-                  <p style={{ fontSize: 22, fontWeight: 900, color: s.accent, lineHeight: 1, margin: '0 0 4px' }}>{s.value}</p>
-                  <p style={{ fontSize: 9, color: v2.brand.muted, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 600, margin: 0 }}>{s.label}</p>
-                </V2Card>
-              );
-            })}
-          </motion.div>
-
-          {loading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[1, 2, 3].map((i) => (
-                <div key={i} style={{ height: 64, borderRadius: v2.radius.lg, background: v2.brand.raised, opacity: 1 - i * 0.2, animation: 'pulse 1.5s ease-in-out infinite' }} />
-              ))}
+    <V2Page pull={pull}>
+      <ProfileHead
+        title="Referrals"
+        subtitle="100 ARX-P per friend who joins and mines"
+      />
+      <div style={{ padding: '0 16px 12px' }}>
+        <MineLoad extra={pull.busy} frost kind="card" radius={22}>
+          <FrostPanel>
+            <div data-tour="refer-code">
+            <p style={{ margin: 0, fontSize: 11, fontWeight: 650, color: pc.muted, fontFamily: neon.font }}>
+              Your code
+            </p>
+            <p style={{
+              margin: '8px 0 0',
+              fontSize: 28,
+              fontWeight: 750,
+              letterSpacing: '2px',
+              color: pc.ink,
+              fontFamily: neon.font,
+              lineHeight: 1,
+            }}>
+              {referralCode || '••••••'}
+            </p>
+            <p style={{
+              margin: '10px 0 0',
+              fontSize: 12,
+              fontWeight: 650,
+              color: pc.muted,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+              fontFamily: neon.font,
+            }}>
+              {short || 'Generating…'}
+            </p>
+            <div style={{ display: 'flex', gap: 8, marginTop: 14 }}>
+              <button
+                type="button"
+                onClick={() => void copyCode()}
+                style={{
+                  flex: 1, height: 40, borderRadius: 12, border: 'none',
+                  background: pc.ink, color: '#fff', fontSize: 13, fontWeight: 700,
+                  fontFamily: neon.font, cursor: 'pointer', display: 'flex',
+                  alignItems: 'center', justifyContent: 'center', gap: 6,
+                }}
+              >
+                <Copy size={14} />
+                {copied ? 'Copied' : 'Copy code'}
+              </button>
+              <button
+                type="button"
+                onClick={() => void share()}
+                disabled={!link}
+                style={{
+                  width: 40, height: 40, borderRadius: 12,
+                  border: '1px solid rgba(12,16,24,0.12)',
+                  background: 'transparent', color: pc.ink, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <Share2 size={15} />
+              </button>
             </div>
-          ) : referrals.length === 0 ? (
-            <motion.div variants={fadeUp}>
-              <V2Card padding="40px 20px" style={{ textAlign: 'center' }}>
-                <div style={{ fontSize: 44, marginBottom: 12 }}>👥</div>
-                <p style={{ fontSize: 16, fontWeight: 700, color: v2.brand.mutedSoft, marginBottom: 6 }}>No referrals yet</p>
-                <p style={{ fontSize: 12, color: v2.brand.muted, marginBottom: 20, lineHeight: 1.5 }}>
-                  Share your referral link and earn{' '}
-                  <span style={{ color: v2.brand.steel, fontWeight: 700 }}>100 ARX-P</span>{' '}
-                  for every friend who joins
-                </p>
-                <V2Button accent={v2.brand.steel} onClick={shareReferralLink} disabled={!referralCode}>
-                  <Share2 size={16} /> Share Your Link
-                </V2Button>
-              </V2Card>
-            </motion.div>
-          ) : (
-            <>
-              {activeReferrals.length > 0 && (
-                <motion.div variants={fadeUp}>
-                  <V2SectionHeader title={`Active (${activeReferrals.length})`} />
-                  {activeReferrals.map((r, i) => (
-                    <V2Card key={r.id} accent={v2.accent.mining} padding="12px 16px" style={{ marginBottom: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: v2.radius.sm, flexShrink: 0,
-                          background: `linear-gradient(135deg, ${v2.accent.mining}, hsl(155 45% 28%))`,
-                          display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 14, fontWeight: 700, color: 'white',
-                        }}>
-                          {(r.referred_username || 'A')[0].toUpperCase()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 700, color: v2.brand.steelBright, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.referred_username || 'Anonymous'}
-                          </p>
-                          <p style={{ fontSize: 10, color: v2.brand.muted, margin: '2px 0 0' }}>
-                            {r.created_at ? format(new Date(r.created_at), 'MMM d, yyyy') : 'N/A'}
-                            {' · '}
-                            <span style={{ color: v2.accent.mining }}>⛏ Mining</span>
-                          </p>
-                        </div>
-                        <span style={{ fontSize: 13, fontWeight: 700, color: v2.accent.mining, flexShrink: 0 }}>
-                          +{r.points_awarded || 0}
-                        </span>
-                      </div>
-                    </V2Card>
-                  ))}
-                </motion.div>
-              )}
+            <div style={{ marginTop: 10 }}>
+              <Body ink>Share copies the full arxonchain.xyz link. Friends keep their own accounts.</Body>
+            </div>
+            </div>
+          </FrostPanel>
+        </MineLoad>
 
-              {inactiveReferrals.length > 0 && (
-                <motion.div variants={fadeUp} style={{ marginTop: 10 }}>
-                  <V2SectionHeader title={`Inactive (${inactiveReferrals.length})`} />
-                  {inactiveReferrals.map((r) => (
-                    <V2Card key={r.id} padding="12px 16px" style={{ marginBottom: 8, opacity: 0.7 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                        <div style={{
-                          width: 36, height: 36, borderRadius: v2.radius.sm, flexShrink: 0,
-                          background: v2.brand.raised, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          fontSize: 14, fontWeight: 700, color: v2.brand.mutedSoft,
-                        }}>
-                          {(r.referred_username || 'A')[0].toUpperCase()}
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: v2.brand.steelLight, margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.referred_username || 'Anonymous'}
-                          </p>
-                          <p style={{ fontSize: 10, color: v2.brand.muted, margin: '2px 0 0' }}>
-                            {r.created_at ? format(new Date(r.created_at), 'MMM d, yyyy') : 'N/A'}
-                          </p>
-                        </div>
-                        <span style={{ fontSize: 12, color: v2.brand.muted, flexShrink: 0 }}>+{r.points_awarded || 0}</span>
-                      </div>
-                    </V2Card>
-                  ))}
-                </motion.div>
-              )}
-            </>
-          )}
-        </div>
-      </motion.div>
-      <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:.45}}`}</style>
+        <GlassSheet title="Your network">
+          <MineLoad extra={pull.busy} kind="rows" rowCount={4} radius={0}>
+            <TokenRow icon={<Users size={14} />} title="Total referrals" trailing={<Stat>{stats.totalReferrals}</Stat>} />
+            <TokenRow icon={<Activity size={14} />} title="Active miners" trailing={<Stat good>{stats.activeMiners}</Stat>} />
+            <TokenRow icon={<UserX size={14} />} title="Inactive" trailing={<Stat muted>{stats.inactiveMiners}</Stat>} />
+            <TokenRow icon={<Gift size={14} />} title="ARX-P earned" trailing={<Stat>{stats.totalEarnings}</Stat>} />
+          </MineLoad>
+        </GlassSheet>
+
+        {loading && referrals.length === 0 ? (
+          <MineLoad waiting extra={pull.busy} kind="rows" rowCount={3} radius={22}>
+            <div style={{ height: 140 }} />
+          </MineLoad>
+        ) : referrals.length === 0 ? (
+          <GlassSheet title="Friends">
+            <EmptyCopy title="No referrals yet" body="Share your link. You earn 100 ARX-P when a friend joins and mines." />
+            <div style={{ padding: '0 0 10px' }}>
+              <PrimaryBtn label="Share link" onClick={() => void share()} disabled={!link} />
+            </div>
+          </GlassSheet>
+        ) : (
+          <>
+            {activeReferrals.length > 0 ? (
+              <GlassSheet title={`Active · ${activeReferrals.length}`}>
+                {activeReferrals.map((r) => (
+                  <TokenRow
+                    key={r.id}
+                    icon={<MinerAvatar size={32} />}
+                    title={r.referred_username || 'Miner'}
+                    sub={`${r.created_at ? format(new Date(r.created_at), 'MMM d, yyyy') : ''} · Mining`}
+                    trailing={<Stat good>+{r.points_awarded || 0}</Stat>}
+                  />
+                ))}
+              </GlassSheet>
+            ) : null}
+            {inactiveReferrals.length > 0 ? (
+              <GlassSheet title={`Inactive · ${inactiveReferrals.length}`}>
+                {inactiveReferrals.map((r) => (
+                  <TokenRow
+                    key={r.id}
+                    icon={<MinerAvatar size={32} />}
+                    title={r.referred_username || 'Miner'}
+                    sub={r.created_at ? format(new Date(r.created_at), 'MMM d, yyyy') : ''}
+                    trailing={<Stat muted>+{r.points_awarded || 0}</Stat>}
+                  />
+                ))}
+              </GlassSheet>
+            ) : null}
+          </>
+        )}
+
+        {!referrals.length ? null : (
+          <div style={{ marginTop: 4 }}>
+            <GhostBtn label="Share link" onClick={() => void share()} />
+          </div>
+        )}
+      </div>
     </V2Page>
+  );
+}
+
+function Stat({ children, good, muted }: { children: ReactNode; good?: boolean; muted?: boolean }) {
+  return (
+    <span style={{
+      fontSize: 13,
+      fontWeight: 700,
+      color: good ? pc.good : muted ? pc.soft : '#fff',
+      fontVariantNumeric: 'tabular-nums',
+      flexShrink: 0,
+    }}>
+      {children}
+    </span>
   );
 }

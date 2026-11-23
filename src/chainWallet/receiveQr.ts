@@ -4,7 +4,7 @@ export async function qrDataUrl(text: string) {
   return QRCode.toDataURL(text, {
     margin: 1,
     width: 400,
-    errorCorrectionLevel: 'M',
+    errorCorrectionLevel: 'H',
     color: { dark: '#050505', light: '#ffffff' },
   });
 }
